@@ -1,52 +1,46 @@
-# 09.0 Serving Extensions 服务化扩展
+# 09.0 构建推理服务核心与 HTTP 接口
 
-## 1. 本章位置与成功标准
+## 本章导读
 
-Chapter 05 已经能执行 Generation Runtime，Chapter 07/08 已经能测量和解释 CPU 行为。本章把同一个 `Request` 接到最小 C++ Service Core：先做 admission，再进入 waiting/running 队列，执行后释放 request-owned KV Cache。
+Chapter06 已经能够推进生成请求，Chapter07–08 已经能够测量和解释 CPU 行为；本章把同一个 `Request` 接入 C++ `ServiceCore`，增加准入、队列、资源回收、指标和 HTTP/SSE 适配。
+
+学习完成后，应能观察容量拒绝、动态 step、取消与超时、终态资源释放、在线延迟和真实模型输出。网络库只负责请求解析与响应写出，模型、调度和资源状态继续由 `ServiceCore` 与 Generation Runtime 管理。
+
+| 学习线 | 本章怎样学习 | 可验证产物 |
+| --- | --- | --- |
+| A 教学证据线 | 用确定性 Executor 验证 admission、队列、取消、超时、metrics 和 transport-neutral writer | 固定状态码、终态计数、HTTP/SSE contract 和资源回收 |
+| B 真实执行线 | 接入共享 TinyLlama Model 和独立 Context，运行真实 ServiceCore、HTTP 和双请求 benchmark | golden token、Context 隔离、在线响应与真实阶段结果 |
+
+| 服务对象 | 当前实现 | 继续扩展时关注什么 |
+| --- | --- | --- |
+| 准入与队列 | 容量、重复 ID、FIFO waiting、动态补位 | 优先级、deadline 和抢占 |
+| 模型执行 | 共享 Model、独立 Executor/Context、请求级 CPU 并发 | ServiceCore 接入真实 batch、专用并行 backend |
+| 资源管理 | 请求 cache、连续模型 K/V、物理 block ID 回收、独立 CPU 分页 payload | 真实 Model Context 接入分页 payload 与 workspace pool |
+| HTTP completion | 同步 token ID、SSE token event、错误映射 | 文本 API、鉴权、背压和异步 transport |
+| 可观测性 | queue wait、TTFT、completion `_sum/_count` | histogram、P50/P99 和 trace |
+| Benchmark | 双请求阶段耗时、正确性、串行/并行 A/B | 开放环负载与 ServiceCore batch A/B |
+
+![Chapter 09 主图：Service Core](../assets/diagrams/chapter09-main.svg)
+
+## 开始学习
+
+先运行 transport-neutral 的默认入口：
 
 ```bash
 bash code/chapter09_serving/scripts/run.sh
 ```
 
-成功标准：容量满时明确拒绝；请求既可完整 dispatch，也可按 token/block budget 单步推进；block 不足时 executor 不运行，完成请求释放 block、cache 与 executor；transport-neutral HTTP 和可选 cpp-httplib loopback 可验证；真实模型 Factory 能接入同步与 SSE completion，并输出在线延迟和 benchmark JSON。
+| 顺序 | 路线 | 页面与源码 | 读完后应看到什么 |
+| --- | --- | --- | --- |
+| 1 | A/B 公共 | [`09.1 C++ 服务核心`](./01_service_core.md)、<a href="../_code/chapter09_serving/include/chapter09_serving/serving_core.h"><code>serving_core.h</code></a> | admission、waiting/running、dispatch 和 release 怎样推进 |
+| 2 | A→B | [`09.4 HTTP Completion`](./04_real_http_completion.md)、[`09.2 Transport 与网络库`](./02_transport.md) | Factory、同步响应、SSE 和网络 writer 怎样保持同一服务语义 |
+| 3 | B | [`09.3 真实 ServiceCore`](./03_real_service_benchmark.md) | 模型计算、Runtime 开销和请求级并发怎样分别计时 |
+| 4 | A/B 对照 | [`09.5 成熟框架对照`](./05_framework_service_comparison.md) | 教学对象怎样映射到 vLLM、SGLang 与 llama.cpp server |
 
-![Chapter 09 主图：Service Core](../assets/diagrams/chapter09-main.svg)
+进阶页面依赖 Chapter06 的 [`连续批处理`](../chapter06_generation/10_continuous_batching.md)、[`真实模型批量执行`](../chapter06_generation/11_real_model_batch.md)和[`分块 KV Cache`](../chapter06_generation/12_block_kv_cache.md)。真实 socket 回环、真实模型 benchmark 和 HTTP server 使用各页面列出的可选脚本。
 
-## 2. 内容地图
+## 验证与下一步
 
-| 服务对象 | 本章实现 | 下一步扩展 |
-| --- | --- | --- |
-| Admission | 容量、重复 ID、terminal request 校验 | API 参数、token budget、优先级 |
-| Waiting / Running | FIFO waiting、batch 上限、按 step 动态补位、最少 prefill 进度优先 | 抢占、业务优先级和 deadline |
-| Cancel / Timeout | 标记 terminal，阻止再次调度 | Beast/Asio 下的异步 deadline 传播 |
-| Resource release | 清空 Request cache、释放 Executor/Context 和物理 block ID | 分层 K/V payload、workspace pool、压力测试 |
-| Model execution | Factory 共享 Model，每请求创建 Executor/Context | 线程池、并行 backend、模型资源池 |
-| HTTP completion | 同步 token ID、SSE token event、Factory 错误映射 | 文本 API、请求参数和鉴权 |
-| Runtime | 完整 round-robin；支持 chunked prefill 的 token/block-budget `dispatch_step()` | 并行 batch executor |
-| Observability | 在线 queue wait、TTFT、completion `_sum/_count` | histogram、P50/P99 和 trace |
-| Benchmark | 固定双请求阶段耗时、吞吐和正确性 | Chapter08 profiling 与 A/B 优化 |
+默认验收检查 `QueueFull`、`DuplicateId`、取消/超时、部分预填充游标、在线延迟、cache 与 block 回收、HTTP/SSE 状态和 transport-neutral contract。真实模型验收再检查 golden token、Context 隔离、Executor 释放和 benchmark JSON。
 
-成熟框架把生成运行时包装成持续服务，并进一步处理异步网络、背压、多进程和分布式资源。本章对照的是 transport 以内的服务核心。
-
-| 对照项 | 内容 |
-| --- | --- |
-| 本章教学对象 | admission、队列、ServiceCore、metrics、HTTP/SSE 和资源回收 |
-| 主对照框架 | vLLM EngineCore、SGLang scheduler、`llama.cpp` server |
-| 成熟组件 | 异步 API、多进程 worker、分布式路由、鉴权、弹性和生产监控 |
-| 重点差异 | 本章保持 C++ ServiceCore 与 transport 解耦，先验证服务语义和生命周期 |
-| 深入入口 | [`09.5 Serving 框架对照`](./05_framework_service_comparison.md) |
-
-## 3. 阅读与源码顺序
-
-1. 阅读 [`Chapter 05 Serving Preview`](../chapter05_generation/part_b_serving_preview.md)，确认已有 Request、Runtime 和 Scheduler 契约。
-2. 阅读 [`Service Core`](./01_service_core.md)，再看 <a href="/_code/chapter09_serving/include/chapter09_serving/serving_core.h"><code>serving_core.h</code></a>。
-3. 阅读 [`真实模型 HTTP Completion`](./04_real_http_completion.md)，跟踪 Factory 如何进入同步和 SSE 请求。
-4. 阅读 [`真实 ServiceCore Benchmark`](./03_real_service_benchmark.md)，区分模型计算、Runtime 开销和 transport 延迟。
-5. 阅读 [`Transport 与 C++ 网络库`](./02_transport.md)，确认网络库不改变 ServiceCore、metrics 和 streaming contract。
-6. 阅读 [`Serving 框架对照`](./05_framework_service_comparison.md)，定位成熟框架中的调度、缓存和 transport 边界。
-7. 运行 demo、CTest 和可选真实 benchmark，观察 admission、dispatch、cache release 与结果 JSON。
-8. 对照 [`推理引擎服务化基础`](../reference/service_basics.md)，把代码状态映射到服务语义。
-
-## 4. 验证
-
-本章只接受可观察结果：`QueueFull`、`DuplicateId`、`cancelled`、`timed_out`、部分 prefill 游标、在线延迟 `_sum/_count`、cache 是否为空、真实请求 golden token、Executor/Context 与 block 是否释放，以及固定环境下的 benchmark JSON；真实 transport 还要观察 HTTP status、SSE event 和 loopback 结果。物理 block ID 到分层 device K/V payload 的绑定以及并行 batch executor 属于 GPU 服务扩展，不作为本章 CPU 验收条件。
+当前请求级并发已经证明两个 Executor 可以重叠，但 ServiceCore 还没有调用 Chapter06 的真实 batch，也没有把真实 TinyLlama Context 绑定到 `CpuPagedKvCache`。两项能力应分别通过批量 Decoder A/B 和连续/Paged KV logits 对照后，才能写入服务能力结论。

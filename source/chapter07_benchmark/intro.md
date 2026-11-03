@@ -1,59 +1,48 @@
-# 07.0 Prove It Works and It’s Fast 验证正确性并比较性能
+# 07.0 建立正确性与性能证据
 
-## 1. 本章位置与成功标准
+## 本章导读
 
-本章把“对不对”和“快不快”放进同一套可重复的测试和 benchmark 条件中。
+Chapter 06 已经能够推进一个或多个生成请求；本章固定输入、运行条件和结果格式，先检查请求是否正确完成，再记录预填充、逐词元解码、首词元延迟和吞吐。Chapter 08 将使用这些结果和事件轨迹定位耗时原因。
+
+| 学习线 | 本章怎样学习 | 可验证产物 |
+| --- | --- | --- |
+| A 教学证据线 | 用确定性 Runtime 固定 workload、计时边界、JSON schema 和 round-robin/Tensor batch 对照 | `1/2/4` 请求正确性、逐轮样本和可重复 baseline |
+| B 真实执行线 | 在 TinyLlama Decoder 与 ServiceCore 上比较串行、请求并发和 scalar Linear batch | golden、Context 隔离、真实延迟、吞吐和 batch 配对结果 |
+
+| 本章新术语 | 先这样理解 | 首次解释 |
+| --- | --- | --- |
+| 工作负载（workload） | 一组固定的模型、输入长度、输出长度和请求方式 | [`07.3 性能指标`](./03_benchmark_metrics.md) |
+| 预热（warmup） | 正式计时前先运行若干次，减少首次运行开销的影响 | [`07.5 测量稳定性`](./05_optimization_tips.md) |
+| 首词元延迟（TTFT） | 请求开始到第一个输出词元可用的时间 | [`07.3 性能指标`](./03_benchmark_metrics.md) |
+| 基准结果（baseline） | 在固定条件下保存、供后续版本比较的一组结果 | [`07.4 可重复执行脚本`](./04_benchmark_script.md) |
+
+![Chapter 07 主图：从正确性检查到性能证据](../assets/diagrams/chapter07-main.svg)
+
+## 开始学习
+
+先运行本章默认入口：
 
 ```bash
 bash code/chapter07_benchmark/scripts/run.sh
 ```
 
-成功标准：测试通过，CPU runtime benchmark 能输出正确性标记、prefill / decode 阶段时间和吞吐，baseline demo 继续输出结构化 trace；可选真实 ServiceCore benchmark 还要记录 CPU、编译器、Model/Context 隔离和资源释放。比较优化版本前，先固定模型、输入、硬件、batch 和运行参数。
+脚本会隔离构建 Chapter07，依次运行固定格式示例、Chapter06 Runtime 实测、Round-robin/Tensor batch 的 `1/2/4` 请求基准和 CTest。终端应出现六个场景的 `correctness=PASS`，结果写入 `code/chapter07_benchmark/results/chapter07_cpu_baseline.json`。
 
-![Chapter 07 主图：验证与性能证据](../assets/diagrams/chapter07-main.svg)
+| 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
+| --- | --- | --- | --- | --- |
+| 1 | A/B 公共 | [`07.1 测试入口`](./01_test_harness_setup.md)、[`07.2 端到端正确性`](./02_e2e_correctness.md) | <a href="../_code/chapter07_benchmark/tests/chapter07_benchmark_test.cpp"><code>chapter07_benchmark_test.cpp</code></a> | 局部格式测试、Runtime 行为测试和真实模型对照分别证明什么 |
+| 2 | A | [`07.3 性能指标`](./03_benchmark_metrics.md)、[`07.4 可重复执行脚本`](./04_benchmark_script.md) | <a href="../_code/chapter07_benchmark/examples/multi_request_benchmark.cpp"><code>multi_request_benchmark.cpp</code></a> | 指标起止点、固定负载和 JSON 字段怎样对应 |
+| 3 | A/B 验证 | [`07.5 测量稳定性`](./05_optimization_tips.md)、[`07.6 结果解读`](./06_result_interpretation.md) | <a href="../_code/chapter07_benchmark/results/chapter07_cpu_baseline.json"><code>chapter07_cpu_baseline.json</code></a> | 怎样判断结果可比，并据此保留、回滚或继续实验 |
+| 4 | B | [`07.7 成熟框架对照`](./07_framework_comparison.md)、[`07.8 服务负载评测`](./08_service_workloads.md) | <a href="../_code/engine/scripts/run_real_parallel_requests_ab.sh"><code>run_real_parallel_requests_ab.sh</code></a>、<a href="../_code/engine/scripts/run_real_batch_benchmark.sh"><code>run_real_batch_benchmark.sh</code></a> | 教学轮询、真实请求级并发与 Tensor batch 的差别 |
 
-本章位于实现和 profiling 之间：先证明行为没有改变，再测量变化，最后把结果交给 Chapter 08 解释原因。
+## 验证与下一步
 
-## 2. 内容地图
+| 证据层级 | 执行入口 | 通过条件 | 当前范围 |
+| --- | --- | --- | --- |
+| E1 结构与行为 | `bash code/chapter07_benchmark/scripts/run.sh` | CTest 通过，`1/2/4` 请求均完成且 `correctness=true` | 默认必做 |
+| E2 真实模型 | `bash scripts/run_real_decoder_learning.sh` | TinyLlama 固定输入得到固定贪心词元，并通过逐层数值检查 | 有模型时必做 |
+| E3 真实服务负载 | `bash code/engine/scripts/run_real_parallel_requests_ab.sh` | 串行与双 worker 均通过正确性和 Context 隔离检查 | CPU 并发选做 |
+| E4 教学 Tensor batch | `bash code/chapter07_benchmark/scripts/run.sh` | 多请求进入一次教学 Transformer 批量调用，并与逐请求结果一致 | CPU 教学路径已实现 |
+| E5 真实 scalar Linear batch | `bash code/engine/scripts/run_real_batch_benchmark.sh` | 两个真实 Context 合并量化 Linear，logits 与 golden 等于顺序路径，并输出配对耗时和 batch 分段计时 | 固定双请求结果为 `0.8541x`，当前只作为正确性路径 |
 
-完成本章后，可以：
-
-- 区分单元测试、端到端正确性测试、回归测试和 benchmark
-- 固定 latency、throughput、prefill、decode、cache 和调度指标
-- 写出可重复执行的 benchmark 脚本和结果记录
-- 从 baseline / optimized / reference 的差异做出保留、回滚或继续实验的决定
-
-成熟框架的 benchmark 对象不同，但都必须公开 workload、指标和运行条件。本章先建立可比较证据，再解释框架结果。
-
-| 对照项 | 内容 |
-| --- | --- |
-| 本章教学对象 | correctness、latency、throughput、阶段时间和结果文件 |
-| 主对照框架 | vLLM benchmarks、TensorRT-LLM benchmarks、`llama-bench` |
-| 成熟组件 | 并发 workload、服务压测、分位延迟、GPU 指标和跨节点测量 |
-| 重点差异 | 本章只比较同机同模型同输入条件，不横比来源不明的吞吐数字 |
-| 深入入口 | [`07.7 主流框架 benchmark 对照`](./07_framework_comparison.md) |
-
-## 3. 阅读与源码顺序
-
-| 顺序 | 页面 | 读完后应看到什么 |
-| --- | --- | --- |
-| 1 | [`07.1 Test Harness Basics`](./01_test_harness_setup.md)、[`07.2 End-to-End Correctness Testing`](./02_e2e_correctness.md) | 测试入口和完整链路正确性 |
-| 2 | [`07.3 Benchmark Metrics`](./03_benchmark_metrics.md)、[`07.4 Benchmark Script`](./04_benchmark_script.md) | 指标定义、固定条件和结果记录 |
-| 3 | [`07.5 Optimization Tips`](./05_optimization_tips.md) | 优化方向必须建立在测量之后 |
-| 4 | [`07.6 Result Interpretation`](./06_result_interpretation.md) | 数字如何转成工程决策 |
-| 5 | [`07.7 主流对照`](./07_framework_comparison.md) | 将本地 benchmark 放回真实 serving 场景 |
-
-源码先看 <a href="../_code/chapter07_benchmark/examples/runtime_benchmark.cpp"><code>runtime_benchmark.cpp</code></a>、<a href="../_code/chapter07_benchmark/src/benchmark.cpp"><code>benchmark.cpp</code></a> 和 <a href="../_code/chapter07_benchmark/tests/chapter07_benchmark_test.cpp"><code>chapter07_benchmark_test.cpp</code></a>。真实服务测量入口见 <a href="../_code/engine/examples/real_tinyllama_serving_benchmark.cpp"><code>real_tinyllama_serving_benchmark.cpp</code></a>；前置阅读是 [`chapter06_quantization`](../chapter06_quantization/intro.md)，TTFT、TPOT、吞吐和加速比见 [`F-PERF-01/02`](../reference/formulas.md#f-perf-01)，已有结果与复现脚本见[实验与验证资产索引](../reference/experiment_assets.md)，长期回归标准见 [`回归测试`](../reference/regression_testing.md)。
-
-## 4. 验证
-
-本章形成四层证据：
-
-1. 单元测试证明局部接口和数值
-2. 端到端测试证明完整链路仍能运行
-3. 回归测试证明旧行为没有回来
-4. benchmark 在固定条件下记录延迟、吞吐、阶段时间和 trace
-
-性能改善只有在正确性先通过后才有意义。benchmark 回答“发生了什么”，下一章的 profiling 才回答“为什么会这样”。
-
-**下一章：**本章产出可复查的输入条件、正确性状态、阶段耗时、吞吐和资源变化；Chapter 08 将根据这些结果拆分热点并用 profiling 和 A/B 实验决定优化。
+本章留下可复查的正确性状态、工作负载参数、阶段耗时和结果文件。进入 [`Chapter 08`](../chapter08_profiling/intro.md) 后，再用 profiling 和 A/B 实验解释性能差异来自哪里。

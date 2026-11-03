@@ -1,87 +1,42 @@
-# 07.5 Optimization Tips 优化建议
+# 07.5 控制测量波动
 
+一次运行得到的数字可能受到首次分配、CPU 调频和后台任务影响。本节先建立稳定测量条件；CUDA Graph、内存池和异步拷贝等优化机制放在 Chapter08，并在 profiling 指出瓶颈后再选择。
 
-## 先测量再选择优化
+## 预热、重复与聚合
 
-列出常见的可选优化方向，例如 CUDA Graph、memory pool 和 async copy，帮助后续定位性能提升空间。
+预热用于触发首次构建或分配开销，正式迭代用于观察稳定阶段。Chapter07 默认 `warmup=1`、`iterations=3` 适合快速检查结果格式，不足以支持细小性能差异的结论。
 
-读完后应能做到：
+需要比较两个实现时，至少保持以下条件相同：
 
-- 理解这些优化项各自适合解决什么问题
-- 理解为什么优化建议要放在 benchmark 之后
-- 理解性能优化不等于先优化所有地方
+| 条件 | 为什么会影响结果 |
+| --- | --- |
+| 模型、量化格式和输入输出长度 | 决定计算量与访存量 |
+| 请求数和到达方式 | 决定调度、排队和并发行为 |
+| 构建类型、编译器与指令集 | 决定生成代码和 SIMD 路径 |
+| CPU 线程、频率和后台负载 | 决定可用计算资源和抖动 |
+| 预热、迭代和聚合方法 | 决定首次开销与异常值怎样进入结果 |
 
-**阅读入口**
+当前程序保存每轮样本，并为 prefill、decode、total、TTFT 和 throughput 计算 mean、median、min、max。默认三轮只适合快速检查；样本较少且没有标准差或分位数时，仍不应声称几个百分点的稳定提升。
 
-- 前置阅读：[`07.3 Benchmark Metrics`](./03_benchmark_metrics.md)、[`07.4 Benchmark Script`](./04_benchmark_script.md)
-- 源码直达：<a href="../_code/chapter07_benchmark/src/benchmark.cpp"><code>benchmark.cpp</code></a>、<a href="../_code/chapter07_benchmark/examples/main_benchmark.cpp"><code>main_benchmark.cpp</code></a>
-- 相关阅读：[`08.4 Kernel Launch and CUDA Graph`](../chapter08_profiling/04_kernel_launch_and_cuda_graph.md)、[`foundation/07 CUDA 常用库`](../foundation/07_cuda_common_libraries.md)
+## 从快速检查升级到实验
 
-## 优化边界
+先用默认脚本确认正确性和字段完整，再提高迭代次数并把结果写到独立目录。读取 `statistics` 中的 median、min 和 max 可以快速判断范围；需要 P95 等分位数时，继续使用 `samples` 计算，而不是只比较 mean 或增加小数位。
 
-优化必须建立在测量结果之上。先知道瓶颈在哪里，再决定是否引入优化手段。
+性能实验至少回答三个问题：
 
-可选优化方向：
+1. 两组运行是否使用相同工作负载和环境？
+2. 差异是否大于重复运行的自然波动？
+3. 正确性、完成请求数和生成词元数是否保持一致？
 
-- CUDA Graph
-- memory pool
-- async copy
+如果任一答案是否定的，当前数字只能作为排查线索，不能作为保留优化的证据。
 
-这些优化项都能在某些工作负载下减少重复开销，但并不一定对所有场景都有效。教程把它们放在 benchmark 之后，就是为了避免“先上优化，再找问题”。
+## 验证与衔接
 
-优化建议适合写成“优化备忘录”：列出常见方向、各自适合解决的瓶颈，以及为什么必须先测量后决定。
+```bash
+CHAPTER07_RESULT_DIR=/tmp/chapter07-stability \
+CHAPTER07_WARMUP=2 \
+CHAPTER07_ITERATIONS=10 \
+bash code/chapter07_benchmark/scripts/run.sh
+```
 
-可以把优化建议理解成一个决策表：当瓶颈在调度时看 scheduler，当瓶颈在 kernel launch 时看 CUDA Graph，当瓶颈在内存分配时看 memory pool，当瓶颈在拷贝时看 async copy。
-
-在工程实践中，建议的优化优先级通常是：先看内存分配和释放是否为热点，memory pool 往往收益明确且实现相对简单；再看 kernel launch 开销，CUDA Graph 的收益取决于 batch size 和模型规模；最后看计算与拷贝重叠，async copy 的收益取决于 kernel 时间和拷贝时间的比值。不是每个项目都需要把这三类优化全部做完。
-
-这一章只要求读者先理解最小可用的 memory pool 思路。
-
-- 复用临时 buffer，而不是每次都重新分配
-- buffer 用完后放回池中，不要立刻释放给系统
-- 重点观察分配次数、峰值内存和运行抖动
-- 完整的 allocator 设计留到后续进阶
-
-这样可以先把主线聚焦在可测量的性能提升上，再去讨论通用 allocator 设计。
-
-最小的 memory pool 可以这样理解：
-
-- 预先准备一组固定大小或按 size class 分组的 buffer
-- 申请时先从池里拿，只有池里没有合适对象时才新分配
-- 归还时把 buffer 放回池中，而不是立刻释放给系统
-- benchmark 里重点观察分配次数、峰值内存和运行抖动
-
-这类实现不需要一开始就做成完整 allocator。教程要让读者先看到“复用”为什么能降低开销，而不是先被复杂内存管理细节淹没。
-
-和 CUDA 工具箱的关系可以再明确一点：
-
-- `CUDA Graph` 更偏执行调度和 launch 开销控制
-- `memory pool` 更偏分配器和复用策略
-- `async copy` 更偏数据搬运和计算重叠
-
-它们不一定是独立“库名”，但都属于 CUDA 侧常见的性能手段。教程这里先把概念和使用场景讲清楚，后面如果真的要实现，再去对照具体 API。
-
-要把这些手段和具体 CUDA 工具对应起来，可以回看
-[`foundation/07_cuda_common_libraries`](../foundation/07_cuda_common_libraries.md)。
-
-使用建议：
-
-- 先测量，再优化
-- 先确认热点，再引入复杂机制
-- 每个优化项都要对应一个可见收益
-
-## 验证与排查
-
-验证时重点看：
-
-- 优化前后有明确对比
-- 优化不破坏正确性
-- 性能收益可以被 benchmark 观察到
-
-如果优化能明确改善 benchmark 指标，同时不引入新的正确性问题，这个优化才值得保留。
-
-常见问题：
-
-- 盲目引入优化，增加复杂度
-- 优化项和实际瓶颈不匹配
-- 只看峰值，不看稳定性
+确认 JSON 的 `environment` 与实际机器一致、每个场景包含 10 个样本，并且所有样本正确完成。下一篇 [`07.6 结果解读`](./06_result_interpretation.md) 将把可比较结果转换为工程决定；需要解释热点时进入 [`Chapter08`](../chapter08_profiling/intro.md)。

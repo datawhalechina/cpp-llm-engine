@@ -1,72 +1,52 @@
-# 07.4 Benchmark Script Benchmark 脚本
+# 07.4 用脚本复现基准结果
 
+手工执行若干程序容易遗漏构建参数、预热次数或输出路径。本节阅读仓库已有的 `run.sh`，观察一次基准怎样从隔离构建走到机器可读结果和 CTest。
 
-## 把 Benchmark 变成脚本
+## 默认脚本的执行顺序
 
-编写 `benchmark.sh`，自动运行 benchmark 并记录硬件与运行信息。
+<a href="../_code/chapter07_benchmark/scripts/run.sh"><code>scripts/run.sh</code></a> 依次完成以下步骤：
 
-读完后应能做到：
+| 顺序 | 程序 | 产物 |
+| --- | --- | --- |
+| 1 | CMake 配置与构建 | 临时构建目录中的可执行文件 |
+| 2 | `chapter07_benchmark_demo` | 固定阶段、事件和 trace 格式样例 |
+| 3 | `chapter07_runtime_benchmark` | Chapter06 Runtime 的单请求实测 |
+| 4 | `chapter07_multi_request_benchmark` | 两种执行模式、`1/2/4` 请求实测和 JSON 文件 |
+| 5 | CTest | Chapter06 与 Chapter07 回归结果 |
 
-- 理解为什么 benchmark 需要自动化
-- 理解应该记录哪些环境信息
-- 理解脚本如何支持重复测量
+默认使用 Release 构建、一次预热和三次测量。可用 `CHAPTER07_BUILD_TYPE`、`CHAPTER07_WARMUP`、`CHAPTER07_ITERATIONS` 和 `CHAPTER07_RESULT_DIR` 改变构建类型、次数与输出目录；比较两组实现时，两边必须使用相同设置。
 
-**阅读入口**
+## 结果文件与可复现条件
 
-- 前置阅读：[`07.3 Benchmark Metrics`](./03_benchmark_metrics.md)、[`07.2 End-to-End Correctness Testing`](./02_e2e_correctness.md)
-- 源码直达：<a href="../_code/chapter07_benchmark/scripts/run.sh"><code>run.sh</code></a>、<a href="../_code/chapter07_benchmark/examples/main_benchmark.cpp"><code>main_benchmark.cpp</code></a>、<a href="../_code/chapter07_benchmark/tests/chapter07_benchmark_test.cpp"><code>chapter07_benchmark_test.cpp</code></a>
-- 相关阅读：[`07.6 Result Interpretation`](./06_result_interpretation.md)、[`回归测试`](../reference/regression_testing.md)
-
-## 脚本设计
-
-没有脚本化的 benchmark 很难复现，也很难比较不同版本的性能。
-
-benchmark 脚本需要覆盖：
-
-- 自动运行测试
-- 记录硬件信息
-- 保存运行结果
-- 输出可比较的 benchmark 报告
-
-脚本化 benchmark 的价值在于把“运行条件”固定下来。没有固定输入、固定模型、固定环境信息，测出来的性能数据很难真正比较。
-
-因此脚本不仅要跑测试，还要把版本、硬件和配置一起写进结果里。
-
-建议脚本输出同时包含两种格式：一种给人看，另一种给后续自动分析用。只留文本日志的话，后面做回归比较会很费劲。
-
-脚本流程可以先写成：
+默认结果写入 `code/chapter07_benchmark/results/chapter07_cpu_baseline.json`。为了避免覆盖仓库基线，可以把实验写到临时目录：
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-./run_tests
-./run_benchmark > benchmark.json
+CHAPTER07_RESULT_DIR=/tmp/chapter07-results \
+CHAPTER07_WARMUP=2 \
+CHAPTER07_ITERATIONS=10 \
+bash code/chapter07_benchmark/scripts/run.sh
 ```
 
-在本教程中，`run_tests` 和 `run_benchmark` 对应的是 `code/chapter07_benchmark/scripts/run.sh` 管理的隔离构建目录。脚本会运行 Chapter 05 CPU runtime benchmark、Chapter 07 多请求 benchmark 和 CTest，并将多请求结果写入 `code/chapter07_benchmark/results/chapter07_cpu_baseline.json`。
+固定脚本仍不能自动消除系统噪声。schema v2 会记录 CPU、编译器、构建类型、每轮样本和统计值；正式比较仍要补充 Git 提交、线程设置、频率策略和后台负载，不能从耗时数字反推这些条件。
 
-实现建议：
+结果顶部还有两个身份字段。`experiment_id` 把结果连接到实验资产索引，例如教学多请求基线使用 `EXP-CPU-01`；`workload_id` 固定模型、输入、请求数和测量边界，Chapter08 选择具体场景后会继续附加请求数。Round-robin 与 Tensor batch 是同一 workload 下被比较的执行方式，不写入 workload ID。
 
-- 让脚本能独立执行
-- 固定输入和配置
-- 把环境信息和结果一起保存
+真实 TinyLlama 服务使用另一条入口：
 
-多请求最小场景固定为 `1/2/4` 个请求，默认 warmup=1、iterations=3。结果文件记录请求数、prefill/decode/total 时间、TTFT、token throughput、完成请求数和 correctness，便于后续 Chapter 08 使用同一输入条件定位热点。
+```bash
+bash code/engine/scripts/run_real_serving_benchmark.sh
+```
 
-Chapter07 默认脚本使用教学 Runtime，适合快速回归 benchmark 结构。完成真实 TinyLlama Model/Context 接入后，可运行 `bash code/engine/scripts/run_real_serving_benchmark.sh`；该脚本固定两个真实请求，记录 CPU 型号、编译器、构建类型、模型加载、prefill/decode、每请求 TTFT/完成时间和吞吐，并把结果交给 [`09.3 真实 ServiceCore Benchmark`](../chapter09_serving/03_real_service_benchmark.md) 解读。真实模型 benchmark 不进入默认回归，避免让 638 MiB GGUF 成为基础测试依赖。
+该脚本依赖外部 GGUF，记录模型加载和服务阶段数据，不进入默认快速回归。
 
-## 验证与排查
+真实 sequential/scalar Linear batch 使用配对入口：
 
-验证时重点看：
+```bash
+bash code/engine/scripts/run_real_batch_benchmark.sh
+```
 
-- 脚本能自动完成一次测量
-- 硬件信息被正确记录
-- 结果可重复生成
+脚本固定两个 prompt、每请求 4 个输出 token，只计量三个 decode 调用，排除模型加载、Context 创建和 prefill。每轮同时测量 sequential 与 batch，并交替执行顺序；结果以 `EXP-CPU-10 / WL-CPU-REAL-BATCH-V1` 写入 `code/chapter07_benchmark/results/tinyllama_real_batch_scalar.json`。该结果只回答当前 scalar batch 在固定双请求负载下是否改善 decode 墙钟，不代表 AVX2、GPU 或服务开放环吞吐。
 
-如果同一脚本在同一环境里多次运行，输出结果格式稳定且便于横向比较，benchmark 脚本就达标了。
+## 验证与衔接
 
-常见问题：
-
-- 测量条件没有固定
-- 输出结果没有归档
-- 硬件信息采集不完整
+在临时目录运行两次，确认 `experiment_id` 和 `workload_id` 未变化、六个场景均为 `correctness=true`，每种执行模式都包含 `1/2/4` 请求，且 `samples` 数量等于 `iterations`。下一篇 [`07.5 测量稳定性`](./05_optimization_tips.md) 解释如何使用统计范围判断耗时波动是否允许比较。

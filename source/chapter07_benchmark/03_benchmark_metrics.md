@@ -1,75 +1,44 @@
-# 07.3 Benchmark Metrics Benchmark 指标
+# 07.3 定义延迟与吞吐指标
 
+同一组耗时只有在起止点、输入规模和聚合方式一致时才可比较。本节使用 Chapter07 结果文件中的字段，连接预填充、逐词元解码和完整请求三个观察范围。
 
-## 固定性能指标
+## 指标与测量区间
 
-定义统一的性能指标，衡量模型的 prefill 延迟、逐 token 延迟和吞吐能力。  
-没有统一指标，就没法公平比较不同实现。
+| 指标 | 当前起止点 | 单位 | 阅读重点 |
+| --- | --- | --- | --- |
+| `prefill_ms` | 调用所有请求的 `Runtime::prefill` 前后 | ms | prompt 处理成本；当前请求按顺序执行 |
+| `decode_ms` | Round-robin 调度开始到全部请求结束 | ms | 多请求逐步推进的总耗时 |
+| `total_ms` | `prefill_ms + decode_ms` | ms | 教学程序中的模型执行总时间 |
+| `ttft_ms` | prefill 开始到第一次 decode 回调 | ms | 当前教学定义，不含网络与排队 |
+| `throughput_tokens_per_second` | 生成词元总数除以 `total_ms` | token/s | 固定负载下的整体生成速率 |
 
-读完后应能做到：
+真实 HTTP 服务中的 TTFT 还会包含排队、序列化和 transport 时间，因此不能直接和当前教学 Runtime 的 `ttft_ms` 横向比较。跨工具比较前，先核对公式、计时边界和分母。
 
-- 理解 latency、prefill 和 throughput 的区别
-- 理解为什么不同阶段需要不同指标
-- 理解指标如何反映系统性能
+## 工作负载决定数字含义
 
-**阅读入口**
+Chapter07 默认比较 `1/2/4` 个请求，每个请求有 4 个 prompt token，并生成 4 个 token。每组负载分别运行 Round-robin 和教学 Tensor batch：前者逐请求调用模型，后者把请求合并为一次 `Transformer::prefill_batch()` 或 `decode_batch()`。两者共享输入、生成上限和正确性检查。
 
-- 前置阅读：[`07.2 End-to-End Correctness Testing`](./02_e2e_correctness.md)、[`chapter06_quantization`](../chapter06_quantization/intro.md)
-- 源码直达：<a href="../_code/chapter07_benchmark/src/benchmark.cpp"><code>benchmark.cpp</code></a>、<a href="../_code/chapter07_benchmark/src/test_helpers.cpp"><code>test_helpers.cpp</code></a>、<a href="../_code/chapter07_benchmark/examples/main_benchmark.cpp"><code>main_benchmark.cpp</code></a>
-- 相关阅读：[`07.4 Benchmark Script`](./04_benchmark_script.md)、[`推理性能分析`](../reference/profiling.md)
+结果至少要同时保留以下条件：
 
-## 指标设计
+| 条件 | 当前结果字段或入口 |
+| --- | --- |
+| 请求规模 | `request_count`、`prompt_tokens`、`max_new_tokens` |
+| 执行方式 | `execution_mode`、`model_invocations`、`tensor_batch_steps` |
+| 重复方式 | 顶层 `warmup`、`iterations` |
+| 执行环境 | `environment.cpu_model`、`hardware_concurrency`、`compiler`、`build_type` |
+| 正确性 | `generated_tokens`、`completed_requests`、`correctness` |
+| 时间与速率 | prefill、decode、total、TTFT、throughput |
+| 波动范围 | 每轮 `samples` 和 `statistics` 中的 mean/median/min/max |
 
-没有统一指标，就无法比较不同实现、不同硬件或不同优化策略。  
-benchmark 不是“跑个数字”，而是把系统行为变成可比较的证据。
+结果 schema v2 已记录 CPU 型号、逻辑并发数、编译器和构建类型。它仍未记录 CPU 频率策略、内存配置、操作系统与后台负载，正式实验需要把这些条件随命令补充。真实服务 benchmark 的阶段和字段不同，两者不要混为同一种结果格式。
 
-核心指标：
+## 验证与衔接
 
-- Prefill latency
-- Token latency
-- Throughput
+运行默认脚本后查看结果：
 
-这三个指标分别对应不同的真实场景：
-
-- `Prefill latency` 看首轮输入处理
-- `Token latency` 看逐步生成的响应速度
-- `Throughput` 看系统整体吞吐能力
-
-把它们混成一个数，工程意义会大幅下降。  
-更合理的做法是让每个指标回答不同问题，而不是让一个指标解释全部现象。
-
-从用户视角看，prefill 影响首次响应体验，token latency 影响连续输出的流畅度，throughput 决定服务能扛住多少并发请求。
-
-最小指标记录结构可以写成：
-
-```cpp
-struct BenchmarkResult {
-    double prefill_ms;
-    double token_ms;
-    double throughput_tok_s;
-};
+```bash
+bash code/chapter07_benchmark/scripts/run.sh
+sed -n '1,220p' code/chapter07_benchmark/results/chapter07_cpu_baseline.json
 ```
 
-最小测量条件清单应包括：硬件型号（CPU / GPU）、batch size、sequence length、量化配置（FP16 / INT8）、CUDA 版本，以及采样策略（greedy / temperature）。这些条件应当和 `BenchmarkResult` 一起记录，否则指标就无法在不同环境之间复现或比较。
-
-实现建议：
-
-- 先固定测量口径
-- 再记录不同配置下的结果
-- 指标要和实际运行场景对应
-
-## 验证与排查
-
-验证时重点看：
-
-- 指标定义清晰
-- 同一场景下可重复测量
-- 不同实现可公平比较
-
-如果指标定义清晰，读者就能一眼看出优化到底是在改善首 token、持续 decode，还是整体吞吐。
-
-常见问题：
-
-- 混淆 prefill 和 decode
-- 只看平均值，不看波动
-- 不记录测量条件
+确认每个场景都同时包含负载、正确性和性能字段。下一篇 [`07.4 可重复执行脚本`](./04_benchmark_script.md) 将说明脚本怎样固定这些条件并写出结果。

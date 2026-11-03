@@ -1,76 +1,35 @@
-# 08.6 Optimization Loop 优化闭环
+# 08.6 建立优化闭环
 
-性能优化按“提出假设、修改实现、重新测量、解释结果、决定保留或回滚”循环推进。
+优化不是不断增加技巧，而是重复执行“观察、提出假设、单变量修改、重新测量、作出决定”。每一轮都要留下下一位学习者可以复查的输入、结果和结论范围。
 
-**阅读入口**
-
-- 前置阅读：[`08.5 A/B Experiment`](./05_ab_experiment.md)、[`07.5 Optimization Tips`](../chapter07_benchmark/05_optimization_tips.md)
-- 源码直达：<a href="../_code/chapter07_benchmark/src/benchmark.cpp"><code>benchmark.cpp</code></a>、<a href="../_code/chapter05_generation/src/runtime.cpp"><code>runtime.cpp</code></a>、<a href="../_code/chapter05_generation/src/kv_cache.cpp"><code>kv_cache.cpp</code></a>
-- 相关阅读：[`推理引擎系统补强图`](../reference/inference_engine_systems.md)、[`08.7 vLLM / nano-vLLM Profiling 阅读桥`](./07_vllm_nano_vllm_profiling_bridge.md)
-
-## 优化步骤
+## 六步优化循环
 
 ```text
 benchmark -> hypothesis -> profiling -> change -> benchmark -> decision
 ```
 
-每一步只回答一个问题：
+| 步骤 | 必须回答的问题 |
+| --- | --- |
+| Benchmark | 问题是否在固定 workload 下稳定存在 |
+| Hypothesis | 怀疑哪个阶段、对象或资源 |
+| Profiling | 当前证据是否支持该方向 |
+| Change | 这次唯一改变什么 |
+| Re-measure | correctness 与目标指标怎样变化 |
+| Decision | 保留、拒绝还是继续拆分 |
 
-- benchmark：问题是否真实存在？
-- hypothesis：你认为瓶颈在哪？
-- profiling：证据是否支持这个判断？
-- change：这次只改什么？
-- benchmark：改动是否产生可复查收益？
-- decision：保留、回滚，还是继续拆？
+## 何时保留或停止
 
-### 保留优化的条件
+正确性没有退化、目标指标稳定改善、资源与复杂度代价可接受时才能进入主线。结果波动、条件不一致或一次修改跨越多个组件时，应先修正实验而不是继续叠加优化。
 
-一个优化至少要同时满足三件事：
+| 状态 | 工程动作 |
+| --- | --- |
+| 正确性失败 | `REJECT`，先定位数值或状态问题 |
+| 收益稳定且超过阈值 | `KEEP`，保存回归证据 |
+| 组合改动有变化但无法归因 | `SPLIT`，拆成单变量实验 |
+| 收益小于波动或维护成本 | `REJECT` 或仅保留实验分支 |
 
-- 正确性没有退化
-- 目标指标有稳定改善
-- 实现复杂度和长期成本可以接受
+## 保存可继续使用的证据
 
-仅有单次指标改善时，将结果保留为实验，重复验证正确性、稳定性和复杂度后再进入主线。
+一次闭环至少留下人可读的 A/B 摘要、机器可读的结构化结果和对应复现入口。阶段计时、Trace 和热点只需保存到支持当前结论的层级，不应把教学事件表述成系统 profiler 证据。
 
-### 什么时候不要继续优化
-
-遇到以下情况时先修正实验，再继续优化：
-
-- benchmark 条件没有固定，结果不可复现
-- 正确性验证没有通过
-- profiling 证据和优化方向对不上
-- 改动收益只出现在单次运行里，重复测量不稳定
-- 复杂度明显增加，但目标指标改善很小
-
-推理引擎优化需要同时考虑长期运行、后续修改和重复测量，单次跑分不能支持保留决策。
-
-### 用当前教程代码走一遍闭环
-
-拿 `chapter07_benchmark_demo` 的真实输出，可以先走一遍不引入任何新优化技巧的最小闭环：
-
-1. `benchmark`：当前 baseline 是 `4000 items/s`，并且 `prefill=0.30ms`、`decode=0.15ms`
-2. `hypothesis`：当前阶段占比里 `prefill=50%`、`decode=25%`，如果后续长 prompt 场景变慢，优先怀疑 `prefill` 路径而不是输出阶段
-3. `profiling`：先围绕 `runtime.cpp`、`benchmark.cpp` 补阶段计时，而不是一开始就猜 kernel
-4. `change`：只增加更细的阶段计时，先不改 scheduler、cache 和 kernel
-5. `benchmark`：确认新增计时后，基线结果仍能稳定复现
-6. `decision`：如果计时开销可接受，就保留这次可观测性改动
-
-这条示例故意很小，因为教程当前要先建立“证据链”习惯，而不是堆优化技巧。
-
-## 结构化输出
-
-当阶段计时、trace 事件和 hotspot 表都已经出现之后，再往前一步就是把它们收进同一份结构化结果。原因很直接：
-
-- 文本适合阅读
-- JSON 适合复查、对比和后续工具消费
-
-也就是说，优化闭环的终点不只是“看懂一次结果”，而是“把这次结果保存成后面还能比较的证据”。
-
-对当前教程来说，这意味着一次完整闭环至少应该留下三样东西：
-
-- 一份人能直接读的 benchmark / A/B 摘要
-- 一份事件级 trace
-- 一份结构化 JSON 结果，方便后续比较和工具消费
-
-如果继续贴近真实工程，再多保留一份“时间轴友好”的 trace 视图也很有价值。它不一定是完整工具导出，但至少要让后来的人能快速看出事件先后顺序和重叠关系。
+当前 Q4_K/Q6_K 优化示例已经按该循环登记在[实验与验证资产索引](../reference/experiment_assets.md)。继续阅读 [`08.7 成熟框架阅读桥`](./07_vllm_nano_vllm_profiling_bridge.md)，观察相同证据链怎样映射到 EngineCore、Worker 和 GPU Kernel。

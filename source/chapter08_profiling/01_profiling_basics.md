@@ -1,89 +1,35 @@
-# 08.1 Profiling Basics Profiling 基础
+# 08.1 建立性能分析基础
 
-benchmark 回答“快了多少”，profiling 回答“为什么这样”。先把这两件事拆开，避免看到一个性能数字后直接猜瓶颈。
+Benchmark 回答“快了多少”，profiling 回答“时间花在哪里以及下一步查什么”。学习者先固定工作负载并确认输出正确，再从阶段汇总进入事件、函数或硬件证据，不能根据单个吞吐数字直接猜瓶颈。
 
-**阅读入口**
+## 区分结果测量与原因定位
 
-- 前置阅读：[`chapter08 导读`](./intro.md)、[`07.3 Benchmark Metrics`](../chapter07_benchmark/03_benchmark_metrics.md)
-- 源码直达：<a href="../_code/chapter07_benchmark/src/benchmark.cpp"><code>benchmark.cpp</code></a>、<a href="../_code/chapter07_benchmark/src/test_helpers.cpp"><code>test_helpers.cpp</code></a>
-- 相关阅读：[`推理引擎 Profiling`](../reference/profiling.md)、[`08.2 Latency Breakdown`](./02_latency_breakdown.md)
+一次记录至少包含实验 ID、workload ID、模型、输入输出长度、batch、后端、硬件、构建类型和运行轮次。实验 ID 指向证据资产，workload ID 固定可比较条件；缺少后者时，两组数字不能直接比较。
 
-## 先看什么
-
-| 问题 | benchmark | profiling |
+| 问题 | Benchmark | Profiling |
 | --- | --- | --- |
-| 回答什么 | 快多少、慢多少 | 为什么快、为什么慢 |
-| 输出什么 | latency、throughput、显存、误差 | 热点、阶段耗时、调用路径、等待点 |
-| 用来做什么 | 决定是否值得继续 | 决定下一步改哪里 |
+| 主要输出 | 延迟、吞吐、内存和正确性 | 阶段耗时、事件、热点和等待点 |
+| 回答的问题 | 改动是否产生稳定变化 | 变化可能来自计算、内存、同步还是调度 |
+| 工程决定 | 是否值得继续调查 | 下一次单变量实验改哪里 |
 
-最小原则是：没有 benchmark，不要谈优化收益；没有 profiling，不要轻易判断瓶颈原因。
+## 从阶段进入热点
 
-### 推理引擎里先看哪些层
+性能证据按下面的顺序逐步收窄。前一级没有成立时，不应跳到后一级下结论。教学结果中 `prefill=50%`、`decode=25%` 只用于练习阶段拆分，不代表真实模型热点；真实 TinyLlama 的服务和 Decoder 证据在 [`08.8`](./08_real_service_profile.md) 单独分析。
 
-- 计算：MatMul、attention、dequantize、sampling
-- 内存：分配、拷贝、KV cache、workspace
-- 调度：request admission、batch 组装、decode step
-- 流程：prefill / decode 切换、同步点、输出回调
-
-先把热点归到正确层级，再决定是否需要更细的工具。
-
-## 记录结果
-
-第一次做 profiling 时，不要直接写“attention 慢”或“cache 慢”。先写成可复查记录：
-
-| 字段 | 示例 |
-| --- | --- |
-| 场景 | batch=1, prompt=512, output=128, FP16 |
-| benchmark 现象 | decode latency 从 18ms/token 变成 24ms/token |
-| profiling 证据 | decode step 中重复出现小 kernel 和同步点 |
-| 初步归因 | kernel launch / host-device sync，而不是 matmul 计算量 |
-| 下一步实验 | 固定输入，只改 decode step 的同步或复用策略 |
-
-这样写的好处是，后面即使结论错了，也能知道错在 benchmark、profiling 解释，还是实验设计。
-
-### 一个真实基线样例
-
-下面这组输出来自当前仓库里已经可运行的最小 benchmark demo：
+运行默认入口可以从 Chapter07 的 `EXP-CPU-01` 结果选择四请求 round-robin workload，生成阶段报告并完成一次不声明优化收益的同构 A/B 检查。适配器会拒绝缺少或错误的实验身份字段：
 
 ```bash
-cmake -S code/chapter07_benchmark -B /tmp/chapter07_benchmark_build
-cmake --build /tmp/chapter07_benchmark_build
-/tmp/chapter07_benchmark_build/chapter07_benchmark_demo
+bash code/chapter08_profiling/scripts/run.sh
 ```
 
-```text
-[chapter07] benchmark demo
-unit checks: true
-e2e checks: true
-result name: demo
-result items/s: 4000
-samples: 6
-chapter07 benchmark summary
-input: tokens=5, elapsed_ms=0.05, share=8.33%, tokens_per_second=100000.00
-prefill: tokens=5, elapsed_ms=0.30, share=50.00%, tokens_per_second=16666.67
-decode: tokens=2, elapsed_ms=0.15, share=25.00%, tokens_per_second=13333.33
-sampling: tokens=2, elapsed_ms=0.05, share=8.33%, tokens_per_second=40000.00
-output: tokens=2, elapsed_ms=0.05, share=8.33%, tokens_per_second=40000.00
-benchmark: tokens=7, elapsed_ms=0.60
-```
+| 观察层级 | 当前教程中的证据 | 能回答什么 |
+| --- | --- | --- |
+| 固定 workload | JSON 中的 `experiment_id`、`workload_id` 和环境字段 | 证据来自哪里，现象能否复现 |
+| 阶段汇总 | input、prefill、decode、sampling、output | 时间主要落在哪一段 |
+| 事件与函数 | trace events、hotspot、Decoder 分段计时 | 下一步检查哪个调用或投影 |
+| 系统证据 | `perf`、Nsight、硬件计数器 | CPU、内存或 GPU 假设是否成立 |
+| 单变量 A/B | baseline、experiment、correctness gate | 改动是否具有因果收益 |
 
-这组输出能先回答三件事：
+## 验证与衔接
 
-- 正确性检查通过没有
-- baseline 吞吐大致是多少
-- 当前流程已经拆成了 `input / prefill / decode / sampling / output`
-
-但它还不能回答热点在哪个函数、同步点在哪里、有没有 cache miss。这正是 profiling 要补上的部分。
-
-### 再往下一层看什么
-
-如果阶段汇总显示 `prefill` 最重，下一步不要直接改代码，先补两类证据：
-
-- `trace events`：看 `prefill` 内部到底是哪几个事件在耗时
-- `hotspot summary`：看排序最靠前的函数或符号是谁
-
-在当前教程基线里，这两层证据已经能落成真实输出。它们的关系是：
-
-- 阶段汇总告诉你“慢在哪一段”
-- trace 事件告诉你“这段里发生了什么”
-- hotspot 排序告诉你“先看哪几个点最值当”
+读完后应能说明：当前数字来自哪个 workload，最慢的是哪个阶段，现有证据能否支持具体函数或硬件归因。下一节 [`08.2 延迟拆解`](./02_latency_breakdown.md) 继续定义各阶段的计时起止点；完整证据强度见 [`08.9 Profiling 证据层级`](./09_profiling_evidence_hierarchy.md)。
