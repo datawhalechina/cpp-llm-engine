@@ -65,6 +65,9 @@ complicated_old/
 *.npy
 *.npz
 
+# External reference checkout used by Chapter 00 and real-model tests
+/llama.cpp/
+
 # Python bytecode and virtualenvs if any helper scripts are added later
 __pycache__/
 .venv/
