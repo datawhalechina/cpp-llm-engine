@@ -9,9 +9,11 @@
     "docs:check-style": "node scripts/check_docs_style.mjs",
     "docs:check-reference": "node scripts/check_reference_assets.mjs",
     "code:check-headers": "node scripts/check_code_headers.mjs code",
+    "test:check-assets": "node scripts/check_test_assets.mjs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
-    "test:regression": "bash scripts/run_regression_baseline.sh"
+    "test:regression": "bash scripts/run_regression_baseline.sh",
+    "test:release-contracts": "bash scripts/run_release_contracts.sh"
   },
   "devDependencies": {
     "vitepress": "^1.6.4",

@@ -42,5 +42,8 @@ jobs:
       - name: Run dependency-free CPU regression
         run: npm run test:regression
 
+      - name: Run Release contract regression
+        run: npm run test:release-contracts
+
       - name: Check that validation leaves tracked files unchanged
         run: git diff --exit-code

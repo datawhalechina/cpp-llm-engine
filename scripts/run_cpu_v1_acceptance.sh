@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CPU v1：统一验收真实基线、输入、算子、Decoder、Runtime 和最小服务。
+# 兼容入口：统一验收真实 CPU 基线、Decoder、Runtime 和最小服务。
 # 产物：在临时结果目录保存 commit、模型、环境和各子任务生成的结果路径。
 set -euo pipefail
 
@@ -49,7 +49,7 @@ LLAMA_CPP_ROOT="${llama_root}" \
     bash "${repo_root}/scripts/run_real_decoder_learning.sh"
 
 echo "[cpu-v1] task 5: generation runtime"
-bash "${repo_root}/code/chapter05_generation/scripts/run.sh"
+bash "${repo_root}/code/chapter06_generation/scripts/run.sh"
 
 echo "[cpu-v1] task 6: real CPU service"
 CPP_LLM_ENGINE_MODEL_PATH="${model_path}" \
