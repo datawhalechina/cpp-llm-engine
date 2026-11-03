@@ -105,7 +105,7 @@ RoPE 请求使用连续 `[tokens, heads, head_dim]` 布局，在原 Tensor 上�
 
 ## Decoder 逐元素算子
 
-P1-4A 增加 Llama 单层尚缺的 RMSNorm 与 SwiGLU；Residual 继续复用 Vector Add。RMSNorm 单 block 分段累加平方和，再按 `input * rsqrt(mean_square + epsilon) * weight` 写回；SwiGLU 按 `silu(gate) * up` 逐元素计算。测试覆盖非整除宽度 257 和 TinyLlama hidden size 2048。当前只表示单层算子齐备，尚未组装 GPU Decoder 对象。
+Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续复用 Vector Add。RMSNorm 单 block 分段累加平方和，再按 `input * rsqrt(mean_square + epsilon) * weight` 写回；SwiGLU 按 `silu(gate) * up` 逐元素计算。测试覆盖非整除宽度 257 和 TinyLlama hidden size 2048，这些算子已由下一节的 `CudaDecoderLayer` 组装成合成单层 Decoder。
 
 ## 合成单层 Decoder
 

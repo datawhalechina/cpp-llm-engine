@@ -1,5 +1,5 @@
 // CUDA Backend：实现 GGML Q4_K/Q6_K block 到 Float32 workspace 的解码。
-// 契约：每个线程解码一个权重值，保持 Chapter06 CPU reference 的元素顺序。
+// 契约：每个线程解码一个权重值，保持 Chapter05 CPU reference 的元素顺序。
 // 验证：cpp_llm_engine_cuda_quantized_linear_test 与 CPU reference 对照。
 #include "cpp_llm_engine/cuda/quantized_dequantize_backend.h"
 

@@ -1,6 +1,6 @@
 // CUDA Backend：声明 Q4_K/Q6_K packed payload 的 Float32 反量化 kernel。
 // 职责：只负责 device-to-device 解码；Linear 的 SGEMM 由 ExecutionContext 编排。
-// 验证：与 Chapter06 CPU reference 逐元素和最终 Linear 输出对照。
+// 验证：与 Chapter05 CPU reference 逐元素和最终 Linear 输出对照。
 #pragma once
 
 #include "cpp_llm_engine/core/backend.h"

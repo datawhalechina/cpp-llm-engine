@@ -1,8 +1,8 @@
 // CUDA Quantized Linear：验证 Q4_K/Q6_K dequantize + SGEMM 基线。
-// 职责：与 Chapter06 CPU reference 对照，并覆盖 payload、shape、移动和 workspace 复用。
+// 职责：与 Chapter05 CPU reference 对照，并覆盖 payload、shape、移动和 workspace 复用。
 // 通过条件：真实 GPU 输出满足误差阈值，且测试不直接管理 DeviceBuffer/stream/handle。
-#include "chapter06_quantization/q4k_dequantize.h"
-#include "chapter06_quantization/q6k_dequantize.h"
+#include "chapter05_quantization/q4k_dequantize.h"
+#include "chapter05_quantization/q6k_dequantize.h"
 #include "cpp_llm_engine/core/linear_contract.h"
 #include "cpp_llm_engine/cuda/cuda_execution_context.h"
 #include "cpp_llm_engine/cuda/cuda_quantized_matrix.h"
@@ -53,7 +53,7 @@ bool close_enough(float actual, float expected) {
 }
 
 std::vector<std::uint8_t> make_q4k_payload() {
-    using chapter06_quantization::kQ4KBlockBytes;
+    using chapter05_quantization::kQ4KBlockBytes;
     std::vector<std::uint8_t> payload(2 * kQ4KBlockBytes, 0);
 
     payload[0] = 0x00;
@@ -79,7 +79,7 @@ std::vector<std::uint8_t> make_q4k_payload() {
 }
 
 std::vector<std::uint8_t> make_q6k_payload() {
-    using chapter06_quantization::kQ6KBlockBytes;
+    using chapter05_quantization::kQ6KBlockBytes;
     std::vector<std::uint8_t> payload(2 * kQ6KBlockBytes, 0);
     for (std::size_t block = 0; block < 2; ++block) {
         const std::size_t offset = block * kQ6KBlockBytes;
@@ -134,7 +134,7 @@ int main() {
     const std::vector<std::uint8_t> q4k_payload = make_q4k_payload();
     std::vector<float> q4k_decoded;
     std::string error;
-    CHECK(chapter06_quantization::dequantize_q4_k(
+    CHECK(chapter05_quantization::dequantize_q4_k(
         q4k_payload.data(), q4k_payload.size(), 512, &q4k_decoded, &error));
     const std::vector<float> q4k_expected =
         cpu_linear(q4k_decoded, 2, 256, input_host);
@@ -167,7 +167,7 @@ int main() {
 
     const std::vector<std::uint8_t> q6k_payload = make_q6k_payload();
     std::vector<float> q6k_decoded;
-    CHECK(chapter06_quantization::dequantize_q6_k(
+    CHECK(chapter05_quantization::dequantize_q6_k(
         q6k_payload.data(), q6k_payload.size(), 512, &q6k_decoded, &error));
     const std::vector<float> q6k_expected =
         cpu_linear(q6k_decoded, 2, 256, input_host);
@@ -198,20 +198,20 @@ int main() {
     constexpr int warmup = 1;
     constexpr int iterations = 10;
     std::vector<std::uint8_t> q4k_benchmark_payload(
-        benchmark_rows * chapter06_quantization::kQ4KBlockBytes);
+        benchmark_rows * chapter05_quantization::kQ4KBlockBytes);
     std::vector<std::uint8_t> q6k_benchmark_payload(
-        benchmark_rows * chapter06_quantization::kQ6KBlockBytes);
+        benchmark_rows * chapter05_quantization::kQ6KBlockBytes);
     for (std::size_t row = 0; row < benchmark_rows; ++row) {
         std::copy_n(
             q4k_payload.data(),
-            chapter06_quantization::kQ4KBlockBytes,
+            chapter05_quantization::kQ4KBlockBytes,
             q4k_benchmark_payload.data() +
-                row * chapter06_quantization::kQ4KBlockBytes);
+                row * chapter05_quantization::kQ4KBlockBytes);
         std::copy_n(
             q6k_payload.data(),
-            chapter06_quantization::kQ6KBlockBytes,
+            chapter05_quantization::kQ6KBlockBytes,
             q6k_benchmark_payload.data() +
-                row * chapter06_quantization::kQ6KBlockBytes);
+                row * chapter05_quantization::kQ6KBlockBytes);
     }
     CudaQuantizedMatrix q4k_benchmark_weights;
     CudaQuantizedMatrix q6k_benchmark_weights;

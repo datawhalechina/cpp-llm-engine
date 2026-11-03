@@ -8,6 +8,8 @@ endif()
 
 project(cpp_llm_engine_cuda LANGUAGES CXX CUDA)
 
+include(${CMAKE_CURRENT_LIST_DIR}/../testing/cmake/CppLlmTesting.cmake)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -77,11 +79,11 @@ target_link_libraries(
 
 add_executable(cpp_llm_engine_cuda_quantized_linear_test
     tests/cuda_quantized_linear_test.cu
-    ../chapter06_quantization/src/q4k_dequantize.cpp
-    ../chapter06_quantization/src/q6k_dequantize.cpp
+    ../chapter05_quantization/src/q4k_dequantize.cpp
+    ../chapter05_quantization/src/q6k_dequantize.cpp
 )
 target_include_directories(cpp_llm_engine_cuda_quantized_linear_test
-    PRIVATE ../chapter06_quantization/include
+    PRIVATE ../chapter05_quantization/include
 )
 target_link_libraries(
     cpp_llm_engine_cuda_quantized_linear_test PRIVATE cpp_llm_engine_cuda)
@@ -116,6 +118,17 @@ add_executable(cpp_llm_engine_cuda_decoder_layer_test
 target_link_libraries(
     cpp_llm_engine_cuda_decoder_layer_test PRIVATE cpp_llm_engine_cuda)
 
+cpp_llm_prepare_test(cpp_llm_engine_cuda_test)
+cpp_llm_prepare_test(cpp_llm_engine_cuda_elementwise_test)
+cpp_llm_prepare_test(cpp_llm_engine_cuda_cublas_matmul_test)
+cpp_llm_prepare_test(cpp_llm_engine_cuda_execution_context_test)
+cpp_llm_prepare_test(cpp_llm_engine_cuda_quantized_linear_test)
+cpp_llm_prepare_test(cpp_llm_engine_cuda_rope_test)
+cpp_llm_prepare_test(cpp_llm_engine_cuda_kv_cache_test)
+cpp_llm_prepare_test(cpp_llm_engine_cuda_gqa_attention_test)
+cpp_llm_prepare_test(cpp_llm_engine_cuda_decoder_elementwise_test)
+cpp_llm_prepare_test(cpp_llm_engine_cuda_decoder_layer_test)
+
 include(CTest)
 enable_testing()
 add_test(NAME cpp_llm_engine_cuda_test COMMAND cpp_llm_engine_cuda_test)
@@ -146,3 +159,13 @@ add_test(
 add_test(
     NAME cpp_llm_engine_cuda_decoder_layer_test
     COMMAND cpp_llm_engine_cuda_decoder_layer_test)
+cpp_llm_set_test_labels(cpp_llm_engine_cuda_test unit cuda runtime)
+cpp_llm_set_test_labels(cpp_llm_engine_cuda_elementwise_test unit cuda operator)
+cpp_llm_set_test_labels(cpp_llm_engine_cuda_cublas_matmul_test integration cuda matmul)
+cpp_llm_set_test_labels(cpp_llm_engine_cuda_execution_context_test contract cuda runtime)
+cpp_llm_set_test_labels(cpp_llm_engine_cuda_quantized_linear_test integration cuda quantization)
+cpp_llm_set_test_labels(cpp_llm_engine_cuda_rope_test unit cuda rope)
+cpp_llm_set_test_labels(cpp_llm_engine_cuda_kv_cache_test component cuda cache)
+cpp_llm_set_test_labels(cpp_llm_engine_cuda_gqa_attention_test component cuda attention)
+cpp_llm_set_test_labels(cpp_llm_engine_cuda_decoder_elementwise_test component cuda decoder)
+cpp_llm_set_test_labels(cpp_llm_engine_cuda_decoder_layer_test integration cuda decoder)
