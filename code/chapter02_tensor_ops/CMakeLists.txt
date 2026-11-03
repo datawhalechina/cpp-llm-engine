@@ -3,9 +3,17 @@
 cmake_minimum_required(VERSION 3.20)
 project(chapter02_tensor_ops LANGUAGES CXX)
 
+option(
+    CHAPTER02_BUILD_STANDALONE_TARGETS
+    "Build the Chapter 02 demo and standalone test"
+    ON
+)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+include(${CMAKE_CURRENT_LIST_DIR}/../testing/cmake/CppLlmTesting.cmake)
 
 if(NOT TARGET cpp_llm_engine_core)
     add_subdirectory(
@@ -26,23 +34,38 @@ target_include_directories(chapter02_tensor_ops
 target_compile_features(chapter02_tensor_ops PUBLIC cxx_std_17)
 target_link_libraries(chapter02_tensor_ops PUBLIC cpp_llm_engine_core)
 
-add_executable(chapter02_tensor_ops_demo
-    examples/main_tensor_ops.cpp
-)
+if(CHAPTER02_BUILD_STANDALONE_TARGETS)
+    add_executable(chapter02_tensor_ops_demo
+        examples/main_tensor_ops.cpp
+    )
 
-target_link_libraries(chapter02_tensor_ops_demo
-    PRIVATE chapter02_tensor_ops
-)
+    target_link_libraries(chapter02_tensor_ops_demo
+        PRIVATE chapter02_tensor_ops
+    )
 
-add_executable(chapter02_tensor_ops_test
-    tests/chapter02_tensor_ops_test.cpp
-)
+    add_executable(chapter02_tensor_ops_test
+        tests/chapter02_tensor_ops_test.cpp
+    )
 
-target_link_libraries(chapter02_tensor_ops_test
-    PRIVATE chapter02_tensor_ops
-)
+    target_link_libraries(chapter02_tensor_ops_test
+        PRIVATE chapter02_tensor_ops
+    )
+    cpp_llm_prepare_test(chapter02_tensor_ops_test)
 
-include(CTest)
-enable_testing()
+    add_executable(chapter02_nd_tensor_test
+        tests/chapter02_nd_tensor_test.cpp
+    )
 
-add_test(NAME chapter02_tensor_ops_test COMMAND chapter02_tensor_ops_test)
+    target_link_libraries(chapter02_nd_tensor_test
+        PRIVATE chapter02_tensor_ops
+    )
+    cpp_llm_prepare_test(chapter02_nd_tensor_test)
+
+    include(CTest)
+    enable_testing()
+
+    add_test(NAME chapter02_tensor_ops_test COMMAND chapter02_tensor_ops_test)
+    add_test(NAME chapter02_nd_tensor_test COMMAND chapter02_nd_tensor_test)
+    cpp_llm_set_test_labels(chapter02_tensor_ops_test unit tensor)
+    cpp_llm_set_test_labels(chapter02_nd_tensor_test contract tensor)
+endif()
