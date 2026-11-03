@@ -14,7 +14,6 @@
 | `src/tokenizer*` | tokenizer contract 和 metadata 边界 |
 | `src/model_schema.*` | Llama Tensor layout 和 shape 校验 |
 | `src/model_builder.*` | `LoadedModel` 和 `DecoderInput` 装配 |
-| `src/real_llama_cpu_decoder.*` | 真实 Llama Model/Context，支持 Q4_K/Q8_0 token 与 embedding prefill |
 | `examples/gguf_inspect.cpp` | 真实 GGUF 检查工具 |
 | `src/real_layer_weights.*` | 按需装配真实 Llama decoder layer 权重 |
 | `examples/gguf_first_layer_inspect.cpp` | 第一层九个 tensor 的 dtype/shape/payload 检查 |
@@ -23,7 +22,7 @@
 | `examples/gguf_q6k_compare.cpp` | 真实 Q6_K tensor 与 llama.cpp 官方解码对照工具（可选整合构建） |
 | `examples/gguf_first_layer_forward.cpp` | 真实 TinyLlama layer-0 单 token CPU forward（可选整合构建） |
 | `examples/gguf_first_layer_multitoken.cpp` | 真实 TinyLlama layer-0 多 token CPU forward：RoPE、causal score、GQA、KV Cache（可选整合构建） |
-| `examples/gguf_decoder_multilayer.cpp` | 真实 TinyLlama 多层 Decoder、Final RMSNorm 和 LM Head logits smoke（可选整合构建） |
+| `../model` | 消费本章模型资产的真实 Decoder 执行模块 |
 | `run_real_tokenizer.sh` | 构建并验证 TinyLlama 真实 tokenizer contract |
 | `tests/chapter01_tensor_loader_test.cpp` | fixture、loader、schema 和装配测试 |
 | `run.sh` | 隔离构建和 CTest 入口 |
@@ -72,11 +71,11 @@ cmake --build /tmp/cpp-llm-engine-chapter01-real-tokenizer
   llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf "Hello TinyLlama"
 ```
 
-Q6_K 真实 tensor 对照需要同时启用 Chapter 06 和 llama.cpp：
+Q6_K 真实 tensor 对照需要同时启用 Chapter 05 和 llama.cpp：
 
 ```bash
 cmake -S code/chapter01_tensor_loader -B /tmp/chapter01-q6k \
-  -DCHAPTER06_SOURCE_DIR="$PWD/code/chapter06_quantization" \
+  -DCHAPTER05_SOURCE_DIR="$PWD/code/chapter05_quantization" \
   -DCHAPTER01_ENABLE_LLAMA_CPP=ON \
   -DLLAMA_CPP_ROOT="$PWD/llama.cpp"
 cmake --build /tmp/chapter01-q6k --target gguf_q6k_compare
@@ -84,7 +83,7 @@ cmake --build /tmp/chapter01-q6k --target gguf_q6k_compare
   llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
 ```
 
-真实首层单 token smoke 复用同一个 Chapter 06 整合构建：
+真实首层单 token smoke 复用同一个 Chapter 05 整合构建：
 
 ```bash
 cmake --build /tmp/chapter01-q6k --target gguf_first_layer_forward
@@ -104,7 +103,7 @@ cmake --build /tmp/chapter01-q6k --target gguf_first_layer_multitoken
 
 该工具使用固定的 6 个 TinyLlama token，逐位置执行 RoPE、causal softmax 和 GQA，并把 K/V 追加到首层 KV Cache。输出中的 `attention_score_count`、`kv_cache_tokens` 和 `last_output_finite=true` 是本步的最小验证证据；它仍只执行 layer-0，不代表完整 Decoder 或 llama.cpp 数值等价。
 
-多层 Decoder smoke 默认执行前 2 层，传入 `22` 可验证完整 Block 堆栈和 logits：
+Chapter04 的多层 Decoder smoke 默认执行前 2 层，传入 `22` 可验证完整 Block 堆栈和 logits：
 
 ```bash
 cmake --build /tmp/chapter01-q6k --target gguf_decoder_multilayer
@@ -114,7 +113,7 @@ cmake --build /tmp/chapter01-q6k --target gguf_decoder_multilayer
 
 第二个参数可以改为不超过模型层数的值。示例不再复制 RoPE、GQA、FFN 和 LM Head，而是加载一个 `RealLlamaCpuModel`，再由它创建独立的 `RealLlamaCpuContext` 执行 `prefill()` / `decode()`。Model 共享量化权重，Context 独占 position、分层 K/V 和统计；两个 Context 用同一 prompt 得到相同 logits，并输出 `context_isolation: PASS`。
 
-Chapter01 负责把 GGUF 变成可执行的真实 Model，因此真实 CPU Decoder 的装配代码暂时位于本目录；Decoder 的数学结构由 Chapter04 解释。`RealLlamaCpuModel::decoder_contract()` 输出结构契约，`RealLlamaCpuContext` 实现 Core 的 `DecoderExecutionContext`，Engine 只依赖该执行接口，不读取 GGUF 或具体层类型。
+Chapter01 到这里结束：它输出模型配置、Tensor Map、Tokenizer 和按层权重，不执行完整 Decoder。真实 CPU Decoder 位于 `code/model`，由 Chapter04 解释其数学结构和执行顺序。`RealLlamaCpuModel::decoder_contract()` 输出结构契约，`RealLlamaCpuContext` 实现 Core 的 `DecoderExecutionContext`，Engine 只依赖该执行接口，不读取 GGUF 或具体层类型。
 
 当构建同时启用 `CHAPTER01_ENABLE_LLAMA_CPP=ON` 时，完整 22 层运行还会用相同 token IDs 调用 llama.cpp CPU reference。对照关闭 Flash Attention，并使用 F32 K/V Cache；验收条件覆盖 cosine similarity、mean absolute error、RMSE 和 top-5 overlap。当前 TinyLlama 结果为 cosine `0.99952`、RMSE `0.148398`、top-1 一致、top-5 `5/5`。随后两边按同一 greedy 规则生成 4 个 token，结果均为 `29892 306 29915 29885`，最终输出 `greedy_sequence_match: true`。不同 CPU kernel 的累加顺序会让单个 logit 存在误差，因此不把 `max_abs` 作为唯一判据。
 

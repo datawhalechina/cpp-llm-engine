@@ -4,7 +4,7 @@
 #include "gguf_reader.h"
 #include "gguf_tensor_loader.h"
 
-#include "chapter06_quantization/q6k_dequantize.h"
+#include "chapter05_quantization/q6k_dequantize.h"
 #include "ggml-quants.h"
 
 #include <algorithm>
@@ -21,7 +21,7 @@ bool valid_shape(const chapter01::GgufTensorInfo& info) {
     return info.dimensions.size() == 2 && info.dimensions[0] > 0 && info.dimensions[1] > 0 &&
            info.dimensions[0] <= std::numeric_limits<std::size_t>::max() &&
            info.dimensions[1] <= std::numeric_limits<std::size_t>::max() &&
-           info.dimensions[1] % chapter06_quantization::kQ6KBlockElements == 0;
+           info.dimensions[1] % chapter05_quantization::kQ6KBlockElements == 0;
 }
 
 }  // namespace
@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
 
     const std::size_t element_count = tensor.numel();
     std::vector<float> tutorial_output;
-    if (!chapter06_quantization::dequantize_q6_k(
+    if (!chapter05_quantization::dequantize_q6_k(
             reinterpret_cast<const std::uint8_t*>(tensor.raw_data()), tensor.bytes(),
             element_count, &tutorial_output, &error)) {
         std::cerr << "tutorial Q6_K decode failed: " << error << '\n';

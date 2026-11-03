@@ -1,7 +1,7 @@
 // Chapter 01/04/06：真实 TinyLlama 多层 Decoder 与 llama.cpp 对照入口。
 // 职责：复用 RealLlamaCpuModel/Context 执行固定 prompt，只保留验证逻辑。
 // 验证：比较 logits、greedy sequence，并检查两个 Context 的 KV 状态隔离。
-#include "real_llama_cpu_decoder.h"
+#include "cpp_llm_engine/model/real_llama_cpu_decoder.h"
 
 #if defined(CHAPTER01_COMPARE_LLAMA_CPP)
 #include <llama.h>

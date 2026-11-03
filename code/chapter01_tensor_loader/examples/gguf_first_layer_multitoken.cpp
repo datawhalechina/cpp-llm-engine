@@ -7,9 +7,9 @@
 #include "model_schema.h"
 #include "real_layer_weights.h"
 
-#include "chapter06_quantization/q4k_dequantize.h"
-#include "chapter06_quantization/q4k_linear.h"
-#include "chapter06_quantization/q6k_linear.h"
+#include "chapter05_quantization/q4k_dequantize.h"
+#include "chapter05_quantization/q4k_linear.h"
+#include "chapter05_quantization/q6k_linear.h"
 
 #include <algorithm>
 #include <cmath>
@@ -93,12 +93,12 @@ bool linear(const chapter01::Tensor& weight,
     const auto rows = static_cast<std::size_t>(shape[0]);
     const auto cols = static_cast<std::size_t>(shape[1]);
     if (weight.dtype() == chapter01::DType::Q4_K) {
-        return chapter06_quantization::Q4KLinearFused::forward(
+        return chapter05_quantization::Q4KLinearFused::forward(
             reinterpret_cast<const std::uint8_t*>(weight.raw_data()), weight.bytes(),
             cols, rows, input, output, error);
     }
     if (weight.dtype() == chapter01::DType::Q6_K) {
-        return chapter06_quantization::Q6KLinearFused::forward(
+        return chapter05_quantization::Q6KLinearFused::forward(
             reinterpret_cast<const std::uint8_t*>(weight.raw_data()), weight.bytes(),
             cols, rows, input, output, error);
     }
@@ -186,7 +186,7 @@ bool dequantize_embedding(const chapter01::Tensor& embedding,
         *error = "embedding layout is not a contiguous Q4_K token table";
         return false;
     }
-    return chapter06_quantization::dequantize_q4_k(
+    return chapter05_quantization::dequantize_q4_k(
         reinterpret_cast<const std::uint8_t*>(embedding.raw_data()) + offset,
         row_bytes, hidden_size, output, error);
 }

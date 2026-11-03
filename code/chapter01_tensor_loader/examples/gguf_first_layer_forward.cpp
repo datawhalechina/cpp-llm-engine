@@ -7,9 +7,9 @@
 #include "model_schema.h"
 #include "real_layer_weights.h"
 
-#include "chapter06_quantization/q4k_dequantize.h"
-#include "chapter06_quantization/q4k_linear.h"
-#include "chapter06_quantization/q6k_linear.h"
+#include "chapter05_quantization/q4k_dequantize.h"
+#include "chapter05_quantization/q4k_linear.h"
+#include "chapter05_quantization/q6k_linear.h"
 
 #include <algorithm>
 #include <cmath>
@@ -99,7 +99,7 @@ bool q4_linear(const chapter01::Tensor& weight,
         *error = "expected 2D Q4_K weight: " + weight.name();
         return false;
     }
-    return chapter06_quantization::Q4KLinearFused::forward(
+    return chapter05_quantization::Q4KLinearFused::forward(
         reinterpret_cast<const std::uint8_t*>(weight.raw_data()), weight.bytes(),
         static_cast<std::size_t>(shape[1]), static_cast<std::size_t>(shape[0]),
         input, output, error);
@@ -114,7 +114,7 @@ bool q6_linear(const chapter01::Tensor& weight,
         *error = "expected 2D Q6_K weight: " + weight.name();
         return false;
     }
-    return chapter06_quantization::Q6KLinearFused::forward(
+    return chapter05_quantization::Q6KLinearFused::forward(
         reinterpret_cast<const std::uint8_t*>(weight.raw_data()), weight.bytes(),
         static_cast<std::size_t>(shape[1]), static_cast<std::size_t>(shape[0]),
         input, output, error);
@@ -191,7 +191,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::vector<float> hidden;
-    if (!chapter06_quantization::dequantize_q4_k(
+    if (!chapter05_quantization::dequantize_q4_k(
             reinterpret_cast<const std::uint8_t*>(embedding.raw_data()) + embedding_offset,
             embedding_row_bytes, hidden_size, &hidden, &error)) {
         std::cerr << "embedding dequant failed: " << error << '\n';

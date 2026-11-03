@@ -1,9 +1,9 @@
-// Chapter 01/04/06：真实 Llama GGUF CPU 模型与请求执行上下文接口。
+// 真实模型执行层：声明 Llama GGUF CPU 模型与请求执行上下文。
 // 职责：Model 共享只读量化权重，Context 独占 position、分层 KV 和执行统计。
 // 验证：多层数值对照与 Engine golden CTest 检查结果和 context 隔离。
 #pragma once
 
-#include "chapter06_quantization/quantized_linear_policy.h"
+#include "chapter05_quantization/quantized_linear_policy.h"
 #include "cpp_llm_engine/core/decoder_contract.h"
 #include "tokenizer.h"
 
@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+// 暂时保留 chapter01 命名空间，兼容已有 Engine 和多模态调用方；
+// 文件与构建目标已经归入独立 model 模块。
 namespace chapter01 {
 
 struct RealLlamaDecoderStats {
@@ -42,9 +44,18 @@ struct RealLlamaDecoderProfile {
     double ffn_down_ms = 0.0;
     double ffn_residual_ms = 0.0;
     double lm_head_ms = 0.0;
+    std::size_t batch_linear_calls = 0;
+    double batch_input_pack_ms = 0.0;
+    double batch_kernel_ms = 0.0;
+    double batch_output_unpack_ms = 0.0;
 };
 
 class RealLlamaCpuContext;
+
+struct RealLlamaCpuBatchItem {
+    RealLlamaCpuContext* context = nullptr;
+    TokenId token = 0;
+};
 
 class RealLlamaCpuModel final {
 public:
@@ -65,10 +76,15 @@ public:
     std::size_t model_layer_count() const;
     std::size_t vocab_size() const;
     TokenId eos_token_id() const;
+    std::size_t weight_payload_bytes() const;
     cpp_llm_engine::core::DecoderModelContract decoder_contract() const;
     bool embed_tokens(
         const TokenSequence& tokens,
         cpp_llm_engine::core::DecoderEmbeddingSequence* embeddings,
+        std::string* error = nullptr) const;
+    bool decode_batch(
+        const std::vector<RealLlamaCpuBatchItem>& items,
+        std::vector<std::vector<float>>* logits,
         std::string* error = nullptr) const;
 
 private:
@@ -108,14 +124,15 @@ public:
         cpp_llm_engine::core::DecoderTokenId token,
         cpp_llm_engine::core::DecoderLogits* logits) override;
     std::size_t token_count() const override;
+    std::size_t kv_cache_bytes() const;
     cpp_llm_engine::core::DecoderModelContract model_contract() const override;
 
     void set_profiling_enabled(bool enabled);
     bool set_attention_linear_policy(
-        const chapter06_quantization::QuantizedLinearPolicy& policy,
+        const chapter05_quantization::QuantizedLinearPolicy& policy,
         std::string* error = nullptr);
     bool set_ffn_linear_policy(
-        const chapter06_quantization::QuantizedLinearPolicy& policy,
+        const chapter05_quantization::QuantizedLinearPolicy& policy,
         std::string* error = nullptr);
     RealLlamaDecoderStats stats() const;
     RealLlamaDecoderProfile profile() const;

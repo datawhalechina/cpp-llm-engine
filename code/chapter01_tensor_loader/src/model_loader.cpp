@@ -64,6 +64,7 @@ std::string make_error(const std::string& message) {
 
 bool ModelLoader::load(const std::filesystem::path& path, std::string* error) {
     tensors_.clear();
+    std::unordered_map<std::string, Tensor> loaded_tensors;
 
     std::ifstream input(path, std::ios::binary);
     if (!input) {
@@ -155,9 +156,10 @@ bool ModelLoader::load(const std::filesystem::path& path, std::string* error) {
                                                static_cast<DType>(dtype_u8),
                                                std::move(bytes),
                                                static_cast<Device>(device_u8));
-        tensors_.emplace(tensor.name(), std::move(tensor));
+        loaded_tensors.emplace(tensor.name(), std::move(tensor));
     }
 
+    tensors_ = std::move(loaded_tensors);
     return true;
 }
 

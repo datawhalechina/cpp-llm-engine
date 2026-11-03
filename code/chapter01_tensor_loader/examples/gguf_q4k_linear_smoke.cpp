@@ -1,11 +1,11 @@
 // Chapter 01/06：真实 Q4_K Linear smoke example
-// 职责：加载 GGUF 中一个 Q4_K tensor，验证它能进入 Chapter 06 CPU Linear。
+// 职责：加载 GGUF 中一个 Q4_K tensor，验证它能进入 Chapter 05 CPU Linear。
 // 输入：model.gguf；输出：reference 与 fused 的首行结果和误差。
 // 验证：Chapter 01/06 跨章 CTest。
 #include "gguf_reader.h"
 #include "gguf_tensor_loader.h"
 
-#include "chapter06_quantization/q4k_linear.h"
+#include "chapter05_quantization/q4k_linear.h"
 
 #include <cstdint>
 #include <iostream>
@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
     const std::size_t cols = static_cast<std::size_t>(shape[1]);
     std::vector<float> input(cols, 1.0f);
     std::vector<float> output;
-    if (!chapter06_quantization::Q4KLinearFused::forward(
+    if (!chapter05_quantization::Q4KLinearFused::forward(
             reinterpret_cast<const std::uint8_t*>(embedding.raw_data()),
             embedding.bytes(), rows, cols, input, &output, &error)) {
         std::cerr << "Q4_K Linear failed: " << error << '\n';

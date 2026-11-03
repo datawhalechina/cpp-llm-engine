@@ -1,12 +1,12 @@
 // Chapter 01/06：真实 GGUF Q4_K benchmark example
-// 职责：从 GGUF index 读取真实 Q4_K tensor，并调用 Chapter 06 Linear 路径。
+// 职责：从 GGUF index 读取真实 Q4_K tensor，并调用 Chapter 05 Linear 路径。
 // 输入：model.gguf；输出：reference/fused 多 tensor 延迟和误差。
 // 验证：真实 TinyLlama benchmark 的 max_abs_delta 小于约定阈值。
 #include "gguf_reader.h"
 #include "gguf_tensor_loader.h"
 
-#include "chapter06_quantization/q4k_linear.h"
-#include "chapter06_quantization/q4k_dequantize.h"
+#include "chapter05_quantization/q4k_linear.h"
+#include "chapter05_quantization/q4k_dequantize.h"
 
 #include <algorithm>
 #include <chrono>
@@ -91,10 +91,10 @@ bool run_linear(bool fused,
     const std::size_t cols = static_cast<std::size_t>(shape[1]);
     const auto* weights = reinterpret_cast<const std::uint8_t*>(tensor.raw_data());
     if (fused) {
-        return chapter06_quantization::Q4KLinearFused::forward(
+        return chapter05_quantization::Q4KLinearFused::forward(
             weights, tensor.bytes(), rows, cols, input, output, error);
     }
-    return chapter06_quantization::Q4KLinearReference::forward(
+    return chapter05_quantization::Q4KLinearReference::forward(
         weights, tensor.bytes(), rows, cols, input, output, error);
 }
 
@@ -122,7 +122,7 @@ bool valid_shape(const chapter01::GgufTensorInfo& info) {
     return info.dimensions.size() == 2 && info.dimensions[0] > 0 && info.dimensions[1] > 0 &&
            info.dimensions[0] <= std::numeric_limits<std::size_t>::max() &&
            info.dimensions[1] <= std::numeric_limits<std::size_t>::max() &&
-           info.dimensions[1] % chapter06_quantization::kQ4KBlockElements == 0;
+           info.dimensions[1] % chapter05_quantization::kQ4KBlockElements == 0;
 }
 
 }  // namespace
