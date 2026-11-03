@@ -19,6 +19,9 @@ public:
     FeedForward(std::size_t model_dim = 0, std::size_t hidden_dim = 0);
 
     Tensor forward(const Tensor& input) const;
+    cpp_llm_engine::core::Status try_forward(
+        const cpp_llm_engine::core::TensorViewRef& input,
+        const cpp_llm_engine::core::MutableTensorViewRef& output) const;
     bool ready() const;
 
     std::size_t model_dim() const;
@@ -32,5 +35,9 @@ private:
 };
 
 Tensor apply_activation(const Tensor& input, ActivationKind kind);
+cpp_llm_engine::core::Status try_apply_activation(
+    const cpp_llm_engine::core::TensorViewRef& input,
+    ActivationKind kind,
+    const cpp_llm_engine::core::MutableTensorViewRef& output);
 
 }  // namespace chapter04_attention

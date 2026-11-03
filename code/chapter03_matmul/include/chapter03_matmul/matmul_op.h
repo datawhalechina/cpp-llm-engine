@@ -1,6 +1,6 @@
 // Chapter 03：MatMul 算子接口
 // 职责：把 Matrix 输入转换为公共 MatmulRequest，并注入可替换 backend。
-// 契约：try_compute 返回 Status；兼容入口 compute 在失败时抛出明确错误。
+// 契约：try_compute 成功后提交输出、失败时保留输出；compute 失败时抛出明确错误。
 // 验证：chapter03_matmul_test.cpp 和 operator_smoke_test.cpp。
 #pragma once
 

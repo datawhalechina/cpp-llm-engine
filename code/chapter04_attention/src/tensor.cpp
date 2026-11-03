@@ -30,16 +30,92 @@ bool Tensor::ready() const {
     return rows > 0 && cols > 0 && data.size() == rows * cols;
 }
 
+cpp_llm_engine::core::TensorContract Tensor::contract() const {
+    return cpp_llm_engine::core::TensorContract{
+        cpp_llm_engine::core::Shape{{rows, cols}},
+        {cols, 1},
+        cpp_llm_engine::core::DType::Float32,
+        cpp_llm_engine::core::DeviceKind::CPU,
+        0,
+        data.size() * sizeof(float),
+    };
+}
+
+cpp_llm_engine::core::TensorViewRef Tensor::view_ref() const {
+    return cpp_llm_engine::core::TensorViewRef{data.data(), contract()};
+}
+
+cpp_llm_engine::core::MutableTensorViewRef Tensor::mutable_view_ref() {
+    return cpp_llm_engine::core::MutableTensorViewRef{data.data(), contract()};
+}
+
+cpp_llm_engine::core::Status validate_cpu_float32_matrix_view(
+    const cpp_llm_engine::core::TensorViewRef& view) {
+    using cpp_llm_engine::core::DType;
+    using cpp_llm_engine::core::DeviceKind;
+    using cpp_llm_engine::core::Status;
+
+    const auto storage_status = view.validate(sizeof(float));
+    if (!storage_status.is_ok()) return storage_status;
+    if (view.contract.shape.dimensions.size() != 2) {
+        return Status::error("tensor matrix view rank must be two");
+    }
+    if (view.contract.dtype != DType::Float32) {
+        return Status::error("tensor matrix view dtype must be Float32");
+    }
+    if (view.contract.device != DeviceKind::CPU) {
+        return Status::error("tensor matrix view device must be CPU");
+    }
+    if (!view.contract.is_contiguous_row_major()) {
+        return Status::error("tensor matrix view must be contiguous row-major");
+    }
+    return Status::ok();
+}
+
 Tensor add(const Tensor& lhs, const Tensor& rhs) {
     if (!lhs.ready() || !rhs.ready() || lhs.rows != rhs.rows || lhs.cols != rhs.cols) {
         return {};
     }
 
     Tensor out(lhs.rows, lhs.cols);
-    for (std::size_t i = 0; i < out.data.size(); ++i) {
-        out.data[i] = lhs.data[i] + rhs.data[i];
-    }
+    const auto status =
+        try_add_views(lhs.view_ref(), rhs.view_ref(), out.mutable_view_ref());
+    if (!status.is_ok()) return {};
     return out;
+}
+
+cpp_llm_engine::core::Status try_add_views(
+    const cpp_llm_engine::core::TensorViewRef& lhs,
+    const cpp_llm_engine::core::TensorViewRef& rhs,
+    const cpp_llm_engine::core::MutableTensorViewRef& output) {
+    using cpp_llm_engine::core::Status;
+
+    const auto lhs_status = validate_cpu_float32_matrix_view(lhs);
+    if (!lhs_status.is_ok()) return lhs_status;
+    const auto rhs_status = validate_cpu_float32_matrix_view(rhs);
+    if (!rhs_status.is_ok()) return rhs_status;
+    const auto output_status = validate_cpu_float32_matrix_view(output.as_const());
+    if (!output_status.is_ok()) return output_status;
+    if (lhs.contract.shape.dimensions != rhs.contract.shape.dimensions ||
+        lhs.contract.shape.dimensions != output.contract.shape.dimensions) {
+        return Status::error("residual add shape mismatch");
+    }
+
+    std::size_t elements = 0;
+    const auto shape_status = lhs.contract.shape.checked_numel(&elements);
+    if (!shape_status.is_ok()) return shape_status;
+    const auto* lhs_data = static_cast<const float*>(lhs.storage_data) +
+                           lhs.contract.storage_offset_elements;
+    const auto* rhs_data = static_cast<const float*>(rhs.storage_data) +
+                           rhs.contract.storage_offset_elements;
+    std::vector<float> result(elements, 0.0f);
+    for (std::size_t i = 0; i < elements; ++i) {
+        result[i] = lhs_data[i] + rhs_data[i];
+    }
+    auto* output_data = static_cast<float*>(output.storage_data) +
+                        output.contract.storage_offset_elements;
+    std::copy(result.begin(), result.end(), output_data);
+    return Status::ok();
 }
 
 Tensor transpose(const Tensor& tensor) {

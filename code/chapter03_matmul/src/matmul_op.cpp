@@ -45,7 +45,6 @@ cpp_llm_engine::core::Status MatMulOp::try_compute(
     if (output == nullptr) {
         return cpp_llm_engine::core::Status::error("matmul output must not be null");
     }
-    *output = {};
     if (!lhs.ready() || !rhs.ready()) {
         return cpp_llm_engine::core::Status::error("matrix is not ready");
     }

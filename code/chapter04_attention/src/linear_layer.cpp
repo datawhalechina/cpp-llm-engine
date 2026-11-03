@@ -1,10 +1,10 @@
 // Chapter 04：Decoder Linear 实现
-// 职责：保存教学 float 权重并执行 row-major 输入到输出的矩阵乘法。
-// 契约：输入列数必须匹配 in_features，错误 shape 返回空 Tensor。
+// 职责：保存教学 float 权重，并通过公共 View 执行 row-major Linear。
+// 契约：只接受 CPU Float32 连续二维 View；失败不修改输出。
 // 验证：chapter04_attention_test.cpp。
 #include "chapter04_attention/linear_layer.h"
 
-#include <stdexcept>
+#include <algorithm>
 
 namespace chapter04_attention {
 
@@ -33,13 +33,49 @@ Tensor LinearLayer::forward(const Tensor& input) const {
         return {};
     }
 
-    Tensor out = matmul(input, weight_);
-    for (std::size_t row = 0; row < out.rows; ++row) {
-        for (std::size_t col = 0; col < out.cols; ++col) {
-            out.at(row, col) += bias_[col];
+    Tensor out(input.rows, out_features_);
+    const auto status = try_forward(input.view_ref(), out.mutable_view_ref());
+    if (!status.is_ok()) return {};
+    return out;
+}
+
+cpp_llm_engine::core::Status LinearLayer::try_forward(
+    const cpp_llm_engine::core::TensorViewRef& input,
+    const cpp_llm_engine::core::MutableTensorViewRef& output) const {
+    using cpp_llm_engine::core::Status;
+
+    if (!ready()) return Status::error("linear layer is not ready");
+    const auto input_status = validate_cpu_float32_matrix_view(input);
+    if (!input_status.is_ok()) return input_status;
+    const auto output_status = validate_cpu_float32_matrix_view(output.as_const());
+    if (!output_status.is_ok()) return output_status;
+
+    const auto rows = input.contract.shape.dimensions[0];
+    if (input.contract.shape.dimensions[1] != in_features_) {
+        return Status::error("linear input shape mismatch");
+    }
+    if (output.contract.shape.dimensions !=
+        std::vector<std::size_t>{rows, out_features_}) {
+        return Status::error("linear output shape mismatch");
+    }
+
+    const auto* input_data = static_cast<const float*>(input.storage_data) +
+                             input.contract.storage_offset_elements;
+    std::vector<float> result(rows * out_features_, 0.0f);
+    for (std::size_t row = 0; row < rows; ++row) {
+        for (std::size_t col = 0; col < out_features_; ++col) {
+            float value = bias_[col];
+            for (std::size_t inner = 0; inner < in_features_; ++inner) {
+                value += input_data[row * in_features_ + inner] *
+                         weight_.at(inner, col);
+            }
+            result[row * out_features_ + col] = value;
         }
     }
-    return out;
+    auto* output_data = static_cast<float*>(output.storage_data) +
+                        output.contract.storage_offset_elements;
+    std::copy(result.begin(), result.end(), output_data);
+    return Status::ok();
 }
 
 bool LinearLayer::ready() const {

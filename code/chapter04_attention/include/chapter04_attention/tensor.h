@@ -4,6 +4,9 @@
 // 验证：chapter04_attention_test.cpp。
 #pragma once
 
+#include "cpp_llm_engine/core/tensor_contract.h"
+#include "cpp_llm_engine/core/tensor_view_ref.h"
+
 #include <cstddef>
 #include <vector>
 
@@ -20,8 +23,17 @@ struct Tensor {
     float& at(std::size_t row, std::size_t col);
     float at(std::size_t row, std::size_t col) const;
     bool ready() const;
+    cpp_llm_engine::core::TensorContract contract() const;
+    cpp_llm_engine::core::TensorViewRef view_ref() const;
+    cpp_llm_engine::core::MutableTensorViewRef mutable_view_ref();
 };
 
+cpp_llm_engine::core::Status validate_cpu_float32_matrix_view(
+    const cpp_llm_engine::core::TensorViewRef& view);
+cpp_llm_engine::core::Status try_add_views(
+    const cpp_llm_engine::core::TensorViewRef& lhs,
+    const cpp_llm_engine::core::TensorViewRef& rhs,
+    const cpp_llm_engine::core::MutableTensorViewRef& output);
 Tensor add(const Tensor& lhs, const Tensor& rhs);
 Tensor transpose(const Tensor& tensor);
 Tensor matmul(const Tensor& lhs, const Tensor& rhs);

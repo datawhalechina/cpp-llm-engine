@@ -1,12 +1,12 @@
 // Chapter 04：Attention/Decoder 综合测试
 // 职责：验证 causal mask、decode offset、KV Cache、LayerNorm、FFN 和 DecoderLayer。
-// 通过条件：所有 assert 成立，Chapter 04 与 core CTest 均通过。
+// 通过条件：Attention、Cache、组件与结构契约检查全部通过。
 // 验证：bash code/chapter04_attention/scripts/run.sh。
 #include "chapter04_attention/decoder_layer.h"
 #include "chapter04_attention/attention_backend.h"
 #include "chapter04_attention/kv_cache.h"
+#include "cpp_llm_engine/testing/test.h"
 
-#include <cassert>
 #include <cmath>
 
 namespace {
@@ -27,87 +27,100 @@ chapter04_attention::Tensor make_input() {
 }  // namespace
 
 int main() {
+    cpp_llm_engine::testing::TestSuite suite("chapter04_attention");
+    suite.run("attention cache and decoder components preserve contracts", [&] {
     const float query[] = {1.0f, 1.0f};
     const float key[] = {1.0f, 1.0f};
     const float value[] = {2.0f, 4.0f};
     float attention_output[] = {0.0f, 0.0f};
     const cpp_llm_engine::core::AttentionRequest causal_request{
         query, key, value, attention_output, 2, 1, 1, 1, 0, true, 1.0f};
-    assert(chapter04_attention::cpu_reference_attention_backend().compute(causal_request).is_ok());
-    assert(std::abs(attention_output[0] - 2.0f) < 1e-5f);
+    CPP_LLM_REQUIRE(
+        suite,
+        chapter04_attention::cpu_reference_attention_backend()
+            .compute(causal_request)
+            .is_ok());
+    CPP_LLM_CHECK(suite, std::abs(attention_output[0] - 2.0f) < 1e-5f);
 
     const float two_keys[] = {1.0f, 1.0f, 1.0f, 1.0f};
     const float two_values[] = {2.0f, 4.0f, 100.0f, 200.0f};
     float first_decode_output[] = {0.0f, 0.0f};
     const cpp_llm_engine::core::AttentionRequest future_mask_request{
         query, two_keys, two_values, first_decode_output, 1, 2, 1, 2, 0, true, 1.0f};
-    assert(chapter04_attention::cpu_reference_attention_backend().compute(
-               future_mask_request).is_ok());
-    assert(std::abs(first_decode_output[0] - 2.0f) < 1e-5f);
+    CPP_LLM_REQUIRE(
+        suite,
+        chapter04_attention::cpu_reference_attention_backend()
+            .compute(future_mask_request)
+            .is_ok());
+    CPP_LLM_CHECK(suite, std::abs(first_decode_output[0] - 2.0f) < 1e-5f);
 
     chapter04_attention::KvCache cache(2, 1, 2);
-    assert(cache.ready());
-    assert(cache.width() == 2);
-    assert(cache.append(two_keys, two_values, 2));
-    assert(cache.size() == 2);
-    assert(cache.key_data()[0] == 1.0f);
-    assert(cache.value_data()[2] == 100.0f);
-    assert(!cache.append(two_keys, two_values, 1));
+    CPP_LLM_CHECK(suite, cache.ready());
+    CPP_LLM_CHECK(suite, cache.width() == 2);
+    CPP_LLM_CHECK(suite, cache.append(two_keys, two_values, 2));
+    CPP_LLM_CHECK(suite, cache.size() == 2);
+    CPP_LLM_CHECK(suite, cache.key_data()[0] == 1.0f);
+    CPP_LLM_CHECK(suite, cache.value_data()[2] == 100.0f);
+    CPP_LLM_CHECK(suite, !cache.append(two_keys, two_values, 1));
 
     float cached_output[] = {0.0f, 0.0f};
     const cpp_llm_engine::core::AttentionRequest cached_decode_request{
         query, cache.key_data(), cache.value_data(), cached_output,
         1, cache.size(), 1, 2, 1, true, 1.0f};
-    assert(chapter04_attention::cpu_reference_attention_backend().compute(
-               cached_decode_request).is_ok());
-    assert(std::abs(cached_output[0] - 51.0f) < 1e-5f);
+    CPP_LLM_REQUIRE(
+        suite,
+        chapter04_attention::cpu_reference_attention_backend()
+            .compute(cached_decode_request)
+            .is_ok());
+    CPP_LLM_CHECK(suite, std::abs(cached_output[0] - 51.0f) < 1e-5f);
     cache.clear();
-    assert(cache.size() == 0);
-    assert(cache.append(two_keys, two_values, 1));
+    CPP_LLM_CHECK(suite, cache.size() == 0);
+    CPP_LLM_CHECK(suite, cache.append(two_keys, two_values, 1));
 
     const chapter04_attention::Tensor input = make_input();
 
     chapter04_attention::LayerNorm norm(4);
     const chapter04_attention::Tensor normed = norm.forward(input);
-    assert(norm.ready());
-    assert(normed.ready());
-    assert(normed.rows == 2);
-    assert(normed.cols == 4);
+    CPP_LLM_CHECK(suite, norm.ready());
+    CPP_LLM_CHECK(suite, normed.ready());
+    CPP_LLM_CHECK(suite, normed.rows == 2);
+    CPP_LLM_CHECK(suite, normed.cols == 4);
 
     chapter04_attention::MultiHeadAttention attention(4, 2);
     const chapter04_attention::Tensor attended = attention.forward(input);
-    assert(attention.ready());
-    assert(attended.ready());
-    assert(attended.rows == 2);
-    assert(attended.cols == 4);
-    assert(attention.backend_kind() == cpp_llm_engine::core::BackendKind::CPU);
+    CPP_LLM_CHECK(suite, attention.ready());
+    CPP_LLM_CHECK(suite, attended.ready());
+    CPP_LLM_CHECK(suite, attended.rows == 2);
+    CPP_LLM_CHECK(suite, attended.cols == 4);
+    CPP_LLM_CHECK(suite, attention.backend_kind() == cpp_llm_engine::core::BackendKind::CPU);
 
     chapter04_attention::FeedForward feed_forward(4, 8);
     const chapter04_attention::Tensor ffn_output = feed_forward.forward(input);
-    assert(feed_forward.ready());
-    assert(ffn_output.ready());
-    assert(ffn_output.rows == 2);
-    assert(ffn_output.cols == 4);
+    CPP_LLM_CHECK(suite, feed_forward.ready());
+    CPP_LLM_CHECK(suite, ffn_output.ready());
+    CPP_LLM_CHECK(suite, ffn_output.rows == 2);
+    CPP_LLM_CHECK(suite, ffn_output.cols == 4);
 
     chapter04_attention::DecoderLayer layer(4, 2, 8, 0);
     const chapter04_attention::Tensor output = layer.forward(input);
-    assert(layer.ready());
-    assert(output.ready());
-    assert(output.rows == 2);
-    assert(output.cols == 4);
-    assert(std::abs(output.at(0, 0) - input.at(0, 0)) > 1e-4f);
-    assert(std::abs(output.at(1, 3) - input.at(1, 3)) > 1e-4f);
+    CPP_LLM_CHECK(suite, layer.ready());
+    CPP_LLM_CHECK(suite, output.ready());
+    CPP_LLM_CHECK(suite, output.rows == 2);
+    CPP_LLM_CHECK(suite, output.cols == 4);
+    CPP_LLM_CHECK(suite, std::abs(output.at(0, 0) - input.at(0, 0)) > 1e-4f);
+    CPP_LLM_CHECK(suite, std::abs(output.at(1, 3) - input.at(1, 3)) > 1e-4f);
     const auto layer_contract = layer.contract();
-    assert(layer_contract.validate().is_ok());
-    assert(layer_contract.hidden_size == 4);
-    assert(layer_contract.ffn_hidden_size == 8);
-    assert(layer_contract.query_head_count == 2);
-    assert(layer_contract.kv_head_count == 2);
-    assert(layer_contract.normalization ==
+    CPP_LLM_CHECK(suite, layer_contract.validate().is_ok());
+    CPP_LLM_CHECK(suite, layer_contract.hidden_size == 4);
+    CPP_LLM_CHECK(suite, layer_contract.ffn_hidden_size == 8);
+    CPP_LLM_CHECK(suite, layer_contract.query_head_count == 2);
+    CPP_LLM_CHECK(suite, layer_contract.kv_head_count == 2);
+    CPP_LLM_CHECK(suite, layer_contract.normalization ==
            cpp_llm_engine::core::DecoderNormalizationKind::LayerNorm);
-    assert(layer_contract.activation ==
+    CPP_LLM_CHECK(suite, layer_contract.activation ==
            cpp_llm_engine::core::DecoderActivationKind::Relu);
-    assert(!layer_contract.uses_kv_cache);
+    CPP_LLM_CHECK(suite, !layer_contract.uses_kv_cache);
 
-    return 0;
+    });
+    return suite.finish();
 }

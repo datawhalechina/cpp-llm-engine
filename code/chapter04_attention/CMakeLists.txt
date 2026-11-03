@@ -7,10 +7,22 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(${CMAKE_CURRENT_LIST_DIR}/../testing/cmake/CppLlmTesting.cmake)
+
 add_subdirectory(
     ${CMAKE_CURRENT_SOURCE_DIR}/../core
     ${CMAKE_CURRENT_BINARY_DIR}/core
 )
+
+if(NOT TARGET chapter02_tensor_ops)
+    set(CHAPTER02_BUILD_STANDALONE_TARGETS OFF)
+    add_subdirectory(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../chapter02_tensor_ops
+        ${CMAKE_CURRENT_BINARY_DIR}/chapter02_tensor_ops
+        EXCLUDE_FROM_ALL
+    )
+    unset(CHAPTER02_BUILD_STANDALONE_TARGETS)
+endif()
 
 add_library(chapter04_attention
     src/attention.cpp
@@ -22,6 +34,7 @@ add_library(chapter04_attention
     src/linear_layer.cpp
     src/kv_cache.cpp
     src/tensor.cpp
+    src/tensor_attention_adapter.cpp
 )
 
 target_include_directories(chapter04_attention
@@ -32,6 +45,7 @@ target_include_directories(chapter04_attention
 target_link_libraries(chapter04_attention
     PUBLIC
         cpp_llm_engine_core
+        chapter02_tensor_ops
 )
 
 target_compile_features(chapter04_attention PUBLIC cxx_std_17)
@@ -48,11 +62,28 @@ add_executable(chapter04_attention_test
     tests/chapter04_attention_test.cpp
 )
 
+add_executable(chapter02_tensor_attention_integration_test
+    tests/chapter02_tensor_attention_integration_test.cpp
+)
+
+target_link_libraries(chapter02_tensor_attention_integration_test
+    PRIVATE chapter04_attention
+)
+cpp_llm_prepare_test(chapter02_tensor_attention_integration_test)
+
 target_link_libraries(chapter04_attention_test
     PRIVATE chapter04_attention
 )
+cpp_llm_prepare_test(chapter04_attention_test)
 
 include(CTest)
 enable_testing()
 
 add_test(NAME chapter04_attention_test COMMAND chapter04_attention_test)
+add_test(
+    NAME chapter02_tensor_attention_integration_test
+    COMMAND chapter02_tensor_attention_integration_test
+)
+cpp_llm_set_test_labels(chapter04_attention_test unit attention decoder)
+cpp_llm_set_test_labels(
+    chapter02_tensor_attention_integration_test integration tensor attention)

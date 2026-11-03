@@ -19,6 +19,9 @@ public:
                        const cpp_llm_engine::core::AttentionBackend& backend);
 
     Tensor forward(const Tensor& input) const;
+    cpp_llm_engine::core::Status try_forward(
+        const cpp_llm_engine::core::TensorViewRef& input,
+        const cpp_llm_engine::core::MutableTensorViewRef& output) const;
     bool ready() const;
 
     std::size_t model_dim() const;

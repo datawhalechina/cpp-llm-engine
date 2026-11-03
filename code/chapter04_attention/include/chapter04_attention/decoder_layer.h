@@ -18,6 +18,9 @@ public:
     DecoderLayer(std::size_t model_dim = 0, std::size_t num_heads = 0, std::size_t ffn_dim = 0, std::size_t layer_index = 0);
 
     Tensor forward(const Tensor& input) const;
+    cpp_llm_engine::core::Status try_forward(
+        const cpp_llm_engine::core::TensorViewRef& input,
+        const cpp_llm_engine::core::MutableTensorViewRef& output) const;
     bool ready() const;
 
     std::size_t layer_index() const;
