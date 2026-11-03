@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(${CMAKE_CURRENT_LIST_DIR}/../testing/cmake/CppLlmTesting.cmake)
+
 option(MULTIMODAL_ENABLE_LLAMA_CPP_TOKENIZER "Enable the optional real tokenizer path" OFF)
 option(MULTIMODAL_ENABLE_CBLAS "Enable the optional CBLAS vision compute backend" OFF)
 option(MULTIMODAL_ENABLE_SERVICE_INTEGRATION
@@ -30,23 +32,24 @@ add_library(cpp_llm_multimodal
     ../chapter01_tensor_loader/src/model_metadata_adapter.cpp
     ../chapter01_tensor_loader/src/model_schema.cpp
     ../chapter01_tensor_loader/src/real_layer_weights.cpp
-    ../chapter01_tensor_loader/src/real_llama_cpu_decoder.cpp
+    ../model/src/real_llama_cpu_decoder.cpp
     ../chapter01_tensor_loader/src/tensor.cpp
-    ../chapter06_quantization/src/q4k_dequantize.cpp
-    ../chapter06_quantization/src/q4k_kernel.cpp
-    ../chapter06_quantization/src/q4k_linear.cpp
-    ../chapter06_quantization/src/q6k_dequantize.cpp
-    ../chapter06_quantization/src/q6k_kernel.cpp
-    ../chapter06_quantization/src/q6k_linear.cpp
-    ../chapter06_quantization/src/q8_0_dequantize.cpp
-    ../chapter06_quantization/src/q8_0_linear.cpp
-    ../chapter06_quantization/src/quantized_linear_policy.cpp
+    ../chapter05_quantization/src/q4k_dequantize.cpp
+    ../chapter05_quantization/src/q4k_kernel.cpp
+    ../chapter05_quantization/src/q4k_linear.cpp
+    ../chapter05_quantization/src/q6k_dequantize.cpp
+    ../chapter05_quantization/src/q6k_kernel.cpp
+    ../chapter05_quantization/src/q6k_linear.cpp
+    ../chapter05_quantization/src/q8_0_dequantize.cpp
+    ../chapter05_quantization/src/q8_0_linear.cpp
+    ../chapter05_quantization/src/quantized_linear_policy.cpp
 )
 target_include_directories(cpp_llm_multimodal PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../chapter01_tensor_loader/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../chapter06_quantization/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../chapter05_quantization/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../model/include
 )
 
 if(MULTIMODAL_ENABLE_CBLAS)
@@ -124,8 +127,8 @@ if(MULTIMODAL_ENABLE_SERVICE_INTEGRATION)
             "MULTIMODAL_ENABLE_SERVICE_INTEGRATION requires MULTIMODAL_ENABLE_LLAMA_CPP_TOKENIZER")
     endif()
     add_subdirectory(
-        ${CMAKE_CURRENT_SOURCE_DIR}/../chapter05_generation
-        ${CMAKE_CURRENT_BINARY_DIR}/chapter05_generation
+        ${CMAKE_CURRENT_SOURCE_DIR}/../chapter06_generation
+        ${CMAKE_CURRENT_BINARY_DIR}/chapter06_generation
     )
     add_subdirectory(
         ${CMAKE_CURRENT_SOURCE_DIR}/../chapter09_serving
@@ -147,30 +150,38 @@ endif()
 
 add_executable(multimodal_preprocessor_test tests/image_preprocessor_test.cpp)
 target_link_libraries(multimodal_preprocessor_test PRIVATE cpp_llm_multimodal)
+cpp_llm_prepare_test(multimodal_preprocessor_test)
 target_compile_definitions(multimodal_preprocessor_test PRIVATE
     MULTIMODAL_TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
 add_executable(multimodal_mmproj_schema_test tests/mmproj_schema_test.cpp)
 target_link_libraries(multimodal_mmproj_schema_test PRIVATE cpp_llm_multimodal)
+cpp_llm_prepare_test(multimodal_mmproj_schema_test)
 
 add_executable(multimodal_vision_encoder_test tests/vision_encoder_test.cpp)
 target_link_libraries(multimodal_vision_encoder_test PRIVATE cpp_llm_multimodal)
+cpp_llm_prepare_test(multimodal_vision_encoder_test)
 
 add_executable(multimodal_vision_weights_test tests/vision_weights_test.cpp)
 target_link_libraries(multimodal_vision_weights_test PRIVATE cpp_llm_multimodal)
+cpp_llm_prepare_test(multimodal_vision_weights_test)
 
 add_executable(multimodal_vision_projector_test tests/vision_projector_test.cpp)
 target_link_libraries(multimodal_vision_projector_test PRIVATE cpp_llm_multimodal)
+cpp_llm_prepare_test(multimodal_vision_projector_test)
 
 add_executable(multimodal_input_embedding_test tests/input_embedding_test.cpp)
 target_link_libraries(multimodal_input_embedding_test PRIVATE cpp_llm_multimodal)
+cpp_llm_prepare_test(multimodal_input_embedding_test)
 
 add_executable(multimodal_smolvlm_prompt_test tests/smolvlm_prompt_test.cpp)
 target_link_libraries(multimodal_smolvlm_prompt_test PRIVATE cpp_llm_multimodal)
+cpp_llm_prepare_test(multimodal_smolvlm_prompt_test)
 
 add_executable(multimodal_request_metrics_test tests/request_metrics_test.cpp)
 target_link_libraries(multimodal_request_metrics_test PRIVATE cpp_llm_multimodal)
+cpp_llm_prepare_test(multimodal_request_metrics_test)
 
 include(CTest)
 enable_testing()
@@ -182,3 +193,11 @@ add_test(NAME multimodal_vision_projector_test COMMAND multimodal_vision_project
 add_test(NAME multimodal_input_embedding_test COMMAND multimodal_input_embedding_test)
 add_test(NAME multimodal_smolvlm_prompt_test COMMAND multimodal_smolvlm_prompt_test)
 add_test(NAME multimodal_request_metrics_test COMMAND multimodal_request_metrics_test)
+cpp_llm_set_test_labels(multimodal_preprocessor_test unit multimodal preprocessing)
+cpp_llm_set_test_labels(multimodal_mmproj_schema_test contract multimodal loader)
+cpp_llm_set_test_labels(multimodal_vision_encoder_test component multimodal vision)
+cpp_llm_set_test_labels(multimodal_vision_weights_test unit multimodal loader)
+cpp_llm_set_test_labels(multimodal_vision_projector_test component multimodal projector)
+cpp_llm_set_test_labels(multimodal_input_embedding_test integration multimodal embedding)
+cpp_llm_set_test_labels(multimodal_smolvlm_prompt_test unit multimodal prompt)
+cpp_llm_set_test_labels(multimodal_request_metrics_test unit multimodal metrics)

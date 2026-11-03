@@ -15,17 +15,17 @@
 
 #include "gguf_tensor_loader.h"
 #include "model_metadata_adapter.h"
-#include "real_llama_cpu_decoder.h"
+#include "cpp_llm_engine/model/real_llama_cpu_decoder.h"
 #ifdef CPP_LLM_MULTIMODAL_HAS_REAL_TOKENIZER
 #include "real_tokenizer.h"
 #endif
 #ifdef CPP_LLM_MULTIMODAL_HAS_SERVICE
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/sampler.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/sampler.h"
 #include "chapter09_serving/http_adapter.h"
 #include "cpp_llm_engine/embedding_request_executor.h"
 #endif
-#include "chapter06_quantization/q8_0_dequantize.h"
+#include "chapter05_quantization/q8_0_dequantize.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -136,16 +136,16 @@ bool load_boundary_text_embeddings(const std::string& model_path,
         return false;
     }
     const std::size_t row_bytes =
-        expected_width / chapter06_quantization::kQ8_0BlockElements *
-        chapter06_quantization::kQ8_0BlockBytes;
+        expected_width / chapter05_quantization::kQ8_0BlockElements *
+        chapter05_quantization::kQ8_0BlockBytes;
     const auto* payload = reinterpret_cast<const std::uint8_t*>(tensor.raw_data());
     const std::size_t bos = static_cast<std::size_t>(metadata->bos_token_id);
     const std::size_t eos = static_cast<std::size_t>(metadata->eos_token_id);
     std::vector<float> bos_values;
     std::vector<float> eos_values;
-    if (!chapter06_quantization::dequantize_q8_0(
+    if (!chapter05_quantization::dequantize_q8_0(
             payload + bos * row_bytes, row_bytes, expected_width, &bos_values, error) ||
-        !chapter06_quantization::dequantize_q8_0(
+        !chapter05_quantization::dequantize_q8_0(
             payload + eos * row_bytes, row_bytes, expected_width, &eos_values, error)) {
         return false;
     }
@@ -567,20 +567,20 @@ int main(int argc, char** argv) {
         }
 #ifdef CPP_LLM_MULTIMODAL_HAS_SERVICE
         if (service_mode) {
-            chapter05_generation::GenerationConfig generation_config;
+            chapter06_generation::GenerationConfig generation_config;
             generation_config.max_new_tokens = 1;
             generation_config.max_context_tokens =
                 decoder_model->decoder_contract().max_context_tokens;
             generation_config.eos_token_id = language_metadata.eos_token_id;
-            chapter05_generation::Runtime runtime(generation_config);
-            chapter05_generation::GreedySampler sampler;
+            chapter06_generation::Runtime runtime(generation_config);
+            chapter06_generation::GreedySampler sampler;
             chapter09_serving::ServingCore service(2, 2);
             std::size_t factory_calls = 0;
             chapter09_serving::HttpAdapter adapter(
                 service,
                 runtime,
                 sampler,
-                [&]() -> std::shared_ptr<chapter05_generation::RequestModelExecutor> {
+                [&]() -> std::shared_ptr<chapter06_generation::RequestModelExecutor> {
                     ++factory_calls;
                     cpp_llm_engine::core::DecoderEmbeddingSequence input{
                         sequence.embeddings.rows,

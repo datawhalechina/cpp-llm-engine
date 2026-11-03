@@ -98,7 +98,7 @@ Projector 先按 `dy -> dx -> hidden` 顺序把相邻 `4x4` 个 Encoder token �
 
 `MultimodalStageRecorder` 依次记录图片解码、动态切图、prompt tokenize、Vision Encoder、Projector、embedding 组装和语言模型 prefill。Vision Encoder 与 Projector 会按视觉输入重复调用，因此指标同时保留累计耗时和调用次数。
 
-`peak_live_bytes` 是调用方传入的请求中间数据估算，只用于比较同一工作负载下的生命周期变化；它不包含模型常驻权重、分配器开销或整个进程 RSS。统一 embedding sequence 通过 Engine 的 `EmbeddingRequestExecutor` 进入 Chapter05 Runtime，图片管线不复制 Request、Scheduler、KV Cache 或采样逻辑。
+`peak_live_bytes` 是调用方传入的请求中间数据估算，只用于比较同一工作负载下的生命周期变化；它不包含模型常驻权重、分配器开销或整个进程 RSS。统一 embedding sequence 通过 Engine 的 `EmbeddingRequestExecutor` 进入 Chapter06 Runtime，图片管线不复制 Request、Scheduler、KV Cache 或采样逻辑。
 
 | 指标 | 含义 | 不包含 |
 | --- | --- | --- |

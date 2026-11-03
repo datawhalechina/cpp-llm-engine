@@ -4,7 +4,7 @@
 // 验证：multimodal_vision_weights_test 与真实 SmolVLM 首 Block。
 #include "multimodal/vision_weights.h"
 
-#include "chapter06_quantization/q8_0_dequantize.h"
+#include "chapter05_quantization/q8_0_dequantize.h"
 #include "gguf_tensor_loader.h"
 
 #include <algorithm>
@@ -54,7 +54,7 @@ bool load_values(const std::string& path,
         return true;
     }
     if (allow_q8_0 && tensor.dtype() == chapter01::DType::Q8_0) {
-        return chapter06_quantization::dequantize_q8_0(
+        return chapter05_quantization::dequantize_q8_0(
             reinterpret_cast<const std::uint8_t*>(tensor.raw_data()),
             tensor.bytes(), tensor.numel(), values, error);
     }
