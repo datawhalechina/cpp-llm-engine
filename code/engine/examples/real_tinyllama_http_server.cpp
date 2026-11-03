@@ -3,8 +3,8 @@
 // 运行：real_tinyllama_http_server <model.gguf> [port] [bind-address]。
 #include "cpp_llm_engine/real_llama_executor_factory.h"
 #include "cpp_llm_engine/real_tokenizer_backend.h"
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/sampler.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/sampler.h"
 #include "chapter09_serving/cpp_httplib_transport.h"
 #include "chapter09_serving/http_adapter.h"
 #include "chapter09_serving/serving_core.h"
@@ -38,12 +38,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    chapter05_generation::GenerationConfig config;
+    chapter06_generation::GenerationConfig config;
     config.max_new_tokens = 4;
     config.max_context_tokens = 2048;
     config.eos_token_id = factory->eos_token_id();
-    chapter05_generation::Runtime runtime(config);
-    chapter05_generation::GreedySampler sampler;
+    chapter06_generation::Runtime runtime(config);
+    chapter06_generation::GreedySampler sampler;
     chapter09_serving::ServingCore service(16, 16);
     chapter09_serving::HttpAdapter adapter(
         service,

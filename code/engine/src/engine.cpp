@@ -1,15 +1,15 @@
 // Engine：文本生成入口实现
 // 职责：执行 tokenizer -> Request -> Runtime -> token decode 的教学主线。
-// 约束：当前使用 Chapter 05 教学 Transformer，不代表真实 GGUF 模型推理。
+// 约束：当前使用 Chapter 06 教学 Transformer，不代表真实 GGUF 模型推理。
 // 验证：code/engine/tests/engine_smoke_test.cpp 和 code/engine/scripts/run.sh。
 #include "cpp_llm_engine/engine.h"
 
-#include "chapter05_generation/embedding.h"
-#include "chapter05_generation/position_encoding.h"
-#include "chapter05_generation/request.h"
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/sampler.h"
-#include "chapter05_generation/transformer.h"
+#include "chapter06_generation/embedding.h"
+#include "chapter06_generation/position_encoding.h"
+#include "chapter06_generation/request.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/sampler.h"
+#include "chapter06_generation/transformer.h"
 
 #include <stdexcept>
 
@@ -34,10 +34,10 @@ private:
 
 }  // namespace
 
-TokenTensor::TokenTensor(std::vector<chapter05_generation::TokenId> values)
+TokenTensor::TokenTensor(std::vector<chapter06_generation::TokenId> values)
     : values_(std::move(values)) {}
 
-const std::vector<chapter05_generation::TokenId>& TokenTensor::values() const {
+const std::vector<chapter06_generation::TokenId>& TokenTensor::values() const {
     return values_;
 }
 
@@ -58,16 +58,16 @@ Engine::Engine(ModelConfig config, std::unique_ptr<TokenizerBackend> tokenizer)
 GenerationResult Engine::generate(std::string_view prompt) const {
     const TokenTensor input(tokenizer_->encode(prompt));
 
-    chapter05_generation::GenerationConfig config;
+    chapter06_generation::GenerationConfig config;
     config.max_new_tokens = config_.max_new_tokens;
     config.use_kv_cache = true;
 
-    chapter05_generation::Embedding embedding(config_.vocab_size);
-    chapter05_generation::PositionEncoding position_encoding(config_.max_position);
-    chapter05_generation::Transformer transformer(config_.layer_count, embedding, position_encoding);
-    chapter05_generation::Runtime runtime(config, transformer);
-    chapter05_generation::GreedySampler sampler;
-    chapter05_generation::Request request(input.values());
+    chapter06_generation::Embedding embedding(config_.vocab_size);
+    chapter06_generation::PositionEncoding position_encoding(config_.max_position);
+    chapter06_generation::Transformer transformer(config_.layer_count, embedding, position_encoding);
+    chapter06_generation::Runtime runtime(config, transformer);
+    chapter06_generation::GreedySampler sampler;
+    chapter06_generation::Request request(input.values());
 
     runtime.generate(request, sampler);
 

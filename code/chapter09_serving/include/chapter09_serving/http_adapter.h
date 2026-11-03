@@ -15,7 +15,7 @@
 namespace chapter09_serving {
 
 using RequestExecutorFactory = std::function<
-    std::shared_ptr<chapter05_generation::RequestModelExecutor>()>;
+    std::shared_ptr<chapter06_generation::RequestModelExecutor>()>;
 
 struct HttpRequest {
     std::string method;
@@ -36,8 +36,8 @@ class HttpAdapter final {
 public:
     HttpAdapter(
         ServingCore& service,
-        chapter05_generation::Runtime& runtime,
-        const chapter05_generation::Sampler& sampler,
+        chapter06_generation::Runtime& runtime,
+        const chapter06_generation::Sampler& sampler,
         RequestExecutorFactory executor_factory = {});
 
     HttpResponse handle(const HttpRequest& request);
@@ -49,10 +49,10 @@ private:
     HttpResponse handle_metrics() const;
 
     ServingCore& service_;
-    chapter05_generation::Runtime& runtime_;
-    const chapter05_generation::Sampler& sampler_;
+    chapter06_generation::Runtime& runtime_;
+    const chapter06_generation::Sampler& sampler_;
     RequestExecutorFactory executor_factory_;
-    std::unordered_map<std::size_t, std::unique_ptr<chapter05_generation::Request>> requests_;
+    std::unordered_map<std::size_t, std::unique_ptr<chapter06_generation::Request>> requests_;
 };
 
 }  // namespace chapter09_serving

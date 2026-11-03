@@ -3,8 +3,8 @@
 // 运行：real_tinyllama_http_adapter_smoke <model.gguf>。
 #include "cpp_llm_engine/real_llama_executor_factory.h"
 #include "cpp_llm_engine/real_tokenizer_backend.h"
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/sampler.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/sampler.h"
 #include "chapter09_serving/http_adapter.h"
 
 #include <iostream>
@@ -51,7 +51,7 @@ std::string completion_body(
 
 bool contains_in_order(
     const std::string& text,
-    const chapter05_generation::TokenSequence& tokens) {
+    const chapter06_generation::TokenSequence& tokens) {
     std::size_t position = 0;
     for (const auto token : tokens) {
         const std::string marker = "\"token\":" + std::to_string(token);
@@ -82,11 +82,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    chapter05_generation::GenerationConfig config;
+    chapter06_generation::GenerationConfig config;
     config.max_new_tokens = 4;
     config.eos_token_id = factory->eos_token_id();
-    chapter05_generation::Runtime runtime(config);
-    chapter05_generation::GreedySampler sampler;
+    chapter06_generation::Runtime runtime(config);
+    chapter06_generation::GreedySampler sampler;
     chapter09_serving::ServingCore service(2, 2);
     chapter09_serving::HttpAdapter adapter(
         service,
@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
     RecordingWriter writer;
     const chapter09_serving::HttpResponse stream_response = adapter.handle_stream({
         "POST", "/v1/completions", completion_body(102, stream_prompt)}, writer);
-    const chapter05_generation::TokenSequence expected_stream{839, 744, 29892, 263};
+    const chapter06_generation::TokenSequence expected_stream{839, 744, 29892, 263};
     const bool stream_golden_match =
         stream_response.status_code == 200 && writer.headers_written && writer.finished &&
         writer.head.status_code == 200 &&

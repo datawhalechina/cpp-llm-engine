@@ -1,5 +1,5 @@
 // Engine：预计算 embedding RequestModelExecutor 实现
-// 职责：把 Chapter05 的 position-count prefill 转发到 Core embedding prefill。
+// 职责：把 Chapter06 的 position-count prefill 转发到 Core embedding prefill。
 // 资源：prefill 成功后释放输入 embedding；Context 保留 position 与分层 K/V。
 // 验证：embedding_request_executor_test。
 #include "cpp_llm_engine/embedding_request_executor.h"
@@ -51,8 +51,8 @@ EmbeddingRequestExecutor::EmbeddingRequestExecutor(
     : context_(std::move(context)), embeddings_(std::move(embeddings)) {}
 
 bool EmbeddingRequestExecutor::prefill(
-    const chapter05_generation::TokenSequence& prompt_positions,
-    chapter05_generation::Logits* logits,
+    const chapter06_generation::TokenSequence& prompt_positions,
+    chapter06_generation::Logits* logits,
     std::string* error) {
     if (prefilled_) return fail(error, "embedding request is already prefilled");
     if (logits == nullptr) return fail(error, "embedding prefill logits must not be null");
@@ -72,8 +72,8 @@ bool EmbeddingRequestExecutor::prefill(
 }
 
 bool EmbeddingRequestExecutor::decode(
-    chapter05_generation::TokenId token,
-    chapter05_generation::Logits* logits,
+    chapter06_generation::TokenId token,
+    chapter06_generation::Logits* logits,
     std::string* error) {
     if (!prefilled_) return fail(error, "embedding request must be prefilled before decode");
     if (logits == nullptr) return fail(error, "embedding decode logits must not be null");
@@ -82,6 +82,17 @@ bool EmbeddingRequestExecutor::decode(
     if (logits->empty()) return fail(error, "embedding decode returned empty logits");
     if (error != nullptr) error->clear();
     return true;
+}
+
+chapter06_generation::ModelExecutionState
+EmbeddingRequestExecutor::execution_state() const {
+    const auto contract = context_->model_contract();
+    return {
+        true,
+        context_->token_count(),
+        contract.layer_count,
+        contract.layer.uses_kv_cache,
+    };
 }
 
 bool EmbeddingRequestExecutor::prefilled() const {

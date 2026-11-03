@@ -1,14 +1,16 @@
 // Chapter 09：实现 C++ Service Core 的 admission、队列推进和资源释放。
-// 契约：Service Core 只编排 Request；Runtime、Scheduler 和 Request 仍由 Chapter 05 提供。
+// 契约：Service Core 只编排 Request；Runtime、Scheduler 和 Request 仍由 Chapter 06 提供。
 // 验证：测试检查请求隔离、容量拒绝、终态处理和 cache clear。
 #include "chapter09_serving/serving_core.h"
 
-#include "chapter05_generation/request.h"
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/serving_preview.h"
+#include "chapter06_generation/request.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/serving_preview.h"
 
 #include <algorithm>
+#include <atomic>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 
 namespace chapter09_serving {
@@ -27,7 +29,7 @@ ServingCore::ServingCore(
     std::size_t max_inflight,
     std::size_t max_batch,
     ServiceNow now,
-    std::shared_ptr<chapter05_generation::KvBlockPool> block_pool)
+    std::shared_ptr<chapter06_generation::KvBlockPool> block_pool)
     : max_inflight_(max_inflight),
       max_batch_(max_batch),
       now_(std::move(now)),
@@ -48,9 +50,9 @@ bool ServingCore::contains(std::size_t request_id) const {
 
 AdmissionResult ServingCore::admit(
     std::size_t request_id,
-    chapter05_generation::Request& request,
-    const chapter05_generation::Sampler& sampler,
-    std::shared_ptr<chapter05_generation::RequestModelExecutor> executor) {
+    chapter06_generation::Request& request,
+    const chapter06_generation::Sampler& sampler,
+    std::shared_ptr<chapter06_generation::RequestModelExecutor> executor) {
     if (contains(request_id)) {
         ++metrics_.duplicate_total;
         return {AdmissionStatus::DuplicateId};
@@ -119,8 +121,8 @@ bool ServingCore::timeout(std::size_t request_id) {
 }
 
 ServiceStats ServingCore::dispatch(
-    chapter05_generation::Runtime& runtime,
-    const chapter05_generation::TokenStreamCallback& on_token) {
+    chapter06_generation::Runtime& runtime,
+    const chapter06_generation::TokenStreamCallback& on_token) {
     if (block_pool_ != nullptr) {
         throw std::logic_error("block-aware ServiceCore requires dispatch_step");
     }
@@ -134,18 +136,18 @@ ServiceStats ServingCore::dispatch(
     }
     stats.admitted = running_.size();
 
-    std::vector<chapter05_generation::ScheduledRequest> scheduled;
+    std::vector<chapter06_generation::ScheduledRequest> scheduled;
     scheduled.reserve(running_.size());
     for (const Entry& entry : running_) {
         scheduled.push_back({entry.request_id, entry.request, entry.sampler, entry.executor});
     }
-    const chapter05_generation::SchedulerStats scheduler_stats =
-        chapter05_generation::RoundRobinScheduler{}.run_with_stats(
+    const chapter06_generation::SchedulerStats scheduler_stats =
+        chapter06_generation::RoundRobinScheduler{}.run_with_stats(
             runtime,
             std::move(scheduled),
             [this, &on_token](
                 std::size_t request_id,
-                chapter05_generation::TokenId token,
+                chapter06_generation::TokenId token,
                 std::size_t step) {
                 Entry* entry = find_running(request_id);
                 if (entry != nullptr) observe_token(*entry, now_());
@@ -163,9 +165,9 @@ ServiceStats ServingCore::dispatch(
 }
 
 ServiceStats ServingCore::dispatch_step(
-    chapter05_generation::Runtime& runtime,
+    chapter06_generation::Runtime& runtime,
     std::size_t max_batch_tokens,
-    const chapter05_generation::TokenStreamCallback& on_token) {
+    const chapter06_generation::TokenStreamCallback& on_token) {
     ServiceStats stats;
     while (!waiting_.empty() && running_.size() < max_batch_) {
         Entry entry = std::move(waiting_.front());
@@ -176,19 +178,19 @@ ServiceStats ServingCore::dispatch_step(
     }
     stats.admitted = running_.size();
 
-    std::vector<chapter05_generation::ScheduledRequest> scheduled;
+    std::vector<chapter06_generation::ScheduledRequest> scheduled;
     scheduled.reserve(running_.size());
     for (const Entry& entry : running_) {
         scheduled.push_back({entry.request_id, entry.request, entry.sampler, entry.executor});
     }
-    const auto step_stats = chapter05_generation::ContinuousBatchScheduler{}.run_step(
+    const auto step_stats = chapter06_generation::ContinuousBatchScheduler{}.run_step(
         runtime,
         scheduled,
         max_batch_tokens,
         max_batch_,
         [this, &on_token](
             std::size_t request_id,
-            chapter05_generation::TokenId token,
+            chapter06_generation::TokenId token,
             std::size_t step) {
             Entry* entry = find_running(request_id);
             if (entry != nullptr) observe_token(*entry, now_());
@@ -210,6 +212,107 @@ ServiceStats ServingCore::dispatch_step(
             observe_completion(entry, now_());
         }
     }
+    return stats;
+}
+
+ServiceStats ServingCore::dispatch_parallel_requests(
+    const chapter06_generation::Runtime& runtime,
+    std::size_t worker_count,
+    const ParallelRequestCallback& on_request) {
+    if (worker_count == 0) {
+        throw std::invalid_argument("parallel request worker count must be positive");
+    }
+    if (block_pool_ != nullptr) {
+        throw std::logic_error(
+            "parallel request dispatch does not implement block-aware step execution");
+    }
+    while (!waiting_.empty() && running_.size() < max_batch_) {
+        Entry entry = std::move(waiting_.front());
+        waiting_.pop_front();
+        metrics_.queue_wait_seconds_sum += elapsed_seconds(entry.admitted_at, now_());
+        ++metrics_.queue_wait_count;
+        running_.push_back(std::move(entry));
+    }
+    for (const Entry& entry : running_) {
+        if (entry.request == nullptr || entry.sampler == nullptr || entry.executor == nullptr) {
+            throw std::logic_error(
+                "parallel request dispatch requires one executor and sampler per request");
+        }
+    }
+
+    struct ParallelResult {
+        std::size_t generated_tokens = 0;
+        bool observed_first_token = false;
+        ServiceClock::time_point first_token_at{};
+        ServiceClock::time_point completion_at{};
+    };
+
+    ServiceStats stats;
+    stats.admitted = running_.size();
+    stats.scheduled_requests = running_.size();
+    std::vector<ParallelResult> results(running_.size());
+    std::atomic<std::size_t> next_index{0};
+    const std::size_t active_workers = std::min(worker_count, running_.size());
+    std::vector<std::thread> workers;
+    workers.reserve(active_workers);
+    for (std::size_t worker = 0; worker < active_workers; ++worker) {
+        workers.emplace_back([&, worker]() {
+            (void)worker;
+            chapter06_generation::Runtime worker_runtime(runtime.config());
+            while (true) {
+                const std::size_t index = next_index.fetch_add(1);
+                if (index >= running_.size()) return;
+                Entry& entry = running_[index];
+                ParallelResult& result = results[index];
+                try {
+                    while (!entry.request->terminal()) {
+                        const std::size_t before = entry.request->generated_size();
+                        const std::size_t generated = worker_runtime.decode_one(
+                            *entry.request, *entry.sampler, *entry.executor);
+                        if (generated == 0) {
+                            if (!entry.request->terminal()) {
+                                entry.request->mark_failed(
+                                    "parallel request execution made no progress");
+                            }
+                            break;
+                        }
+                        result.generated_tokens += generated;
+                        if (!result.observed_first_token &&
+                            entry.request->generated_size() > before) {
+                            result.observed_first_token = true;
+                            result.first_token_at = now_();
+                        }
+                    }
+                    result.completion_at = now_();
+                } catch (...) {
+                    entry.request->mark_failed("parallel request executor threw an exception");
+                    result.completion_at = now_();
+                }
+            }
+        });
+    }
+    for (std::thread& worker : workers) worker.join();
+
+    for (std::size_t index = 0; index < running_.size(); ++index) {
+        Entry& entry = running_[index];
+        const ParallelResult& result = results[index];
+        stats.generated_tokens += result.generated_tokens;
+        if (result.observed_first_token) observe_token(entry, result.first_token_at);
+        if (entry.request->terminal()) {
+            observe_completion(entry, result.completion_at);
+            if (entry.request->finished()) ++stats.completed;
+        }
+        if (on_request) {
+            on_request({
+                entry.request_id,
+                result.generated_tokens,
+                result.observed_first_token
+                    ? elapsed_seconds(entry.admitted_at, result.first_token_at) : 0.0,
+                elapsed_seconds(entry.admitted_at, result.completion_at),
+            });
+        }
+    }
+    metrics_.generated_tokens_total += stats.generated_tokens;
     return stats;
 }
 
@@ -253,7 +356,7 @@ const ServiceMetrics& ServingCore::metrics() const {
     return metrics_;
 }
 
-const std::shared_ptr<chapter05_generation::KvBlockPool>&
+const std::shared_ptr<chapter06_generation::KvBlockPool>&
 ServingCore::block_pool() const {
     return block_pool_;
 }

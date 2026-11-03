@@ -3,19 +3,47 @@
 // 验证：真实服务 CTest 检查双请求 golden token、状态隔离和终态释放。
 #pragma once
 
-#include "chapter05_generation/model_executor.h"
+#include "chapter06_generation/model_executor.h"
 #include "cpp_llm_engine/core/decoder_contract.h"
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace cpp_llm_engine {
 
 enum class RealLlamaExecutionMode : std::uint8_t {
     Scalar,
     OptimizedAvx2,
+};
+
+struct RealLlamaExecutorProfile {
+    std::size_t forward_tokens = 0;
+    double total_ms = 0.0;
+    double embedding_ms = 0.0;
+    double normalization_ms = 0.0;
+    double qkv_projection_ms = 0.0;
+    double rope_ms = 0.0;
+    double attention_ms = 0.0;
+    double attention_output_ms = 0.0;
+    double ffn_ms = 0.0;
+    double ffn_gate_ms = 0.0;
+    double ffn_up_ms = 0.0;
+    double ffn_activation_ms = 0.0;
+    double ffn_down_ms = 0.0;
+    double ffn_residual_ms = 0.0;
+    double lm_head_ms = 0.0;
+    std::size_t batch_linear_calls = 0;
+    double batch_input_pack_ms = 0.0;
+    double batch_kernel_ms = 0.0;
+    double batch_output_unpack_ms = 0.0;
+};
+
+struct RealLlamaExecutorMemory {
+    std::size_t committed_tokens = 0;
+    std::size_t kv_cache_bytes = 0;
 };
 
 class RealLlamaExecutorFactory final {
@@ -35,9 +63,28 @@ public:
     RealLlamaExecutorFactory(const RealLlamaExecutorFactory&) = delete;
     RealLlamaExecutorFactory& operator=(const RealLlamaExecutorFactory&) = delete;
 
-    std::shared_ptr<chapter05_generation::RequestModelExecutor> create_executor() const;
+    std::shared_ptr<chapter06_generation::RequestModelExecutor> create_executor() const;
+    bool decode_batch(
+        const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>& executors,
+        const chapter06_generation::TokenSequence& tokens,
+        const std::vector<std::size_t>& expected_positions,
+        std::vector<chapter06_generation::Logits>* logits,
+        std::string* error = nullptr) const;
+    bool set_executor_profiling(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+        bool enabled,
+        std::string* error = nullptr) const;
+    bool executor_profile(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+        RealLlamaExecutorProfile* profile,
+        std::string* error = nullptr) const;
+    bool executor_memory(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+        RealLlamaExecutorMemory* memory,
+        std::string* error = nullptr) const;
+    std::size_t model_weight_payload_bytes() const;
     std::size_t vocab_size() const;
-    chapter05_generation::TokenId eos_token_id() const;
+    chapter06_generation::TokenId eos_token_id() const;
     std::size_t layer_count() const;
     cpp_llm_engine::core::DecoderModelContract decoder_contract() const;
     RealLlamaExecutionMode execution_mode() const;

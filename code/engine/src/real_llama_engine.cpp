@@ -1,13 +1,13 @@
 // Engine：真实 TinyLlama CPU 生成入口实现。
-// 职责：由 Chapter05 Runtime 驱动 prefill、greedy sampling、decode 和 EOS 停止。
+// 职责：由 Chapter06 Runtime 驱动 prefill、greedy sampling、decode 和 EOS 停止。
 // 契约：Engine 共享只读 Model，并为每次 generate 创建独立请求 Context。
 #include "cpp_llm_engine/real_llama_engine.h"
 
 #include "cpp_llm_engine/real_llama_executor_factory.h"
 #include "cpp_llm_engine/real_tokenizer_backend.h"
-#include "chapter05_generation/request.h"
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/sampler.h"
+#include "chapter06_generation/request.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/sampler.h"
 
 #include <utility>
 
@@ -58,13 +58,13 @@ bool RealLlamaEngine::generate(std::string_view prompt,
     }
 
     auto executor = impl_->executor_factory->create_executor();
-    chapter05_generation::GenerationConfig config;
+    chapter06_generation::GenerationConfig config;
     config.max_new_tokens = max_new_tokens;
     config.eos_token_id = impl_->executor_factory->eos_token_id();
     config.use_kv_cache = true;
-    chapter05_generation::Runtime runtime(config);
-    chapter05_generation::GreedySampler sampler;
-    chapter05_generation::Request request(prompt_tokens);
+    chapter06_generation::Runtime runtime(config);
+    chapter06_generation::GreedySampler sampler;
+    chapter06_generation::Request request(prompt_tokens);
     runtime.generate(request, sampler, *executor);
     if (request.failed()) {
         if (error != nullptr) *error = request.failure_reason();

@@ -16,7 +16,7 @@ mkdir -p "$(dirname "${result_file}")"
 cmake -S "${repo_root}/code/engine" -B "${build_dir}" \
     -DCHAPTER01_ENABLE_LLAMA_CPP=ON \
     -DLLAMA_CPP_ROOT="${repo_root}/llama.cpp" \
-    -DCHAPTER06_SOURCE_DIR="${repo_root}/code/chapter06_quantization" \
+    -DCHAPTER05_SOURCE_DIR="${repo_root}/code/chapter05_quantization" \
     -DCPP_LLM_ENGINE_REAL_MODEL="${model_path}" \
     -DCMAKE_BUILD_TYPE=Release
 cmake --build "${build_dir}" --target real_tinyllama_serving_benchmark -j2
@@ -24,4 +24,5 @@ cmake --build "${build_dir}" --target real_tinyllama_serving_benchmark -j2
     --warmup "${REAL_SERVING_WARMUP:-1}" \
     --iterations "${REAL_SERVING_ITERATIONS:-3}" \
     --execution-policy "${REAL_SERVING_EXECUTION_POLICY:-scalar}" \
+    --dispatch-mode "${REAL_SERVING_DISPATCH_MODE:-sequential}" \
     --output "${result_file}"

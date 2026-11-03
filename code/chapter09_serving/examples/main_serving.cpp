@@ -1,28 +1,28 @@
 // Chapter 09：运行最小 C++ Service Core 演示。
 // 职责：提交 3 个请求，按 batch 上限分两轮执行，并展示完成后的 cache 回收。
 // 验证：输出 admission、dispatch、completion 和 release 结果。
-#include "chapter05_generation/embedding.h"
-#include "chapter05_generation/position_encoding.h"
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/sampler.h"
-#include "chapter05_generation/transformer.h"
+#include "chapter06_generation/embedding.h"
+#include "chapter06_generation/position_encoding.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/sampler.h"
+#include "chapter06_generation/transformer.h"
 #include "chapter09_serving/serving_core.h"
 
 #include <iostream>
 
 int main() {
-    chapter05_generation::GenerationConfig config;
+    chapter06_generation::GenerationConfig config;
     config.max_new_tokens = 2;
     config.max_context_tokens = 32;
-    chapter05_generation::Embedding embedding(32);
-    chapter05_generation::PositionEncoding positions(16);
-    chapter05_generation::Transformer transformer(2, embedding, positions);
-    chapter05_generation::Runtime runtime(config, transformer);
-    chapter05_generation::GreedySampler sampler;
+    chapter06_generation::Embedding embedding(32);
+    chapter06_generation::PositionEncoding positions(16);
+    chapter06_generation::Transformer transformer(2, embedding, positions);
+    chapter06_generation::Runtime runtime(config, transformer);
+    chapter06_generation::GreedySampler sampler;
 
-    chapter05_generation::Request request_a({1, 2});
-    chapter05_generation::Request request_b({3, 4});
-    chapter05_generation::Request request_c({5, 6});
+    chapter06_generation::Request request_a({1, 2});
+    chapter06_generation::Request request_b({3, 4});
+    chapter06_generation::Request request_c({5, 6});
     chapter09_serving::ServingCore service(3, 2);
 
     std::cout << "admit_a=" << service.admit(1, request_a, sampler).accepted() << '\n'

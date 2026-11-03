@@ -3,7 +3,8 @@
 // 验证入口：Chapter 09 CTest target 或 scripts/run.sh。
 #include "chapter09_serving/response_writer.h"
 
-#include <cassert>
+#include "cpp_llm_engine/testing/test.h"
+
 #include <string>
 
 namespace {
@@ -49,24 +50,37 @@ private:
 
 int main() {
     using namespace chapter09_serving;
+    cpp_llm_engine::testing::TestSuite suite("chapter09_response_writer");
 
-    FakeWriter writer;
-    assert(writer.write_headers({200, "text/event-stream"}));
-    assert(writer.head().status_code == 200);
-    assert(writer.write_event("token-1\n\n") == WriteResult::Ok);
-    assert(writer.body() == "token-1\n\n");
+    suite.run("writes headers and event while connected", [&] {
+        FakeWriter writer;
+        CPP_LLM_CHECK(suite, writer.write_headers({200, "text/event-stream"}));
+        CPP_LLM_CHECK_EQ(suite, writer.head().status_code, 200);
+        CPP_LLM_CHECK(suite, writer.write_event("token-1\n\n") == WriteResult::Ok);
+        CPP_LLM_CHECK(suite, writer.body() == "token-1\n\n");
+    });
 
-    writer.set_blocked(true);
-    assert(writer.write_event("token-2\n\n") == WriteResult::Backpressure);
-    assert(writer.body() == "token-1\n\n");
+    suite.run("backpressure preserves buffered body", [&] {
+        FakeWriter writer;
+        CPP_LLM_REQUIRE(suite, writer.write_headers({200, "text/event-stream"}));
+        CPP_LLM_REQUIRE(suite, writer.write_event("token-1\n\n") == WriteResult::Ok);
+        writer.set_blocked(true);
+        CPP_LLM_CHECK(
+            suite, writer.write_event("token-2\n\n") == WriteResult::Backpressure);
+        CPP_LLM_CHECK(suite, writer.body() == "token-1\n\n");
+    });
 
-    writer.set_blocked(false);
-    writer.disconnect();
-    assert(!writer.client_connected());
-    assert(writer.write_event("token-3\n\n") == WriteResult::ClientClosed);
+    suite.run("disconnect and finish reject further writes", [&] {
+        FakeWriter writer;
+        CPP_LLM_REQUIRE(suite, writer.write_headers({200, "text/event-stream"}));
+        writer.disconnect();
+        CPP_LLM_CHECK(suite, !writer.client_connected());
+        CPP_LLM_CHECK(
+            suite, writer.write_event("token-3\n\n") == WriteResult::ClientClosed);
 
-    writer.finish();
-    assert(writer.finished());
-    assert(!writer.write_headers({200, "text/event-stream"}));
-    return 0;
+        writer.finish();
+        CPP_LLM_CHECK(suite, writer.finished());
+        CPP_LLM_CHECK(suite, !writer.write_headers({200, "text/event-stream"}));
+    });
+    return suite.finish();
 }

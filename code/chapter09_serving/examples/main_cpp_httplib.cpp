@@ -1,18 +1,18 @@
 // Chapter 09：启动可选 cpp-httplib HTTP transport。
 // 职责：组装教学 Runtime、ServiceCore 和真实 HTTP server，不复制服务状态。
 // 验证入口：开启 CHAPTER09_ENABLE_CPPHTTPLIB 后运行本示例并发送 loopback 请求。
-#include "chapter05_generation/embedding.h"
-#include "chapter05_generation/position_encoding.h"
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/sampler.h"
-#include "chapter05_generation/transformer.h"
+#include "chapter06_generation/embedding.h"
+#include "chapter06_generation/position_encoding.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/sampler.h"
+#include "chapter06_generation/transformer.h"
 #include "chapter09_serving/cpp_httplib_transport.h"
 
 #include <cstdlib>
 #include <string>
 
 int main(int argc, char** argv) {
-    using namespace chapter05_generation;
+    using namespace chapter06_generation;
     using namespace chapter09_serving;
 
     const int port = argc > 1 ? std::atoi(argv[1]) : 18080;

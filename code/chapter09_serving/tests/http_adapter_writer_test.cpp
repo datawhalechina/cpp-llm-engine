@@ -1,14 +1,15 @@
 // Chapter 09：验证 HttpAdapter 通过 ResponseWriter 输出真实 token event。
 // 职责：覆盖正常 stream、disconnect、timeout 和背压，不依赖具体 socket 或网络库。
 // 验证入口：Chapter 09 CTest target 或 scripts/run.sh。
-#include "chapter05_generation/embedding.h"
-#include "chapter05_generation/position_encoding.h"
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/sampler.h"
-#include "chapter05_generation/transformer.h"
+#include "chapter06_generation/embedding.h"
+#include "chapter06_generation/position_encoding.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/sampler.h"
+#include "chapter06_generation/transformer.h"
 #include "chapter09_serving/http_adapter.h"
 
-#include <cassert>
+#include "cpp_llm_engine/testing/test.h"
+
 #include <string>
 
 namespace {
@@ -42,7 +43,7 @@ public:
 }  // namespace
 
 int main() {
-    using namespace chapter05_generation;
+    using namespace chapter06_generation;
     using namespace chapter09_serving;
 
     GenerationConfig config;
@@ -55,40 +56,58 @@ int main() {
     GreedySampler sampler;
     ServingCore service(4, 4);
     HttpAdapter adapter(service, runtime, sampler);
+    cpp_llm_engine::testing::TestSuite suite("chapter09_http_adapter_writer");
 
-    RecordingWriter normal;
-    const HttpResponse normal_response = adapter.handle_stream({
-        "POST", "/v1/completions", "{\"request_id\":11,\"prompt_tokens\":[1,2]}"}, normal);
-    assert(normal_response.status_code == 200);
-    assert(normal.headers_written);
-    assert(normal.headers.status_code == 200);
-    assert(normal.headers.content_type == "text/event-stream");
-    assert(normal.body.find("data: {\"token\":") != std::string::npos);
-    assert(normal.body.find("finish_reason\":\"stop") != std::string::npos);
-    assert(normal.finished);
+    suite.run("normal stream writes headers tokens and finish event", [&] {
+        RecordingWriter normal;
+        const HttpResponse response = adapter.handle_stream({
+            "POST", "/v1/completions",
+            "{\"request_id\":11,\"prompt_tokens\":[1,2]}"}, normal);
+        CPP_LLM_CHECK_EQ(suite, response.status_code, 200);
+        CPP_LLM_CHECK(suite, normal.headers_written);
+        CPP_LLM_CHECK_EQ(suite, normal.headers.status_code, 200);
+        CPP_LLM_CHECK(suite, normal.headers.content_type == "text/event-stream");
+        CPP_LLM_CHECK(suite, normal.body.find("data: {\"token\":") != std::string::npos);
+        CPP_LLM_CHECK(suite, normal.body.find("finish_reason\":\"stop") != std::string::npos);
+        CPP_LLM_CHECK(suite, normal.finished);
+    });
 
-    RecordingWriter disconnected;
-    HttpRequest disconnect_request{
-        "POST", "/v1/completions", "{\"request_id\":12,\"prompt_tokens\":[1,2]}"};
-    disconnect_request.disconnect_after_tokens = 1;
-    const HttpResponse disconnect_response = adapter.handle_stream(disconnect_request, disconnected);
-    assert(disconnect_response.status_code == 499);
-    assert(disconnected.body.find("finish_reason\":\"client_disconnect") != std::string::npos);
+    suite.run("disconnect and timeout map to terminal stream events", [&] {
+        RecordingWriter disconnected;
+        HttpRequest disconnect_request{
+            "POST", "/v1/completions",
+            "{\"request_id\":12,\"prompt_tokens\":[1,2]}"};
+        disconnect_request.disconnect_after_tokens = 1;
+        const HttpResponse disconnect_response =
+            adapter.handle_stream(disconnect_request, disconnected);
+        CPP_LLM_CHECK_EQ(suite, disconnect_response.status_code, 499);
+        CPP_LLM_CHECK(
+            suite,
+            disconnected.body.find("finish_reason\":\"client_disconnect") !=
+                std::string::npos);
 
-    RecordingWriter timed_out;
-    HttpRequest timeout_request{
-        "POST", "/v1/completions", "{\"request_id\":13,\"prompt_tokens\":[1,2]}"};
-    timeout_request.timeout_after_tokens = 1;
-    const HttpResponse timeout_response = adapter.handle_stream(timeout_request, timed_out);
-    assert(timeout_response.status_code == 408);
-    assert(timed_out.body.find("finish_reason\":\"timeout") != std::string::npos);
+        RecordingWriter timed_out;
+        HttpRequest timeout_request{
+            "POST", "/v1/completions",
+            "{\"request_id\":13,\"prompt_tokens\":[1,2]}"};
+        timeout_request.timeout_after_tokens = 1;
+        const HttpResponse timeout_response =
+            adapter.handle_stream(timeout_request, timed_out);
+        CPP_LLM_CHECK_EQ(suite, timeout_response.status_code, 408);
+        CPP_LLM_CHECK(
+            suite,
+            timed_out.body.find("finish_reason\":\"timeout") != std::string::npos);
+    });
 
-    RecordingWriter backpressured;
-    backpressured.blocked = true;
-    const HttpResponse backpressure_response = adapter.handle_stream({
-        "POST", "/v1/completions", "{\"request_id\":14,\"prompt_tokens\":[1,2]}"}, backpressured);
-    assert(backpressure_response.status_code == 503);
-    assert(backpressured.body.empty());
-    assert(backpressured.finished);
-    return 0;
+    suite.run("backpressure stops stream without buffering an event", [&] {
+        RecordingWriter writer;
+        writer.blocked = true;
+        const HttpResponse response = adapter.handle_stream({
+            "POST", "/v1/completions",
+            "{\"request_id\":14,\"prompt_tokens\":[1,2]}"}, writer);
+        CPP_LLM_CHECK_EQ(suite, response.status_code, 503);
+        CPP_LLM_CHECK(suite, writer.body.empty());
+        CPP_LLM_CHECK(suite, writer.finished);
+    });
+    return suite.finish();
 }

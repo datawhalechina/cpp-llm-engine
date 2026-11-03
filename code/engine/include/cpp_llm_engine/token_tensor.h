@@ -4,7 +4,7 @@
 // 验证：code/engine/tests/engine_smoke_test.cpp。
 #pragma once
 
-#include "chapter05_generation/generation_types.h"
+#include "chapter06_generation/generation_types.h"
 
 #include <cstddef>
 #include <vector>
@@ -13,13 +13,13 @@ namespace cpp_llm_engine {
 
 class TokenTensor {
 public:
-    explicit TokenTensor(std::vector<chapter05_generation::TokenId> values);
+    explicit TokenTensor(std::vector<chapter06_generation::TokenId> values);
 
-    const std::vector<chapter05_generation::TokenId>& values() const;
+    const std::vector<chapter06_generation::TokenId>& values() const;
     std::size_t size() const;
 
 private:
-    std::vector<chapter05_generation::TokenId> values_;
+    std::vector<chapter06_generation::TokenId> values_;
 };
 
 }  // namespace cpp_llm_engine

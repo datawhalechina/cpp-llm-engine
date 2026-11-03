@@ -3,7 +3,7 @@
 // 验证：HTTP adapter 测试检查 endpoint、状态码、完成结果和 metrics 字段。
 #include "chapter09_serving/http_adapter.h"
 
-#include "chapter05_generation/request.h"
+#include "chapter06_generation/request.h"
 
 #include <cctype>
 #include <sstream>
@@ -34,7 +34,7 @@ bool read_number(const std::string& body, const std::string& key, std::size_t& v
     return true;
 }
 
-bool read_tokens(const std::string& body, chapter05_generation::TokenSequence& tokens) {
+bool read_tokens(const std::string& body, chapter06_generation::TokenSequence& tokens) {
     const std::size_t key_position = body.find("\"prompt_tokens\"");
     if (key_position == std::string::npos) return false;
     const std::size_t open = body.find('[', key_position);
@@ -47,7 +47,7 @@ bool read_tokens(const std::string& body, chapter05_generation::TokenSequence& t
         const std::size_t start = position;
         while (position < close && std::isdigit(static_cast<unsigned char>(body[position]))) ++position;
         if (start == position) return false;
-        tokens.push_back(static_cast<chapter05_generation::TokenId>(
+        tokens.push_back(static_cast<chapter06_generation::TokenId>(
             std::stoull(body.substr(start, position - start))));
     }
     return !tokens.empty();
@@ -76,8 +76,8 @@ bool read_bool(const std::string& body, const std::string& key, bool& value) {
 
 HttpAdapter::HttpAdapter(
     ServingCore& service,
-    chapter05_generation::Runtime& runtime,
-    const chapter05_generation::Sampler& sampler,
+    chapter06_generation::Runtime& runtime,
+    const chapter06_generation::Sampler& sampler,
     RequestExecutorFactory executor_factory)
     : service_(service), runtime_(runtime), sampler_(sampler),
       executor_factory_(std::move(executor_factory)) {}
@@ -108,7 +108,7 @@ HttpResponse HttpAdapter::handle_stream_completion(
     const HttpRequest& request,
     ResponseWriter& writer) {
     std::size_t request_id = 0;
-    chapter05_generation::TokenSequence prompt;
+    chapter06_generation::TokenSequence prompt;
     if (!read_number(request.body, "request_id", request_id) ||
         !read_tokens(request.body, prompt)) {
         return json_response(400, "{\"error\":\"invalid_completion_body\"}");
@@ -117,8 +117,8 @@ HttpResponse HttpAdapter::handle_stream_completion(
         return json_response(409, "{\"error\":\"duplicate_request_id\"}");
     }
 
-    auto owned_request = std::make_unique<chapter05_generation::Request>(std::move(prompt));
-    std::shared_ptr<chapter05_generation::RequestModelExecutor> executor;
+    auto owned_request = std::make_unique<chapter06_generation::Request>(std::move(prompt));
+    std::shared_ptr<chapter06_generation::RequestModelExecutor> executor;
     if (executor_factory_) {
         executor = executor_factory_();
         if (executor == nullptr) {
@@ -133,7 +133,7 @@ HttpResponse HttpAdapter::handle_stream_completion(
         }
         return json_response(400, "{\"error\":\"request_rejected\"}");
     }
-    chapter05_generation::Request* request_ptr = owned_request.get();
+    chapter06_generation::Request* request_ptr = owned_request.get();
     requests_.emplace(request_id, std::move(owned_request));
 
     if (!request.client_connected) {
@@ -152,7 +152,7 @@ HttpResponse HttpAdapter::handle_stream_completion(
     WriteResult write_result = WriteResult::Ok;
     const ServiceStats stats = service_.dispatch(
         runtime_,
-        [&](std::size_t callback_request_id, chapter05_generation::TokenId token, std::size_t step) {
+        [&](std::size_t callback_request_id, chapter06_generation::TokenId token, std::size_t step) {
             if (callback_request_id != request_id || write_failed) return;
             std::ostringstream event;
             event << "data: {\"token\":" << token << ",\"step\":" << step << "}\n\n";
@@ -202,7 +202,7 @@ HttpResponse HttpAdapter::handle_stream_completion(
 
 HttpResponse HttpAdapter::handle_completion(const HttpRequest& request) {
     std::size_t request_id = 0;
-    chapter05_generation::TokenSequence prompt;
+    chapter06_generation::TokenSequence prompt;
     if (!read_number(request.body, "request_id", request_id) ||
         !read_tokens(request.body, prompt)) {
         return json_response(400, "{\"error\":\"invalid_completion_body\"}");
@@ -213,8 +213,8 @@ HttpResponse HttpAdapter::handle_completion(const HttpRequest& request) {
         return json_response(409, "{\"error\":\"duplicate_request_id\"}");
     }
 
-    auto owned_request = std::make_unique<chapter05_generation::Request>(std::move(prompt));
-    std::shared_ptr<chapter05_generation::RequestModelExecutor> executor;
+    auto owned_request = std::make_unique<chapter06_generation::Request>(std::move(prompt));
+    std::shared_ptr<chapter06_generation::RequestModelExecutor> executor;
     if (executor_factory_) {
         executor = executor_factory_();
         if (executor == nullptr) {
@@ -229,16 +229,16 @@ HttpResponse HttpAdapter::handle_completion(const HttpRequest& request) {
         }
         return json_response(400, "{\"error\":\"request_rejected\"}");
     }
-    chapter05_generation::Request* request_ptr = owned_request.get();
+    chapter06_generation::Request* request_ptr = owned_request.get();
     requests_.emplace(request_id, std::move(owned_request));
     if (!request.client_connected) {
         service_.cancel(request_id);
     }
 
-    std::vector<chapter05_generation::TokenId> streamed_tokens;
+    std::vector<chapter06_generation::TokenId> streamed_tokens;
     const ServiceStats stats = service_.dispatch(
         runtime_,
-        [&](std::size_t /*callback_request_id*/, chapter05_generation::TokenId token, std::size_t /*step*/) {
+        [&](std::size_t /*callback_request_id*/, chapter06_generation::TokenId token, std::size_t /*step*/) {
             streamed_tokens.push_back(token);
             if (request.disconnect_after_tokens > 0 &&
                 streamed_tokens.size() >= request.disconnect_after_tokens) {
@@ -251,7 +251,7 @@ HttpResponse HttpAdapter::handle_completion(const HttpRequest& request) {
     service_.release_completed();
     const bool finished = request_ptr->finished();
     const std::size_t generated = request_ptr->generated_size();
-    const chapter05_generation::TokenSequence generated_tokens =
+    const chapter06_generation::TokenSequence generated_tokens =
         request_ptr->generated();
     const bool cancelled = request_ptr->cancelled();
     const bool timed_out = request_ptr->timed_out();

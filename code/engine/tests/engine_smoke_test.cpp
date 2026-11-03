@@ -4,7 +4,7 @@
 // 验证：code/engine/scripts/run.sh。
 #include "cpp_llm_engine/engine.h"
 
-#include <cassert>
+#include "cpp_llm_engine/testing/test.h"
 
 namespace {
 
@@ -18,27 +18,35 @@ public:
 }  // namespace
 
 int main() {
-    cpp_llm_engine::ModelConfig config;
-    config.max_new_tokens = 3;
-    const cpp_llm_engine::Engine engine(config);
-    const cpp_llm_engine::GenerationResult result = engine.generate("hello");
+    cpp_llm_engine::testing::TestSuite suite("cpp_llm_engine");
 
-    assert(result.prompt_tokens.size() == 5);
-    assert(result.generated_tokens.size() == 3);
-    assert(result.output.size() == 3);
-    assert(result.finished);
+    suite.run("default tokenizer completes generation", [&] {
+        cpp_llm_engine::ModelConfig config;
+        config.max_new_tokens = 3;
+        const cpp_llm_engine::GenerationResult result =
+            cpp_llm_engine::Engine(config).generate("hello");
+        CPP_LLM_CHECK_EQ(suite, result.prompt_tokens.size(), 5U);
+        CPP_LLM_CHECK_EQ(suite, result.generated_tokens.size(), 3U);
+        CPP_LLM_CHECK_EQ(suite, result.output.size(), 3U);
+        CPP_LLM_CHECK(suite, result.finished);
+    });
 
-    const chapter01::Tokenizer tokenizer(config.vocab_size);
-    const cpp_llm_engine::TokenTensor tokens(tokenizer.encode("a!"));
-    assert(tokens.size() == 2);
-    assert(tokens.values()[0] == 1);
-    assert(tokens.values()[1] == 0);
+    suite.run("token tensor preserves encoded ids", [&] {
+        const chapter01::Tokenizer tokenizer(64);
+        const cpp_llm_engine::TokenTensor tokens(tokenizer.encode("a!"));
+        CPP_LLM_REQUIRE(suite, tokens.size() == 2);
+        CPP_LLM_CHECK_EQ(suite, tokens.values()[0], 1);
+        CPP_LLM_CHECK_EQ(suite, tokens.values()[1], 0);
+    });
 
-    config.max_new_tokens = 1;
-    const cpp_llm_engine::Engine injected_engine(
-        config, std::make_unique<FixedTokenizerBackend>());
-    const auto injected_result = injected_engine.generate("real prompt");
-    assert(injected_result.prompt_tokens == chapter01::TokenSequence({7, 8}));
-    assert(injected_result.output == "fixed");
-    return 0;
+    suite.run("injected tokenizer controls prompt ids and decode", [&] {
+        cpp_llm_engine::ModelConfig config;
+        config.max_new_tokens = 1;
+        const cpp_llm_engine::Engine engine(
+            config, std::make_unique<FixedTokenizerBackend>());
+        const auto result = engine.generate("real prompt");
+        CPP_LLM_CHECK(suite, result.prompt_tokens == chapter01::TokenSequence({7, 8}));
+        CPP_LLM_CHECK(suite, result.output == "fixed");
+    });
+    return suite.finish();
 }

@@ -2,8 +2,8 @@
 // 职责：显式开启 Context 计时，汇总量化投影、attention、FFN 和 LM Head 耗时。
 // 运行：real_tinyllama_decoder_profile <model.gguf> [iterations] [backend]。
 #include "cpp_llm_engine/real_tokenizer_backend.h"
-#include "real_llama_cpu_decoder.h"
-#include "chapter05_generation/sampler.h"
+#include "cpp_llm_engine/model/real_llama_cpu_decoder.h"
+#include "chapter06_generation/sampler.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -60,25 +60,25 @@ int main(int argc, char** argv) {
     }
 
     const auto prompt = tokenizer->encode("Hello TinyLlama");
-    const chapter05_generation::TokenSequence expected{29892, 306, 29915, 29885};
-    chapter05_generation::GreedySampler sampler;
+    const chapter06_generation::TokenSequence expected{29892, 306, 29915, 29885};
+    chapter06_generation::GreedySampler sampler;
     chapter01::RealLlamaDecoderProfile total;
     bool correctness = true;
     for (std::size_t iteration = 0; iteration < iterations; ++iteration) {
         auto context = model->create_context();
-        const chapter06_quantization::QuantizedLinearPolicy attention_policy{
+        const chapter05_quantization::QuantizedLinearPolicy attention_policy{
             backend == "q4-attention-avx2" || backend == "optimized-avx2"
-                ? chapter06_quantization::QuantizedLinearBackendKind::Avx2Fused
-                : chapter06_quantization::QuantizedLinearBackendKind::ScalarFused,
-            chapter06_quantization::QuantizedLinearBackendKind::ScalarFused};
-        const chapter06_quantization::QuantizedLinearPolicy ffn_policy{
+                ? chapter05_quantization::QuantizedLinearBackendKind::Avx2Fused
+                : chapter05_quantization::QuantizedLinearBackendKind::ScalarFused,
+            chapter05_quantization::QuantizedLinearBackendKind::ScalarFused};
+        const chapter05_quantization::QuantizedLinearPolicy ffn_policy{
             backend == "q4-avx2" || backend == "optimized-avx2"
-                ? chapter06_quantization::QuantizedLinearBackendKind::Avx2Fused
-                : chapter06_quantization::QuantizedLinearBackendKind::ScalarFused,
+                ? chapter05_quantization::QuantizedLinearBackendKind::Avx2Fused
+                : chapter05_quantization::QuantizedLinearBackendKind::ScalarFused,
             backend == "q6-avx2" || backend == "avx2" ||
                 backend == "optimized-avx2"
-                ? chapter06_quantization::QuantizedLinearBackendKind::Avx2Fused
-                : chapter06_quantization::QuantizedLinearBackendKind::ScalarFused};
+                ? chapter05_quantization::QuantizedLinearBackendKind::Avx2Fused
+                : chapter05_quantization::QuantizedLinearBackendKind::ScalarFused};
         if (!context->set_attention_linear_policy(attention_policy, &error)) {
             std::cerr << "decoder profile Attention backend policy failed: "
                       << error << '\n';
@@ -89,8 +89,8 @@ int main(int argc, char** argv) {
             return 1;
         }
         context->set_profiling_enabled(true);
-        chapter05_generation::Logits logits;
-        chapter05_generation::TokenSequence generated;
+        chapter06_generation::Logits logits;
+        chapter06_generation::TokenSequence generated;
         if (!context->prefill(prompt, &logits, &error)) {
             std::cerr << "decoder profile prefill failed: " << error << '\n';
             return 1;

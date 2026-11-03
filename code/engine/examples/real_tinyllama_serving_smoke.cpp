@@ -3,10 +3,10 @@
 // 运行：real_tinyllama_serving_smoke <model.gguf>。
 #include "cpp_llm_engine/real_llama_executor_factory.h"
 #include "cpp_llm_engine/real_tokenizer_backend.h"
-#include "chapter05_generation/request.h"
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/sampler.h"
-#include "chapter05_generation/serving_preview.h"
+#include "chapter06_generation/request.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/sampler.h"
+#include "chapter06_generation/serving_preview.h"
 #include "chapter09_serving/serving_core.h"
 
 #include <iostream>
@@ -15,8 +15,8 @@
 #include <utility>
 
 int main(int argc, char** argv) {
-    using chapter05_generation::Request;
-    using chapter05_generation::TokenSequence;
+    using chapter06_generation::Request;
+    using chapter06_generation::TokenSequence;
 
     if (argc != 2) {
         std::cerr << "usage: real_tinyllama_serving_smoke <model.gguf>\n";
@@ -49,20 +49,20 @@ int main(int argc, char** argv) {
             cpp_llm_engine::core::DecoderPositionEncodingKind::Rotary &&
         decoder_contract.layer.uses_kv_cache;
 
-    chapter05_generation::GenerationConfig config;
+    chapter06_generation::GenerationConfig config;
     config.max_new_tokens = 4;
     config.eos_token_id = factory->eos_token_id();
-    chapter05_generation::Runtime runtime(config);
-    chapter05_generation::GreedySampler sampler;
+    chapter06_generation::Runtime runtime(config);
+    chapter06_generation::GreedySampler sampler;
     Request request_a(tokenizer->encode("Hello TinyLlama"));
     Request request_b(tokenizer->encode("Hi"));
 
     auto executor_a = factory->create_executor();
     auto executor_b = factory->create_executor();
-    std::weak_ptr<chapter05_generation::RequestModelExecutor> weak_a = executor_a;
-    std::weak_ptr<chapter05_generation::RequestModelExecutor> weak_b = executor_b;
+    std::weak_ptr<chapter06_generation::RequestModelExecutor> weak_a = executor_a;
+    std::weak_ptr<chapter06_generation::RequestModelExecutor> weak_b = executor_b;
 
-    auto block_pool = std::make_shared<chapter05_generation::KvBlockPool>(8, 4);
+    auto block_pool = std::make_shared<chapter06_generation::KvBlockPool>(8, 4);
     chapter09_serving::ServingCore service(2, 2, {}, block_pool);
     const bool admitted_a = service.admit(
         101, request_a, sampler, std::move(executor_a)).accepted();

@@ -4,12 +4,13 @@
 // 运行：由 Engine CTest 执行 embedding_request_service_test。
 #include "cpp_llm_engine/embedding_request_executor.h"
 
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/sampler.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/sampler.h"
 #include "chapter09_serving/http_adapter.h"
+#include "cpp_llm_engine/testing/test.h"
 
-#include <cassert>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -103,7 +104,7 @@ cpp_llm_engine::core::DecoderEmbeddingSequence make_embeddings() {
                    9.0f, 10.0f, 11.0f, 12.0f}};
 }
 
-std::shared_ptr<chapter05_generation::RequestModelExecutor> make_executor(
+std::shared_ptr<chapter06_generation::RequestModelExecutor> make_executor(
     bool fail_prefill,
     std::vector<std::weak_ptr<ContextState>>* observed_states) {
     auto state = std::make_shared<ContextState>();
@@ -112,152 +113,175 @@ std::shared_ptr<chapter05_generation::RequestModelExecutor> make_executor(
     std::string error;
     auto executor = cpp_llm_engine::EmbeddingRequestExecutor::create(
         std::move(context), make_embeddings(), &error);
-    assert(executor != nullptr && error.empty());
+    if (executor == nullptr || !error.empty()) {
+        throw std::runtime_error("failed to create embedding request executor: " + error);
+    }
     return executor;
 }
 
 }  // namespace
 
 int main() {
-    chapter05_generation::GenerationConfig config;
+    cpp_llm_engine::testing::TestSuite suite("embedding_request_service");
+    chapter06_generation::GenerationConfig config;
     config.max_new_tokens = 2;
     config.max_context_tokens = 16;
     config.eos_token_id = 4;
-    chapter05_generation::Runtime runtime(config);
-    chapter05_generation::GreedySampler sampler;
-    chapter09_serving::ServingCore service(2, 2);
-    std::vector<std::weak_ptr<ContextState>> observed_states;
-    chapter09_serving::HttpAdapter adapter(
-        service,
-        runtime,
-        sampler,
-        [&observed_states]() { return make_executor(false, &observed_states); });
+    chapter06_generation::Runtime runtime(config);
+    chapter06_generation::GreedySampler sampler;
+    suite.run("sync and SSE requests release per-request contexts", [&] {
+        chapter09_serving::ServingCore service(2, 2);
+        std::vector<std::weak_ptr<ContextState>> states;
+        chapter09_serving::HttpAdapter adapter(
+            service,
+            runtime,
+            sampler,
+            [&states]() { return make_executor(false, &states); });
 
-    const auto sync = adapter.handle({
-        "POST", "/v1/completions",
-        "{\"request_id\":71,\"prompt_tokens\":[0,0,0]}"});
-    assert(sync.status_code == 200);
-    assert(sync.body.find("\"generated_token_ids\":[2,4]") != std::string::npos);
-    assert(observed_states.size() == 1 && observed_states[0].expired());
+        const auto sync = adapter.handle({
+            "POST", "/v1/completions",
+            "{\"request_id\":71,\"prompt_tokens\":[0,0,0]}"});
+        CPP_LLM_CHECK_EQ(suite, sync.status_code, 200);
+        CPP_LLM_CHECK(
+            suite, sync.body.find("\"generated_token_ids\":[2,4]") != std::string::npos);
+        CPP_LLM_REQUIRE(suite, states.size() == 1);
+        CPP_LLM_CHECK(suite, states[0].expired());
 
-    RecordingWriter writer;
-    const auto stream = adapter.handle_stream({
-        "POST", "/v1/completions",
-        "{\"request_id\":72,\"prompt_tokens\":[0,0,0]}"}, writer);
-    assert(stream.status_code == 200);
-    assert(writer.head.status_code == 200);
-    assert(writer.head.content_type == "text/event-stream");
-    assert(writer.body.find("data: {\"token\":2,\"step\":0}") != std::string::npos);
-    assert(writer.body.find("data: {\"token\":4,\"step\":1}") != std::string::npos);
-    assert(writer.body.find("finish_reason\":\"stop") != std::string::npos);
-    assert(writer.finished);
-    assert(observed_states.size() == 2 && observed_states[1].expired());
-    assert(service.metrics().accepted_total == 2);
-    assert(service.metrics().completed_total == 2);
-    assert(service.metrics().released_total == 2);
-    assert(service.metrics().generated_tokens_total == 4);
+        RecordingWriter writer;
+        const auto stream = adapter.handle_stream({
+            "POST", "/v1/completions",
+            "{\"request_id\":72,\"prompt_tokens\":[0,0,0]}"}, writer);
+        CPP_LLM_CHECK_EQ(suite, stream.status_code, 200);
+        CPP_LLM_CHECK_EQ(suite, writer.head.status_code, 200);
+        CPP_LLM_CHECK(suite, writer.head.content_type == "text/event-stream");
+        CPP_LLM_CHECK(
+            suite, writer.body.find("data: {\"token\":2,\"step\":0}") != std::string::npos);
+        CPP_LLM_CHECK(
+            suite, writer.body.find("data: {\"token\":4,\"step\":1}") != std::string::npos);
+        CPP_LLM_CHECK(suite, writer.body.find("finish_reason\":\"stop") != std::string::npos);
+        CPP_LLM_CHECK(suite, writer.finished);
+        CPP_LLM_REQUIRE(suite, states.size() == 2);
+        CPP_LLM_CHECK(suite, states[1].expired());
+        CPP_LLM_CHECK_EQ(suite, service.metrics().accepted_total, 2U);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().completed_total, 2U);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().released_total, 2U);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().generated_tokens_total, 4U);
+    });
 
-    chapter09_serving::ServingCore failing_service(1, 1);
-    std::vector<std::weak_ptr<ContextState>> failed_states;
-    chapter09_serving::HttpAdapter failing_adapter(
-        failing_service,
-        runtime,
-        sampler,
-        [&failed_states]() { return make_executor(true, &failed_states); });
-    const auto failed = failing_adapter.handle({
-        "POST", "/v1/completions",
-        "{\"request_id\":73,\"prompt_tokens\":[0,0,0]}"});
-    assert(failed.status_code == 500);
-    assert(failed.body.find("runtime_did_not_finish") != std::string::npos);
-    assert(failing_service.metrics().failed_total == 1);
-    assert(failing_service.metrics().released_total == 1);
-    assert(failed_states.size() == 1 && failed_states[0].expired());
+    suite.run("failed visual prefill reaches terminal state and releases context", [&] {
+        chapter09_serving::ServingCore service(1, 1);
+        std::vector<std::weak_ptr<ContextState>> states;
+        chapter09_serving::HttpAdapter adapter(
+            service,
+            runtime,
+            sampler,
+            [&states]() { return make_executor(true, &states); });
+        const auto response = adapter.handle({
+            "POST", "/v1/completions",
+            "{\"request_id\":73,\"prompt_tokens\":[0,0,0]}"});
+        CPP_LLM_CHECK_EQ(suite, response.status_code, 500);
+        CPP_LLM_CHECK(
+            suite, response.body.find("runtime_did_not_finish") != std::string::npos);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().failed_total, 1U);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().released_total, 1U);
+        CPP_LLM_REQUIRE(suite, states.size() == 1);
+        CPP_LLM_CHECK(suite, states[0].expired());
+    });
 
-    chapter09_serving::ServingCore stress_service(4, 4);
-    std::vector<std::weak_ptr<ContextState>> stress_states;
-    chapter09_serving::HttpAdapter stress_adapter(
-        stress_service,
-        runtime,
-        sampler,
-        [&stress_states]() { return make_executor(false, &stress_states); });
-    constexpr std::size_t kStressRequests = 32;
-    for (std::size_t index = 0; index < kStressRequests; ++index) {
-        const std::string body = "{\"request_id\":" + std::to_string(1000 + index) +
-            ",\"prompt_tokens\":[0,0,0]}";
-        if (index % 2 == 0) {
-            const auto response = stress_adapter.handle(
-                {"POST", "/v1/completions", body});
-            assert(response.status_code == 200);
-            assert(response.body.find("\"generated_token_ids\":[2,4]") !=
-                   std::string::npos);
-        } else {
-            RecordingWriter stress_writer;
-            const auto response = stress_adapter.handle_stream(
-                {"POST", "/v1/completions", body}, stress_writer);
-            assert(response.status_code == 200);
-            assert(stress_writer.body.find("data: {\"token\":2,\"step\":0}") !=
-                   std::string::npos);
-            assert(stress_writer.body.find("data: {\"token\":4,\"step\":1}") !=
-                   std::string::npos);
-            assert(stress_writer.finished);
+    suite.run("mixed sync and SSE requests do not retain contexts", [&] {
+        chapter09_serving::ServingCore service(4, 4);
+        std::vector<std::weak_ptr<ContextState>> states;
+        chapter09_serving::HttpAdapter adapter(
+            service,
+            runtime,
+            sampler,
+            [&states]() { return make_executor(false, &states); });
+        constexpr std::size_t kRequests = 32;
+        for (std::size_t index = 0; index < kRequests; ++index) {
+            const std::string body = "{\"request_id\":" +
+                std::to_string(1000 + index) + ",\"prompt_tokens\":[0,0,0]}";
+            if (index % 2 == 0) {
+                const auto response = adapter.handle({"POST", "/v1/completions", body});
+                CPP_LLM_CHECK_EQ(suite, response.status_code, 200);
+                CPP_LLM_CHECK(
+                    suite,
+                    response.body.find("\"generated_token_ids\":[2,4]") !=
+                        std::string::npos);
+            } else {
+                RecordingWriter writer;
+                const auto response =
+                    adapter.handle_stream({"POST", "/v1/completions", body}, writer);
+                CPP_LLM_CHECK_EQ(suite, response.status_code, 200);
+                CPP_LLM_CHECK(
+                    suite,
+                    writer.body.find("data: {\"token\":2,\"step\":0}") !=
+                        std::string::npos);
+                CPP_LLM_CHECK(
+                    suite,
+                    writer.body.find("data: {\"token\":4,\"step\":1}") !=
+                        std::string::npos);
+                CPP_LLM_CHECK(suite, writer.finished);
+            }
+            CPP_LLM_REQUIRE(suite, states.size() == index + 1);
+            CPP_LLM_CHECK(suite, states.back().expired());
+            CPP_LLM_CHECK_EQ(suite, service.inflight_size(), 0U);
         }
-        assert(stress_states.size() == index + 1);
-        assert(stress_states.back().expired());
-        assert(stress_service.inflight_size() == 0);
-    }
-    assert(stress_service.metrics().accepted_total == kStressRequests);
-    assert(stress_service.metrics().completed_total == kStressRequests);
-    assert(stress_service.metrics().released_total == kStressRequests);
-    assert(stress_service.metrics().generated_tokens_total == kStressRequests * 2);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().accepted_total, kRequests);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().completed_total, kRequests);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().released_total, kRequests);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().generated_tokens_total, kRequests * 2);
+    });
 
-    chapter09_serving::ServingCore stress_failure_service(2, 2);
-    std::vector<std::weak_ptr<ContextState>> stress_failure_states;
-    chapter09_serving::HttpAdapter stress_failure_adapter(
-        stress_failure_service,
-        runtime,
-        sampler,
-        [&stress_failure_states]() {
-            return make_executor(true, &stress_failure_states);
-        });
-    constexpr std::size_t kFailureRequests = 8;
-    for (std::size_t index = 0; index < kFailureRequests; ++index) {
-        const std::string body = "{\"request_id\":" + std::to_string(2000 + index) +
-            ",\"prompt_tokens\":[0,0,0]}";
-        const auto response = stress_failure_adapter.handle(
-            {"POST", "/v1/completions", body});
-        assert(response.status_code == 500);
-        assert(stress_failure_states.back().expired());
-        assert(stress_failure_service.inflight_size() == 0);
-    }
-    assert(stress_failure_service.metrics().accepted_total == kFailureRequests);
-    assert(stress_failure_service.metrics().failed_total == kFailureRequests);
-    assert(stress_failure_service.metrics().released_total == kFailureRequests);
+    suite.run("repeated failures release every context", [&] {
+        chapter09_serving::ServingCore service(2, 2);
+        std::vector<std::weak_ptr<ContextState>> states;
+        chapter09_serving::HttpAdapter adapter(
+            service,
+            runtime,
+            sampler,
+            [&states]() { return make_executor(true, &states); });
+        constexpr std::size_t kRequests = 8;
+        for (std::size_t index = 0; index < kRequests; ++index) {
+            const std::string body = "{\"request_id\":" +
+                std::to_string(2000 + index) + ",\"prompt_tokens\":[0,0,0]}";
+            const auto response = adapter.handle({"POST", "/v1/completions", body});
+            CPP_LLM_CHECK_EQ(suite, response.status_code, 500);
+            CPP_LLM_REQUIRE(suite, states.size() == index + 1);
+            CPP_LLM_CHECK(suite, states.back().expired());
+            CPP_LLM_CHECK_EQ(suite, service.inflight_size(), 0U);
+        }
+        CPP_LLM_CHECK_EQ(suite, service.metrics().accepted_total, kRequests);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().failed_total, kRequests);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().released_total, kRequests);
+    });
 
-    chapter09_serving::ServingCore terminal_service(2, 2);
-    std::vector<std::weak_ptr<ContextState>> terminal_states;
-    chapter09_serving::HttpAdapter terminal_adapter(
-        terminal_service,
-        runtime,
-        sampler,
-        [&terminal_states]() { return make_executor(false, &terminal_states); });
-    chapter09_serving::HttpRequest disconnected{
-        "POST", "/v1/completions",
-        "{\"request_id\":3001,\"prompt_tokens\":[0,0,0]}"};
-    disconnected.disconnect_after_tokens = 1;
-    const auto disconnected_response = terminal_adapter.handle(disconnected);
-    assert(disconnected_response.status_code == 499);
-    assert(terminal_states.back().expired());
+    suite.run("disconnect and timeout release terminal contexts", [&] {
+        chapter09_serving::ServingCore service(2, 2);
+        std::vector<std::weak_ptr<ContextState>> states;
+        chapter09_serving::HttpAdapter adapter(
+            service,
+            runtime,
+            sampler,
+            [&states]() { return make_executor(false, &states); });
+        chapter09_serving::HttpRequest disconnected{
+            "POST", "/v1/completions",
+            "{\"request_id\":3001,\"prompt_tokens\":[0,0,0]}"};
+        disconnected.disconnect_after_tokens = 1;
+        CPP_LLM_CHECK_EQ(suite, adapter.handle(disconnected).status_code, 499);
+        CPP_LLM_REQUIRE(suite, states.size() == 1);
+        CPP_LLM_CHECK(suite, states.back().expired());
 
-    chapter09_serving::HttpRequest timed_out{
-        "POST", "/v1/completions",
-        "{\"request_id\":3002,\"prompt_tokens\":[0,0,0]}"};
-    timed_out.timeout_after_tokens = 1;
-    const auto timeout_response = terminal_adapter.handle(timed_out);
-    assert(timeout_response.status_code == 408);
-    assert(terminal_states.back().expired());
-    assert(terminal_service.metrics().cancelled_total == 1);
-    assert(terminal_service.metrics().timed_out_total == 1);
-    assert(terminal_service.metrics().released_total == 2);
-    assert(terminal_service.inflight_size() == 0);
-    return 0;
+        chapter09_serving::HttpRequest timed_out{
+            "POST", "/v1/completions",
+            "{\"request_id\":3002,\"prompt_tokens\":[0,0,0]}"};
+        timed_out.timeout_after_tokens = 1;
+        CPP_LLM_CHECK_EQ(suite, adapter.handle(timed_out).status_code, 408);
+        CPP_LLM_REQUIRE(suite, states.size() == 2);
+        CPP_LLM_CHECK(suite, states.back().expired());
+        CPP_LLM_CHECK_EQ(suite, service.metrics().cancelled_total, 1U);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().timed_out_total, 1U);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().released_total, 2U);
+        CPP_LLM_CHECK_EQ(suite, service.inflight_size(), 0U);
+    });
+    return suite.finish();
 }

@@ -36,7 +36,7 @@ fi
 cmake -S "${repo_root}/code/engine" -B "${build_dir}" \
     -DCHAPTER01_ENABLE_LLAMA_CPP=ON \
     -DLLAMA_CPP_ROOT="${repo_root}/llama.cpp" \
-    -DCHAPTER06_SOURCE_DIR="${repo_root}/code/chapter06_quantization" \
+    -DCHAPTER05_SOURCE_DIR="${repo_root}/code/chapter05_quantization" \
     -DCPP_LLM_ENGINE_REAL_MODEL="${model_path}" \
     -DCHAPTER09_ENABLE_CPPHTTPLIB=ON \
     -DCHAPTER09_CPPHTTPLIB_INCLUDE_DIR="${httplib_include}" \
