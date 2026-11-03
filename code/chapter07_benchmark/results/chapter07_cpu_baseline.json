@@ -1,49 +1,185 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "experiment_id": "EXP-CPU-01",
+  "workload_id": "WL-CPU-TEACHING-BATCH-V1",
   "benchmark": "chapter07_cpu_multi_request",
   "device": "cpu",
-  "hardware_concurrency": 32,
+  "environment": {
+    "cpu_model": "AMD Ryzen 9 9955HX 16-Core Processor",
+    "hardware_concurrency": 32,
+    "compiler": "GNU 13.1.0",
+    "build_type": "Release"
+  },
   "warmup": 1,
   "iterations": 3,
   "scenarios": [
     {
+      "execution_mode": "round_robin",
       "request_count": 1,
       "prompt_tokens": 4,
       "max_new_tokens": 4,
-      "prefill_ms": 0.00100533,
-      "decode_ms": 0.00446167,
-      "total_ms": 0.005467,
-      "ttft_ms": 0.00219067,
-      "throughput_tokens_per_second": 731663,
+      "prefill_ms": 0.00026,
+      "decode_ms": 0.000828,
+      "total_ms": 0.001088,
+      "ttft_ms": 0.0004936666667,
+      "throughput_tokens_per_second": 3843087.722,
       "generated_tokens": 4,
       "completed_requests": 1,
-      "correctness": true
+      "model_invocations": 5,
+      "tensor_batch_steps": 0,
+      "correctness": true,
+      "statistics": {
+        "prefill_ms": {"mean": 0.00026, "median": 0.0002, "min": 0.00019, "max": 0.00039},
+        "decode_ms": {"mean": 0.000828, "median": 0.000731, "min": 0.000711, "max": 0.001042},
+        "total_ms": {"mean": 0.001088, "median": 0.000931, "min": 0.000901, "max": 0.001432},
+        "ttft_ms": {"mean": 0.0004936666667, "median": 0.00039, "min": 0.00038, "max": 0.000711},
+        "throughput_tokens_per_second": {"mean": 3843087.722, "median": 4296455.424, "min": 2793296.089, "max": 4439511.654}
+      },
+      "samples": [
+        {"iteration": 1, "prefill_ms": 0.00039, "decode_ms": 0.001042, "total_ms": 0.001432, "ttft_ms": 0.000711, "throughput_tokens_per_second": 2793296.089, "generated_tokens": 4, "completed_requests": 1, "model_invocations": 5, "tensor_batch_steps": 0, "correctness": true},
+        {"iteration": 2, "prefill_ms": 0.0002, "decode_ms": 0.000731, "total_ms": 0.000931, "ttft_ms": 0.00039, "throughput_tokens_per_second": 4296455.424, "generated_tokens": 4, "completed_requests": 1, "model_invocations": 5, "tensor_batch_steps": 0, "correctness": true},
+        {"iteration": 3, "prefill_ms": 0.00019, "decode_ms": 0.000711, "total_ms": 0.000901, "ttft_ms": 0.00038, "throughput_tokens_per_second": 4439511.654, "generated_tokens": 4, "completed_requests": 1, "model_invocations": 5, "tensor_batch_steps": 0, "correctness": true}
+      ]
     },
     {
+      "execution_mode": "round_robin",
       "request_count": 2,
       "prompt_tokens": 4,
       "max_new_tokens": 4,
-      "prefill_ms": 0.001964,
-      "decode_ms": 0.008212,
-      "total_ms": 0.010176,
-      "ttft_ms": 0.00302933,
-      "throughput_tokens_per_second": 786164,
+      "prefill_ms": 0.0003973333333,
+      "decode_ms": 0.001392666667,
+      "total_ms": 0.00179,
+      "ttft_ms": 0.0005776666667,
+      "throughput_tokens_per_second": 4472302.889,
       "generated_tokens": 8,
       "completed_requests": 2,
-      "correctness": true
+      "model_invocations": 10,
+      "tensor_batch_steps": 0,
+      "correctness": true,
+      "statistics": {
+        "prefill_ms": {"mean": 0.0003973333333, "median": 0.000391, "min": 0.00036, "max": 0.000441},
+        "decode_ms": {"mean": 0.001392666667, "median": 0.001383, "min": 0.001382, "max": 0.001413},
+        "total_ms": {"mean": 0.00179, "median": 0.001773, "min": 0.001743, "max": 0.001854},
+        "ttft_ms": {"mean": 0.0005776666667, "median": 0.000571, "min": 0.000541, "max": 0.000621},
+        "throughput_tokens_per_second": {"mean": 4472302.889, "median": 4512126.34, "min": 4314994.606, "max": 4589787.722}
+      },
+      "samples": [
+        {"iteration": 1, "prefill_ms": 0.000441, "decode_ms": 0.001413, "total_ms": 0.001854, "ttft_ms": 0.000621, "throughput_tokens_per_second": 4314994.606, "generated_tokens": 8, "completed_requests": 2, "model_invocations": 10, "tensor_batch_steps": 0, "correctness": true},
+        {"iteration": 2, "prefill_ms": 0.000391, "decode_ms": 0.001382, "total_ms": 0.001773, "ttft_ms": 0.000571, "throughput_tokens_per_second": 4512126.34, "generated_tokens": 8, "completed_requests": 2, "model_invocations": 10, "tensor_batch_steps": 0, "correctness": true},
+        {"iteration": 3, "prefill_ms": 0.00036, "decode_ms": 0.001383, "total_ms": 0.001743, "ttft_ms": 0.000541, "throughput_tokens_per_second": 4589787.722, "generated_tokens": 8, "completed_requests": 2, "model_invocations": 10, "tensor_batch_steps": 0, "correctness": true}
+      ]
     },
     {
+      "execution_mode": "round_robin",
       "request_count": 4,
       "prompt_tokens": 4,
       "max_new_tokens": 4,
-      "prefill_ms": 0.00372,
-      "decode_ms": 0.0161667,
-      "total_ms": 0.0198867,
-      "ttft_ms": 0.004862,
-      "throughput_tokens_per_second": 804559,
+      "prefill_ms": 0.0008053333333,
+      "decode_ms": 0.002678333333,
+      "total_ms": 0.003483666667,
+      "ttft_ms": 0.001022,
+      "throughput_tokens_per_second": 4594909.486,
       "generated_tokens": 16,
       "completed_requests": 4,
-      "correctness": true
+      "model_invocations": 20,
+      "tensor_batch_steps": 0,
+      "correctness": true,
+      "statistics": {
+        "prefill_ms": {"mean": 0.0008053333333, "median": 0.000802, "min": 0.000722, "max": 0.000892},
+        "decode_ms": {"mean": 0.002678333333, "median": 0.002675, "min": 0.002675, "max": 0.002685},
+        "total_ms": {"mean": 0.003483666667, "median": 0.003477, "min": 0.003397, "max": 0.003577},
+        "ttft_ms": {"mean": 0.001022, "median": 0.001022, "min": 0.000932, "max": 0.001112},
+        "throughput_tokens_per_second": {"mean": 4594909.486, "median": 4601668.105, "min": 4473022.086, "max": 4710038.269}
+      },
+      "samples": [
+        {"iteration": 1, "prefill_ms": 0.000892, "decode_ms": 0.002685, "total_ms": 0.003577, "ttft_ms": 0.001112, "throughput_tokens_per_second": 4473022.086, "generated_tokens": 16, "completed_requests": 4, "model_invocations": 20, "tensor_batch_steps": 0, "correctness": true},
+        {"iteration": 2, "prefill_ms": 0.000802, "decode_ms": 0.002675, "total_ms": 0.003477, "ttft_ms": 0.001022, "throughput_tokens_per_second": 4601668.105, "generated_tokens": 16, "completed_requests": 4, "model_invocations": 20, "tensor_batch_steps": 0, "correctness": true},
+        {"iteration": 3, "prefill_ms": 0.000722, "decode_ms": 0.002675, "total_ms": 0.003397, "ttft_ms": 0.000932, "throughput_tokens_per_second": 4710038.269, "generated_tokens": 16, "completed_requests": 4, "model_invocations": 20, "tensor_batch_steps": 0, "correctness": true}
+      ]
+    },
+    {
+      "execution_mode": "tensor_batch",
+      "request_count": 1,
+      "prompt_tokens": 4,
+      "max_new_tokens": 4,
+      "prefill_ms": 0.00026,
+      "decode_ms": 0.0009986666667,
+      "total_ms": 0.001258666667,
+      "ttft_ms": 0.0005676666667,
+      "throughput_tokens_per_second": 3207074.337,
+      "generated_tokens": 4,
+      "completed_requests": 1,
+      "model_invocations": 5,
+      "tensor_batch_steps": 4,
+      "correctness": true,
+      "statistics": {
+        "prefill_ms": {"mean": 0.00026, "median": 0.00023, "min": 0.00021, "max": 0.00034},
+        "decode_ms": {"mean": 0.0009986666667, "median": 0.000962, "min": 0.000942, "max": 0.001092},
+        "total_ms": {"mean": 0.001258666667, "median": 0.001192, "min": 0.001152, "max": 0.001432},
+        "ttft_ms": {"mean": 0.0005676666667, "median": 0.000501, "min": 0.000471, "max": 0.000731},
+        "throughput_tokens_per_second": {"mean": 3207074.337, "median": 3355704.698, "min": 2793296.089, "max": 3472222.222}
+      },
+      "samples": [
+        {"iteration": 1, "prefill_ms": 0.00034, "decode_ms": 0.001092, "total_ms": 0.001432, "ttft_ms": 0.000731, "throughput_tokens_per_second": 2793296.089, "generated_tokens": 4, "completed_requests": 1, "model_invocations": 5, "tensor_batch_steps": 4, "correctness": true},
+        {"iteration": 2, "prefill_ms": 0.00023, "decode_ms": 0.000962, "total_ms": 0.001192, "ttft_ms": 0.000501, "throughput_tokens_per_second": 3355704.698, "generated_tokens": 4, "completed_requests": 1, "model_invocations": 5, "tensor_batch_steps": 4, "correctness": true},
+        {"iteration": 3, "prefill_ms": 0.00021, "decode_ms": 0.000942, "total_ms": 0.001152, "ttft_ms": 0.000471, "throughput_tokens_per_second": 3472222.222, "generated_tokens": 4, "completed_requests": 1, "model_invocations": 5, "tensor_batch_steps": 4, "correctness": true}
+      ]
+    },
+    {
+      "execution_mode": "tensor_batch",
+      "request_count": 2,
+      "prompt_tokens": 4,
+      "max_new_tokens": 4,
+      "prefill_ms": 0.0003376666667,
+      "decode_ms": 0.001335666667,
+      "total_ms": 0.001673333333,
+      "ttft_ms": 0.0006983333333,
+      "throughput_tokens_per_second": 4823787.607,
+      "generated_tokens": 8,
+      "completed_requests": 2,
+      "model_invocations": 5,
+      "tensor_batch_steps": 4,
+      "correctness": true,
+      "statistics": {
+        "prefill_ms": {"mean": 0.0003376666667, "median": 0.000291, "min": 0.000291, "max": 0.000431},
+        "decode_ms": {"mean": 0.001335666667, "median": 0.001272, "min": 0.001262, "max": 0.001473},
+        "total_ms": {"mean": 0.001673333333, "median": 0.001563, "min": 0.001553, "max": 0.001904},
+        "ttft_ms": {"mean": 0.0006983333333, "median": 0.000632, "min": 0.000631, "max": 0.000832},
+        "throughput_tokens_per_second": {"mean": 4823787.607, "median": 5118362.124, "min": 4201680.672, "max": 5151320.026}
+      },
+      "samples": [
+        {"iteration": 1, "prefill_ms": 0.000431, "decode_ms": 0.001473, "total_ms": 0.001904, "ttft_ms": 0.000832, "throughput_tokens_per_second": 4201680.672, "generated_tokens": 8, "completed_requests": 2, "model_invocations": 5, "tensor_batch_steps": 4, "correctness": true},
+        {"iteration": 2, "prefill_ms": 0.000291, "decode_ms": 0.001272, "total_ms": 0.001563, "ttft_ms": 0.000631, "throughput_tokens_per_second": 5118362.124, "generated_tokens": 8, "completed_requests": 2, "model_invocations": 5, "tensor_batch_steps": 4, "correctness": true},
+        {"iteration": 3, "prefill_ms": 0.000291, "decode_ms": 0.001262, "total_ms": 0.001553, "ttft_ms": 0.000632, "throughput_tokens_per_second": 5151320.026, "generated_tokens": 8, "completed_requests": 2, "model_invocations": 5, "tensor_batch_steps": 4, "correctness": true}
+      ]
+    },
+    {
+      "execution_mode": "tensor_batch",
+      "request_count": 4,
+      "prompt_tokens": 4,
+      "max_new_tokens": 4,
+      "prefill_ms": 0.000564,
+      "decode_ms": 0.002301,
+      "total_ms": 0.002865,
+      "ttft_ms": 0.001182,
+      "throughput_tokens_per_second": 5666523.841,
+      "generated_tokens": 16,
+      "completed_requests": 4,
+      "model_invocations": 5,
+      "tensor_batch_steps": 4,
+      "correctness": true,
+      "statistics": {
+        "prefill_ms": {"mean": 0.000564, "median": 0.00049, "min": 0.000471, "max": 0.000731},
+        "decode_ms": {"mean": 0.002301, "median": 0.002224, "min": 0.002054, "max": 0.002625},
+        "total_ms": {"mean": 0.002865, "median": 0.002714, "min": 0.002525, "max": 0.003356},
+        "ttft_ms": {"mean": 0.001182, "median": 0.001081, "min": 0.001022, "max": 0.001443},
+        "throughput_tokens_per_second": {"mean": 5666523.841, "median": 5895357.406, "min": 4767580.453, "max": 6336633.663}
+      },
+      "samples": [
+        {"iteration": 1, "prefill_ms": 0.000731, "decode_ms": 0.002625, "total_ms": 0.003356, "ttft_ms": 0.001443, "throughput_tokens_per_second": 4767580.453, "generated_tokens": 16, "completed_requests": 4, "model_invocations": 5, "tensor_batch_steps": 4, "correctness": true},
+        {"iteration": 2, "prefill_ms": 0.00049, "decode_ms": 0.002224, "total_ms": 0.002714, "ttft_ms": 0.001081, "throughput_tokens_per_second": 5895357.406, "generated_tokens": 16, "completed_requests": 4, "model_invocations": 5, "tensor_batch_steps": 4, "correctness": true},
+        {"iteration": 3, "prefill_ms": 0.000471, "decode_ms": 0.002054, "total_ms": 0.002525, "ttft_ms": 0.001022, "throughput_tokens_per_second": 6336633.663, "generated_tokens": 16, "completed_requests": 4, "model_invocations": 5, "tensor_batch_steps": 4, "correctness": true}
+      ]
     }
   ]
 }

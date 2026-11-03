@@ -13,7 +13,8 @@ using chapter08_profiling::ProfileRecord;
 
 ProfileRecord valid_record(double total_ms) {
     ProfileRecord record;
-    record.workload = "chapter05_cpu";
+    record.experiment_id = "EXP-TEST-01";
+    record.workload_id = "WL-TEST-CPU-V1";
     record.backend = "cpu";
     record.correctness_pass = true;
     record.iterations = 3;
@@ -26,15 +27,30 @@ ProfileRecord valid_record(double total_ms) {
 
 bool test_parse() {
     std::istringstream input(
-        "runtime_benchmark=chapter05_cpu\n"
+        "experiment_id=EXP-CPU-01\n"
+        "workload_id=WL-CPU-TEACHING-BATCH-V1\n"
+        "backend=cpu\n"
         "correctness=PASS\n"
         "iterations=3\n"
         "generated_tokens_per_iteration=4\n"
         "prefill_ms=1.5\n"
         "decode_ms=2.5\n"
-        "ttft_ms=1.8\n");
+        "ttft_ms=1.8\n"
+        "model_weight_payload_bytes=667078656\n"
+        "kv_cache_bytes=585728\n"
+        "peak_memory_mb=652.8203\n");
     const ProfileRecord record = chapter08_profiling::parse_benchmark_output(input);
-    return record.backend == "cpu" && record.total_ms == 4.0 && record.ttft_ms == 1.8 && record.valid();
+    const std::string report = chapter08_profiling::render_report(record);
+    return record.experiment_id == "EXP-CPU-01" &&
+           record.workload_id == "WL-CPU-TEACHING-BATCH-V1" &&
+           record.backend == "cpu" && record.total_ms == 4.0 &&
+           record.ttft_ms == 1.8 &&
+           record.model_weight_payload_bytes == 667078656 &&
+           record.kv_cache_bytes == 585728 &&
+           std::abs(record.peak_memory_mb - 652.8203) < 1e-6 &&
+           report.find("model_weight_payload_bytes=667078656") != std::string::npos &&
+           report.find("kv_cache_bytes=585728") != std::string::npos &&
+           record.valid();
 }
 
 bool test_tokens_per_second() {
@@ -75,7 +91,7 @@ bool test_reports_dominant_phase() {
 
 bool test_rejects_incomparable_workload() {
     ProfileRecord experiment = valid_record(9.0);
-    experiment.generated_tokens_per_iteration = 8;
+    experiment.workload_id = "WL-OTHER-V1";
     const auto result = chapter08_profiling::compare(valid_record(10.0), experiment);
     return !result.accepted && !result.correctness_ok &&
            result.reason.find("not comparable") != std::string::npos;

@@ -30,7 +30,10 @@ node "${source_dir}/scripts/select_multi_request_profile.mjs" \
 cp "${build_dir}/baseline.txt" "${build_dir}/experiment.txt"
 
 echo "[chapter08] measured benchmark report"
-"${build_dir}/chapter08_profile_report" < "${build_dir}/baseline.txt"
+measured_report=$("${build_dir}/chapter08_profile_report" < "${build_dir}/baseline.txt")
+printf '%s\n' "${measured_report}"
+grep -Fq "experiment_id=EXP-CPU-01" <<<"${measured_report}"
+grep -Fq "workload_id=WL-CPU-TEACHING-BATCH-V1:requests_4" <<<"${measured_report}"
 echo "[chapter08] same-build A/B smoke decision (not an optimization claim)"
 comparison_output=$("${build_dir}/chapter08_profile_report" --compare \
     "${build_dir}/baseline.txt" "${build_dir}/experiment.txt"
@@ -46,6 +49,8 @@ echo "[chapter08] archived TinyLlama ServiceCore profile"
 real_report=$("${build_dir}/chapter08_profile_report" \
     < "${build_dir}/tinyllama_service_profile.txt")
 printf '%s\n' "${real_report}"
+grep -Fq "experiment_id=EXP-CPU-02" <<<"${real_report}"
+grep -Fq "workload_id=WL-CPU-REAL-SERVICE-V1" <<<"${real_report}"
 grep -Fq "bottleneck_scope=model_compute" <<<"${real_report}"
 grep -Fq "execution_pattern=single_thread_round_robin" <<<"${real_report}"
 
@@ -58,3 +63,13 @@ echo "[chapter08] archived combined optimized policy A/B"
 printf '%s\n' "${optimized_report}"
 grep -Fq "correctness=PASS" <<<"${optimized_report}"
 grep -Fq "decision=KEEP" <<<"${optimized_report}"
+
+batch_profile_report=$(node "${source_dir}/scripts/analyze_real_batch_profile.mjs" \
+    "${repo_dir}/code/chapter07_benchmark/results/tinyllama_real_batch_scalar.json")
+echo "[chapter08] archived real scalar batch profile"
+printf '%s\n' "${batch_profile_report}"
+grep -Fq "experiment_id=EXP-CPU-10" <<<"${batch_profile_report}"
+grep -Fq "workload_id=WL-CPU-REAL-BATCH-V1" <<<"${batch_profile_report}"
+grep -Fq "correctness=PASS" <<<"${batch_profile_report}"
+grep -Fq "bottleneck_scope=scalar_batch_kernel" <<<"${batch_profile_report}"
+grep -Fq "decision=CORRECTNESS_ONLY" <<<"${batch_profile_report}"

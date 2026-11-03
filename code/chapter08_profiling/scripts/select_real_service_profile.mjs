@@ -6,9 +6,11 @@
 
 import fs from "node:fs";
 
-const [inputPath, outputPath] = process.argv.slice(2);
+const [inputPath, outputPath, experimentId = "EXP-CPU-02"] = process.argv.slice(2);
 if (!inputPath || !outputPath) {
-  console.error("usage: select_real_service_profile.mjs INPUT_JSON OUTPUT_TXT");
+  console.error(
+    "usage: select_real_service_profile.mjs INPUT_JSON OUTPUT_TXT [EXPERIMENT_ID]",
+  );
   process.exit(2);
 }
 
@@ -43,9 +45,16 @@ const throughput = document.throughput_tokens_per_second?.mean;
 if (!Number.isFinite(throughput) || throughput <= 0) {
   throw new Error("invalid throughput mean");
 }
+const memory = document.memory_bytes ?? {};
+for (const field of ["model_weight_payload", "kv_committed_total", "process_peak_rss"]) {
+  if (!Number.isInteger(memory[field]) || memory[field] <= 0) {
+    throw new Error(`missing memory_bytes.${field}`);
+  }
+}
 
 const lines = [
-  `runtime_benchmark=${document.benchmark}`,
+  `experiment_id=${experimentId}`,
+  "workload_id=WL-CPU-REAL-SERVICE-V1",
   `backend=${document.device}`,
   `model=${document.model}`,
   `cpu_model=${document.environment?.cpu_model ?? "unknown"}`,
@@ -64,6 +73,8 @@ const lines = [
   `ttft_spread_ms=${Math.abs(ttftB - ttftA)}`,
   `completion_spread_ms=${Math.abs(completionB - completionA)}`,
   `reported_tokens_per_second=${throughput}`,
-  "peak_memory_mb=0",
+  `model_weight_payload_bytes=${memory.model_weight_payload}`,
+  `kv_cache_bytes=${memory.kv_committed_total}`,
+  `peak_memory_mb=${memory.process_peak_rss / (1024 * 1024)}`,
 ];
 fs.writeFileSync(outputPath, `${lines.join("\n")}\n`);

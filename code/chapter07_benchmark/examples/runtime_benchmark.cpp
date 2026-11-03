@@ -1,12 +1,12 @@
-// Chapter 07：测量 Chapter 05 CPU Runtime 的单请求 prefill/decode 基线。
+// Chapter 07：测量 Chapter 06 CPU Runtime 的单请求 prefill/decode 基线。
 // 职责：固定教学 Transformer、输入和迭代参数，输出正确性与阶段耗时。
 // 验证：结果必须包含 correctness=PASS，性能数字仅用于同环境比较。
-#include "chapter05_generation/embedding.h"
-#include "chapter05_generation/position_encoding.h"
-#include "chapter05_generation/request.h"
-#include "chapter05_generation/runtime.h"
-#include "chapter05_generation/sampler.h"
-#include "chapter05_generation/transformer.h"
+#include "chapter06_generation/embedding.h"
+#include "chapter06_generation/position_encoding.h"
+#include "chapter06_generation/request.h"
+#include "chapter06_generation/runtime.h"
+#include "chapter06_generation/sampler.h"
+#include "chapter06_generation/transformer.h"
 
 #include <chrono>
 #include <cstddef>
@@ -23,16 +23,16 @@ struct Measurement {
 
 Measurement run_once() {
     using clock = std::chrono::steady_clock;
-    chapter05_generation::GenerationConfig config;
+    chapter06_generation::GenerationConfig config;
     config.max_new_tokens = 4;
     config.max_context_tokens = 32;
 
-    chapter05_generation::Embedding embedding(64);
-    chapter05_generation::PositionEncoding position_encoding(32);
-    chapter05_generation::Transformer transformer(2, embedding, position_encoding);
-    chapter05_generation::Runtime runtime(config, transformer);
-    chapter05_generation::Request request({1, 2, 3, 4});
-    chapter05_generation::GreedySampler sampler;
+    chapter06_generation::Embedding embedding(64);
+    chapter06_generation::PositionEncoding position_encoding(32);
+    chapter06_generation::Transformer transformer(2, embedding, position_encoding);
+    chapter06_generation::Runtime runtime(config, transformer);
+    chapter06_generation::Request request({1, 2, 3, 4});
+    chapter06_generation::GreedySampler sampler;
 
     const auto prefill_start = clock::now();
     const std::size_t prefills = runtime.prefill(request);
@@ -76,7 +76,7 @@ int main() {
                                          ? static_cast<double>(total.generated_tokens) *
                                                1000.0 / (total_ms * iterations)
                                          : 0.0;
-    std::cout << "runtime_benchmark=chapter05_cpu\n"
+    std::cout << "runtime_benchmark=chapter06_cpu\n"
               << "correctness=" << (total.correct ? "PASS" : "FAIL") << '\n'
               << "warmup=" << warmup << '\n'
               << "iterations=" << iterations << '\n'

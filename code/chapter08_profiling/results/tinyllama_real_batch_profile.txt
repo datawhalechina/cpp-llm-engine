@@ -1,0 +1,16 @@
+experiment_id=EXP-CPU-10
+workload_id=WL-CPU-REAL-BATCH-V1
+correctness=PASS
+samples=3
+sequential_decode_mean_ms=3604.6768
+batch_decode_mean_ms=4220.3354
+paired_speedup=0.8541
+batch_profile_total_mean_ms=4220.1805
+batch_linear_calls_mean=465.0000
+batch_input_pack_mean_ms=0.2113
+batch_kernel_mean_ms=4215.3183
+batch_output_unpack_mean_ms=0.5643
+batch_pack_unpack_share_percent=0.0184
+batch_kernel_share_percent=99.8848
+bottleneck_scope=scalar_batch_kernel
+decision=CORRECTNESS_ONLY

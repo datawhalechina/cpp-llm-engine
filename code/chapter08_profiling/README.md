@@ -1,6 +1,6 @@
 # Chapter 08：Profiling Evidence 性能证据
 
-本目录不重新实现 Runtime，也不伪造硬件 trace。它消费 Chapter 07 的实测 `key=value` 输出，整理阶段指标并执行 correctness-first 的 A/B 判定。完整学习说明见 [`source/chapter08_profiling`](../../source/chapter08_profiling/intro.md)。
+本目录不重新实现 Runtime，也不伪造硬件 trace。它消费 Chapter07/09 的结果文件，保留 experiment/workload 身份，整理阶段指标并执行 correctness-first 的 A/B 判定。完整学习说明见 [`source/chapter08_profiling`](../../source/chapter08_profiling/intro.md)。
 
 ## 本章资产总览
 
@@ -13,6 +13,7 @@
 | `tests/chapter08_profiling_test.cpp` | 解析、吞吐和回退阈值测试 |
 | `scripts/select_multi_request_profile.mjs` | 从 Chapter 07 JSON 选择指定请求数并适配 ProfileRecord |
 | `scripts/select_real_service_profile.mjs` | 把真实 TinyLlama ServiceCore JSON 适配为 ProfileRecord |
+| `scripts/analyze_real_batch_profile.mjs` | 校验真实 scalar batch schema v2，并定位输入整理、kernel 与输出拆分耗时 |
 | `scripts/run.sh` | 消费 Chapter 07 与归档真实服务基线，并执行轻量回归 |
 | `scripts/run_real_service_ab.sh` | 重新采集真实服务 experiment，与归档 baseline 做同条件回归 A/B |
 | `scripts/run_real_q6k_down_ab.sh` | 只切换 FFN down backend 的三轮 scalar/AVX2 A/B |
@@ -30,6 +31,7 @@
 | `results/tinyllama_q4k_ffn_*.txt` | Q4_K gate/up scalar/AVX2 原始 profile 与 A/B 报告 |
 | `results/tinyllama_q4k_attention_*.txt` | Q4_K QKV/out scalar/AVX2 原始 profile 与 A/B 报告 |
 | `results/tinyllama_optimized_*` | 组合 policy 的 Decoder、ServiceCore 原始结果与判定 |
+| `results/tinyllama_real_batch_profile.txt` | `EXP-CPU-10` 的离线瓶颈摘要 |
 
 ## 运行与验证
 
@@ -41,7 +43,7 @@ bash code/chapter08_profiling/scripts/run.sh
 
 脚本默认选择 `request_count=4` 的 Chapter 07 JSON 场景，先生成阶段报告，再执行同构 baseline/experiment 的 A/B smoke。这个 A/B 只验证 JSON 适配、correctness 和判定逻辑，不代表优化收益；真实实验必须替换 experiment 输入，并保持 workload、硬件、编译选项和 correctness 条件一致。
 
-默认脚本还会读取 `code/chapter09_serving/results/tinyllama_service_cpu_baseline.json`，报告真实模型的 prefill、decode、Runtime overhead、双请求 TTFT/完成时间差和瓶颈范围，但不会重新运行 638 MiB 模型。需要重新采集真实 experiment 时执行：
+默认脚本还会读取 `code/chapter09_serving/results/tinyllama_service_cpu_baseline.json`，报告真实模型的 prefill、decode、Runtime overhead、双请求 TTFT/完成时间差、权重 payload、已提交 KV、进程峰值 RSS 和瓶颈范围，但不会重新运行 638 MiB 模型。需要重新采集真实 experiment 时执行：
 
 ```bash
 bash code/chapter08_profiling/scripts/run_real_service_ab.sh

@@ -13,8 +13,10 @@ namespace chapter08_profiling {
 namespace {
 
 void assign_value(ProfileRecord& record, const std::string& key, const std::string& value) {
-    if (key == "runtime_benchmark") {
-        record.workload = value;
+    if (key == "experiment_id") {
+        record.experiment_id = value;
+    } else if (key == "workload_id" || key == "runtime_benchmark") {
+        record.workload_id = value;
     } else if (key == "backend") {
         record.backend = value;
     } else if (key == "model") {
@@ -53,6 +55,12 @@ void assign_value(ProfileRecord& record, const std::string& key, const std::stri
         record.completion_spread_ms = std::strtod(value.c_str(), nullptr);
     } else if (key == "reported_tokens_per_second") {
         record.reported_tokens_per_second = std::strtod(value.c_str(), nullptr);
+    } else if (key == "model_weight_payload_bytes") {
+        record.model_weight_payload_bytes =
+            static_cast<std::size_t>(std::strtoull(value.c_str(), nullptr, 10));
+    } else if (key == "kv_cache_bytes") {
+        record.kv_cache_bytes =
+            static_cast<std::size_t>(std::strtoull(value.c_str(), nullptr, 10));
     } else if (key == "peak_memory_mb") {
         record.peak_memory_mb = std::strtod(value.c_str(), nullptr);
     }
@@ -85,7 +93,7 @@ bool ProfileRecord::valid(std::string* error) const {
         }
         return false;
     };
-    if (workload.empty() || workload == "unknown") return fail("missing workload");
+    if (workload_id.empty() || workload_id == "unknown") return fail("missing workload_id");
     if (backend.empty() || backend == "unknown") return fail("missing backend");
     if (!correctness_pass) return fail("correctness failed");
     if (iterations == 0) return fail("iterations must be positive");
@@ -109,7 +117,7 @@ ProfileRecord parse_benchmark_output(std::istream& input) {
         const std::string value = line.substr(separator + 1);
         assign_value(record, key, value);
     }
-    if (record.backend == "unknown" && record.workload.find("cpu") != std::string::npos) {
+    if (record.backend == "unknown" && record.workload_id.find("cpu") != std::string::npos) {
         record.backend = "cpu";
     }
     if (record.total_ms <= 0.0) {
@@ -121,7 +129,10 @@ ProfileRecord parse_benchmark_output(std::istream& input) {
 std::string render_report(const ProfileRecord& record) {
     std::ostringstream output;
     output << std::fixed << std::setprecision(4);
-    output << "workload=" << record.workload << '\n'
+    if (record.experiment_id != "unregistered") {
+        output << "experiment_id=" << record.experiment_id << '\n';
+    }
+    output << "workload_id=" << record.workload_id << '\n'
            << "backend=" << record.backend << '\n'
            << "correctness=" << (record.correctness_pass ? "PASS" : "FAIL") << '\n'
            << "iterations=" << record.iterations << '\n'
@@ -163,6 +174,13 @@ std::string render_report(const ProfileRecord& record) {
     }
     if (record.peak_memory_mb > 0.0) {
         output << "peak_memory_mb=" << record.peak_memory_mb << '\n';
+    }
+    if (record.model_weight_payload_bytes > 0) {
+        output << "model_weight_payload_bytes="
+               << record.model_weight_payload_bytes << '\n';
+    }
+    if (record.kv_cache_bytes > 0) {
+        output << "kv_cache_bytes=" << record.kv_cache_bytes << '\n';
     }
     return output.str();
 }

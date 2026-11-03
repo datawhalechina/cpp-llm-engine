@@ -34,7 +34,7 @@ ComparisonResult compare(const ProfileRecord& baseline,
         result.reason = "invalid experiment: " + error;
         return result;
     }
-    if (baseline.workload != experiment.workload ||
+    if (baseline.workload_id != experiment.workload_id ||
         baseline.backend != experiment.backend ||
         baseline.generated_tokens_per_iteration !=
             experiment.generated_tokens_per_iteration ||

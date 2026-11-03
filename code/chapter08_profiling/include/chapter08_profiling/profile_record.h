@@ -10,7 +10,8 @@
 namespace chapter08_profiling {
 
 struct ProfileRecord {
-    std::string workload = "unknown";
+    std::string experiment_id = "unregistered";
+    std::string workload_id = "unknown";
     std::string backend = "unknown";
     std::string model = "unknown";
     std::string cpu_model = "unknown";
@@ -29,6 +30,8 @@ struct ProfileRecord {
     double ttft_spread_ms = 0.0;
     double completion_spread_ms = 0.0;
     double reported_tokens_per_second = 0.0;
+    std::size_t model_weight_payload_bytes = 0;
+    std::size_t kv_cache_bytes = 0;
     double peak_memory_mb = 0.0;
 
     double tokens_per_second() const;

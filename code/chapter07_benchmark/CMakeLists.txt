@@ -5,9 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(${CMAKE_CURRENT_LIST_DIR}/../testing/cmake/CppLlmTesting.cmake)
+
 add_subdirectory(
-    ${CMAKE_CURRENT_SOURCE_DIR}/../chapter05_generation
-    ${CMAKE_CURRENT_BINARY_DIR}/chapter05_generation
+    ${CMAKE_CURRENT_SOURCE_DIR}/../chapter06_generation
+    ${CMAKE_CURRENT_BINARY_DIR}/chapter06_generation
 )
 
 add_library(chapter07_benchmark
@@ -34,12 +36,25 @@ add_executable(chapter07_multi_request_benchmark
     examples/multi_request_benchmark.cpp
 )
 
+if(CMAKE_BUILD_TYPE)
+    set(CHAPTER07_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+else()
+    set(CHAPTER07_BUILD_TYPE "unspecified")
+endif()
+
+target_compile_definitions(chapter07_multi_request_benchmark
+    PRIVATE
+        CHAPTER07_BUILD_TYPE="${CHAPTER07_BUILD_TYPE}"
+        CHAPTER07_COMPILER_ID="${CMAKE_CXX_COMPILER_ID}"
+        CHAPTER07_COMPILER_VERSION="${CMAKE_CXX_COMPILER_VERSION}"
+)
+
 target_link_libraries(chapter07_runtime_benchmark
-    PRIVATE chapter05_generation
+    PRIVATE chapter06_generation
 )
 
 target_link_libraries(chapter07_multi_request_benchmark
-    PRIVATE chapter05_generation
+    PRIVATE chapter06_generation
 )
 
 target_link_libraries(chapter07_benchmark_demo
@@ -53,15 +68,19 @@ add_executable(chapter07_benchmark_test
 target_link_libraries(chapter07_benchmark_test
     PRIVATE chapter07_benchmark
 )
+cpp_llm_prepare_test(chapter07_benchmark_test)
 
 include(CTest)
 enable_testing()
 
 add_test(NAME chapter07_benchmark_test COMMAND chapter07_benchmark_test)
+cpp_llm_set_test_labels(chapter07_benchmark_test unit benchmark)
 add_test(
-    NAME chapter07_multi_request_benchmark
-    COMMAND chapter07_multi_request_benchmark
-        --warmup 0
-        --iterations 1
-        --output ${CMAKE_CURRENT_BINARY_DIR}/chapter07_multi_request_test.json
+    NAME chapter07_multi_request_result_schema
+    COMMAND ${CMAKE_COMMAND}
+        -DBENCHMARK_EXECUTABLE=$<TARGET_FILE:chapter07_multi_request_benchmark>
+        -DOUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/chapter07_multi_request_test.json
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_multi_request_result.cmake
 )
+cpp_llm_set_test_labels(
+    chapter07_multi_request_result_schema contract benchmark result-schema)

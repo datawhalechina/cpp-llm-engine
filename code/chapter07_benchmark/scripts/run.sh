@@ -18,7 +18,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cmake -S "${source_dir}" -B "${build_dir}"
+cmake -S "${source_dir}" -B "${build_dir}" \
+    -DCMAKE_BUILD_TYPE="${CHAPTER07_BUILD_TYPE:-Release}"
 cmake --build "${build_dir}"
 "${build_dir}/chapter07_benchmark_demo"
 "${build_dir}/chapter07_runtime_benchmark"

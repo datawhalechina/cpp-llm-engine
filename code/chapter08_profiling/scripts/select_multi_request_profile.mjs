@@ -6,17 +6,26 @@
 
 import fs from "node:fs";
 
-const [inputPath, requestCountText, outputPath] = process.argv.slice(2);
+const [inputPath, requestCountText, outputPath, executionMode = "round_robin"] =
+  process.argv.slice(2);
 if (!inputPath || !requestCountText || !outputPath) {
-  console.error("usage: select_multi_request_profile.mjs INPUT_JSON REQUEST_COUNT OUTPUT_TXT");
+  console.error(
+    "usage: select_multi_request_profile.mjs INPUT_JSON REQUEST_COUNT OUTPUT_TXT [EXECUTION_MODE]",
+  );
   process.exit(2);
 }
 
 const requestCount = Number(requestCountText);
 const document = JSON.parse(fs.readFileSync(inputPath, "utf8"));
-const scenario = document.scenarios?.find((item) => item.request_count === requestCount);
+if (document.experiment_id !== "EXP-CPU-01" ||
+    document.workload_id !== "WL-CPU-TEACHING-BATCH-V1") {
+  throw new Error("Chapter07 result identity does not match EXP-CPU-01");
+}
+const scenario = document.scenarios?.find(
+  (item) => item.request_count === requestCount && item.execution_mode === executionMode,
+);
 if (!scenario) {
-  throw new Error(`request_count=${requestCount} not found`);
+  throw new Error(`request_count=${requestCount}, execution_mode=${executionMode} not found`);
 }
 if (!scenario.correctness || scenario.completed_requests !== requestCount) {
   throw new Error(`scenario request_count=${requestCount} failed correctness`);
@@ -26,8 +35,10 @@ if (scenario.generated_tokens !== requestCount * scenario.max_new_tokens) {
 }
 
 const lines = [
-  `runtime_benchmark=chapter07_cpu_multi_request_${requestCount}`,
+  `experiment_id=${document.experiment_id}`,
+  `workload_id=${document.workload_id}:requests_${requestCount}`,
   "backend=cpu",
+  `execution_pattern=${scenario.execution_mode}`,
   `correctness=${scenario.correctness ? "PASS" : "FAIL"}`,
   `iterations=${document.iterations}`,
   `request_count=${scenario.request_count}`,

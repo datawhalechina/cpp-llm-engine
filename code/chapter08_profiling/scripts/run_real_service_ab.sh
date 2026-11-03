@@ -34,9 +34,9 @@ fi
 cmake -S "${source_dir}" -B "${build_dir}/profile" -DCMAKE_BUILD_TYPE=Release
 cmake --build "${build_dir}/profile" --target chapter08_profile_report -j2
 node "${script_dir}/select_real_service_profile.mjs" \
-    "${baseline_json}" "${build_dir}/baseline.txt"
+    "${baseline_json}" "${build_dir}/baseline.txt" "EXP-CPU-02"
 node "${script_dir}/select_real_service_profile.mjs" \
-    "${experiment_json}" "${build_dir}/experiment.txt"
+    "${experiment_json}" "${build_dir}/experiment.txt" "EXP-CPU-03"
 
 baseline_report=$("${build_dir}/profile/chapter08_profile_report" \
     < "${build_dir}/baseline.txt")

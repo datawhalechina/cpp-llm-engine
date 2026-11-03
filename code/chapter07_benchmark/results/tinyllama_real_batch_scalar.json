@@ -1,0 +1,25 @@
+{
+  "schema_version": 2,
+  "experiment_id": "EXP-CPU-10",
+  "workload_id": "WL-CPU-REAL-BATCH-V1",
+  "benchmark": "tinyllama_real_decode_batch_cpu",
+  "model": "TinyLlama-1.1B-Chat-v1.0.Q4_K_M",
+  "device": "cpu",
+  "execution_policy": "scalar",
+  "workload": {"request_count": 2, "prompt_tokens": [6, 1], "decode_calls_per_request": 3, "generated_tokens_per_request": 4},
+  "measurement_scope": "decode_only_excludes_model_load_context_creation_and_prefill",
+  "environment": {"hardware_concurrency": 32, "cpu_model": "AMD Ryzen 9 9955HX 16-Core Processor", "compiler": "gcc 13.1.0", "build_type": "Release"},
+  "warmup_pairs": 1,
+  "iterations": 3,
+  "samples": [
+    {"iteration": 0, "order": "sequential-batch", "sequential_decode_ms": 3620.27869, "batch_decode_ms": 4090.302318, "speedup": 0.8850882914, "correctness": true, "sequential_profile": {"forward_tokens": 6, "total_ms": 3620.130252, "embedding_ms": 0.012523, "normalization_ms": 0.529694, "qkv_projection_ms": 397.001802, "rope_ms": 1.222175, "attention_ms": 0.830947, "attention_output_ms": 313.84461, "ffn_ms": 2648.798382, "lm_head_ms": 257.7268, "batch_linear_calls": 0, "batch_input_pack_ms": 0, "batch_kernel_ms": 0, "batch_output_unpack_ms": 0}, "batch_profile": {"forward_tokens": 6, "total_ms": 4090.146839, "embedding_ms": 0.008756, "normalization_ms": 0.397734, "qkv_projection_ms": 474.58285, "rope_ms": 1.108983, "attention_ms": 0.767477, "attention_output_ms": 383.787395, "ffn_ms": 3031.063353, "lm_head_ms": 198.286576, "batch_linear_calls": 465, "batch_input_pack_ms": 0.217966, "batch_kernel_ms": 4085.356416, "batch_output_unpack_ms": 0.585222}},
+    {"iteration": 1, "order": "batch-sequential", "sequential_decode_ms": 3591.032857, "batch_decode_ms": 4292.24977, "speedup": 0.836631848, "correctness": true, "sequential_profile": {"forward_tokens": 6, "total_ms": 3590.887237, "embedding_ms": 0.009818, "normalization_ms": 0.492302, "qkv_projection_ms": 393.266736, "rope_ms": 1.136728, "attention_ms": 0.78104, "attention_output_ms": 312.46772, "ffn_ms": 2629.237319, "lm_head_ms": 253.386289, "batch_linear_calls": 0, "batch_input_pack_ms": 0, "batch_kernel_ms": 0, "batch_output_unpack_ms": 0}, "batch_profile": {"forward_tokens": 6, "total_ms": 4292.095212, "embedding_ms": 0.009699, "normalization_ms": 0.40924, "qkv_projection_ms": 497.047561, "rope_ms": 1.176737, "attention_ms": 0.824788, "attention_output_ms": 401.832035, "ffn_ms": 3180.935222, "lm_head_ms": 209.729211, "batch_linear_calls": 465, "batch_input_pack_ms": 0.213201, "batch_kernel_ms": 4287.126646, "batch_output_unpack_ms": 0.566489}},
+    {"iteration": 2, "order": "sequential-batch", "sequential_decode_ms": 3602.718882, "batch_decode_ms": 4278.454083, "speedup": 0.8420608968, "correctness": true, "sequential_profile": {"forward_tokens": 6, "total_ms": 3602.569885, "embedding_ms": 0.007805, "normalization_ms": 0.47675, "qkv_projection_ms": 394.708523, "rope_ms": 1.134702, "attention_ms": 0.786152, "attention_output_ms": 313.669114, "ffn_ms": 2638.076293, "lm_head_ms": 253.606793, "batch_linear_calls": 0, "batch_input_pack_ms": 0, "batch_kernel_ms": 0, "batch_output_unpack_ms": 0}, "batch_profile": {"forward_tokens": 6, "total_ms": 4278.299425, "embedding_ms": 0.008145, "normalization_ms": 0.394382, "qkv_projection_ms": 495.892169, "rope_ms": 1.147121, "attention_ms": 0.823435, "attention_output_ms": 400.973225, "ffn_ms": 3169.602515, "lm_head_ms": 209.33221, "batch_linear_calls": 465, "batch_input_pack_ms": 0.202824, "batch_kernel_ms": 4273.471972, "batch_output_unpack_ms": 0.541304}}
+  ],
+  "summary": {
+    "sequential_decode_ms": {"min": 3591.032857, "mean": 3604.67681, "median": 3602.718882, "max": 3620.27869},
+    "batch_decode_ms": {"min": 4090.302318, "mean": 4220.33539, "median": 4278.454083, "max": 4292.24977},
+    "paired_speedup": {"min": 0.836631848, "mean": 0.8545936787, "median": 0.8420608968, "max": 0.8850882914}
+  },
+  "correctness": {"all_iterations": true, "sequential_batch_tokens_match": true, "golden_tokens_match": true}
+}
