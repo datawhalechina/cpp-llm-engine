@@ -24,4 +24,4 @@
 
 ## 主线映射
 
-对应 [`chapter05 generation runtime`](/chapter05_generation/intro)、[`Request 生命周期`](/chapter05_generation/09_request_lifecycle) 和 [`continuous batching`](/chapter05_generation/10_continuous_batching)。
+对应 [`chapter06 generation runtime`](/chapter06_generation/intro)、[`Request 生命周期`](/chapter06_generation/09_request_lifecycle) 和 [`continuous batching`](/chapter06_generation/10_continuous_batching)。

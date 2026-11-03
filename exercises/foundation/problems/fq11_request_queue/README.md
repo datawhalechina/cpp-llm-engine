@@ -14,7 +14,7 @@
 
 ## 验证
 
-运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq11_request_queue`；再对照 Chapter 05 的 scheduler admission 和 continuous batching 规则。
+运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq11_request_queue`；再对照 Chapter 06 的 scheduler admission 和 continuous batching 规则。
 
 ## 提示
 
@@ -24,4 +24,4 @@
 
 ## 主线映射
 
-对应 [`chapter05 Scheduler`](/chapter05_generation/05_scheduler)、[`chapter05 Continuous Batching`](/chapter05_generation/10_continuous_batching) 和 [`推理引擎服务化基础`](/reference/service_basics)。
+对应 [`chapter06 Scheduler`](/chapter06_generation/05_scheduler)、[`chapter06 Continuous Batching`](/chapter06_generation/10_continuous_batching) 和 [`推理引擎服务化基础`](/reference/service_basics)。

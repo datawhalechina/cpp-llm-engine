@@ -24,7 +24,7 @@ CUDA library names can be more confusing than the code itself. This page is not 
 ## Where they appear
 
 - `chapter03_matmul`: `cuBLAS` as the dense matmul backend reference
-- `chapter05_generation`: `NCCL` only if the tutorial grows toward multi-GPU serving
+- `chapter06_generation`: `NCCL` only if the tutorial grows toward multi-GPU serving
 - `chapter07_benchmark`: `CUDA Graph`, memory pools, and async copy as optimization ideas
 
 ## Chapter relationship

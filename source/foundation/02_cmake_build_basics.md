@@ -1,8 +1,8 @@
-# F02 CMake and Build Basics CMake 和编译基础
+# F02 CMake 与构建基础
 
 CMake 在本教程中负责把源码、library、app 和 test 组织成可重复构建的 target。先掌握 target 依赖，再进入 Chapter 00 和后续章节。
 
-## 1. 主线位置与目标
+## 主线位置与学习目标
 
 | 需要掌握 | 直接用途 |
 | --- | --- |
@@ -12,7 +12,7 @@ CMake 在本教程中负责把源码、library、app 和 test 组织成可重复
 | out-of-source build | 隔离源码和产物 |
 | Debug / Release | 分开做正确性和性能验证 |
 
-## 2. 一个最小构建图
+## 最小构建图
 
 ```text
 core library
@@ -26,7 +26,7 @@ core library
 | `app` | `main.cpp` + `core` | executable | 展示运行结果 |
 | `test` | 测试代码 + `core` | executable / CTest | 固定行为 |
 
-## 3. 最小例子
+## 最小示例
 
 ```cmake
 cmake_minimum_required(VERSION 3.20)
@@ -47,7 +47,7 @@ add_test(NAME core_test COMMAND core_test)
 
 编译选项优先挂在 target 上，不用全局变量污染其他模块。
 
-## 4. 验证与练习
+## 验证与练习
 
 ```bash
 cmake -S . -B build
@@ -56,7 +56,3 @@ ctest --test-dir build --output-on-failure
 ```
 
 对应练习见 [Foundation 正文与练习映射](./exercise_map.md)，直接完成 `FQ04`；把 library、app、test 和 workspace 组合起来时完成 `FQ17`。
-
-## 5. 总结
-
-CMake 文件的价值是让依赖方向可见、构建可重复、测试可单独运行。Chapter 00-01 的脚本和题库都沿用这个 target 结构。

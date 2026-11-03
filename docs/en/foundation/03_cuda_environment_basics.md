@@ -79,8 +79,8 @@ These chapters are intentionally designed to be CPU-friendly:
 - `chapter01_tensor_loader`
 - `chapter02_tensor_ops`
 - `chapter04_attention`
-- `chapter05_generation`
-- `chapter06_quantization`
+- `chapter06_generation`
+- `chapter05_quantization`
 - `chapter07_benchmark`
 
 CUDA becomes necessary when you want to compare backends or optimize the execution path.

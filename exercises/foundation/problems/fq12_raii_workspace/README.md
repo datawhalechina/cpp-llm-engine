@@ -23,4 +23,4 @@
 
 ## 主线映射
 
-对应 [`推理引擎内存管理`](/reference/memory_management)、[`foundation C++ 基础`](/foundation/01_cxx_basics) 和 [`chapter05 runtime`](/chapter05_generation/intro)。
+对应 [`推理引擎内存管理`](/reference/memory_management)、[`foundation C++ 基础`](/foundation/01_cxx_basics) 和 [`chapter06 runtime`](/chapter06_generation/intro)。

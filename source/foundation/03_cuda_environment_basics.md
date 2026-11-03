@@ -1,8 +1,8 @@
-# F03 CUDA and Environment Basics CUDA 和环境基础
+# F03 CUDA 与环境基础
 
 CUDA 学习先解决“环境是否可用”和“CPU 结果如何作为基线”，再进入 kernel、cuBLAS 和异步执行。没有 GPU 时，仍然可以完成 CPU 主线。
 
-## 1. 主线位置与目标
+## 主线位置与学习目标
 
 | 检查对象 | 需要确认什么 | 失败时先看哪里 |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ CUDA 学习先解决“环境是否可用”和“CPU 结果如何作为基线�
 | 构建开关 | target 确实编译 CUDA 文件 | CMake 配置和日志 |
 | CPU fallback | 无 GPU 仍能跑正确性测试 | CPU reference |
 
-## 2. CPU 与 CUDA 的分工
+## CPU 与 CUDA 的分工
 
 | 路径 | 负责什么 | 本教程入口 |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ CUDA 学习先解决“环境是否可用”和“CPU 结果如何作为基线�
 
 `GGML_CUDA=ON` 是 llama.cpp 的构建选项；教程自己的代码使用类似 `ENABLE_CUDA` 的 target 选项。学习重点是构建开关如何改变代码路径，而不是记住某个项目的变量名。
 
-## 3. 最小例子
+## 最小示例
 
 ```cpp
 __global__ void add_kernel(const float* a, const float* b, float* c, int n) {
@@ -33,7 +33,7 @@ __global__ void add_kernel(const float* a, const float* b, float* c, int n) {
 
 先写相同输入输出约定的 CPU reference，再比较 CUDA 结果。这样 kernel 错误可以和模型、tokenizer、服务层问题分开。
 
-## 4. 验证与练习
+## 验证与练习
 
 验证顺序：确认设备 -> 配置 CUDA target -> 编译 -> 枚举设备 -> 与 CPU 结果比较。对应练习见 [Foundation 正文与练习映射](./exercise_map.md)，完成 `FQ10`；它验证 kernel 映射，不替代完整环境排查。
 
@@ -51,7 +51,3 @@ CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
 | `CudaStream` / `CudaEvent` | 异步顺序、同步边界和 GPU elapsed time | 同一 stream 串联 H2D、kernel、D2H，并由 event 记录完成时间 |
 | 同步/异步 H2D/D2H | host 指针、offset、容量和 stream 边界 | 真实 kernel 前后数据正确，无效句柄和越界在入队前拒绝 |
 | `CudaElementwiseBackend` | grid/block、非整除边界和 backend 设备身份 | Vector Add 与 CPU golden 一致，固定 workload 用 event 多轮计时 |
-
-## 5. 总结
-
-CUDA 是 CPU 主线的后端扩展，不是进入教程的前置条件。先让 CPU 版本提供稳定答案，再让 GPU 路径承担加速和性能验证。

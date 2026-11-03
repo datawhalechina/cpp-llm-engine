@@ -13,7 +13,7 @@
 
 ## 验证
 
-运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq09_request_state`；再对照 Chapter 05 的 Request 生命周期和 scheduler admission 规则。
+运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq09_request_state`；再对照 Chapter 06 的 Request 生命周期和 scheduler admission 规则。
 
 ## 提示
 
@@ -23,4 +23,4 @@
 
 ## 主线映射
 
-对应 [`chapter05 Request 生命周期`](/chapter05_generation/09_request_lifecycle) 和 [`chapter05 Scheduler`](/chapter05_generation/05_scheduler)。
+对应 [`chapter06 Request 生命周期`](/chapter06_generation/09_request_lifecycle) 和 [`chapter06 Scheduler`](/chapter06_generation/05_scheduler)。

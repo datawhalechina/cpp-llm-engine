@@ -12,16 +12,16 @@
 | `FQ04` | 入门 | CMake + CTest | target、构建、测试注册 | `F02` / `foundation` |
 | `FQ05` | 入门 | 安全缓冲区 | 输入检查、失败路径 | `F04` / `foundation` |
 | `FQ06` | 主线 | CPU MatMul | shape 检查、数值结果 | `F06` / `chapter03` |
-| `FQ07` | 主线 | Token queue | FIFO、状态转移 | `F06` / `chapter05` |
+| `FQ07` | 主线 | Token queue | FIFO、状态转移 | `F06` / `chapter06` |
 | `FQ08` | 主线 | Mini Tensor | ownership、view、索引组合 | `F05`、`F08` / `chapter01` |
-| `FQ09` | 主线 | Request State | 状态迁移、终态、取消 | `chapter05` |
+| `FQ09` | 主线 | Request State | 状态迁移、终态、取消 | `chapter06` |
 | `FQ10` | 进阶选修 | Vector Add / CUDA 映射 | CPU 参考、kernel 索引、边界 | `F03`、`F07` / `chapter03` |
-| `FQ11` | 主线 | Request Queue | 容量、FIFO、取消、backpressure | `chapter05` |
-| `FQ12` | 主线 | RAII Workspace | 移动所有权、边界、异常安全 | `F09` / `chapter05` / `reference` |
-| `FQ13` | 主线 | Shape-aware Batch | sequence length、padding、buffer offset | `chapter05` |
-| `FQ14` | 主线 | Step Scheduler | FIFO、token budget、round-robin | `chapter05` |
-| `FQ15` | 主线 | KV Block Pool | block 分配、释放、复用 | `chapter05` / `reference` |
-| `FQ16` | 综合 | Prefill/Decode State | 阶段迁移、token 计数、终态 | `chapter05` |
+| `FQ11` | 主线 | Request Queue | 容量、FIFO、取消、backpressure | `chapter06` |
+| `FQ12` | 主线 | RAII Workspace | 移动所有权、边界、异常安全 | `F09` / `chapter06` / `reference` |
+| `FQ13` | 主线 | Shape-aware Batch | sequence length、padding、buffer offset | `chapter06` |
+| `FQ14` | 主线 | Step Scheduler | FIFO、token budget、round-robin | `chapter06` |
+| `FQ15` | 主线 | KV Block Pool | block 分配、释放、复用 | `chapter06` / `reference` |
+| `FQ16` | 综合 | Prefill/Decode State | 阶段迁移、token 计数、终态 | `chapter06` |
 | `FQ17` | 综合 | Minimal Project Integration | library、app、test、workspace 所有权 | `F09` / `chapter00` / `chapter01` |
 
 每道题都包含问题说明、完成标准、验证命令、提示和主线链接。题目入口：
@@ -107,7 +107,7 @@ bash exercises/foundation/run_all.sh
 
 ## Foundation 完成标准
 
-完成入门组后，学习者应能独立构建和测试 C++ 小程序；完成 CPU 主线和 FQ17 后，应能读懂 Chapter 00-03 的项目组织、对象和算子；完成 Runtime 综合练习后，应能进入 Chapter 05 阅读 Request、Scheduler、KV Cache 和 Prefill/Decode。题库参考实现的 CTest 通过不等于学习完成，学习者还需要把 starter 改完并运行对应验证。
+完成入门组后，学习者应能独立构建和测试 C++ 小程序；完成 CPU 主线和 FQ17 后，应能读懂 Chapter 00-03 的项目组织、对象和算子；完成 Runtime 综合练习后，应能进入 Chapter 06 阅读 Request、Scheduler、KV Cache 和 Prefill/Decode。题库参考实现的 CTest 通过不等于学习完成，学习者还需要把 starter 改完并运行对应验证。
 
 ## 运行全部题目
 

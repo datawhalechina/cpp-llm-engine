@@ -1,8 +1,8 @@
-# F09 Minimal C++/CUDA Project 构建一个最小的 C++/CUDA 项目
+# F09 构建最小 C++/CUDA 工程
 
 F09 把前面的 C++、CMake、测试和资源管理组合成一个可增长的工程。CPU 项目先跑通，CUDA 作为同一构建图中的可选 target 扩展。
 
-## 1. 主线位置与目标
+## 主线位置与学习目标
 
 | 阶段 | 工程结构 | 结果 |
 | --- | --- | --- |
@@ -11,7 +11,7 @@ F09 把前面的 C++、CMake、测试和资源管理组合成一个可增长的�
 | 完整工程 | library + app + test + CTest | 可独立验证和持续扩展 |
 | CUDA 扩展 | `.cu` target + `ENABLE_CUDA` | CPU baseline 与 GPU backend 并存 |
 
-## 2. 最小构建图
+## 最小构建图
 
 ```text
 foundation_engine
@@ -26,7 +26,7 @@ foundation_engine
 | `app/` | 可运行示例 | 可复用核心逻辑 |
 | `tests/` | 固定输入和断言 | 外部大模型依赖 |
 
-## 3. 最小例子
+## 最小示例
 
 ```cmake
 add_library(foundation_engine src/engine.cpp)
@@ -43,7 +43,7 @@ add_test(NAME engine_test COMMAND engine_test)
 
 `Workspace` 等资源对象由 library 持有并自动释放；app 只调用接口，test 只验证行为。CUDA target 以后再挂到同一个接口上，不另起一套工程。
 
-## 4. 验证与练习
+## 验证与练习
 
 ```bash
 cmake -S . -B build
@@ -52,7 +52,3 @@ ctest --test-dir build --output-on-failure
 ```
 
 对应练习见 [Foundation 正文与练习映射](./exercise_map.md)：FQ04 验证 CMake/CTest，FQ12 验证 workspace 所有权，FQ17 验证三者组合。完成后进入 Chapter 00 和 Chapter 01。
-
-## 5. 总结
-
-后续章节只需向这个构建图增加 Tensor、Operator、Backend 和 Runtime target，不需要重写项目布局。CPU 正确性先成立，CUDA 再作为可替换后端加入。
