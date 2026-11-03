@@ -1,82 +1,44 @@
-# 02.2 Reshape 重塑
+# 02.2 变形与转置
 
+`reshape` 在不改变元素顺序和底层存储的情况下，为连续视图建立新的形状。它适合调整下一步算子的输入形状，不负责重新排列数据。
 
-## 用 Reshape 改变 Tensor 视图
+## 形状与步长怎样变化
 
-实现只改变形状、不复制数据的 `reshape` 操作。
+形状（`shape`）记录每个维度的长度；步长（`stride`）记录某一维下标增加 1 时跨过的元素数。连续 `[2,3]` 张量的步长是 `[3,1]`。
 
-读完后应能做到：
+`reshape` 必须同时满足：
 
-- 理解 `reshape` 的语义边界
-- 理解为什么 `reshape` 不能偷偷拷贝数据
-- 理解 `reshape` 对后续算子的意义
+- 新旧元素总数相同；
+- 当前视图连续；
+- 底层存储和偏移保持不变；
+- 新步长按连续布局重新计算。
 
-## 代码直达
+带非零偏移的完整连续行仍可变形；跨行 `2x2` 切片保留父张量的行步长，通常不连续，因此必须拒绝变形，而不是暗中复制。
 
-- <a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a>
-- <a href="../_code/chapter02_tensor_ops/tests/chapter02_tensor_ops_test.cpp"><code>chapter02_tensor_ops_test.cpp</code></a>
+## 实现与失败状态
 
-## 核心语义
-
-`reshape` 是最典型的 view 操作之一。它只改变张量的形状解释，不改变底层存储内容。
-
-语义要求：
-
-- 只改变 `shape`
-- 不复制底层数据
-- 保持数据总元素数一致
-- 保持底层存储句柄不变
-
-`reshape` 的关键约束有两个：元素总数必须不变，当前 view 必须逻辑连续。如果新旧 shape 的元素数不同，或者 view 中间存在行间隙，这个操作就应该直接拒绝，而不是偷偷复制数据。
-
-本章的实现允许带非零 `offset` 的连续 view 继续 reshape。例如，先取出完整的一行，再把这一行 reshape 成 `3x1`，仍然复用同一份 storage。一个跨行的 `2x2` slice 具有父 Tensor 的行 stride，虽然共享 storage，但不是连续 view，因此不能 reshape。
-
-最小实现通常只做四件事：
-
-1. 校验当前 view 是否连续
-2. 校验新 shape 的元素数
-3. 复用原始存储和偏移
-4. 返回一个只更新 shape 和 stride 的新视图
-
-便捷入口和工程入口复用同一条核心路径：
+<a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> 中的 `try_reshape()` 先验证源张量、连续性、维度和元素数量，再构造共享底层存储的新视图：
 
 ```cpp
 Tensor output;
 auto status = tensor.try_reshape(rows, cols, &output);
 ```
 
-`try_reshape()` 用 `Status` 区分 source 未就绪、view 非连续、元素数变化和溢出；`reshape()` 在失败时仍返回无效 Tensor。两种入口不会分配新 storage，也不会形成两套 reshape 语义。
+`Status` 区分源张量未就绪、非连续、元素数变化和溢出。便捷接口 `reshape()` 复用同一条路径，失败时返回无效张量。
 
-实现建议：
+输出参数可以指向源张量。`tensor.try_reshape(shape, &tensor)` 会先构造临时结果，成功后再替换原视图；验证失败时原张量保持不变。
 
-- 检查元素数量是否匹配
-- 复用原始存储
-- 返回新的张量视图对象
+## 转置交换逻辑轴
 
-## `reshape` 在真实项目里为什么重要
+二维便捷接口 `transpose()` 把 `[rows, cols]` 变成 `[cols, rows]`。通用接口 `transpose(axis_a, axis_b)` 可以交换 1–4 维张量中任意两个轴。两者都同时交换对应的形状和步长，底层存储、偏移和数值不移动：
 
-`reshape` 在推理里最重要的价值，不是把二维改成一维，而是让同一块数据在不同计算阶段以不同形状被解释。
+```text
+原张量： shape [2,3]  stride [3,1]
+转置视图：shape [3,2]  stride [1,3]
+```
 
-学习者读真实项目时，应该先把这件事和“生成新张量”分开：
+交换轴后的相邻逻辑元素可能不再物理相邻，因此视图通常不连续。需要交给只接受连续布局的算子时，调用者先执行 `contiguous()`，把逻辑顺序物化为新的连续存储。
 
-- 如果只是为了匹配下一步算子输入 shape，优先想到 `reshape` / view
-- 如果真的改变了数据排布或内容，那才应该考虑新分配或复制
+## 验证与衔接
 
-这也是后面看 QKV 组织、中间结果整理或某些 attention 输入变换时最需要带着的判断。
-
-## 验证与排查
-
-验证时重点看：
-
-- `reshape` 前后元素总数一致
-- 数据内容不变
-- 新旧张量共享同一份存储
-- 非连续 slice 的 reshape 会失败
-
-一个简单的验证方式是把 `{2, 2}` reshape 成 `{4}`，再把结果转回 vector 比较，确认内容顺序没有变化。
-
-常见问题：
-
-- reshape 后偷偷分配了新内存
-- shape 修改后元素数量不一致
-- 忘记保留原始 storage
+运行 `bash code/chapter02_tensor_ops/scripts/run.sh`，确认变形只重解释连续元素，转置只交换形状和步长，两个视图都共享原存储；转置连续化后使用独立存储。[`slice`](./03_slice.md) 将继续改变观察窗口。

@@ -1,61 +1,51 @@
-# 02.0 Tensor Views and Shared Storage 学习视图语义和存储共享
+# 02.0 学习张量视图与共享存储
 
-## 1. 本章位置与成功标准
+## 本章导读
 
-本章让 `Tensor` 在不复制数据的情况下改变 shape 和局部窗口。
+Chapter 01 已经建立模型形状、数据类型和底层存储概念；本章用独立的 CPU Float32 教学张量实现 1–4 维形状、步长和偏移，并加入 `reshape`、按轴 `slice`、交换轴和 `contiguous()`。二维示例先建立地址直觉，再通过只读输入视图和可写输出视图进入矩阵乘法、解码器与量化线性层。
+
+| 学习线 | 本章怎样学习 | 可验证产物 |
+| --- | --- | --- |
+| A 教学闭环 | 用二维小数组观察共享存储、变形、切片、转置和显式连续化 | 可直接打印的形状、步长、偏移与共享关系 |
+| B 真实执行闭环 | 将同一地址公式扩展到 1–4 维，并通过 `TensorViewRef` 交给后续计算后端 | 3D/4D Q/K/V 布局、Chapter03/04 跨章测试 |
+
+本章先用中文概念建立直觉，再在正文中对应到代码变量：
+
+| 本章新术语 | 先这样理解 | 首次解释 |
+| --- | --- | --- |
+| 形状（`shape`） | 数据按几个维度、每个维度多长来观察 | [`02.2 变形与转置`](./02_reshape.md) |
+| 维数（`rank`） | 形状中包含多少个轴 | [`02.1 共享底层存储`](./01_shared_ptr_memory.md) |
+| 轴（`axis`） | 形状中某个维度的位置 | [`02.3 切片`](./03_slice.md) |
+| 步长（`stride`） | 某一维下标增加 1 时，要跨过多少个元素 | [`02.2 变形与转置`](./02_reshape.md) |
+| 偏移（`offset`） | 当前视图从底层存储的第几个元素开始 | [`02.3 切片`](./03_slice.md) |
+| 转置（`transpose`） | 交换行列的观察方式，不移动底层数值 | [`02.2 变形与转置`](./02_reshape.md) |
+| 视图与底层存储（view / storage） | 多个张量对象可以观察同一份数据 | [`02.1 共享底层存储`](./01_shared_ptr_memory.md) |
+
+![Chapter 02 主图：张量视图与共享存储](../assets/diagrams/chapter02-main.svg)
+
+## 开始学习
+
+先运行本章入口：
 
 ```bash
 bash code/chapter02_tensor_ops/scripts/run.sh
 ```
 
-成功标准：demo 能完成 `reshape` 和 `slice`，CTest 能证明 view 共享 storage、`TensorContract` 保留 stride/offset，边界错误通过 `Status` 被明确拒绝。
+脚本会先输出二维视图和三维 Q/K/V 示例的形状、偏移、步长与存储共享结果；随后 CTest 验证 1D、3D、4D 索引、按轴视图、越界拒绝和公共张量契约。阅读时先理解二维地址，再把同一公式推广到更多轴。
 
-![Chapter 02 主图：Tensor View 与共享存储](../assets/diagrams/chapter02-main.svg)
+| 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
+| --- | --- | --- | --- | --- |
+| 1 | A/B 公共 | [`02.1 共享底层存储`](./01_shared_ptr_memory.md) | <a href="../_code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> | 视图元数据与存储所有权分开 |
+| 2 | A | [`02.2 变形与转置`](./02_reshape.md)、[`02.3 切片`](./03_slice.md) | <a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> | 二维地址变化、共享和显式复制可以直接观察 |
+| 3 | B | [`02.4 单元测试`](./04_unit_tests.md) | <a href="../_code/chapter02_tensor_ops/tests/chapter02_nd_tensor_test.cpp"><code>chapter02_nd_tensor_test.cpp</code></a> | 1D、3D、4D 与跨章输入契约成立 |
+| 4 | B | [`02.5 张量与视图框架对照`](./05_framework_tensor_comparison.md) | [`数据结构与算法资产表`](../reference/data_structures_algorithms.md) | 在 ggml 和 vLLM 中定位视图与执行布局 |
 
-本章位于对象表示和数值计算之间，解决“同一份数据怎样被不同算子观察”的问题。本章不实现 MatMul、Attention 或 KV Cache，只提供它们需要的 view 语义。
+## 验证与下一步
 
-## 2. 内容地图
+[`Chapter 03`](../chapter03_matmul/intro.md) 明确要求二维输入，把连续 CPU Float32 视图适配为 `MatmulRequest`；高维张量不会被自动展平或解释为批量矩阵乘法。
 
-完成本章后，可以：
-
-- 区分改变 shape 与复制数据
-- 用共享 storage 表达多个 Tensor view
-- 用 `reshape` 改变形状，用 `slice` 改变 offset 和窗口
-- 检查 view 的生命周期、范围和底层数据是否仍然一致
-- 区分适合入门的便捷 API 与跨 backend 使用的 `contract()` / `try_*` API
-
-成熟框架会在 tensor 图、模型执行和 KV Cache 中反复使用 view 语义。本章先对照 storage、shape、stride 和 offset 四个共同要素。
-
-| 对照项 | 内容 |
-| --- | --- |
-| 本章教学对象 | 共享 storage、reshape、slice 和 TensorContract |
-| 主对照框架 | `llama.cpp` 的 ggml tensor/view；vLLM 的 cache 元数据 |
-| 成熟组件 | 非连续 view、设备内存、allocator、页表和异步生命周期 |
-| 重点差异 | 本章只实现连续 CPU storage 上的可验证 view，不隐藏复制和跨设备迁移 |
-| 深入入口 | [`02.5 Tensor 与 View 框架对照`](./05_framework_tensor_comparison.md) |
-
-## 3. 阅读与源码顺序
-
-| 顺序 | 页面 | 读完后应看到什么 |
-| --- | --- | --- |
-| 1 | [`02.1 Shared Underlying Storage`](./01_shared_ptr_memory.md) | storage 和 view 的所有权关系 |
-| 2 | [`02.2 Reshape`](./02_reshape.md) | 只改 shape、不复制数据 |
-| 3 | [`02.3 Slice`](./03_slice.md) | 通过 offset 观察局部窗口 |
-| 4 | [`02.4 Unit Tests`](./04_unit_tests.md) | shape、offset、共享 storage 和异常边界 |
-| 5 | [`02.5 Tensor 与 View 框架对照`](./05_framework_tensor_comparison.md) | 在 ggml 和 vLLM 中定位对应数据结构 |
-
-源码先看 <a href="../_code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a>、<a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> 和 <a href="../_code/chapter02_tensor_ops/tests/chapter02_tensor_ops_test.cpp"><code>chapter02_tensor_ops_test.cpp</code></a>。前置阅读是 [`chapter01_tensor_loader`](../chapter01_tensor_loader/intro.md)；内存生命周期的扩展说明见 [`推理引擎内存管理`](../reference/memory_management.md)，numel、stride 和 offset 统一写法见 [`F-TENSOR-01/02`](../reference/formulas.md#f-tensor-01)。
-
-## 4. 验证
-
-本章至少检查：
-
-1. `reshape` 只改变 shape
-2. `slice` 只改变 offset 和窗口
-3. 父张量和子视图指向同一份 storage
-4. 越界 shape、offset 和长度会失败
-5. `contract()` 的 shape、stride、offset 和 storage bytes 能通过公共范围校验
-
-看到 Tensor API 时，先判断它是在重新分配数据，还是只改变观察方式。这个判断会直接影响 Chapter 03 的算子输入和 Chapter 05 的 KV Cache 成本。
-
-**下一章：**本章固定数据的观察方式，Chapter 03 将 Tensor 接入 MatMul，并把算子语义与 CPU / GPU backend 分开。
+| 验收层级 | 执行入口 | 通过条件 | 本章要求 |
+| --- | --- | --- | --- |
+| L1 默认 CPU | `bash code/chapter02_tensor_ops/scripts/run.sh` | 1–4 维索引、变形、转置、切片、共享存储、`contiguous()` 和失败路径通过 CTest | 必做 |
+| L2 真实模型 | 不读取模型文件 | 视图与存储语义由固定形状、步长、偏移和别名关系完整验证 | 不适用 |
+| L3 可选 CUDA | 不单独设置 Chapter02 CUDA 验收 | 本章只建立主机视图；设备存储由 `code/cuda` 的 `CudaTensor` 验证 | 不适用 |

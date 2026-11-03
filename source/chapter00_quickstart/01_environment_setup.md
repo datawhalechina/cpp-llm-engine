@@ -1,50 +1,36 @@
-# 00.1 Environment Setup 环境准备
+# 00.1 检查本地环境
 
-**阅读入口**
+完成本节后，终端应能找到 C++ 编译器、CMake 和 Git。CUDA 不属于 Chapter00 CPU 基线的前置条件；需要 GPU 时再阅读 [`CUDA 环境指南`](../guides/setup_cuda.md)。
 
-- 前置阅读：[`chapter00 导读`](./intro.md)、[`foundation`](../foundation/README.md)
-- 源码直达：<a href="../_code/chapter00_quickstart/main_quick.cpp"><code>main_quick.cpp</code></a>、<a href="../_code/chapter00_quickstart/run.sh"><code>run.sh</code></a>
-- 相关阅读：[`00.2 Clone and Build`](./02_clone_and_build_llamacpp.md)、[`00.4 First Inference`](./04_first_inference.md)
+## 最小环境
 
-## 准备和目标
+| 项目 | 建议基线 | 用途 |
+| --- | --- | --- |
+| 操作系统 | Ubuntu 22.04 或兼容 Linux | 运行仓库脚本和 llama.cpp |
+| CMake | 3.20+ | 配置 C++ 项目 |
+| 编译器 | GCC 11+ 或 Clang 14+ | 编译 C++17 代码 |
+| Git | 可用版本 | 获取并固定 llama.cpp 源码 |
+| 磁盘 | 至少 3 GiB 可用空间 | 保存源码、构建产物和 638 MiB GGUF |
+| 内存 | 建议至少 4 GiB 可用内存 | 加载 TinyLlama Q4_K_M 并执行 CPU 推理 |
 
-准备好本章需要的系统环境、编译工具链和基础依赖。
+## 检查命令
 
-**完成后：**
+从仓库根目录执行：
 
-- 知道需要哪些基础工具
-- 知道什么时候可以先用 CPU 路径验证
-- 知道 CUDA 只是可选加速路径，不是快速开始的前置条件
+```bash
+cmake --version
+g++ --version || clang++ --version
+git --version
+bash code/chapter00_quickstart/run.sh
+```
 
-## 环境检查
+最后一条命令不读取模型，只编译 Chapter00 连通性检查程序。看到 `smoke check passed` 后，继续构建 [`llama.cpp`](./02_clone_and_build_llamacpp.md)。
 
-- Ubuntu 或其他兼容 Linux 发行版
-- `git`
-- `cmake`
-- C++ 编译器
-- 可选：CUDA toolkit 和 NVIDIA 驱动
+## 验证与衔接
 
-**检查项目：**
-
-- 编译器可用
-- `cmake` 可用
-- `git` 可用
-- 如果要走 GPU 路径，CUDA 相关组件可用
-
-先确认最小可用链路存在。只要 CPU 编译链路可用，就已经能支撑后续大部分教程验证；CUDA 留到后续优化阶段。
-
-如果你同时有 CPU 和 GPU 环境，建议先把 CPU 路径跑通，再回头检查 CUDA。这样一旦后面出问题，你更容易判断是工具链问题还是 GPU 配置问题。
-
-## 怎么验证
-
-- `cmake --version`
-- `g++ --version` 或 `clang++ --version`
-- `git --version`
-
-如果这些命令都能正常返回版本号，说明最基础的构建工具已经到位。后续只要再确认磁盘空间和网络可用，就可以进入源码编译阶段。
-
-## 常见问题
-
-- 编译器版本太旧
-- `cmake` 不在 PATH
-- CUDA 驱动和 toolkit 混淆
+| 检查项 | 通过条件 | 失败时先看 |
+| --- | --- | --- |
+| CMake | 版本不低于 3.20 | PATH 或系统软件源 |
+| C++ 编译器 | 能报告版本并支持 C++17 | Foundation C++/CMake 基础 |
+| Git | 能报告版本 | PATH 或系统软件源 |
+| 仓库连通性检查 | 输出 `smoke check passed` | [`00.5 排查首次运行问题`](./05_troubleshooting.md) |

@@ -1,80 +1,48 @@
-# 01.0 Model Weights and Tensor Objects 加载模型权重并统一表示
+# 01.0 加载模型权重并建立张量对象
 
-## 1. 本章位置与成功标准
+## 本章导读
 
-本章把模型文件和用户文本送入 C++ 程序：`ModelLoader` 产生 `Tensor`，`Tokenizer` 产生 token IDs，metadata adapter 产生可校验的模型配置。
+Chapter 00 已经用 llama.cpp 跑通 TinyLlama，证明模型文件、分词器和运行环境可用；本章开始建立教程自己的输入对象，把模型文件转换为配置、权重张量和模型对象，把用户文本转换为词元编号（token ID）。Chapter 02 会继续学习张量怎样共享存储和改变观察方式。
+
+| 学习线 | 本章怎样学习 | 可验证产物 |
+| --- | --- | --- |
+| A 教学闭环 | 用小型 CIE1 文件、固定测试数据和教学分词器分开观察格式、加载过程与输入错误 | 可检查的张量、错误文件拒绝和词元编号 |
+| B 真实执行闭环 | 读取 TinyLlama GGUF 的模型元数据、真实分词器信息和权重目录 | `ModelConfig`、张量映射、Llama 权重布局和真实文件检查 |
+
+| 本章新术语 | 先这样理解 | 首次解释 |
+| --- | --- | --- |
+| 张量（`Tensor`） | 带名称、形状、数据类型和底层字节的数据对象 | [`01.1 Tensor Object`](./01_tensor_object.md) |
+| 模型加载器（`ModelLoader`） | 把文件中的权重恢复成可按名称查询的张量 | [`01.3 ModelLoader and Validation`](./03_model_loader_validation.md) |
+| 分词器（`Tokenizer`） | 在用户文本和模型使用的词元编号之间转换 | [`01.4 输入契约与分词器`](./04_input_contract_and_tokenizer.md) |
+| 模型元数据（model metadata） | 描述模型层数、隐藏维度、词表和上下文长度 | [`01.5 Model Metadata and GGUF`](./05_model_metadata_and_gguf.md) |
+| GGUF | 保存模型配置、分词信息、权重目录和权重数据的文件格式 | [`01.5 Model Metadata and GGUF`](./05_model_metadata_and_gguf.md) |
+
+![Chapter 01 主图：模型文件和文本输入转换为内部对象](../assets/diagrams/chapter01-main.svg)
+
+## 开始学习
+
+先运行不依赖真实模型文件的默认测试：
 
 ```bash
 bash code/chapter01_tensor_loader/run.sh
 ```
 
-成功标准：Chapter 01 测试通过，加载后的 tensor 名称、shape 和 dtype 可检查；如果提供 Chapter 00 下载的 GGUF 文件，额外运行 `gguf_inspect` 检查 metadata、tensor index 和 `DecoderInput` mapping，并可运行 TinyLlama 22 层 token-to-logits CPU smoke。循环采样和文本生成仍由 Chapter 05 Runtime 承担。
+脚本会构建并运行 `chapter01_tensor_loader_test`，检查 Tensor、教学权重格式、Loader、Tokenizer、模型配置和 GGUF fixture。真实 TinyLlama 检查需要 Chapter 00 下载的 GGUF，按 `01.5` 中的可选命令运行。
 
-![Chapter 01 主图：权重与 Tensor 对象](../assets/diagrams/chapter01-main.svg)
+| 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
+| --- | --- | --- | --- | --- |
+| 1 | A/B 公共 | [`01.1 Tensor Object`](./01_tensor_object.md) | <a href="../_code/chapter01_tensor_loader/src/tensor.h"><code>tensor.h</code></a> | 名称、形状、类型和底层字节组成一个 Tensor |
+| 2 | A | [`01.2 Teaching Weight Format`](./02_teaching_weight_format.md)、[`01.3 ModelLoader`](./03_model_loader_validation.md) | <a href="../_code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> | 小文件固定 Loader 正常与失败路径 |
+| 3 | A→B | [`01.4 Input Contract and Tokenizer`](./04_input_contract_and_tokenizer.md) | <a href="../_code/chapter01_tensor_loader/src/tokenizer.h"><code>tokenizer.h</code></a> | 教学接口怎样过渡到模型规定的 tokenizer |
+| 4 | B | [`01.5 模型元数据与 GGUF`](./05_model_metadata_and_gguf.md) | <a href="../_code/chapter01_tensor_loader/src/gguf_reader.cpp"><code>gguf_reader.cpp</code></a>、<a href="../_code/chapter01_tensor_loader/src/model_builder.cpp"><code>model_builder.cpp</code></a> | GGUF 配置和权重进入张量映射与 Llama 权重布局 |
+| 5 | B | [`Loader 框架对照`](./06_framework_loader_comparison.md) | [`llama.cpp` 项目卡](../reference/ecosystem/llama_cpp.md) | 在成熟框架中定位格式解析、权重加载和模型构建 |
 
-本章把静态权重转换成后续 view、算子和 runtime 可以消费的对象。
+## 验证与下一步
 
-![Chapter 01 软件架构与输入边界](../assets/diagrams/chapter01-software-architecture.svg)
+本章留下可检查的权重张量、模型配置、分词器、张量映射和 Llama 权重布局，不执行完整解码器。[`Chapter 02`](../chapter02_tensor_ops/intro.md) 用独立的教学张量建立视图与执行布局；[`Chapter 04`](../chapter04_attention/06_real_tinyllama_decoder.md) 通过 `code/model` 消费这些资产并执行真实解码器。
 
-读取链从外部格式开始，经过 adapter 和校验，最后得到内部对象；文本输入和权重加载在 Chapter 05 的 Request 中汇合。
-
-## 2. 内容地图
-
-完成本章后，可以：
-
-- 用 `Tensor` 表达 shape、dtype、storage 和基本 ownership
-- 用 `ModelLoader` 从文件恢复 tensor 名称、shape 和 payload
-- 用 tokenizer contract 把文本转换成 token IDs
-- 用 metadata adapter 把 GGUF / HuggingFace 信息归一化为 `ModelMetadata` / `ModelConfig`
-- 用 `ModelBuilder` 生成包含 Llama layer mapping 的 `DecoderInput`
-- 用真实 TinyLlama 的 Q4_K/Q6_K 权重贯通 22 层 Decoder、Final RMSNorm 和 LM Head，得到 32000 维 logits
-- 用公共 Decoder 契约把真实 Model/Context 交给 Engine，而不泄漏 GGUF 细节
-
-本章只保留一张输入链表：
-
-| 输入 | 本章代码 | 输出 |
-| --- | --- | --- |
-| GGUF、配置文件、文本 prompt | `GgufReader`、metadata/tokenizer adapter、`GgufTensorLoader` | metadata、tokenizer metadata、Tensor |
-| 已解析对象 | `ModelBuilder` / `LoadedModel` | Decoder 输入和 Llama layer mapping |
-| 真实权重和模型配置 | `RealLlamaCpuModel` / `RealLlamaCpuContext` | `DecoderModelContract` 和请求级执行 Context |
-
-成熟框架会把相同输入职责拆到格式解析、权重装载、模型配置和执行对象中。本章对照这些职责，不照搬框架规模。
-
-| 对照项 | 内容 |
-| --- | --- |
-| 本章教学对象 | GGUF metadata、权重 Tensor、Tokenizer、ModelConfig 和 Model/Context |
-| 主对照框架 | `llama.cpp` model loader、vLLM model loader |
-| 成熟组件 | 分片加载、设备放置、并行权重映射、延迟加载和多模型格式 |
-| 重点差异 | 本章以 TinyLlama GGUF 和 CPU 路径固定输入契约，成熟框架还要处理分布式和多后端 |
-| 深入入口 | [`01.6 Loader 框架对照`](./06_framework_loader_comparison.md) |
-
-## 3. 阅读与源码顺序
-
-| 顺序 | 页面 | 读完后应看到什么 |
-| --- | --- | --- |
-| 1，必读 | [`01.1 Tensor Object`](./01_tensor_object.md) | Tensor 的数据表示、存储和生命周期 |
-| 2，选读 | [`01.2 Teaching Weight Format`](./02_teaching_weight_format.md) | 用 CIE1 fixture 理解文件格式契约 |
-| 3，必读 | [`01.3 ModelLoader and Validation`](./03_model_loader_validation.md) | 文件如何恢复成可检查的 Tensor |
-| 4，必读 | [`01.4 Input Contract and Tokenizer`](./04_input_contract_and_tokenizer.md) | 文本如何变成 token IDs |
-| 5，必读 | [`01.5 Model Metadata and GGUF`](./05_model_metadata_and_gguf.md) | GGUF 如何进入配置、权重和执行对象 |
-| 6，进阶 | [`01.6 Loader 框架对照`](./06_framework_loader_comparison.md) | 从本章加载链定位成熟框架源码 |
-
-源码先看 <a href="../_code/chapter01_tensor_loader/src/tensor.h"><code>tensor.h</code></a>、<a href="../_code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> 和 <a href="../_code/chapter01_tensor_loader/tests/chapter01_tensor_loader_test.cpp"><code>chapter01_tensor_loader_test.cpp</code></a>。前置阅读是 [`chapter00_quickstart`](../chapter00_quickstart/intro.md)；输入侧扩展见 [`推理引擎输入链路`](../reference/input_pipeline.md)。
-
-## 4. 验证
-
-本章验证以下结果：
-
-1. shape、dtype、storage size 和 offset 不越界
-2. loader 能恢复 tensor 名称和 shape
-3. tokenizer 输出落在词表范围内，特殊 token 和长度约束可检查
-4. GGUF reader 能读取 header、metadata、tensor index 和对齐后的 payload offset
-5. 缺失 tensor、错误 shape 或不兼容 metadata 会明确失败
-6. 完整 22 层 logits 与 llama.cpp reference 的 cosine、RMSE 和 top-k 对照达到验收门槛
-7. 同一 prompt 的 4-token greedy 序列与 llama.cpp 一致，并能通过可选真实模型 CTest 固定结果
-8. 同一个只读 Model 创建的两个请求 Context 分别维护 position 和分层 K/V，输出不互相污染
-9. 教学 Decoder 与真实 Model 都能输出合法结构契约，真实 Context 能通过公共执行接口完成 prefill/decode
-
-Toy tokenizer 用于验证接口和测试夹具；Chapter 00 的 TinyLlama tokenizer 由 `llama.cpp` 提供，本章同时验证真实 tokenizer adapter 和 layer-0 权重进入 CPU 计算前的契约。
-
-**下一章：**程序已经知道模型里有什么、用户输入是什么；Chapter 02 在不复制 storage 的情况下实现 `reshape` 和 `slice`。
+| 验收层级 | 执行入口 | 通过条件 | 本章要求 |
+| --- | --- | --- | --- |
+| L1 默认 CPU | `bash code/chapter01_tensor_loader/run.sh` | Tensor、教学 Loader、Tokenizer、模型配置、GGUF fixture 和错误路径通过 CTest | 必做 |
+| L2 真实模型 | `gguf_inspect <TinyLlama.gguf> --validate-schema` | metadata、201 个 Tensor index、22 层名称、shape、dtype 和 payload offset 可检查 | 有模型时必做 |
+| L3 可选 CUDA | 不单独设置 Loader CUDA 验收 | 文件解析和权重索引保持 Host 侧职责，设备上传由后续 backend 验证 | 不适用 |

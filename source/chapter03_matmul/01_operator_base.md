@@ -1,85 +1,27 @@
-# 03.1 Operator Base 算子基类
+# 03.1 算子基类
 
+Chapter03 需要把稳定的算子调用方式和具体计算实现分开。当前教学接口使用主机端 `Matrix` 表达连续二维输入，并让 `MatMulOp` 把计算交给 CPU 计算后端。
 
-## 定义统一 Operator 入口
+## 算子固定什么
 
-定义所有前向算子都能继承的基础接口，让本章的 `MatMul` 能先用同一种方式接入主流程。
-
-读完后应能做到：
-
-- 理解为什么算子需要统一接口
-- 理解 `forward` 的输入输出契约
-- 理解算子如何和 `Tensor` 协作
-
-## 阅读入口
-
-- 前置阅读：[`chapter03 导读`](./intro.md)、[`MatMulOp 设计`](./02_matmul_design.md)
-- 源码直达：<a href="../_code/chapter03_matmul/include/chapter03_matmul/operator.h"><code>operator.h</code></a>、<a href="../_code/chapter03_matmul/src/operator.cpp"><code>operator.cpp</code></a>
-- 相关阅读：[`CPU Reference`](./03_cpu_reference.md)、[`cuBLAS 接入设计`](./04_cublas_implement.md)
-
-## 核心设计
-
-当算子越来越多时，如果每个算子都用不同的入口形式，主流程就会变成一堆特例。  
-统一基类让调用方通过稳定接口接入不同算子实现。
-
-最小版本只需要一件事：定义 `forward`。
-
-这个 `forward` 要尽量窄，只负责“输入什么、输出什么”，不要在基类里塞进过多参数。  
-如果某个算子还需要额外状态，应该让子类自己保存，而不是把基类做成万能接口。
-
-最小版本可以先支持这样的调用方式：
-
-```cpp
-Tensor y = op.forward(x);
-```
-
-源码锚点：<a href="../_code/chapter03_matmul/include/chapter03_matmul/operator.h"><code>operator.h</code></a>
-
-这个接口默认适合“单输入 -> 单输出”的算子。对当前这章来说，这已经足够支撑 `MatMul` 的最小边界。
-后续如果遇到多输入算子，再决定是组合输入结构，还是把接口升级成 `forward(const std::vector<Tensor>&)`。这是一种有意的取舍：接口越窄，基类越稳定，但上层组织输入的责任就越大。
-
-后面如果某个算子需要多个输入，再把接口扩展成接收输入张量列表，而不是提前把所有可能性都塞进去。  
-这样做的好处是：新算子只需要继承统一接口，主流程不需要为每个模块写新的分支。
-
-最小示意：
+<a href="../_code/chapter03_matmul/include/chapter03_matmul/operator.h"><code>operator.h</code></a> 定义双输入、单输出接口：
 
 ```cpp
 class Operator {
 public:
     virtual ~Operator() = default;
-    virtual Tensor forward(const Tensor& input) = 0;
+    virtual Matrix compute(const Matrix& lhs, const Matrix& rhs) const = 0;
 };
 ```
 
-## 验证与排查
+调用方只表达“用两个输入计算一个输出”。CPU 参考实现的循环和资源不会进入这个基类。cuBLAS 使用设备指针和 CUDA 流，因此通过 `code/cuda` 的独立入口执行，而不是接收这里的主机端 `Matrix`。
 
-验证时重点看：
+## 教学矩阵与公共契约
 
-- 其他算子可以继承该基类
-- `forward` 接口可以统一调用
-- 基类不承担具体计算逻辑
+Chapter03 的 `Matrix` 拥有连续行优先 `vector<float>`，与 Chapter02 的共享视图不是同一个类。两者都能导出 `TensorContract`，因此形状、步长、偏移、数据类型和存储范围使用相同检查语义。
 
-如果 `MatMulOp` 能放进统一调用流程里，而不需要为这一个核心算子单独写特殊分支，这个基类就已经起作用了。后续再把这种接口稳定性复用到更多算子上。
+这种关系是公共契约复用，不是对象直接传递。当前教学用 `Matrix` 保持简单连续布局；适配器负责把通用张量视图与算子请求连接起来。
 
-```cpp
-class Operator {
-public:
-    virtual ~Operator() = default;
-    virtual Tensor forward(const Tensor& input) = 0;
-};
+## 验证与衔接
 
-class DummyOp : public Operator {
-public:
-    Tensor forward(const Tensor& input) override { return input; }
-};
-```
-
-源码锚点：<a href="../_code/chapter03_matmul/src/operator.cpp"><code>operator.cpp</code></a>
-
-这说明基类只负责接口，不负责具体数学逻辑。
-
-常见问题：
-
-- 基类设计过宽
-- 强行把所有算子参数塞进同一个接口
-- 让接口依赖过多上下文
+运行 `bash code/chapter03_matmul/scripts/run.sh`，确认 `MatMulOp` 可以通过 `Operator` 调用，`Matrix::contract()` 输出 `[rows, cols]`、`[cols, 1]` 和有效存储范围。[`矩阵乘法算子设计`](./02_matmul_design.md) 将继续固定乘法语义和后端请求。

@@ -1,75 +1,31 @@
-# 03.5 PyTorch Comparison Testing PyTorch 对照测试
+# 03.5 用 PyTorch 独立复算
 
+独立数值参考可以帮助判断错误来自数学定义还是计算后端映射。PyTorch 适合生成小矩阵基准结果，但不进入本教程默认 CMake 和 CTest 依赖。
 
-## 用 PyTorch 对照 MatMul
+## 用固定输入复算结果
 
-随机生成矩阵，与 PyTorch 的结果对照，验证 `MatMul` 的数值正确性。
-
-读完后应能做到：
-
-- 理解为什么要做对照测试
-- 理解数值误差应该怎么判断
-- 理解 correctness test 和 performance test 的区别
-
-## 阅读入口
-
-- 前置阅读：[`CPU Reference`](./03_cpu_reference.md)、[`cuBLAS 接入设计`](./04_cublas_implement.md)
-- 源码直达：<a href="../_code/chapter03_matmul/tests/chapter03_matmul_test.cpp"><code>chapter03_matmul_test.cpp</code></a>、<a href="../_code/chapter03_matmul/src/matmul_op.cpp"><code>matmul_op.cpp</code></a>
-- 相关阅读：[`复杂度直觉`](./06_complexity_intuition.md)、[`章节导读`](./intro.md)
-
-## 测试设计
-
-矩阵乘法是很多后续模块的基础。一旦这里出现偏差，attention 和 FFN 的误差会被放大，所以必须有稳定的对照测试。
-
-测试策略：
-
-- 随机生成小矩阵
-- 分别跑 CPU 版本和 cuBLAS 版本
-- 与 PyTorch 结果比较
-- 检查误差是否在阈值内
-
-建议把随机测试固定随机种子，这样一旦失败，输入可以复现。对于工程教程来说，可复现比“随机覆盖更多”更重要。
-
-测试复用关系：
-
-这套 PyTorch 对照测试可以直接复用 `03.3` 和 `03.4` 的测试入口：
-
-- `test_matmul_cpu`
-- `test_matmul_cublas`
-
-两者使用相同的随机输入，再分别与 PyTorch 对照。
-
-这样就能形成一条清晰的双基线路径：
-
-- 如果 CPU 版本通过、cuBLAS 版本失败，问题大概率在布局翻译或 backend 参数
-- CPU reference 当前必须通过；后续 cuBLAS 实现也通过同一对照后，才能说明 backend 替换可信
-- 如果两者都失败，问题大概率在数学定义或测试输入本身
-
-这样做的好处是，读者可以沿着同一组输入同时检查参考实现、GPU 实现和 PyTorch 基线，而不是为三者分别维护一套不同的测试逻辑。
-
-## 验证与排查
-
-验证标准：
-
-- 输出 shape 一致
-- 数值误差足够小
-- 边界输入也能被正确处理
-
-如果 PyTorch 对照测试能稳定区分“实现错误”和“数值误差”，这个测试就有实际价值，而不是形式上的单测。
-
-一个最小对照伪代码可以是：
+下面的输入与 Chapter03 C++ 测试一致，可以直接复算 `58/64/139/154`：
 
 ```python
-torch.manual_seed(0)
-A = torch.randn(2, 3)
-B = torch.randn(3, 4)
-golden = A @ B
+import torch
+
+lhs = torch.tensor([[1, 2, 3], [4, 5, 6]], dtype=torch.float32)
+rhs = torch.tensor([[7, 8], [9, 10], [11, 12]], dtype=torch.float32)
+expected = torch.tensor([[58, 64], [139, 154]], dtype=torch.float32)
+actual = lhs @ rhs
+
+torch.testing.assert_close(actual, expected)
+print(actual)
 ```
 
-然后把同样的输入送到本实现中，比较输出和 `golden` 的差异。
+这段代码是学习时可选的独立复算，不属于默认回归。需要把对照扩展成固定测试数据时，再记录输入、输出、数据类型和误差容限；C++ 测试只读取结果，不在默认回归中现场安装或调用 PyTorch。
 
-常见问题：
+## 当前仓库怎样完成对照
 
-- 误差阈值设得过严
-- PyTorch 输入布局和本实现不一致
-- 随机测试只覆盖了部分情况
+当前 Chapter03 CTest 使用固定小矩阵和手算结果验证 CPU 参考实现；CUDA 的 cuBLAS 测试使用相同形状的 CPU 三重循环生成基准结果。仓库尚未提交独立 PyTorch 测试数据，因此不能把 PyTorch 对照写成已执行的默认测试。
+
+判断顺序是：CPU 参考实现先通过固定结果，其他计算后端再与 CPU 基准结果比较。两者都偏离独立测试数据时，才回到数学定义、输入布局或测试数据本身排查。
+
+## 验证与衔接
+
+运行 `bash code/chapter03_matmul/scripts/run.sh` 验证 CPU 结果；具备 CUDA 环境时运行 `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` 验证 cuBLAS 与 CPU 基准结果。需要增加 PyTorch 测试数据时，应固定随机种子、形状、数据类型和容差，并保持默认 CTest 不依赖 Python 环境。

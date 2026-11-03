@@ -1,151 +1,107 @@
-# 04.1 Multi-head Attention 多头注意力
-## 学习入口
+# 04.1 多头注意力
 
-实现多头注意力的前向计算，并理解 Q/K/V、score、softmax 和输出合并的完整数据流。
+Chapter03 已经固定矩阵乘法的形状、布局和计算后端分层；本节把同样的计算语义放进第一个模型结构：输入先生成 Q、K、V，再按注意力头计算相关性并聚合 V。Chapter04 的教学线性层保留本地可读循环，注意力通过独立计算后端执行。学习时重点追踪每一步形状，而不是先记住公式名称。
 
-读完后应能做到：
+教学 `MultiHeadAttention` 接收连续二维输入 `[T,D]`；跨章张量适配器接收 `[T,H,Dh]` 或 `[B,T,H,Dh]`。两条路径最终都把连续缓冲区交给同一个 `AttentionRequest`。
 
-- 理解注意力公式的基本结构
-- 理解 Q/K/V 线性变换的作用
-- 理解每个 head 如何独立计算 score
-- 理解 softmax 和输出合并的过程
+## Q、K、V 怎样产生输出
 
-- 前置阅读：[`chapter04 导读`](./intro.md)、[`MatMulOp 设计`](../chapter03_matmul/02_matmul_design.md)
-- 源码直达：<a href="../_code/chapter04_attention/src/attention.cpp"><code>attention.cpp</code></a>、<a href="../_code/chapter04_attention/src/linear_layer.cpp"><code>linear_layer.cpp</code></a>、<a href="../_code/chapter04_attention/tests/chapter04_attention_test.cpp"><code>chapter04_attention_test.cpp</code></a>
-- 相关阅读：[`04.2 LayerNorm 与激活`](./02_layernorm_and_activation.md)、[`04.4 DecoderLayer`](./04_decoder_layer.md)
-
-## 核心数据流
-
-注意力是 Transformer 的核心。它决定 token 之间如何相互作用，也决定后续 DecoderLayer 的表达能力。
-
-从整条教程主线看，本节把 `chapter03` 的 Linear / MatMul 契约第一次放进真实模型结构里。后面读 vLLM / nano-vLLM 时，attention backend、KV cache 和 prefill / decode 路径的理解，都建立在这里固定的 Q/K/V 与 shape 关系上。
-
-核心步骤：
-
-- 输入做 Q/K/V 线性变换
-- 按 head 切分
-- 计算 attention score
-- 进行 softmax
-- 得到每个 head 的输出
-- 合并所有 head 的结果
-
-实现时最重要的是把张量 shape 一步一步对应起来。每一步输入和输出的维度都要能明确说清，这样后面调试才能定位到具体变换。
-
-最小实现通常先从单 batch、单序列长度开始，然后再扩展到更一般的输入。
-
-通用数学采用 `[B,S,D]` shape。仓库教学实现把 batch 固定为 1，因此 `Tensor` 和 `AttentionRequest` 使用 `[tokens, model_dim]` 连续 row-major 布局；Q、K、V head 数相同。TinyLlama 的 GQA、RoPE 和请求级分层 K/V 位于真实 CPU Context，不在该 `MultiHeadAttention` 类中。
-
-| 能力 | 教学 `MultiHeadAttention` | TinyLlama CPU Context |
-| --- | --- | --- |
-| 输入布局 | `[tokens, model_dim]` | token hidden vectors |
-| head 结构 | MHA，Q/K/V head 数相同 | GQA，32 个 Q heads、4 个 KV heads |
-| 位置 | backend 接收 offset，类内固定为 0 | 每层 Q/K 应用 RoPE |
-| K/V 历史 | 类内不持有；backend 测试可直接传历史 K/V | 每请求 22 层 K/V |
-
-### 通用 shape
-
-head 切分前后的维度：
-
-假设：
-
-- `batch_size = B`
-- `seq_len = S`
-- `hidden_dim = D`
-- `num_heads = H`
-- `head_dim = D / H`
-
-前置条件：`hidden_dim % num_heads == 0`，否则 head 无法平均切分。
-
-线性变换后：
-
-- `Q`, `K`, `V`: `[B, S, D]`
-
-按 head 切分后，通常会先 `reshape` 再 `transpose`：
-
-- `Q`, `K`, `V`: `[B, H, S, head_dim]`
-
-这样每个 head 都能独立计算自己的 score：
-
-- `score_head`: `[B, H, S, S]`
-- `out_head`: `[B, H, S, head_dim]`
-
-最后再把所有 head 合并回原始隐藏维度：
-
-- `out`: `[B, S, D]`
-
-mask 的作用位置：
-
-在生成场景中，为了防止当前 token 看到未来 token，需要在 softmax 之前加入 mask：
+设词元数为 `T`、隐藏维度为 `D`、注意力头数为 `H`，每个头的宽度为 `Dh = D / H`。`D` 必须能被 `H` 整除。
 
 ```text
-score = (Q @ K^T) / sqrt(head_dim)
-score = score + mask
-weight = softmax(score)
-out = weight @ V
+输入 X[T,D]
+  -> Q/K/V 线性投影
+  -> Q/K/V[T,H,Dh]
+  -> score[T,H,T] = Q @ K^T / sqrt(Dh)
+  -> causal mask
+  -> softmax
+  -> head output[T,H,Dh] = weight @ V
+  -> 合并为 [T,D]
+  -> 输出投影
 ```
 
-这里的 mask 通常是 `[S, S]` 的上三角矩阵，未来位置为 `-∞`，在多头场景下会广播到 `[B, H, S, S]`。
+生成模型使用因果掩码。第 `t` 个查询只能读取位置 `0..t` 的键和值，未来位置在 softmax 前写成负无穷：
 
-head 合并的逆操作：
+```text
+score = (Q @ K^T) / sqrt(Dh)
+score = score + causal_mask
+weight = softmax(score)
+output = weight @ V
+```
 
-`out_head: [B, H, S, head_dim]` 合并回去时，通常是：
+当前代码维护三种输入形态，它们表达同一套注意力语义：
 
-1. `transpose` 到 `[B, S, H, head_dim]`
-2. `reshape` 成 `[B, S, H * head_dim] = [B, S, D]`
+| 路径 | 输入布局 | 当前用途 |
+| --- | --- | --- |
+| 教学 `MultiHeadAttention` | `[T,D]` | 串起 Q/K/V 投影、CPU 注意力和输出投影 |
+| Chapter02 张量适配器 | `[T,H,Dh]`、`[B,T,H,Dh]` | 验证维数、连续布局和批次隔离 |
+| TinyLlama CPU 执行上下文 | 词元隐藏向量与分层 KV | 执行 GQA、RoPE、KV Cache 和 22 个解码器块 |
 
-实现建议：
+通用资料常写 `[B,H,T,Dh]`。本教程的跨章适配器使用词元优先（token-major）布局 `[B,T,H,Dh]`，让同一个词元的所有注意力头连续存放。阅读下图时从左到右追踪形状，再在下半部分比较预填充与逐词元解码的请求差异。
 
-- 先把数学流程讲清楚，再写代码
-- 先实现单头，再扩展到多头
-- 先保证 shape 正确，再关注性能
+![多头注意力的形状、因果掩码与预填充/解码数据流](../assets/diagrams/chapter04-attention-dataflow.svg)
 
-## 算法镜像与 C++ 映射
+## 从算法镜像进入 C++
 
-下面的 Python 只表达 CPU reference kernel 的循环顺序，不是第二套可运行实现。Q/K/V projection 和 head 合并由 `MultiHeadAttention::forward()` 处理；镜像从连续 `[token, head, dim]` buffer 开始。
+下面的 Python 只镜像 CPU 参考实现的循环顺序，用来先看清算法，不形成第二套运行时：
 
 ```python
-def attention_reference(query, key, value, heads, head_dim, causal, offset):
+def attention_reference(query, key, value, causal, offset):
     output = zeros_like(query)
-    scale = 1.0 / sqrt(head_dim)
+    scale = 1.0 / sqrt(query.head_dim)
 
-    for query_token in range(len(query)):
+    for query_token in range(query.token_count):
         query_position = offset + query_token
-        for head in range(heads):
+        for head in range(query.head_count):
             scores = []
-            for key_token in range(len(key)):
+            for key_token in range(key.token_count):
                 if causal and key_token > query_position:
                     scores.append(float("-inf"))
-                    continue
-                scores.append(dot(query[query_token][head], key[key_token][head]) * scale)
+                else:
+                    scores.append(dot(query[query_token, head],
+                                      key[key_token, head]) * scale)
 
             probabilities = stable_softmax(scores)
             for key_token, probability in enumerate(probabilities):
-                output[query_token][head] += probability * value[key_token][head]
-
+                output[query_token, head] += (
+                    probability * value[key_token, head])
     return output
 ```
 
-| Python 动作 | C++ 位置 | 验证重点 |
+对照源码时按下表逐项定位：
+
+| 算法动作 | C++ 对象或位置 | 观察重点 |
 | --- | --- | --- |
-| `query_position = offset + query_token` | `query_position_offset` | decode 查询可以看到历史 K/V |
-| causal 条件 | `key_token > query_position` | 未来位置写成负无穷 |
-| `dot(...) * scale` | `dim` 内积循环 | head 之间不串数据 |
-| `stable_softmax` | max、exp、denominator 三段循环 | 大分数输入不溢出 |
-| 概率加权 `value` | output 聚合循环 | 输出保持 `[query_tokens, heads * head_dim]` |
+| Q/K/V 与输出投影 | <a href="../_code/chapter04_attention/src/attention.cpp"><code>attention.cpp</code></a> | `[T,D]` 怎样进入和离开计算后端 |
+| 查询的绝对位置 | `query_position_offset` | 解码查询怎样读取历史 K/V |
+| 因果判断 | `key_token > query_position` | 未来词元不进入 softmax |
+| 缩放点积 | 注意力 CPU 内核 | 每个注意力头独立计算，默认缩放因子为 `1/sqrt(Dh)` |
+| 稳定 softmax | 最大值、指数、分母三段循环 | 大分数不直接进入 `exp` |
+| 3D/4D 视图适配 | <a href="../_code/chapter04_attention/src/tensor_attention_adapter.cpp"><code>tensor_attention_adapter.cpp</code></a> | 批次指针偏移与连续性检查 |
 
-## 验证与排查
+适配器不隐式复制非连续视图。Chapter02 的转置或切片如果破坏连续布局，调用者必须先执行 `contiguous()`，复制成本因此保持可见。`try_compute_tensor_attention_into()` 接收调用方提供的可写输出视图；它先完成全部批次计算，成功后统一提交，因此形状校验或计算后端失败不会覆盖已有输出。返回 Chapter02 张量的旧入口继续作为兼容外壳。
 
-验证时重点看：
+## 从单次 Attention 进入 KV Cache
 
-- 输出 shape 正确
-- 每个 head 的维度一致
-- softmax 后的权重分布合理
-- causal mask 和 `query_position_offset` 能正确访问历史 K/V
+Prefill 可以同时产生多个位置的 Q/K/V；decode 每次只产生一个新位置。连续缓存把新 K/V 追加到 `[S,Hkv,Dh]` 尾部，再让当前 query 读取更新后的 `S+1` 个位置。分页缓存改变存储和寻址方式，但不改变这套注意力语义。
 
-如果小样本输入下，attention 权重会对某些位置明显聚焦，而输出 shape 又保持稳定，通常说明这一步已经能工作。
+Chapter04 的 `KvCache` 用固定容量连续数组验证追加、容量和清空；真实 TinyLlama Context 为 22 层分别保存连续 K/V，并在每次 decode 后推进 position。Block 分配、逻辑位置映射和终态回收由 Chapter06 继续组织。
 
-常见问题：
+| 观察点 | 连续 CPU 路径 | 分页路径目标 |
+| --- | --- | --- |
+| 写入新 K/V | 追加到每层连续数组尾部 | 写入页表给出的 physical block/slot |
+| 读取历史 | 按连续位置 `0..S` 遍历 | 按 block table 定位 `0..S` |
+| 序列增长 | `size: S -> S+1` | committed tokens: `S -> S+1` |
+| 计算结果 | 当前 query 聚合历史 value | 与连续路径 logits 一致 |
 
-- head 切分维度错误
-- Q/K/V 线性变换维度不一致
-- softmax 轴选错
+## 验证与衔接
+
+从仓库根目录运行：
+
+```bash
+bash code/chapter04_attention/scripts/run.sh
+```
+
+测试提供四组可观察证据：因果预填充的首个输出只能读取首个 V；`query_position_offset=1` 的逐词元解码可以读取两项历史 V，并得到 `51`；4D 输入中的两个批次分别保持数值 `3` 和 `7`；非连续视图在显式连续化前被拒绝。
+
+验证还应看到 `MultiHeadAttention(4,2)` 保持输入输出形状 `[2,4]`，计算后端类型为 CPU。下一节将补上解码器中围绕注意力和 FFN 使用的归一化与激活函数。

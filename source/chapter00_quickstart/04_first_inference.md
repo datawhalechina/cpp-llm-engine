@@ -1,62 +1,46 @@
-# 00.4 First Inference 第一次推理
+# 00.4 运行第一次真实推理
 
-**阅读入口**
+本节用一条命令连接输入文本（`prompt`）、真实分词器（`tokenizer`）、GGUF 权重、模型解码器（`Decoder`）和生成词元（`token`）。模型先输出每个候选词元的未归一化分数（`logits`），贪心选择（`greedy sampling`）再取分数最高的词元。Chapter00 只观察这条链是否成立，后续章节分别展开内部实现。
 
-- 前置阅读：[`00.2 Clone and Build`](./02_clone_and_build_llamacpp.md)、[`00.3 Download TinyLlama`](./03_download_tinyllama.md)
-- 源码直达：<a href="../_code/chapter00_quickstart/main_quick.cpp"><code>main_quick.cpp</code></a>、<a href="../_code/chapter00_quickstart/run.sh"><code>run.sh</code></a>
-- 相关阅读：[`00.5 Troubleshooting`](./05_troubleshooting.md)、[`推理引擎输入链路`](../reference/input_pipeline.md)、[`章节导读`](./intro.md)
+![真实文本生成的数据链，以及 Chapter01、04、05、06 对应的实现阶段](../assets/diagrams/chapter00-real-inference-chain.svg)
 
-## 运行前检查
+## 运行 CPU 基线
 
-运行 TinyLlama，观察第一次推理输出，并确认整个链路已经跑通。
-
-**完成后：**
-
-- 知道如何启动模型推理
-- 知道如何判断输出是否正常
-- 知道 CPU 路径可以作为最稳妥的回退方案
-
-**前置条件：**
-
-- 已完成编译
-- 已下载模型
-- 知道 `llama.cpp` 的可执行文件在哪里
-
-## 运行命令
-
-### CPU 路径
+从仓库根目录执行：
 
 ```bash
-cd /data/cpp-llm-engine/llama.cpp/build
-./bin/llama-simple -m ../models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf -n 1 "Hello, world"
+bash code/chapter00_quickstart/run_real_inference.sh
 ```
 
-### CUDA 路径
+脚本优先查找 `llama.cpp/build-cpu/bin/llama-simple`，并兼容已有的 `llama.cpp/build`。它默认使用 `-ngl 0`、prompt `Hello, world` 和 8 个新 token，只显示生成文本与关键耗时。
 
-如果你已经编译了 CUDA 版本，并且知道对应的运行参数，可以在同一模型上做 GPU 验证。
+更换 prompt 和生成长度：
 
-## 结果和验证
+```bash
+bash code/chapter00_quickstart/run_real_inference.sh "Hello TinyLlama" 4
+```
 
-- 程序正常启动
-- 模型加载成功
-- 控制台输出一段生成结果
+固定 llama.cpp commit、GGUF、prompt 和 greedy sampling，可以让不同环境的运行结果具有可比性。本章脚本只检查模型确实生成了 token，不把具体文本作为 golden；固定 token 和数值结果由 Chapter04 的真实 Decoder 测试验证。
 
-示例输出会因模型版本和随机性而变化，但应当是类似自然语言文本，而不是报错信息。
+## 可选 GPU 检查
 
-重点是确认命令行输入、模型加载、前向推理和 token 输出构成一条可重复的 baseline。输入契约的完整拆分见 [`推理引擎输入链路`](../reference/input_pipeline.md)。
+已完成 CUDA 构建时，可以让同一脚本使用 GPU offload：
 
-**验证标准：**
+```bash
+LLAMA_CPP_BUILD_DIR="$PWD/llama.cpp/build-cuda" \
+CHAPTER00_GPU_LAYERS=99 \
+bash code/chapter00_quickstart/run_real_inference.sh "Hello TinyLlama" 4
+```
 
-- 命令执行完毕且退出码正常
-- 模型输出不是空的
-- 没有路径错误、加载错误或显存错误
+该命令只验证 llama.cpp 的外部 GPU 基线，不代表本教程 CUDA backend 已完成。Chapter00 的必做结果仍是 CPU 推理。
 
-如果第一次推理能稳定返回，后面的章节就不需要再怀疑环境本身。此时可以把注意力转到自研引擎的抽象和实现上。
+## 验证与衔接
 
-**常见问题：**
+| 输出 | 表示什么 | 通过条件 |
+| --- | --- | --- |
+| `model:` | 实际读取的 GGUF | 路径指向 TinyLlama 文件 |
+| 生成文本 | Tokenizer 与模型执行已连通 | 至少生成 1 个 token |
+| `decoded_tokens=N` | 脚本解析的生成数量 | `N > 0` |
+| 关键耗时 | load、prompt eval、eval 和 total | 数值存在且进程正常退出 |
 
-- 模型路径写错
-- 可执行文件路径写错
-- 当前 `llama.cpp` 版本没有 `llama-simple` 时，先查看 `build/bin` 中的示例程序名称，再按对应程序的 `--help` 调整参数
-- CPU 版本和 CUDA 版本混用
-- 输出太慢但不是错误
+看到 `real inference passed` 后，真实推理链路已经连通。下一步进入 [`Chapter01`](../chapter01_tensor_loader/intro.md)，实现教程自己的模型输入和加载对象。

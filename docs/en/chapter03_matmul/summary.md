@@ -20,5 +20,5 @@
 ## Related Reading
 
 - Prerequisites: this chapter builds on `chapter01` weight loading and `chapter02` tensor view semantics, plus the Foundation C++ / CMake basics.
-- Later use: the Q/K/V projections in `chapter04_attention` and the runtime in `chapter05_generation` both reuse this operator boundary.
+- Later use: the Q/K/V projections in `chapter04_attention` and the runtime in `chapter06_generation` both reuse this operator boundary.
 - Code index: open [the Chapter 03 intro](/en/chapter03_matmul/intro) and [the chapter code index](/code/chapter03_matmul).

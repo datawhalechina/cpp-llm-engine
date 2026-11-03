@@ -1,66 +1,37 @@
-# 00.5 Troubleshooting 常见问题排查
+# 00.5 排查首次运行问题
 
-**阅读入口**
+排错顺序固定为“工具 -> 源码 -> 可执行文件 -> 模型 -> 运行参数 -> GPU”。先恢复 CPU 基线，再判断是否需要处理 CUDA。
 
-- 前置阅读：[`00.1 Environment Setup`](./01_environment_setup.md)、[`00.2 Clone and Build`](./02_clone_and_build_llamacpp.md)、[`00.4 First Inference`](./04_first_inference.md)
-- 源码直达：<a href="../_code/chapter00_quickstart/main_quick.cpp"><code>main_quick.cpp</code></a>、<a href="../_code/chapter00_quickstart/run.sh"><code>run.sh</code></a>
-- 相关阅读：[`章节导读`](./intro.md)
+## 现象与处理
 
-## 排查问题
+| 现象 | 检查命令 | 处理方式 |
+| --- | --- | --- |
+| `llama.cpp` 已存在但不是 Git 仓库 | `test -d llama.cpp/.git` | 将误建目录改名后重新 clone；不要移动正常仓库 |
+| 找不到 `llama-simple` | `find llama.cpp -path '*/bin/llama-simple'` | 完成 00.2，或设置 `LLAMA_CPP_BUILD_DIR` |
+| 找不到 GGUF | `ls -lh llama.cpp/models/*.gguf` | 完成 00.3，或设置 `CPP_LLM_ENGINE_MODEL_PATH` |
+| SHA256 不一致 | `sha256sum <model.gguf>` | 删除损坏文件并重新下载 |
+| CPU 推理失败 | `CHAPTER00_VERBOSE=1 bash code/chapter00_quickstart/run_real_inference.sh` | 根据完整 llama.cpp 日志检查模型和参数 |
+| CUDA 构建失败 | `nvcc --version`、`nvidia-smi` | 保留 `build-cpu`，按 CUDA 环境指南检查驱动和 Toolkit |
+| 显存不足 | `nvidia-smi` | 减少 `CHAPTER00_GPU_LAYERS` 或回到 CPU |
+| 运行较慢 | 查看 `prompt eval` 和 `eval` 速度 | 先确认能稳定生成，再进入 Benchmark 章节测量 |
 
-整理第一次跑通推理时最常见的问题和处理方式。
+## 最小回退路径
 
-**完成后：**
+以下三条命令把问题收敛到仓库工具链、外部构建或真实模型之一：
 
-- 知道先检查什么，再检查什么
-- 知道如何区分环境问题、模型问题和运行参数问题
-- 知道什么时候应该退回 CPU 路径做最小验证
+```bash
+bash code/chapter00_quickstart/run.sh
+test -x llama.cpp/build-cpu/bin/llama-simple || test -x llama.cpp/build/bin/llama-simple
+bash code/chapter00_quickstart/run_real_inference.sh
+```
 
-### 常见问题
+第一条失败时检查 C++/CMake；第二条失败时重做 llama.cpp 构建；前两条通过而第三条失败时，检查 GGUF 和运行参数。
 
-### 1. 找不到模型文件
+## 验证与衔接
 
-- 检查 `-m` 参数是否指向正确路径
-- 检查文件是否真的下载完成
-- 检查当前目录是否和你预期一致
-
-### 2. 编译失败
-
-- 检查编译器版本
-- 检查 CMake 配置是否完成
-- 检查是否缺少依赖库
-
-### 3. CUDA 相关错误
-
-- 检查驱动是否安装
-- 检查 toolkit 是否可用
-- 检查是否真的编译了 CUDA 版本
-
-### 4. 显存不足
-
-- 先换更小的模型
-- 先走 CPU 路径确认功能正确
-- 再回到 GPU 调优参数
-
-### 5. 输出很慢
-
-- 这不一定是错误，先区分 CPU 路径和 GPU 路径
-- 小模型或第一次启动可能本来就慢
-
-## 排查顺序
-
-1. 确认文件路径
-2. 确认可执行文件存在
-3. 确认模型存在
-4. 确认编译路径正确
-5. 确认 CPU 回退路径可用
-
-这个顺序对应的是“先外层、后内层”的排障思路：先排路径和文件，再排构建，再排运行参数，最后才看 GPU 和性能问题。多数第一次失败都出在最外层。
-
-## 验证结果
-
-- 能快速定位问题属于哪一层
-- 能用 CPU 路径做最小回退验证
-- 能避免把所有问题都归因于模型本身
-
- 如果你能在十分钟内把问题归类到“环境、编译、下载、运行”之一，排错目标就算完成了。
+| 状态 | 结论 |
+| --- | --- |
+| 连通性检查失败 | 仓库工具链尚未可用 |
+| 连通性检查通过、`llama-simple` 缺失 | 外部基线尚未构建 |
+| 可执行文件存在、模型校验失败 | GGUF 下载不完整或路径错误 |
+| CPU 真实推理通过 | Chapter00 完成，可以进入 Chapter01 |

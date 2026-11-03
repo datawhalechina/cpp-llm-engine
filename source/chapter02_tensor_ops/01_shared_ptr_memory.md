@@ -1,97 +1,46 @@
-# 02.1 Shared Underlying Storage 共享底层存储
+# 02.1 共享底层存储
 
+Chapter01 的权重张量已经区分逻辑形状和物理字节。Chapter02 使用独立的 Float32 教学张量，把这个概念扩展成可操作的视图：多个视图共享同一份底层存储，形状或窗口变化不必复制数据。
 
-## 让多个 Tensor 共享存储
+## 底层存储与视图怎样分开
 
-让多个 `Tensor` 对象可以共享同一份底层数据，而不是每次视图变化都复制内存。
+底层存储（storage）保存元素，视图（view）保存观察方式：
 
-读完后应能做到：
+| 视图字段 | 回答的问题 |
+| --- | --- |
+| `shape` | 每个维度有多长 |
+| `stride` | 下标增加 1 时跨过多少个元素 |
+| `offset` | 当前视图从底层存储的哪个元素开始 |
+| 存储句柄 | 哪个对象保证底层数据仍然存活 |
 
-- 理解为什么要共享底层存储
-- 理解 `shared_ptr` 在 view 语义中的角色
-- 理解“数据”和“视图”分离的意义
+维数（`rank`）是形状中轴的数量。教程实现接受 1–4 维，连续布局的步长从最后一维向前计算：
 
-## 代码直达
+| 维数 | 示例形状 | 连续步长 | 推理对象 |
+| --- | --- | --- | --- |
+| 1 | `[hidden]` | `[1]` | 归一化权重、单个向量 |
+| 2 | `[tokens, hidden]` | `[hidden, 1]` | 隐藏状态、权重矩阵 |
+| 3 | `[tokens, heads, head_dim]` | `[heads×head_dim, head_dim, 1]` | Q/K/V |
+| 4 | `[batch, tokens, heads, head_dim]` | `[tokens×heads×head_dim, heads×head_dim, head_dim, 1]` | 注意力、KV Cache 执行输入 |
 
-- <a href="../_code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a>
-- <a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a>
-
-## 核心语义
-
-`reshape` 和 `slice` 都不应该随意复制数据。复制不仅浪费内存，还会让视图语义失去意义。  
-共享底层存储是实现高效 Tensor 操作的前提。
-
-更具体一点说，核心问题是“如何让一个数据对象同时支持多种观察方式”。
-如果没有共享存储，view 语义就只是一个看起来省事、实际上很贵的包装。
-
-最稳妥的做法是把责任拆开：
-
-- 底层数据交给共享所有权对象管理
-- `Tensor` 只保存自己的视图信息
-- 多个视图可以指向同一份存储
-
-实现上，最直接的做法是让 `Tensor` 持有一个共享存储句柄，并额外保存自己的偏移量和形状信息。这样，复制 `Tensor` 对象只会复制视图描述，不会复制底层字节。
-
-一个典型的行为是：
+<a href="../_code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> 使用 `shared_ptr<vector<float>>` 保存共享所有权。复制张量只复制视图描述和存储句柄，不复制元素：
 
 ```cpp
-Tensor a = Tensor::from_vector<float>("a", {4}, {1.f, 2.f, 3.f, 4.f});
-Tensor b = a;
-// b 和 a 指向同一份 storage，但可以拥有不同的 shape / offset 解释
+Tensor original(2, 2, 1.0f);
+Tensor view = original;
 ```
 
-这种设计的关键不是“省一次拷贝”这么简单，而是为后面的 `reshape`、`slice`、`KV Cache` 复用同一套存储语义。
+只要任一视图仍持有底层存储，数据就不会提前释放。`shares_storage_with()` 和 `storage_use_count()` 让这种关系可以被测试观察。
 
-## 共享存储在真实推理里的位置
+## 共享存储怎样支持后续操作
 
-如果说 `chapter01` 解决的是“权重怎样进入程序”，本节解决的就是下一步：进入程序后的数据怎样被多个视图复用。
+`reshape` 复用整个观察窗口，只改变形状和连续步长；`slice` 复用某个轴的局部窗口；`transpose` 交换两个轴的形状和步长。三种操作都建立在同一个共享存储上。
 
-在真实推理项目里，这种共享存储语义通常会出现在三类地方：
+注意力的局部窗口和 KV 数据也需要类似的“数据与观察方式分离”，但缓存分配和淘汰由 Chapter06/09 处理；本章只验证视图的地址与生命周期。
 
-- 输入或中间张量的多种 shape 解释
-- attention 或 projection 前后的局部视图
-- KV cache 这类需要长期持有、反复观察的数据块
+## 验证与衔接
 
-共享存储需要满足一条约束：view 可以多，storage 不能乱复制。
-
-示例伪代码可以写成：
-
-```cpp
-struct TensorView {
-    std::shared_ptr<std::vector<std::byte>> storage;
-    std::size_t offset_bytes;
-    std::vector<int64_t> shape;
-};
-
-TensorView make_view(const TensorView& parent, std::size_t offset, std::vector<int64_t> shape) {
-    return TensorView{parent.storage, offset, std::move(shape)};
-}
+```bash
+bash code/chapter02_tensor_ops/scripts/run.sh
 ```
 
-这类结构的重点是“视图”只保存引用，不复制底层字节。
-
-实现建议：
-
-- 使用 `std::shared_ptr<uint8_t>` 或等价存储句柄管理原始数据
-- 让 `Tensor` 持有偏移、长度和 shape 信息
-- 不把 view 的派生数据单独复制出来
-
-## 验证与排查
-
-验证时重点看：
-
-- 多个视图对象可以同时访问同一份数据
-- 一个视图销毁后，底层存储不会被提前释放
-- 共享存储不会导致重复释放
-
-如果共享存储设计正确，读者应能观察到：
-
-- 父张量和子张量读到相同的底层内容
-- 销毁子张量不会影响父张量的数据可读性
-- 多次复制对象不会引发 double free
-
-常见问题：
-
-- 把共享存储误写成独占所有权
-- 忘记保存偏移信息
-- 让 view 对象和底层数据生命周期不一致
+测试应确认父张量与视图共享底层存储，任一对象销毁都不会造成提前释放或重复释放，修改共享元素后其他视图能观察到相同结果。接下来用 [`reshape`](./02_reshape.md) 改变整份数据的形状解释。

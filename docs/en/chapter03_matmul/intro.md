@@ -25,7 +25,7 @@ Continue to [summary](summary) or move to [the next chapter](/en/chapter04_atten
 ## Related Reading
 
 - Prerequisites: read [Foundation 01](/en/foundation/01_cxx_basics) and [Foundation 02](/en/foundation/02_cmake_build_basics) first, so the interface, build, and layout constraints are easier to follow.
-- Later use: `chapter04_attention` will reuse this `MatMulOp` boundary directly, and `chapter05_generation` will keep using the same operator interface in the runtime.
+- Later use: `chapter04_attention` will reuse this `MatMulOp` boundary directly, and `chapter06_generation` will keep using the same operator interface in the runtime.
 - The full 03–06 reading path is summarized on this page. Use it as the roadmap for the chapters that follow.
 
 ### 03–06 Reading Path
@@ -34,12 +34,12 @@ Continue to [summary](summary) or move to [the next chapter](/en/chapter04_atten
 | --- | --- | --- |
 | `chapter03_matmul` | `Operator`, CPU reference, cuBLAS comparison | A stable, replaceable, and checkable matmul boundary |
 | `chapter04_attention` | `Multi-head Attention`, `DecoderLayer`, first-layer weight wiring | A reusable model structure built on top of the operator boundary |
-| `chapter05_generation` | `Naive Generation`, `KV Cache`, `Sampler` | A persistent generation loop built on the decoder structure |
-| `chapter06_quantization` | quantization basics, dequantization, accuracy checks | A resource-vs-accuracy trade-off on top of the stable runtime |
+| `chapter06_generation` | `Naive Generation`, `KV Cache`, `Sampler` | A persistent generation loop built on the decoder structure |
+| `chapter05_quantization` | quantization basics, dequantization, accuracy checks | A resource-vs-accuracy trade-off on top of the stable runtime |
 
 ### Source Reading Suggestion
 
 - `chapter03_matmul`: read `Operator` first, then the implemented CPU reference, then the planned cuBLAS backend design
 - `chapter04_attention`: read `Multi-head Attention`, then `DecoderLayer`, then first-layer weight validation
-- `chapter05_generation`: read `Naive Generation`, then `KV Cache`, then `Sampler`
-- `chapter06_quantization`: read quantization basics, then `DequantizeOp`, then accuracy validation
+- `chapter06_generation`: read `Naive Generation`, then `KV Cache`, then `Sampler`
+- `chapter05_quantization`: read quantization basics, then `DequantizeOp`, then accuracy validation

@@ -1,78 +1,48 @@
-# 02.3 Slice 切片
+# 02.3 切片
 
+`slice` 从已有张量中选择局部窗口。它与 `reshape` 的区别是：变形重新解释整个窗口，切片改变窗口起点和范围。
 
-## 用 Slice 取局部视图
+## 偏移与步长怎样定位窗口
 
-实现返回子视图的 `slice` 操作，让张量可以表达局部窗口而不复制数据。
-
-读完后应能做到：
-
-- 理解 `slice` 和 `reshape` 的区别
-- 理解子视图为什么要带偏移
-- 理解如何在共享存储上构造局部窗口
-
-## 代码直达
-
-- <a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a>
-- <a href="../_code/chapter02_tensor_ops/tests/chapter02_tensor_ops_test.cpp"><code>chapter02_tensor_ops_test.cpp</code></a>
-
-## 核心语义
-
-很多后续场景都需要局部访问张量，例如分块计算、子矩阵访问、token 范围处理。`slice` 是这些能力的基础。
-
-语义要求：
-
-- 返回子视图
-- 共享底层数据
-- 记录偏移、shape 和 stride
-- 不复制原始数据
-
-`slice` 和 `reshape` 的区别在于：`reshape` 改的是“如何解释整个数据”，`slice` 改的是“读哪一段数据”。因此 `slice` 必须记录起始偏移，并把视图限制在目标区间内。
-
-最小版本先支持二维切片，先把偏移、shape 和 stride 算对，再考虑更复杂的多维索引。
-
-本章二维 slice 的核心计算是：
+通用 `slice(axis, start, count)` 只改变指定轴。新起点由父视图的偏移、该轴的起始位置和步长决定：
 
 ```cpp
-const std::size_t new_offset = offset_ + row_start * row_stride_ + col_start * col_stride_;
-return Tensor(storage_, row_count, col_count, new_offset, row_stride_, col_stride_);
+new_offset = offset + start * strides[axis];
+new_shape[axis] = count;
 ```
 
-二维切片的偏移是父视图偏移、起始行 stride 和起始列 stride 的组合；返回 view 还要保留父视图的 stride。这样可以正确表达跨行窗口，但这类窗口通常不是连续 view，不能直接 reshape。
+二维四参数 `slice` 是兼容接口，可以同时截取行列窗口。返回的视图更新形状和偏移，并保留父视图的步长，因此可以正确寻址，但不一定连续。
 
-`try_slice()` 将“起点越界”“长度为零”“范围超出 shape”和“offset 溢出”分别返回为 `Status`。`contract()` 再把结果导出为 `{shape, strides, storage_offset_elements, storage_bytes}`，后续算子无需了解 `shared_ptr<vector<float>>` 也能检查 view 范围。
+`try_slice` 和 `try_transpose` 同样允许输出参数指向源张量。实现先完成范围检查和新视图构造，成功后再替换；失败不会清空原对象。
 
-实现建议：
+## 从视图导出非拥有引用
 
-- 计算切片起点对应的偏移
-- 保留原始 storage
-- 更新视图范围和 shape
+<a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> 中的 `try_slice()` 分别检查起点、长度、范围和地址计算溢出。`contract()` 将结果导出为：
 
-## `slice` 在真实项目里为什么重要
+```text
+shape + strides + storage_offset_elements
+      + storage_bytes + dtype + device
+```
 
-`slice` 和推理引擎的联系很直接。很多真实工程问题本质上是“从已有数据里取出该看的那一段”。
+`TensorContract` 只描述布局。`view_ref()` 再把存储基址与契约组合为只读的非拥有 `TensorViewRef`；需要让算子写入已有存储时，`mutable_view_ref()` 返回对应的 `MutableTensorViewRef`：
 
-最典型的对应场景包括：
+```text
+只读输入：const 存储基址 + shape/stride/offset/dtype/device
+可写输出：      存储基址 + shape/stride/offset/dtype/device
+```
 
-- token 范围的局部读取
-- attention 中间结果的局部窗口
-- KV cache block 或 chunk 的局部访问
+两种引用都不会增加存储的共享计数，因此只能在原张量或其他共享视图存活期间使用。可写引用可以转成只读引用，但只读引用不能反向取得写权限。Chapter03 使用这些公共引用检查连续行优先布局，并根据偏移找到当前视图的第一个元素。
 
-切片练习要建立一种工程习惯：先问能不能通过 view 取局部窗口，再问要不要复制出一份新数据。
+## 需要连续内存时显式物化
 
-## 验证与排查
+跨行切片会保留父张量的行步长，例如 `shape=[2,2]`、`stride=[3,1]`。两个逻辑行之间存在未选中的元素，因此不能直接交给只接受连续行优先输入的矩阵乘法算子。
 
-验证时重点看：
+`contiguous()` 按逻辑索引顺序复制到新存储，并把布局规范化为 `offset=0` 和连续步长；二维 `[rows,cols]` 的结果是 `[cols,1]`。如果源视图已经连续，该函数直接复用原存储。调用者主动选择连续化，因此复制成本不会隐藏在后续适配器中。
 
-- 子视图能读到原始数据中的对应片段
-- 父视图和子视图共享同一存储
-- 父 Tensor 销毁后，仍被持有的 view 可以继续读写
-- 越界起点、长度和元素访问会失败
+`data()` 只为状态正常且连续的视图返回当前首元素指针；非连续视图返回空指针。跨章算子通常使用 `view_ref()` 读取输入，用 `mutable_view_ref()` 接收输出，从而同时携带存储基址与布局契约。下图用同一组元素对比共享引用和显式复制，橙色路径才会分配新存储。
 
-建议用一个小数组做测试，例如 `{10, 20, 30, 40, 50}`，切出中间一段，确认返回内容和原始数组对应区间一致。
+![张量视图共享存储与显式连续化](../assets/diagrams/chapter02-view-materialization.svg)
 
-常见问题：
+## 验证与衔接
 
-- 切片偏移计算错误
-- 返回了数据拷贝而不是视图
-- shape 与实际窗口不一致
+运行 `bash code/chapter02_tensor_ops/scripts/run.sh`，确认子视图读取正确元素、共享父存储，并确认非连续视图物化后改用独立的连续存储。[`单元测试`](./04_unit_tests.md) 将这些语义固定为回归条件。

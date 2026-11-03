@@ -1,123 +1,73 @@
-# 04.3 Feed Forward Network 前馈网络
-## 学习入口
+# 04.3 前馈网络
 
-实现 FFN 模块，用两层线性层和一个激活函数构成 Transformer block 的前馈部分。
+注意力在词元之间传递信息，FFN 则独立变换每个词元的特征。教学实现先用两个线性层和 ReLU 建立可运行结构，真实 TinyLlama 再用门控、升维、降维投影和 SwiGLU 对齐模型权重。
 
-读完后应能做到：
+## 从隐藏维升维再降维
 
-- 理解 FFN 为什么是两层线性层
-- 理解中间维度扩展的作用
-- 理解激活函数在 FFN 中的位置
-
-- 前置阅读：[`chapter04 导读`](./intro.md)、[`04.2 LayerNorm 与激活`](./02_layernorm_and_activation.md)
-- 源码直达：<a href="../_code/chapter04_attention/src/feed_forward.cpp"><code>feed_forward.cpp</code></a>、<a href="../_code/chapter04_attention/src/linear_layer.cpp"><code>linear_layer.cpp</code></a>、<a href="../_code/chapter04_attention/tests/chapter04_attention_test.cpp"><code>chapter04_attention_test.cpp</code></a>
-- 相关阅读：[`04.4 DecoderLayer`](./04_decoder_layer.md)、[`04.5 首层权重加载`](./05_load_first_layer.md)
-
-## 核心结构
-
-FFN 是 Transformer 中与注意力并列的核心计算模块。注意力负责 token 之间的信息交互，FFN 负责单个 token 的非线性变换。
-
-- 第一层线性映射
-- 激活函数
-- 第二层线性映射
-
-教学实现先串起两层线性和一个激活函数，形成可测试的 DecoderLayer 输入；真实 TinyLlama 路径再用 gate/up/down 三条投影和 SwiGLU 替换它。
-
-如果后面要做门控 FFN、SwiGLU 或其他变体，也可以在这个结构上扩展，而不是重新设计一套新接口。
-
-中间隐藏维度的典型值：
-
-在很多 Transformer 里，FFN 的中间隐藏维度通常是 `hidden_dim` 的 4 倍：
-
-- `hidden_dim = 768`
-- `ffn_dim = 3072 = 4 * 768`
-
-这是一种常见经验值，能给中间表示提供足够空间，同时不把参数量推得太高。
-
-不同模型会略有差异：
-
-- BERT 通常是 4 倍扩展
-- GPT-2 通常是 4 倍扩展
-- T5 通常是 4 倍扩展
-- LLaMA 常用 SwiGLU 变体，等效扩展倍数会不同
-
-FFN 变体对比：
-
-| 变体 | 结构 | 常见模型 |
-| --- | --- | --- |
-| 标准 FFN | `Linear -> Activation -> Linear` | BERT、GPT-2 |
-| Gated FFN | `Linear -> Activation * Gate` | PaLM |
-| SwiGLU | `Linear_value` 和 `Linear_gate` 配合，再做门控输出 | LLaMA、Mistral |
-
-标准 FFN 的形式最适合先实现：
+设输入为 `[T,D]`，中间维度为 `F`。标准两层 FFN 的形状流程是：
 
 ```text
-out = Linear2(Activation(Linear1(x)))
+输入 [T,D]
+  -> fc1[D,F]
+  -> hidden [T,F]
+  -> ReLU
+  -> activated [T,F]
+  -> fc2[F,D]
+  -> 输出 [T,D]
 ```
 
-SwiGLU 的思路可以理解为：
+中间维度扩大了单个词元可使用的特征空间，但不会改变词元数。`FeedForward(4,8)` 因此把 `[2,4]` 暂时变为 `[2,8]`，再恢复为 `[2,4]`，以便与残差分支逐元素相加。
 
-```text
-gate = Linear_gate(x)
-value = Linear_value(x)
-out = Linear_out(SiLU(gate) * value)
-```
-
-Chapter04 的 `FeedForward` 实现标准两层 FFN：`fc1 -> ReLU -> fc2`。真实 TinyLlama 走三组权重：`SiLU(gate(x)) * up(x) -> down`；该路径位于 `RealLlamaCpuContext`，并复用 Chapter06 的 Q4_K/Q6_K Linear backend。
-
-| 对照项 | Chapter04 教学 FFN | TinyLlama 真实 FFN |
-| --- | --- | --- |
-| 投影 | `fc1`、`fc2` | `gate`、`up`、`down` |
-| 激活 | ReLU | SiLU |
-| 门控乘法 | 无 | `SiLU(gate) * up` |
-| 权重 | 教学浮点参数 | GGUF Q4_K/Q6_K |
-
-### FFN 在 DecoderLayer 中的位置
-
-DecoderLayer 的标准顺序是：
-
-```text
-x = x + Attention(LayerNorm(x))
-x = x + FFN(LayerNorm(x))
-```
-
-也就是说，FFN 紧跟在 Attention 之后，接收 Attention 输出后的表示，再做逐 token 的非线性变换。
-
-Attention 和 FFN 的职责对比：
-
-- Attention：混合 token 之间的信息，回答“谁和谁相关”
-- FFN：变换每个 token 的表示，回答“这个 token 应该变成什么”
-
-两者合在一起，才构成 Transformer 的完整计算模式。
-
-实现建议：
-
-- 保持和 `MatMul` 接口一致
-- 先实现最基础的两层结构
-- 再考虑后续优化
-
-## 验证与排查
-
-验证时重点看：
-
-- 输入输出 shape 正确
-- ReLU 位于两次 Linear 之间
-- 能和 DecoderLayer 组合
-
-如果 FFN 的输入输出维度和 attention 的残差路径都能对上，说明这层已经可复用了。
-
-FFN 的最小伪代码可以写成：
+<a href="../_code/chapter04_attention/src/feed_forward.cpp"><code>feed_forward.cpp</code></a> 直接表达这三个步骤：
 
 ```cpp
-Tensor hidden = matmul(x, w1);
-hidden = activation(hidden);
-Tensor out = matmul(hidden, w2);
+Tensor hidden = fc1_.forward(input);
+Tensor activated = apply_activation(hidden, ActivationKind::Relu);
+return fc2_.forward(activated);
 ```
 
-这就是最基础的“两层线性 + 非线性”结构。
+两个线性层复用 <a href="../_code/chapter04_attention/src/linear_layer.cpp"><code>linear_layer.cpp</code></a>。`forward()` 保留 Chapter04 的教学张量接口；`try_forward()` 接收公共只读输入视图和可写输出视图，因此 Chapter02 张量可以直接进入同一线性计算。两条入口都要求 CPU Float32、二维连续布局和匹配的输入输出形状，不会替调用者隐式连续化。
 
-常见问题：
+线性层、LayerNorm、ReLU、残差相加和完整 FFN 均提供公共视图接口。Chapter04 教学张量仍负责旧入口和中间结果的存储所有权，公共视图只负责跨章传递布局与数据引用。
 
-- 中间隐藏维度设置错误
-- 激活函数位置放错
-- 线性层输入输出顺序搞混
+## 从教学 FFN 到真实 SwiGLU
+
+TinyLlama 的 FFN 不是简单地把 ReLU 换成 SiLU。它使用三组权重并在两个升维分支之间执行逐元素门控：
+
+```text
+gate = gate_proj(x)
+up = up_proj(x)
+hidden = SiLU(gate) * up
+output = down_proj(hidden)
+```
+
+| 对照项 | 教学 `FeedForward` | TinyLlama 真实 FFN |
+| --- | --- | --- |
+| 升维投影 | `fc1` | `gate_proj`、`up_proj` |
+| 激活 | ReLU | SiLU |
+| 门控乘法 | 无 | `SiLU(gate) * up` |
+| 降维投影 | `fc2` | `down_proj` |
+| 权重数据 | 教学 Float32 参数 | GGUF Q4_K/Q6_K 权重 |
+
+两条路径保留的共同约束是：词元数不变，最终隐藏维恢复为 `D`，输出才能进入残差加法。真实路径位于 `RealLlamaCpuContext`，量化线性层复用 Chapter05 计算后端；教学 `FeedForward` 保持小尺寸和可读性。
+
+在解码器中，注意力和 FFN 各自位于一条残差支路：
+
+```text
+x = x + Attention(Norm(x))
+x = x + FFN(Norm(x))
+```
+
+因此 FFN 的输入输出形状是否一致不是实现细节，而是残差连接成立的前提。
+
+## 验证与衔接
+
+从仓库根目录运行：
+
+```bash
+bash code/chapter04_attention/scripts/run.sh
+```
+
+`chapter04_attention_test` 构造 `FeedForward(4,8)`，输入 `[2,4]` 后检查输出仍为 `[2,4]`。跨章测试还把 Chapter02 的 `[1,2]` 张量送入 `LinearLayer(2,3)` 和 `FeedForward(2,3)`，分别验证 `[0.05,0.10,0.15]` 与 `[0.007,0.014]`，并确认错误输出形状不会覆盖已有数据。
+
+下一节将把两条残差支路、两个 LayerNorm、注意力和 FFN 组装成一个完整的教学 `DecoderLayer`。

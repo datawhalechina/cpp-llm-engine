@@ -1,90 +1,35 @@
-# 03.2 MatMulOp Design `MatMulOp` 设计
+# 03.2 矩阵乘法算子设计
 
+矩阵乘法的数学公式、内存位置和执行实现必须分开描述。`MatMulOp` 固定主机输入上的 `A[M,K] × B[K,N] = C[M,N]`；独立 CUDA 目标复用相同形状语义，但接收设备指针和 CUDA 流。
 
-## 固定 MatMul 的输入输出契约
+## 输入输出与布局契约
 
-先把 `MatMulOp` 的输入输出契约定下来。读完后，读者应该能说清楚三件事：
+Chapter03 当前接受连续行优先 `Matrix`：
 
-- 这个算子接收什么输入
-- 它输出什么结果
-- CPU reference 和 cuBLAS 为什么是同一个接口下的两种实现
-
-矩阵乘法是后面很多模块的公共底座。如果 MatMul 契约不清楚，attention 和 FFN 的问题会和布局问题混在一起，排错会很慢。
-
-## 阅读入口
-
-- 前置阅读：[`Operator Base`](./01_operator_base.md)、[`CPU Reference`](./03_cpu_reference.md)
-- 源码直达：<a href="../_code/chapter03_matmul/include/chapter03_matmul/matmul_op.h"><code>matmul_op.h</code></a>、<a href="../_code/chapter03_matmul/src/matmul_op.cpp"><code>matmul_op.cpp</code></a>
-- 相关阅读：[`cuBLAS 接入设计`](./04_cublas_implement.md)、[`PyTorch 对照测试`](./05_test_with_pytorch.md)
-
-## 核心设计
-
-在推理引擎里，矩阵乘法不是“先写一个公式就完了”的东西。真正难的地方是把内部 Tensor 布局、安全的资源管理，以及外部高性能库的调用方式接起来。
-
-如果直接从 cuBLAS 调用开始写，读者很容易只看到参数，没有看到设计约束。  
-如果先把接口说清楚，再讨论后端实现，就能把“语义”与“性能”分开。
-
-`MatMulOp` 不是一个单纯的计算函数，而是一个稳定边界：
-
-- 上层只依赖它的输入输出契约
-- 下层可以切换 CPU reference 或 cuBLAS
-- 布局转换只发生在边界内，不向上层泄漏
-
-当前代码提供两个调用层级：教学示例使用 `compute(lhs, rhs)`；需要显式处理错误的 Engine/backend 代码使用 `try_compute(lhs, rhs, &output)`。后者先检查两个 `Matrix::contract()` 对应的 shape 和连续布局，再把原始 buffer 适配为 `MatmulRequest`，错误沿 `Status` 返回。
-
-这里最容易出错的不是矩阵乘法本身，而是内部 layout 到库调用参数的映射。  
-因此设计阶段必须先明确项目内部使用什么布局，再决定如何翻译成 cuBLAS 所需的参数。
-
-`cublasHandle_t` 的生命周期要独立管理，不能让它散落在调用点。  
-同时，传给 cuBLAS 的矩阵布局可能和项目内部布局不同，所以转置标志、leading dimension 和内存顺序必须一起考虑。
-
-如果内部统一采用 row-major，很多时候要把输入视作转置后的 column-major 形式交给 cuBLAS。  
-这不是实现细节，而是设计约束。
-
-这里的接口约定也要明确：`forward(A, B)` 表示 `A * B`，也就是左乘语义。  
-只要这个语义在 CPU 和 cuBLAS 后端之间保持一致，上层在拼接 Q/K/V 或组织 FFN 输入时就不会因为参数顺序而写反。
-
-## 为什么 MatMul 需要独立契约
-
-如果把矩阵乘法直接埋进模型代码里，后面很快会出现三个问题：
-
-- 上层模型语义和 layout 细节混在一起
-- backend 切换会扩散到每个调用点
-- attention、FFN、projection 的排错边界会变得很模糊
-
-所以 `MatMulOp` 的作用不只是“包装一次乘法”，还要把职责切开：
-
-- 上层只说“我要一次什么形状、什么语义的乘法”
-- backend 层决定“这次乘法由谁来算”
-- kernel 或库调用层负责“具体怎么高效地算”
-
-这也是读 vLLM / nano-vLLM 时最容易混淆的一点。很多人一上来就看 kernel，但真正应该先看的是：这里到底是在定义算子语义，还是在替换 backend 实现。
-
-## 验证与排查
-
-验证时重点看：
-
-读完后，应当能够不看实现就回答：
-
-- 输入是什么
-- 输出是什么
-- 布局怎么转换
-- 资源怎么释放
-- 为什么先保证正确性，再谈加速
-
-可以先用一个简化调用把思路写出来：
-
-```cpp
-Tensor y = matmul_op.forward(x, w);
-// 内部再根据 backend 选择 CPU reference 或 cuBLAS 路径
+```text
+lhs [M,K] stride [K,1]
+rhs [K,N] stride [N,1]
+out [M,N] stride [N,1]
 ```
 
-源码锚点：<a href="../_code/chapter03_matmul/include/chapter03_matmul/matmul_op.h"><code>matmul_op.h</code></a>
+`try_compute(lhs, rhs, &output)` 检查对象是否有效、`lhs.cols == rhs.rows` 和输出元素数量，再创建公共 `MatmulRequest`。教学入口 `compute()` 复用同一逻辑，并在失败时抛出异常。
 
-这个例子展示稳定前端接口与可替换后端执行之间的分工。
+工程入口 <a href="../_code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> 接收两个只读 `TensorViewRef` 和一个可写 `MutableTensorViewRef`，依次检查存储范围、维数、Float32、CPU、连续行优先布局和输入输出形状。连续性由公共 `TensorContract` 判断，Chapter03 不再另写一套布局规则。验证通过后，适配器把存储基址加上偏移，生成指向视图首元素的 `MatmulRequest`。非连续切片或转置返回 `matmul requires contiguous row-major input`；调用者可先显式执行 Chapter02 的 `contiguous()`，再提交新的视图。
 
-常见问题：
+`try_compute_tensor_views_into()` 先在临时连续结果中计算，后端成功后才写入调用方的输出视图。这个提交步骤用于保证形状、存储或后端执行失败时已有输出保持不变。`try_compute_tensor_views()` 继续返回 `Matrix`，但它只是兼容教学入口，不再是跨章输出类型。
 
-- 只考虑数学公式，不考虑内存布局
-- 把 cuBLAS 输入布局和内部布局混为一谈
-- handle 没有明确释放路径
+## 算子、计算后端与内核
+
+<a href="../_code/chapter03_matmul/src/matmul_op.cpp"><code>matmul_op.cpp</code></a> 将计算拆成三层：
+
+| 层 | 决定什么 | 当前对象 |
+| --- | --- | --- |
+| 算子 | 输入输出和数学语义 | `MatMulOp` |
+| 计算后端 | 当前主机请求使用哪个实现 | `CpuReferenceMatmulBackend` |
+| 内核/计算库 | 怎样完成循环或设备库调用 | CPU 三重循环；独立 CUDA 目标使用 `cublasSgemm` |
+
+CPU 与 CUDA 都保持 `A × B` 的数学语义，但指针所在内存不同。行优先到 cuBLAS 列优先的转换、设备内存分配、CUDA 流和句柄生命周期位于 `code/cuda`，不能把 `Matrix::data` 的主机指针直接传给 cuBLAS。
+
+## 验证与衔接
+
+运行 `bash code/chapter03_matmul/scripts/run.sh`，确认合法矩阵、Chapter02 连续视图和显式物化结果都得到正确输出；形状不匹配、空引用、错误数据类型/设备、越界存储和未物化的非连续布局返回明确错误，并且不覆盖已有输出。[`CPU 参考实现`](./03_cpu_reference.md) 将建立可读的数值基线。

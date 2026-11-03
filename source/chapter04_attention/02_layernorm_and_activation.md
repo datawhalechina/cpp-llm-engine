@@ -1,115 +1,62 @@
-# 04.2 LayerNorm and Activation LayerNorm 与激活函数
-## 学习入口
+# 04.2 层归一化与激活函数
 
-实现教学 Decoder 使用的 LayerNorm 和 ReLU，并理解它们与 TinyLlama 的 RMSNorm 和 SwiGLU 的差异。
+注意力负责聚合词元之间的信息，解码器还需要归一化稳定每个词元的特征尺度，并用激活函数引入非线性。教学路径实现 LayerNorm 和 ReLU；真实 TinyLlama 路径使用 RMSNorm 和 SwiGLU，两者不能互换后声称数值等价。
 
-读完后应能做到：
+## 每个词元怎样完成归一化
 
-- 理解 LayerNorm 的作用
-- 理解激活函数在非线性表达中的意义
-- 区分已实现的 ReLU 与模型变体中的 SiLU、GELU
-
-- 前置阅读：[`chapter04 导读`](./intro.md)、[`04.1 Multi-head Attention`](./01_multihead_attention.md)
-- 源码直达：<a href="../_code/chapter04_attention/src/layer_norm.cpp"><code>layer_norm.cpp</code></a>、<a href="../_code/chapter04_attention/tests/chapter04_attention_test.cpp"><code>chapter04_attention_test.cpp</code></a>
-- 相关阅读：[`04.3 Feed Forward Network`](./03_feedforward.md)、[`04.4 DecoderLayer`](./04_decoder_layer.md)
-
-## 核心实现
-
-LayerNorm 稳定训练和推理中的数值分布，激活函数引入非线性表达能力。它们虽然不是最“显眼”的模块，但对 Transformer 的稳定性很关键。
-
-仓库教学层实现以下内容：
-
-- LayerNorm 的均值和方差归一化
-- gamma 和 beta 参数位置；教学构造函数固定初始化为 1 和 0
-- `apply_activation(..., ActivationKind::Relu)`
-
-SiLU 和 GELU 用于模型结构对照，Chapter04 源码没有实现这两种激活。真实 TinyLlama 使用 RMSNorm 与 SwiGLU，其实现位于真实 CPU Decoder，不能用教学 `LayerNorm` 和 ReLU 代替后声称数值等价。
-
-工程上建议把 LayerNorm 的参数、统计量计算和输出变换分开写清楚，这样后续复用更简单。
-
-LayerNorm 的归一化维度：
-
-Transformer 里的 LayerNorm 是对每个 token 的特征维度单独归一化：
-
-- 输入: `[B, S, D]`
-- 归一化维度: 最后一维 `D`
-- 输出: `[B, S, D]`
-
-也就是说，LayerNorm 不改变 shape，只改变每个 token 的特征分布：
+输入 `[T,D]` 中的每一行表示一个词元。LayerNorm 只在该行的 `D` 个特征上计算均值和方差，不混合不同词元，也不改变形状：
 
 ```text
-x_shape = [B, S, D]
-mean = x.mean(dim=-1, keepdim=True)   # [B, S, 1]
-var  = x.var(dim=-1, keepdim=True)    # [B, S, 1]
-y = (x - mean) / sqrt(var + eps) * gamma + beta   # [B, S, D]
+mean = sum(x_i) / D
+variance = sum((x_i - mean)^2) / D
+y_i = (x_i - mean) / sqrt(variance + epsilon) * gamma_i + beta_i
 ```
 
-这也是 LayerNorm 和 BatchNorm 的关键区别：
+| 对象 | 当前值或形状 | 作用 |
+| --- | --- | --- |
+| 输入与输出 | `[T,D]` | 词元数和隐藏维度保持不变 |
+| `mean`、`variance` | 每个词元各一个标量 | 只统计当前词元的特征 |
+| `epsilon` | 默认 `1e-5` | 防止方差接近零时除零 |
+| `gamma`、`beta` | `[D]` | 当前构造函数分别初始化为 `1` 和 `0` |
 
-- BatchNorm 通常在 batch 维度上统计
-- LayerNorm 在特征维度上统计
+LayerNorm 在推理时仍使用当前输入计算统计量，不读取 BatchNorm 式的 running mean/variance。<a href="../_code/chapter04_attention/src/layer_norm.cpp"><code>layer_norm.cpp</code></a> 中的三段循环依次计算均值、方差和输出，正好对应上面的公式。
 
-SiLU 和 GELU：
+`forward()` 保留 Chapter04 教学张量入口，`try_forward()` 接收公共只读输入视图和可写输出视图。两条入口都要求 CPU Float32、二维连续布局、输入列数等于 `dim`，并保持输入输出形状一致。计算先写入临时结果，全部成功后再提交到输出，因此错误形状不会破坏调用方已有数据。
 
-SiLU (Swish)：
+## 教学实现与 TinyLlama 的差异
+
+教学 `FeedForward` 使用 ReLU：
 
 ```text
-SiLU(x) = x * sigmoid(x) = x / (1 + e^(-x))
+ReLU(x) = max(0, x)
 ```
 
-GELU (Gaussian Error Linear Unit)：
+真实 TinyLlama 使用 RMSNorm 和 SwiGLU。RMSNorm 不减均值，而是按均方根缩放；SwiGLU 需要 gate、up、down 三组投影：
 
 ```text
-GELU(x) = 0.5 * x * (1 + erf(x / sqrt(2)))
+RMSNorm(x) = x / sqrt(mean(x^2) + epsilon) * weight
+SwiGLU(x) = down(SiLU(gate(x)) * up(x))
+SiLU(x) = x / (1 + exp(-x))
 ```
 
-在 Transformer 里，两者都很常见：
+| 对照项 | 教学解码器 | TinyLlama 真实解码器 |
+| --- | --- | --- |
+| 归一化 | LayerNorm | RMSNorm |
+| 是否减均值 | 是 | 否 |
+| 可学习参数 | `gamma`、`beta` | 缩放权重 |
+| FFN 激活 | ReLU | SiLU 门控 |
+| 作用 | 建立可读组合结构 | 匹配真实模型配置和权重 |
 
-- BERT 更常见 GELU
-- LLaMA 更常见 SiLU
-- GPT 系列也常见 GELU
+`apply_activation()` 位于 <a href="../_code/chapter04_attention/src/feed_forward.cpp"><code>feed_forward.cpp</code></a>，当前枚举只包含 ReLU。TinyLlama 的 RMSNorm 和 SwiGLU 由真实 CPU 解码器路径实现，不通过给教学枚举增加名字来伪装模型兼容性。
 
-教学源码把 ReLU 做成独立纯函数供 FFN 复用。若扩展 GELU，应明确近似公式和误差测试；若实现 TinyLlama 路径，则需要 gate/up 两条投影和 SiLU 乘门，而不是只替换一个枚举值。
+## 验证与衔接
 
-推理中的一致性：
+运行：
 
-LayerNorm 在训练和推理里的行为是一致的：
-
-- 训练：按当前输入计算均值和方差
-- 推理：仍然按当前输入计算均值和方差
-
-所以它不需要像 BatchNorm 那样维护 running mean / running var。对本教程来说，这意味着同一份 LayerNorm 实现可以直接用于推理路径。
-
-实现建议：
-
-- 先实现基础公式
-- 再关注数值稳定性
-- 保持接口和后续 FFN 可直接复用
-
-## 验证与排查
-
-验证时重点看：
-
-- 输出形状不变
-- 归一化后数值分布合理
-- ReLU 将负值截断为 0，并保留正值
-
-如果输入整体偏移后，LayerNorm 输出仍能回到稳定范围，这通常说明归一化逻辑没有跑偏。
-
-一个最小的 LayerNorm 伪代码可以写成：
-
-```cpp
-for (each token) {
-    mean = average(x);
-    var = average((x - mean)^2);
-    y = (x - mean) / sqrt(var + eps) * gamma + beta;
-}
+```bash
+bash code/chapter04_attention/scripts/run.sh
 ```
 
-激活函数则可以单独作为纯函数实现，便于在 FFN 中复用。
+`chapter04_attention_test` 使用 `[2,4]` 输入验证 `LayerNorm(4)` 已就绪，输出仍为 `[2,4]`；跨章测试将 Chapter02 的 `[1,2]` 张量归一化为约 `[-0.99998,0.99998]`，并检查错误输出形状不覆盖已有数据。同一测试随后把归一化对象交给完整 `DecoderLayer`。检查实现时应确认每一行独立统计、`epsilon` 位于平方根内部、ReLU 把负值变为零且保留正值。
 
-常见问题：
-
-- 归一化维度选错
-- 方差计算不稳定
-- 激活函数实现和公式不一致
+下一节会把线性层、ReLU 和第二个线性层组合成保持 `[T,D]` 输入输出形状的 FFN。

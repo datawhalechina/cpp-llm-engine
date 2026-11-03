@@ -20,10 +20,10 @@ This is the English landing page for the chapter. The detailed Chinese pages rem
 
 ## Next step
 
-Continue to [summary](summary) or move to [the next chapter](/en/chapter05_generation/intro).
+Continue to [summary](summary) or move to [the next chapter](/en/chapter05_quantization/intro).
 
 ## Related Reading
 
 - Prerequisites: read the Chapter 03 MatMul pages first, because this chapter reuses the operator boundary and the Linear / MatMul setup.
-- Later use: `chapter05_generation` will embed this `DecoderLayer` into the runtime, and `chapter06_quantization` will replace the weight representation on the same structure.
+- Later use: `chapter05_quantization` first replaces the weight representation used by this `DecoderLayer`; `chapter06_generation` then embeds it into the generation runtime.
 - Roadmap: if you want the full 03–06 path first, start from [the Chapter 03 intro](/en/chapter03_matmul/intro). It summarizes the reading order from operators to quantization.

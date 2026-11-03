@@ -1,130 +1,59 @@
-# 04.4 DecoderLayer 解码器层
-## 学习入口
+# 04.4 解码器层（`DecoderLayer`）
 
-把 Pre-LN、Attention、Residual 和 FFN 组合成一个完整的 Transformer decoder layer。
+注意力、归一化和 FFN 单独通过测试后，还需要按照模型结构组合成一个解码器块（Decoder Block）。组合过程必须保持隐藏状态形状、残差来源和模块顺序一致。
 
-读完后应能做到：
+## 一层解码器的数据流
 
-- 理解 DecoderLayer 的标准结构
-- 理解残差连接在模块组合中的作用
-- 理解模块组合后如何继续保持 shape 一致
+一层前置归一化（Pre-Norm）解码器先归一化输入，再执行注意力和第一次残差相加；随后再次归一化，执行 FFN 和第二次残差相加。
 
-- 前置阅读：[`04.1 Multi-head Attention`](./01_multihead_attention.md)、[`04.3 Feed Forward Network`](./03_feedforward.md)
-- 源码直达：<a href="../_code/chapter04_attention/src/decoder_layer.cpp"><code>decoder_layer.cpp</code></a>、<a href="../_code/chapter04_attention/src/attention.cpp"><code>attention.cpp</code></a>、<a href="../_code/chapter04_attention/tests/chapter04_attention_test.cpp"><code>chapter04_attention_test.cpp</code></a>
-- 相关阅读：[`04.5 首层权重加载`](./05_load_first_layer.md)、[`04.6 Decoder 成熟框架对照`](./06_gemma_tensorrt_comparison.md)、[`章节导读`](./intro.md)
+![解码器与注意力数据流](../assets/diagrams/chapter04-decoder-attention-flow.svg)
 
-![Decoder / Attention 数据流](../assets/diagrams/chapter04-decoder-attention-flow.svg)
-
-## 核心结构
-
-单个模块正确不代表整体正确。DecoderLayer 是各模块真正拼接起来的地方，也是后面多层 Transformer 的最小单元。
-
-它也是 `chapter01` 到 `chapter03` 的结构对照点：
-
-- `chapter01` 提供真实模型 metadata、权重布局和独立 CPU Decoder，用来对照教学层 contract
-- `chapter02` 提供的 view / shape 语义，要能支撑 attention 和 residual 的数据流
-- `chapter03` 提供的 MatMul / Linear 边界，要能被稳定组合成 attention 和 FFN
-
-Chapter04 的教学 `DecoderLayer` 不直接装载 TinyLlama GGUF 权重，因为两者的 Norm、激活、head 结构和量化格式不同；`DecoderLayerContract` 用于显式比较这些差异。
-
-## 结构契约与执行契约
-
-单层结构和一次请求的执行状态需要分开表示。Chapter04 的 `DecoderLayer` 只回答层内部由哪些组件组成；真实模型 Context 还要保存 position、分层 K/V，并提供 token 级 prefill/decode。把两者塞进同一个接口，会迫使教学层伪造 tokenizer、embedding 和 LM Head。
-
-| 契约 | 回答的问题 | 实现位置 | 使用者 |
-| --- | --- | --- | --- |
-| `DecoderLayerContract` | 层的 hidden、head、FFN、Norm、RoPE 和 KV 能力是什么 | Chapter04 教学层、Chapter01 真实 Model | 测试、Engine Factory、架构检查 |
-| `DecoderExecutionContext` | 当前请求如何 reset、prefill、decode，已经消费多少 token | Chapter01 真实 Context | Engine adapter |
-| `RequestModelExecutor` | Runtime 如何按请求取得 logits | Engine adapter | Chapter05 Runtime、Chapter09 ServiceCore |
-
-标准结构：
-
-- Pre-LN
-- Attention
-- Residual
-- FFN
-- Residual
-
-这里的重点不是“把模块堆起来”，而是保持各模块之间的 shape、顺序和数据流都一致。只要其中一个环节顺序错了，模型就会看起来能跑，但结果明显不对。
-
-建议把 DecoderLayer 当作一个独立的中间里程碑：它既够小，方便验证；又够完整，足以代表一层 Transformer 的核心行为。
-
-为什么使用 Pre-LN：
-
-Transformer 常见有两种归一化位置：
-
-- Post-LN：`y = LayerNorm(x + sublayer(x))`
-- Pre-LN：`y = x + sublayer(LayerNorm(x))`
-
-本教程使用的是 **Pre-LN**，原因是：
-
-1. 训练更稳定，梯度更容易通过残差路径传播
-2. 收敛通常更顺滑
-3. 现代大模型里 Pre-LN 更常见
-
-对推理实现来说，Pre-LN 也更容易把模块边界画清楚：先归一化，再进入子模块，再做残差加法。
-
-单层参数量的粗略估算：
-
-假设：
-
-- `hidden_dim = D`
-- `ffn_dim = 4D`
-
-那么一层 DecoderLayer 的主要参数量可以粗略看成：
-
-- Attention：`4 * D^2`，对应 Q/K/V/O 四个投影矩阵
-- FFN：`2 * D * 4D = 8D^2`
-- LayerNorm：两个归一化，约 `4D`
-- 合计：`≈ 12D^2 + 4D`
-
-如果 `D = 768`，那单层大约就是几百万级参数。这个估算后面在 benchmark 和 quantization 章节会反复用到。
-
-从单层到多层：
-
-完整 Transformer 不是一层 DecoderLayer，而是多层堆叠：
-
-```python
-y = x
-for i in range(num_layers):
-    y = decoder_layer_i(y)
-```
-
-每一层的参数独立，但结构相同。层数越多，表达能力越强，代价也越高。
-
-实现建议：
-
-- 先把每个子模块单独验证过
-- 再组合成完整层
-- 每一步都检查 shape
-
-## 验证与排查
-
-验证时重点看：
-
-- 输入输出 shape 一致
-- 残差连接不破坏维度
-- 模块顺序符合预期
-- 教学层报告 LayerNorm、ReLU、MHA 和无 RoPE/KV；真实 TinyLlama 报告 RMSNorm、SwiGLU、GQA、RoPE 和请求级 KV
-
-如果一层 `DecoderLayer` 的完整数据流图能够和代码一致，单层结构就完成了。
-
-最小伪代码可以写成：
+最小控制流可以写成：
 
 ```cpp
-Tensor y = x;
-y = y + attention(layernorm1(y));
-y = y + ffn(layernorm2(y));
+Tensor hidden = input;
+hidden = hidden + attention(norm1(hidden));
+hidden = hidden + ffn(norm2(hidden));
 ```
 
-源码锚点：<a href="../_code/chapter04_attention/src/decoder_layer.cpp"><code>decoder_layer.cpp</code></a>
+输入和输出都保持 `[token_count, hidden_size]`。注意力在词元之间交换信息，FFN 独立变换每个词元，残差路径把子模块输入直接送到加法节点。
 
-这段代码把 Pre-LN、Residual 和两个子模块的组合关系表达得很直接。
+教学实现使用 LayerNorm、普通多头注意力和 ReLU FFN；TinyLlama 使用 RMSNorm、RoPE、GQA 和 SwiGLU。两者共享相同的前置归一化与双残差骨架，具体算子和权重形状不同。
 
-常见问题：
+## 从前置产物到执行契约
 
-- 残差连接的位置错误
-- 归一化顺序错误
-- 子模块输出 shape 与输入不匹配
-- 先 Residual 再 LayerNorm，容易让训练和推理的行为偏离预期
-- 模块顺序颠倒时，常见现象是 shape 看起来对，但结果明显不对
+Chapter04 同时消费前三章的稳定产物：
+
+| 输入来源 | Chapter04 使用的对象 | 用途 |
+| --- | --- | --- |
+| Chapter01 | `ModelConfig`、张量映射、Llama 权重布局 | 确定层数、维度和各层权重 |
+| Chapter02 | 形状、步长、偏移、底层存储 | 表达注意力和残差使用的张量 |
+| Chapter03 | 矩阵乘法形状、布局和计算后端分层 | 为投影计算提供语义与架构参照 |
+
+教学线性层当前通过 Chapter04 本地循环执行，没有直接调用 Chapter03 `MatmulBackend`。两章共享公共视图和行优先计算契约；真实量化投影由 Chapter05 计算后端执行。
+
+线性层、LayerNorm、ReLU、残差相加、FFN、`MultiHeadAttention` 和 `DecoderLayer` 均能接收公共只读/可写视图。`DecoderLayer::forward()` 保留教学张量入口，但内部复用同一条视图执行链。跨章测试使用 Chapter02 张量执行完整单层，并与教学入口逐元素比较。
+
+当前教学 `DecoderLayer` 仍是无状态单次前向计算，尚未把 `KvCache` 接入注意力。KV Cache 的追加、解码偏移和请求隔离分别由独立测试与真实解码器路径验证，不能把公共视图迁移理解为缓存执行已经合并。
+
+模型结构和请求执行状态使用不同契约：
+
+| 契约 | 保存的信息 | 使用位置 |
+| --- | --- | --- |
+| `DecoderLayerContract` | 隐藏维度、注意力头、FFN、归一化、RoPE 和 KV 能力 | 教学层与真实模型的结构检查 |
+| `DecoderExecutionContext` | 位置、分层 K/V、`prefill()` 和 `decode()` | 单个请求的模型执行 |
+| `RequestModelExecutor` | 请求怎样取得下一步候选分数 | Chapter06 生成运行时 |
+
+结构契约回答“一层由什么组成”，执行上下文回答“当前请求已经处理到哪里”。共享权重保存在模型中，位置和 K/V 保存在每个请求独立的执行上下文中。
+
+实现入口是 <a href="../_code/chapter04_attention/src/decoder_layer.cpp"><code>decoder_layer.cpp</code></a>，注意力与组合测试分别位于 <a href="../_code/chapter04_attention/src/attention.cpp"><code>attention.cpp</code></a> 和 <a href="../_code/chapter04_attention/tests/chapter04_attention_test.cpp"><code>chapter04_attention_test.cpp</code></a>。
+
+## 验证与衔接
+
+```bash
+bash code/chapter04_attention/scripts/run.sh
+```
+
+测试应确认输入输出形状一致、两次残差使用正确输入、因果位置只能读取允许的历史 K/V，并能区分教学层与 TinyLlama 的归一化、注意力和 FFN 契约。
+
+单层结构成立后，[`接入首层权重`](./05_load_first_layer.md) 使用 Chapter01 的真实权重布局执行 TinyLlama 第一个解码器块。
