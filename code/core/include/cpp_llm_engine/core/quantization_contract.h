@@ -1,7 +1,7 @@
 // Core：量化 block 布局契约
 // 职责：统一 Q4_K/Q6_K/Q8_0 的 block 尺寸，并安全计算 row-major 权重字节数。
 // 契约：每一行必须由完整 block 组成；本文件不拥有 payload，也不执行解码。
-// 验证：core contract、Chapter06 CPU 测试和 CUDA Quantized Linear 测试。
+// 验证：core contract、Chapter05 CPU 测试和 CUDA Quantized Linear 测试。
 #pragma once
 
 #include "linear_contract.h"

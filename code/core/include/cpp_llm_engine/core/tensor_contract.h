@@ -54,6 +54,27 @@ struct TensorContract final {
     std::size_t storage_offset_elements = 0;
     std::size_t storage_bytes = 0;
 
+    bool is_contiguous_row_major() const {
+        if (shape.dimensions.empty() ||
+            strides.size() != shape.dimensions.size()) {
+            return false;
+        }
+        std::size_t expected_stride = 1;
+        for (std::size_t axis = shape.dimensions.size(); axis-- > 0;) {
+            const auto dimension = shape.dimensions[axis];
+            if (dimension == 0) return false;
+            if (dimension != 1 && strides[axis] != expected_stride) {
+                return false;
+            }
+            if (expected_stride >
+                std::numeric_limits<std::size_t>::max() / dimension) {
+                return false;
+            }
+            expected_stride *= dimension;
+        }
+        return true;
+    }
+
     Status checked_required_elements(std::size_t* result) const {
         if (result == nullptr) {
             return Status::error("tensor required-elements output is null");
