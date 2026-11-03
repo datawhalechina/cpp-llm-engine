@@ -121,4 +121,3 @@ add_executable(chapter06_streaming_demo
 target_link_libraries(chapter06_streaming_demo
     PRIVATE chapter06_generation
 )
-
