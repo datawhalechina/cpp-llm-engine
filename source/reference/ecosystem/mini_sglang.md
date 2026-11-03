@@ -21,6 +21,6 @@
 
 ## 对应教程章节
 
-- Chapter05：Prefill/Decode、Chunked Prefill 和 Scheduler
+- Chapter06：Prefill/Decode、Chunked Prefill 和 Scheduler
 - Chapter09：请求 admission、缓存复用和资源释放
 - Chapter07-08：调度 A/B workload 与重叠效果

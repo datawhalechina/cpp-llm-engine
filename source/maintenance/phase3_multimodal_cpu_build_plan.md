@@ -1,6 +1,6 @@
 # 第三期多模态 CPU 建设计划
 
-本文供教程维护使用。多模态不是一套平行推理引擎，而是给现有 LLM 引擎增加图片输入、视觉模型和 embedding 拼接；生成 Runtime、请求状态、benchmark、profiling 和 Serving 继续复用 Chapter05、07、08、09。
+本文供教程维护使用。多模态不是一套平行推理引擎，而是给现有 LLM 引擎增加图片输入、视觉模型和 embedding 拼接；生成 Runtime、请求状态、benchmark、profiling 和 Serving 继续复用 Chapter06、07、08、09。
 
 ## 建设目标
 
@@ -11,8 +11,8 @@
 | Chapter01 GGUF index、metadata、量化 payload | mmproj metadata 和视觉权重 schema |
 | Chapter02 Tensor、Storage、View | RGB、CHW、patch 和 visual embedding shape |
 | Chapter03-04 Linear、Attention、Norm、FFN | SigLIP Vision Transformer 和 projector |
-| Chapter05 Runtime 与模型执行接口 | 文本 token、图片占位符和 visual embedding 拼接 |
-| Chapter06 Quantized Linear | Q8_0 视觉权重解码与执行策略 |
+| Chapter06 Runtime 与模型执行接口 | 文本 token、图片占位符和 visual embedding 拼接 |
+| Chapter05 Quantized Linear | Q8_0 视觉权重解码与执行策略 |
 | Chapter07-09 correctness、profiling、Serving | 图片请求、图像 token 预算和视觉阶段指标 |
 
 ## 分阶段顺序
@@ -36,7 +36,7 @@
 | MM-P6C-2B | 真实 chat template、tokenizer 与 overview-only chunk | `25x960` prompt logits/token golden | 已完成 |
 | MM-P6C-3 | 单个完整 visual tile | 64 visual rows 的 logits/token golden | 已完成 |
 | MM-P6D | 动态 tiles 与真实图片 prompt | `tiles + overview` 完整输入对照 | 已完成 |
-| MM-P7A | 请求阶段指标与同步 Runtime 适配 | 七阶段耗时/内存；embedding prefill 进入 Chapter05 Runtime | 已完成 |
+| MM-P7A | 请求阶段指标与同步 Runtime 适配 | 七阶段耗时/内存；embedding prefill 进入 Chapter06 Runtime | 已完成 |
 | MM-P7B-1 | 通用 embedding ServiceCore 与 SSE 接入 | 同步/SSE token 一致、失败终态、metrics 和 Context 释放 | 已完成 |
 | MM-P7B-2 | 真实 SmolVLM 服务接入 | 图片管线产生每请求 Executor；真实同步/SSE golden | 已完成 |
 | MM-P7C-1 | 生命周期与失败压力 | 32 次成功、8 次 prefill 失败、断开、超时和 Context 释放 | 已完成 |
@@ -63,7 +63,7 @@
 
 ## MM-P4B 实现结果
 
-Chapter01 loader 已增加 Q8_0 的 32 元素/34 字节 raw payload 契约，Chapter06 增加独立 CPU reference 解码；多模态 `vision_weights` 负责加载 F32 bias/norm、解码 Q8_0 matrix，并将 legacy raw `ffn_down` 装配为 MLP 输入投影、raw `ffn_up` 装配为输出投影。
+Chapter01 loader 已增加 Q8_0 的 32 元素/34 字节 raw payload 契约，Chapter05 增加独立 CPU reference 解码；多模态 `vision_weights` 负责加载 F32 bias/norm、解码 Q8_0 matrix，并将 legacy raw `ffn_down` 装配为 MLP 输入投影、raw `ffn_up` 装配为输出投影。
 
 默认 CTest 使用 hidden 32、intermediate 64 的合成 payload 验证 Q8_0 数值、Linear shape 和 FFN 映射。真实 mmproj 使用前 4 个无损 PPM patch 执行第 0 个 Block，C++ 最终 checksum 为 `5051.34963`、首值为 `0.02374182269`；独立 NumPy/gguf-py 参考分别为 `5051.34918` 和 `0.0237418152`。模型/input hash、全部中间值和容差保存在 `code/multimodal/results/siglip_block_q8_0_golden.json`。
 
@@ -85,7 +85,7 @@ Chapter01 loader 已增加 Q8_0 的 32 元素/34 字节 raw payload 契约，Cha
 
 真实路径读取 SmolVLM 文本 GGUF 的 metadata 与 Q8_0 `token_embd.weight`，确认语言模型是 `llama` 架构、hidden width 960。BOS `1`、真实 Projector `1x960`、EOS `49279` 组成 `3x960`；C++ 与独立 NumPy 的 sequence checksum 分别为 `-10984.81625` 和 `-10984.768`。语言模型、mmproj、输入 hash 和来源顺序保存在 `multimodal_input_q8_0_golden.json`。
 
-共享 Core 新增 `[tokens, hidden]` 预计算 embedding contract，真实 CPU Context 将 token-prefill 和 embedding-prefill 汇合到同一个 hidden-state 前向。Chapter06 的 Q8_0 已从 block 解码扩展到 reference、scalar fused backend 和统一 policy；真实 SmolVLM 一层路径覆盖 token embedding、Attention、FFN 和 LM Head。
+共享 Core 新增 `[tokens, hidden]` 预计算 embedding contract，真实 CPU Context 将 token-prefill 和 embedding-prefill 汇合到同一个 hidden-state 前向。Chapter05 的 Q8_0 已从 block 解码扩展到 reference、scalar fused backend 和统一 policy；真实 SmolVLM 一层路径覆盖 token embedding、Attention、FFN 和 LM Head。
 
 真实图文 `3x960` 输入经过一层 Decoder 得到 49,280 logits。C++/NumPy checksum 为 `-4338022.483/-4338021.33`，top-1 都是 token `269`，top-1 logit 为 `5.944906712/5.94491386`。
 
@@ -103,7 +103,7 @@ MM-P6D 复用单 tile 路径，按 row-major tiles、overview 的顺序执行 7 
 
 `MultimodalStageRecorder` 固定 Image Decode、Dynamic Tiling、Prompt Tokenization、Vision Encoder、Projector、Embedding Composition 和 Language Prefill 七个阶段。同一时刻只允许一个活动阶段；多个视觉输入的 Encoder/Projector 时间与调用次数累加。`peak_live_bytes` 是请求中间数据估算，不包含模型权重、allocator bookkeeping 或进程 RSS。
 
-Engine 新增 `EmbeddingRequestExecutor`，把 Core `DecoderEmbeddingSequence` 和每请求 `DecoderExecutionContext` 适配为 Chapter05 `RequestModelExecutor`。合成 Runtime 测试验证 3 个 embedding position 经过一次 prefill、一次 decode 后生成 `[2,4]` 并以 EOS 结束；prefill 成功后 embedding storage 归零，position 数与 hidden width 不匹配均被拒绝。
+Engine 新增 `EmbeddingRequestExecutor`，把 Core `DecoderEmbeddingSequence` 和每请求 `DecoderExecutionContext` 适配为 Chapter06 `RequestModelExecutor`。合成 Runtime 测试验证 3 个 embedding position 经过一次 prefill、一次 decode 后生成 `[2,4]` 并以 EOS 结束；prefill 成功后 embedding storage 归零，position 数与 hidden width 不匹配均被拒绝。
 
 真实单 tile 检查已输出七阶段指标：Vision Encoder 约 `2.31s`，Projector 约 `0.010s`，Language Prefill 约 `14.79s`，请求中间数据峰值 `15,728,640` bytes。该单次数据只用于确认计量闭环，并显示当前完整 Decoder 比视觉输入阶段更慢；可比较的重复基线留给 MM-P7C。
 
@@ -111,7 +111,7 @@ Engine 新增 `EmbeddingRequestExecutor`，把 Core `DecoderEmbeddingSequence` �
 
 Engine 默认集成构建现在链接 Chapter09 核心库，但 Chapter09 的单章 demo/test 只在其顶层构建中注册，避免 Engine 重复执行同一批单元测试。新增 `embedding_request_service_test` 通过 `HttpAdapter` 的 Executor Factory 为每个请求创建独立 embedding、Context 和 `EmbeddingRequestExecutor`。
 
-同步 completion 与 `ResponseWriter` SSE 都生成 `[2,4]` 并以 EOS `4` 结束；服务累计 accepted/completed/released=`2`、generated tokens=`4`。合成 prefill 失败返回 HTTP 500，failed/released=`1`。三个 Context 都通过 `weak_ptr` 确认在 terminal release 后销毁。该结果证明 Chapter05/09 可以原样复用，但真实图片 body、视觉管线构建和 SmolVLM token golden 仍属于 MM-P7B-2。
+同步 completion 与 `ResponseWriter` SSE 都生成 `[2,4]` 并以 EOS `4` 结束；服务累计 accepted/completed/released=`2`、generated tokens=`4`。合成 prefill 失败返回 HTTP 500，failed/released=`1`。三个 Context 都通过 `weak_ptr` 确认在 terminal release 后销毁。该结果证明 Chapter06/09 可以原样复用，但真实图片 body、视觉管线构建和 SmolVLM token golden 仍属于 MM-P7B-2。
 
 ## MM-P7B-2 实现结果
 

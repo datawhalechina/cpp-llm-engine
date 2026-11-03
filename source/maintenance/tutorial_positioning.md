@@ -37,8 +37,8 @@
 | Foundation | C++、CMake、测试、CUDA、内存和数据结构前置能力 | 完整模型和 Runtime |
 | Chapter00 | 使用成熟实现建立真实模型推理基线 | 自研引擎实现 |
 | Chapter01-04 | 输入、Tensor、Operator、Attention、FFN 和 Decoder 执行核心 | 请求调度和 HTTP 服务 |
-| Chapter05 | Request、Prefill/Decode、KV、Scheduler 和 Generation Runtime | 网络 transport 和生产集群 |
-| Chapter06 | 量化表示、解码、Quantized Linear 和 backend 选择 | 通用性能结论 |
+| Chapter06 | Request、Prefill/Decode、KV、Scheduler 和 Generation Runtime | 网络 transport 和生产集群 |
+| Chapter05 | 量化表示、解码、Quantized Linear 和 backend 选择 | 通用性能结论 |
 | Chapter07 | Correctness、workload、指标和可复现 benchmark | 无证据的优化建议 |
 | Chapter08 | Profiling、瓶颈归因和 A/B 决策 | 新模型语义 |
 | Chapter09 | ServiceCore、HTTP/SSE、metrics 和资源生命周期 | 分布式服务平台 |
@@ -71,9 +71,9 @@
 | `llama.cpp` | 本地真实推理、GGUF、CPU 与多模态 baseline | Chapter00-01、06、多模态 |
 | Tiny-VLLM | C++/CUDA 纵向实现和零基础 kernel 拆解 | Foundation、Chapter03-06、CUDA |
 | nano-vLLM | 可读的 Python 模型与 Runtime 算法骨架 | Chapter04-05、08 |
-| vLLM | EngineCore、continuous batching、Block KV 和生产执行器 | Chapter05、07-09 |
-| Mini-SGLang | 可读的 Prefill/Decode、Radix Cache 和 overlap scheduling | Chapter05、09 |
-| SGLang | LPM、RadixAttention、HiCache 和生产调度扩展 | Chapter05、09、Reference |
+| vLLM | EngineCore、continuous batching、Block KV 和生产执行器 | Chapter06、07-09 |
+| Mini-SGLang | 可读的 Prefill/Decode、Radix Cache 和 overlap scheduling | Chapter06、09 |
+| SGLang | LPM、RadixAttention、HiCache 和生产调度扩展 | Chapter06、09、Reference |
 | TensorRT-LLM | GPU kernel、量化、engine build 和部署边界 | Chapter03-04、06、08 |
 | DeepInfer | 模型、kernel、通信、调度和集群拓扑的联合设计 | Chapter09、多模态完成后的进阶案例 |
 

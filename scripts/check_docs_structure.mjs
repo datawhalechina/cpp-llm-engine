@@ -66,6 +66,7 @@ for (const root of roots) {
 const chapterDirectories = readdirSync('source', { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && /^chapter\d{2}_/.test(entry.name))
   .map((entry) => entry.name)
+  .filter((entry) => existsSync(join('source', entry, 'intro.md')))
   .sort()
 
 for (const chapterDirectory of chapterDirectories) {

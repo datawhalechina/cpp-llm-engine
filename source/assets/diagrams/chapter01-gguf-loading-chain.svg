@@ -1,1 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 430" role="img" aria-labelledby="title desc"><title id="title">Chapter 01 GGUF loading chain</title><desc id="desc">A four-layer loading chain from GGUF file to model builder.</desc><defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#64748b"/></marker></defs><rect width="1200" height="430" rx="20" fill="#f8fafc"/><text x="40" y="42" font-family="sans-serif" font-size="24" font-weight="700" fill="#172033">Chapter 01 · GGUF 四层加载链</text><text x="40" y="70" font-family="sans-serif" font-size="14" fill="#475569">格式解析只负责把外部模型转换成稳定的内部输入，不把 GGUF 细节扩散到 Runtime</text><g font-family="sans-serif"><rect x="40" y="110" width="250" height="220" rx="16" fill="#e0edff"/><text x="165" y="145" text-anchor="middle" font-size="18" font-weight="700" fill="#1d4ed8">1 · GGUF Reader</text><text x="165" y="178" text-anchor="middle" font-size="14" fill="#334155">文件头 / KV / Tensor Index</text><text x="165" y="210" text-anchor="middle" font-size="13" fill="#475569">输入：文件字节</text><text x="165" y="238" text-anchor="middle" font-size="13" fill="#475569">输出：key/value、offset</text><text x="165" y="282" text-anchor="middle" font-size="13" fill="#1e40af">不负责：模型语义</text><rect x="325" y="110" width="250" height="220" rx="16" fill="#dcfce7"/><text x="450" y="145" text-anchor="middle" font-size="18" font-weight="700" fill="#15803d">2 · Metadata Adapter</text><text x="450" y="178" text-anchor="middle" font-size="14" fill="#334155">架构 key → 统一字段</text><text x="450" y="210" text-anchor="middle" font-size="13" fill="#475569">输入：解析后的 KV</text><text x="450" y="238" text-anchor="middle" font-size="13" fill="#475569">输出：ModelMetadata</text><text x="450" y="282" text-anchor="middle" font-size="13" fill="#166534">不负责：读取 tensor 数据</text><rect x="610" y="110" width="250" height="220" rx="16" fill="#fef3c7"/><text x="735" y="145" text-anchor="middle" font-size="18" font-weight="700" fill="#a16207">3 · Tensor Loader</text><text x="735" y="178" text-anchor="middle" font-size="14" fill="#334155">名称 / Shape / DType / Offset</text><text x="735" y="210" text-anchor="middle" font-size="13" fill="#475569">输入：Tensor Index</text><text x="735" y="238" text-anchor="middle" font-size="13" fill="#475569">输出：Tensor map</text><text x="735" y="282" text-anchor="middle" font-size="13" fill="#854d0e">不负责：决定 Decoder 结构</text><rect x="895" y="110" width="265" height="220" rx="16" fill="#fce7f3"/><text x="1027" y="145" text-anchor="middle" font-size="18" font-weight="700" fill="#be185d">4 · Model Builder</text><text x="1027" y="178" text-anchor="middle" font-size="14" fill="#334155">Metadata + Tensor → Model</text><text x="1027" y="210" text-anchor="middle" font-size="13" fill="#475569">输入：统一内部对象</text><text x="1027" y="238" text-anchor="middle" font-size="13" fill="#475569">输出：Decoder / Runtime</text><text x="1027" y="282" text-anchor="middle" font-size="13" fill="#9d174d">不负责：解析文件格式</text></g><path d="M290 220H325M575 220H610M860 220H895" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/><rect x="40" y="355" width="1120" height="42" rx="10" fill="#fff" stroke="#cbd5e1"/><text x="600" y="382" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="600" fill="#334155">GGUF Reader 与 Metadata Adapter 可替换，Runtime 只依赖 ModelMetadata、Tensor 和 Tokenizer 契约</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 460" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 01 GGUF 四层加载链</title>
+  <desc id="desc">GGUF 读取器、元数据适配器、张量加载器和模型构建器依次把文件字节转换成模型配置、张量映射、LoadedModel 与 DecoderInput。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#64748b"/></marker>
+    <style>
+      .title { font-family: sans-serif; font-size: 25px; font-weight: 700; fill: #172033; }
+      .stage { font-family: sans-serif; font-size: 17px; font-weight: 700; }
+      .label { font-family: sans-serif; font-size: 13px; font-weight: 700; fill: #334155; }
+      .text { font-family: sans-serif; font-size: 12px; fill: #52606d; }
+      .arrow { stroke: #64748b; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="460" rx="22" fill="#f8fafc"/>
+  <text x="42" y="48" class="title">Chapter 01：GGUF 文件怎样变成可执行模型材料</text>
+  <text x="42" y="76" class="text">每一步只转换一种信息，并在进入下一步前检查结构、名称、形状和词表约束</text>
+
+  <g>
+    <rect x="42" y="112" width="246" height="238" rx="16" fill="#e0edff" stroke="#93c5fd"/>
+    <text x="165" y="147" text-anchor="middle" class="stage" fill="#1d4ed8">1 · GGUF 读取器</text>
+    <text x="64" y="184" class="label">输入</text><text x="108" y="184" class="text">文件字节</text>
+    <text x="64" y="218" class="label">输出</text><text x="108" y="218" class="text">文件头 · KV · 张量索引</text>
+    <text x="64" y="252" class="label">检查</text><text x="108" y="252" class="text">魔数 · 版本 · 对齐</text>
+    <rect x="64" y="288" width="202" height="38" rx="9" fill="#fff"/>
+    <text x="165" y="312" text-anchor="middle" class="text">定位元数据与数据区</text>
+
+    <rect x="330" y="112" width="246" height="238" rx="16" fill="#dcfce7" stroke="#86efac"/>
+    <text x="453" y="147" text-anchor="middle" class="stage" fill="#15803d">2 · 元数据适配器</text>
+    <text x="352" y="184" class="label">输入</text><text x="396" y="184" class="text">GGUF 键值</text>
+    <text x="352" y="218" class="label">输出</text><text x="396" y="218" class="text">ModelMetadata · ModelConfig</text>
+    <text x="352" y="252" class="label">检查</text><text x="396" y="252" class="text">架构 · 层数 · 维度 · 词元</text>
+    <rect x="352" y="288" width="202" height="38" rx="9" fill="#fff"/>
+    <text x="453" y="312" text-anchor="middle" class="text">归一化外部配置字段</text>
+
+    <rect x="618" y="112" width="246" height="238" rx="16" fill="#fef3c7" stroke="#fcd34d"/>
+    <text x="741" y="147" text-anchor="middle" class="stage" fill="#a16207">3 · 张量加载器</text>
+    <text x="640" y="184" class="label">输入</text><text x="684" y="184" class="text">张量索引 · 数据区</text>
+    <text x="640" y="218" class="label">输出</text><text x="684" y="218" class="text">张量映射 · 权重数据</text>
+    <text x="640" y="252" class="label">检查</text><text x="684" y="252" class="text">名称 · 形状 · 类型 · 偏移</text>
+    <rect x="640" y="288" width="202" height="38" rx="9" fill="#fff"/>
+    <text x="741" y="312" text-anchor="middle" class="text">保留量化权重原始字节</text>
+
+    <rect x="906" y="112" width="252" height="238" rx="16" fill="#fce7f3" stroke="#f9a8d4"/>
+    <text x="1032" y="147" text-anchor="middle" class="stage" fill="#be185d">4 · 模型构建器</text>
+    <text x="928" y="184" class="label">输入</text><text x="972" y="184" class="text">配置 · 张量映射 · 分词器</text>
+    <text x="928" y="218" class="label">输出</text><text x="972" y="218" class="text">LoadedModel · DecoderInput</text>
+    <text x="928" y="252" class="label">检查</text><text x="972" y="252" class="text">词表 · 结构约束 · 权重映射</text>
+    <rect x="928" y="288" width="208" height="38" rx="9" fill="#fff"/>
+    <text x="1032" y="312" text-anchor="middle" class="text">交付稳定模型对象</text>
+  </g>
+
+  <path d="M288 231H330M576 231H618M864 231H906" class="arrow"/>
+  <rect x="42" y="382" width="1116" height="44" rx="11" fill="#173f3c"/>
+  <text x="600" y="410" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="700" fill="#fff">后续解码器读取 ModelConfig、张量映射和 DecoderInput，不再读取 GGUF 键或文件偏移</text>
+</svg>

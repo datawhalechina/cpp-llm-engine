@@ -4,11 +4,12 @@
 
 ## 内容范围
 
-- [phase1_cpu_learning_plan.md](./phase1_cpu_learning_plan.md)：第一期六个 CPU 任务、可选 GPU 初探和逐任务验收标准
+- [phase1_cpu_learning_plan.md](./phase1_cpu_learning_plan.md)：六个 CPU 主线任务、可选 GPU 初探和逐任务验收标准
 - [learning_record_template.md](./learning_record_template.md)：保存环境、命令、正确性和解释的学习验收记录
 - [cmake_guide.md](./cmake_guide.md)：CMake 常用技巧
 - [setup_cuda.md](./setup_cuda.md)：CUDA 安装与配置
 - [gguf_parser.md](./gguf_parser.md)：GGUF 解析与加载器实现
+- [vllm_serving_baseline.md](./vllm_serving_baseline.md)：可选 vLLM Docker 服务基线，不属于 Chapter00 必读路径
 
 ## 怎么用
 

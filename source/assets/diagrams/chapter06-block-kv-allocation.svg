@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
-  <title id="title">Chapter 05 block KV allocation and reuse</title>
-  <desc id="desc">Request A maps two logical token blocks to non-contiguous physical blocks, then releases them for another request.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 06 Block KV 的控制面与数据面</title>
+  <desc id="desc">Request A 经 BlockTable 映射到非连续物理 block，CpuPagedKvCache 按层保存 K/V payload，Attention 根据页表直接读取，释放后 block 被清空并复用。</desc>
   <defs>
     <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
       <path d="M0 0L9 4.5L0 9Z" fill="#475569"/>
@@ -13,8 +13,8 @@
       .line { stroke: #475569; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
     </style>
   </defs>
-  <rect width="1200" height="520" rx="22" fill="#f8fafc"/>
-  <text x="42" y="48" class="title">Chapter 05 · Block KV 分配、寻址与复用</text>
+  <rect width="1200" height="650" rx="22" fill="#f8fafc"/>
+  <text x="42" y="48" class="title">Chapter 06 · Block KV 控制面与 CPU 数据面</text>
 
   <rect x="42" y="82" width="310" height="270" rx="16" fill="#e8f1ff" stroke="#93c5fd"/>
   <text x="66" y="118" class="label">Request A · logical tokens</text>
@@ -51,12 +51,28 @@
   <path d="M352 217H410" class="line"/>
   <path d="M670 217H730" class="line"/>
 
-  <rect x="42" y="390" width="1116" height="86" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+  <rect x="42" y="382" width="760" height="110" rx="14" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="66" y="416" class="label">CpuPagedKvCache · K/V payload</text>
+  <text x="66" y="444" class="text">keys / values：[layer][physical block][slot][kv head][head dimension]</text>
+  <text x="66" y="470" class="small">write_token 写入预留槽 · 所有层完成后 commit · release 清空物理块</text>
+
+  <rect x="860" y="382" width="298" height="110" rx="14" fill="#e0f2fe" stroke="#7dd3fc"/>
+  <text x="884" y="416" class="label">分页 Attention</text>
+  <text x="884" y="444" class="text">query + BlockTable</text>
+  <text x="884" y="470" class="small">按页读取历史 K/V，不做连续拼接</text>
+
+  <path d="M542 332V377" class="line"/>
+  <path d="M846 352V365H780V377" class="line"/>
+  <path d="M802 437H855" class="line"/>
+
+  <rect x="42" y="530" width="1116" height="86" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
   <g class="text" text-anchor="middle">
-    <text x="172" y="424" class="label">reserve</text><text x="172" y="450">足量才一次性分配</text>
-    <text x="450" y="424" class="label">commit / trim</text><text x="450" y="450">推进成功提交，失败回滚</text>
-    <text x="728" y="424" class="label">locate</text><text x="728" y="450">token → physical block + slot</text>
-    <text x="1006" y="424" class="label">release / reuse</text><text x="1006" y="450">A 释放 0、2，后续请求复用</text>
+    <text x="172" y="564" class="label">reserve</text><text x="172" y="590">足量才一次性分配</text>
+    <text x="450" y="564" class="label">write / commit</text><text x="450" y="590">逐层写入完成后提交</text>
+    <text x="728" y="564" class="label">locate / attention</text><text x="728" y="590">页表定位并直接读取</text>
+    <text x="1006" y="564" class="label">release / reuse</text><text x="1006" y="590">清空 payload，后续请求复用</text>
   </g>
-  <path d="M282 432H330M560 432H608M838 432H886" class="line"/>
+  <path d="M282 572H330" class="line"/>
+  <path d="M560 572H608" class="line"/>
+  <path d="M838 572H886" class="line"/>
 </svg>

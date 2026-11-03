@@ -28,7 +28,7 @@
     <rect x="60" y="220" width="200" height="82" class="box" fill="#dbeafe"/><text x="160" y="253" text-anchor="middle" class="label">Chapter01</text><text x="160" y="278" text-anchor="middle" class="small">Loader / GGUF / Model Build</text>
     <rect x="285" y="220" width="200" height="82" class="box" fill="#dbeafe"/><text x="385" y="253" text-anchor="middle" class="label">Chapter02</text><text x="385" y="278" text-anchor="middle" class="small">View / Storage / contract()</text>
     <rect x="510" y="220" width="200" height="82" class="box" fill="#dbeafe"/><text x="610" y="253" text-anchor="middle" class="label">Chapter03-04</text><text x="610" y="278" text-anchor="middle" class="small">Operator / Decoder Structure</text>
-    <rect x="735" y="220" width="200" height="82" class="box" fill="#dcfce7"/><text x="835" y="253" text-anchor="middle" class="label">Chapter05-06</text><text x="835" y="278" text-anchor="middle" class="small">Runtime / Quantization</text>
+    <rect x="735" y="220" width="200" height="82" class="box" fill="#dcfce7"/><text x="835" y="253" text-anchor="middle" class="label">Chapter05-06</text><text x="835" y="278" text-anchor="middle" class="small">Quantization / Runtime</text>
     <rect x="960" y="220" width="180" height="82" class="box" fill="#fce7f3"/><text x="1050" y="253" text-anchor="middle" class="label">Chapter09</text><text x="1050" y="278" text-anchor="middle" class="small">Service / HTTP</text>
   </g>
   <path d="M160 195 V220" class="line"/>
@@ -36,11 +36,14 @@
   <path d="M610 195 V220" class="line"/>
   <path d="M835 195 V220" class="line"/>
   <path d="M1050 195 V220" class="line"/>
-  <rect x="45" y="370" width="250" height="92" class="box" fill="#f1f5f9"/><text x="170" y="398" text-anchor="middle" class="label">code/engine</text><text x="170" y="424" text-anchor="middle" class="small">1 Model -> N Context</text><text x="170" y="446" text-anchor="middle" class="small">Core Context -> Runtime</text>
-  <rect x="320" y="370" width="250" height="92" class="box" fill="#e0f2fe"/><text x="445" y="398" text-anchor="middle" class="label">code/cuda</text><text x="445" y="424" text-anchor="middle" class="small">Device / Stream / Workspace</text><text x="445" y="446" text-anchor="middle" class="small">cuBLAS / Quantized Linear</text>
-  <rect x="595" y="370" width="250" height="92" class="box" fill="#e8f0fa"/><text x="720" y="398" text-anchor="middle" class="label">code/multimodal</text><text x="720" y="424" text-anchor="middle" class="small">Vision / Projector</text><text x="720" y="446" text-anchor="middle" class="small">Embedding Composition</text>
-  <rect x="870" y="370" width="285" height="92" class="box" fill="#f1f5f9"/><text x="1012" y="405" text-anchor="middle" class="label">source / docs / tests</text><text x="1012" y="432" text-anchor="middle" class="small">正文、SVG、独立构建与回归</text>
-  <path d="M160 302 V340 H170 V370 M610 302 V340 H445 V370 M835 302 V340 H720 V370 M1050 302 V340 H1012 V370" class="dash"/>
-  <text x="600" y="535" text-anchor="middle" class="small">Core 契约对齐 CPU/CUDA backend、教学结构与真实 Model；Context 隔离请求状态。</text>
-  <text x="600" y="562" text-anchor="middle" class="small">Engine 适配执行；多模态扩展输入；Chapter05/09 负责请求推进、终态和资源释放。</text>
+  <rect x="30" y="370" width="205" height="92" class="box" fill="#dcfce7"/><text x="132" y="398" text-anchor="middle" class="label">code/model</text><text x="132" y="424" text-anchor="middle" class="small">1 Model -> N Context</text><text x="132" y="446" text-anchor="middle" class="small">22 层真实 Decoder</text>
+  <rect x="255" y="370" width="205" height="92" class="box" fill="#f1f5f9"/><text x="357" y="398" text-anchor="middle" class="label">code/engine</text><text x="357" y="424" text-anchor="middle" class="small">Model Context 适配</text><text x="357" y="446" text-anchor="middle" class="small">Runtime / Service</text>
+  <rect x="480" y="370" width="205" height="92" class="box" fill="#e0f2fe"/><text x="582" y="398" text-anchor="middle" class="label">code/cuda</text><text x="582" y="424" text-anchor="middle" class="small">Device / Stream</text><text x="582" y="446" text-anchor="middle" class="small">cuBLAS / Kernel</text>
+  <rect x="705" y="370" width="205" height="92" class="box" fill="#e8f0fa"/><text x="807" y="398" text-anchor="middle" class="label">code/multimodal</text><text x="807" y="424" text-anchor="middle" class="small">Vision / Projector</text><text x="807" y="446" text-anchor="middle" class="small">Embedding Composition</text>
+  <rect x="930" y="370" width="240" height="92" class="box" fill="#f1f5f9"/><text x="1050" y="405" text-anchor="middle" class="label">source / docs / tests</text><text x="1050" y="432" text-anchor="middle" class="small">正文、SVG 与回归</text>
+  <path d="M160 302 V340 H132 V370 M610 302 V330 H132 V370 M835 302 V340 H582 V370 M1050 302 V340 H1050 V370" class="dash"/>
+  <path d="M235 416 H255" class="line"/>
+  <path d="M807 462 V490 H132 V462" class="dash"/>
+  <text x="600" y="535" text-anchor="middle" class="small">Chapter01 输出模型资产；Chapter04 解释 Decoder；code/model 保存真实执行实现。</text>
+  <text x="600" y="562" text-anchor="middle" class="small">Engine 适配 Runtime；CUDA 替换 Backend；多模态复用 Model Context。</text>
 </svg>

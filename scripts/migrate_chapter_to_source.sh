@@ -8,7 +8,7 @@ Usage:
 
 Examples:
   scripts/migrate_chapter_to_source.sh chapter03_matmul
-  scripts/migrate_chapter_to_source.sh chapter05_generation
+  scripts/migrate_chapter_to_source.sh chapter06_generation
 
 What it does:
   - Moves docs/<chapter-dir> to source/<chapter-dir> if needed

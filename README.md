@@ -46,7 +46,7 @@ Foundation -> Chapter00 -> Chapter01 -> Chapter02 -> Chapter03 -> Chapter04
     -> Chapter05 -> Chapter06 -> Chapter07 -> Chapter08 -> Chapter09
 ```
 
-Chapter09 位于主线末尾，也可以在完成 Chapter05 后提前进入服务专题。
+Chapter09 位于主线末尾，也可以在完成 Chapter06 后提前进入服务专题。
 
 | 阶段 | 章节 | 产物 |
 | --- | --- | --- |
@@ -56,21 +56,31 @@ Chapter09 位于主线末尾，也可以在完成 Chapter05 后提前进入服�
 | 证据与服务 | Chapter07-09 | Benchmark、Profiling、ServiceCore 和 HTTP/SSE |
 | 可选扩展 | CUDA、多模态 | GPU Backend 或视觉输入接入现有 Runtime |
 
+章节是从输入到服务的纵向学习顺序；数据、算子和系统是贯穿各章的横向观察线。数据层追踪模型与请求状态怎样表示，算子层追踪数值计算怎样执行，系统层追踪多请求怎样调度、分配资源并对外服务。
+
+| 横向视角 | 主要章节 | 重点对象 | 完成后能回答什么 |
+| --- | --- | --- | --- |
+| 数据层 | Chapter01-02、04、06 | GGUF、Tensor/View、Q/K/V、Context、BlockTable | 数据是什么形状、由谁持有、怎样随请求增长 |
+| 算子层 | Chapter03-05、CUDA | MatMul、Attention、FFN、量化 Linear、Backend | 一次计算做什么、由哪个 CPU/GPU 实现执行 |
+| 系统层 | Chapter00、06-09 | Runtime、Scheduler、Benchmark、Profiling、ServiceCore | 请求怎样持续推进、测量、回收并通过 HTTP/SSE 输出 |
+
 ## 建设进度
 
-更新时间：**2026-10-26**。详细实验条件与复现入口见[实验资产表](source/reference/experiment_assets.md)。
+更新时间：**2026-11-03**。详细实验条件与复现入口见[实验资产表](source/reference/experiment_assets.md)。
 
 | 时间 | 里程碑 | 状态 | 可验证产物 |
 | --- | --- | --- | --- |
 | 2026-08 | 教程骨架与 Foundation | 完成 | 章节主线、基础题库、benchmark trace |
-| 2026-10 | CPU v1 | 完成 | TinyLlama 22 层 Decoder、Runtime、HTTP/SSE 和统一验收 |
-| 2026-10 | GPU v1 | 建设中 | CUDA 资源、量化 Linear、RoPE、KV、GQA 和合成 Decoder；下一步接真实模型 |
-| 2026-10 | 多模态 CPU v1 | 完成 | SmolVLM Vision、Projector、Decoder、ServiceCore 和 profiling golden |
-| 2026-10 | 工程验证 | 完成 | 默认 CPU 回归、文档检查和 GitHub Actions CI |
+| 2026-10 | CPU 主线闭环 | 完成 | TinyLlama 22 层 Decoder、Runtime、HTTP/SSE 和真实模型验收 |
+| 2026-10 | 多模态输入闭环 | 完成 | SmolVLM Vision、Projector、Decoder、ServiceCore 和 profiling golden |
+| 2026-11 | CUDA 后端 | 建设中 | CUDA 资源、量化 Linear、RoPE、KV、GQA 和合成 Decoder；下一步接真实模型 |
+| 2026-11 | 工程验证体系 | 完成 | 默认回归、Release 契约、测试资产审计、文档检查和 GitHub Actions CI |
 
 ## 验证、查阅与贡献
 
 默认 CPU 回归不依赖 GGUF、网络下载或 GPU；真实模型、transport、性能和 CUDA 使用各自入口补充证据。GitHub Actions 会在 `main` push 和 pull request 上执行文档检查与默认回归。
+
+测试先检查单个对象的契约和不变量，再检查组件协作与跨章主线；真实模型和性能实验建立在正确性通过之后。图中的每一层对应不同问题，不能用一次端到端成功替代底层契约测试。
 
 术语、公式、实验和框架坐标集中在 [Reference](source/reference/README.md)；修改与提交规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
@@ -79,6 +89,7 @@ npm install
 npm run docs:check-style
 npm run docs:check-links
 npm run test:regression
+npm run test:release-contracts
 ```
 
 ![教程验证证据图](source/assets/diagrams/test-pipeline.svg)

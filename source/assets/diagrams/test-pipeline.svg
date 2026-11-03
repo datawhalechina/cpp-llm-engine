@@ -1,43 +1,65 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
-  <title id="title">Tutorial test pipeline</title>
-  <desc id="desc">Layered default CPU validation plus optional real-model, transport, performance, and CUDA device evidence.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">cpp-llm-engine 分层测试体系</title>
+  <desc id="desc">从对象契约、不变量、组件协作、跨章主线到真实模型和性能实验逐层验证。</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
       <path d="M0,0 L9,3 L0,6 Z" fill="#334155"/>
     </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.12"/>
+    </filter>
   </defs>
-  <rect width="1200" height="560" rx="24" fill="#f8fafc"/>
-  <g font-family="Noto Sans CJK SC">
-    <text x="52" y="54" fill="#0f172a" font-size="28" font-weight="700">从局部行为到教程发布的验证流水线</text>
+  <rect width="1200" height="720" rx="28" fill="#f4f1e8"/>
+  <g font-family="Noto Sans CJK SC, sans-serif">
+    <text x="58" y="58" fill="#172554" font-size="29" font-weight="700">测试体系：先证明约束，再证明整条链路</text>
+    <text x="58" y="90" fill="#475569" font-size="15">下层失败时停止向上验证；性能数据不能替代正确性证据</text>
 
-    <rect x="55" y="155" width="235" height="130" rx="14" fill="#dbeafe" stroke="#334155" stroke-width="2"/>
-    <text x="172" y="198" text-anchor="middle" fill="#0f172a" font-size="17" font-weight="700">单元测试</text>
-    <text x="172" y="228" text-anchor="middle" fill="#475569" font-size="14">shape / state / numeric</text>
-    <text x="172" y="254" text-anchor="middle" fill="#475569" font-size="14">每个 target 的 CTest</text>
+    <g filter="url(#shadow)">
+      <rect x="70" y="130" width="700" height="82" rx="14" fill="#dbeafe" stroke="#1e3a8a" stroke-width="2"/>
+      <text x="98" y="164" fill="#172554" font-size="18" font-weight="700">L0 对象契约</text>
+      <text x="98" y="190" fill="#334155" font-size="14">Tensor 形状、Request 转换、参数与错误路径</text>
+      <text x="742" y="176" text-anchor="end" fill="#1e3a8a" font-size="13">unit / contract</text>
 
-    <rect x="345" y="155" width="235" height="130" rx="14" fill="#dcfce7" stroke="#334155" stroke-width="2"/>
-    <text x="462" y="198" text-anchor="middle" fill="#0f172a" font-size="17" font-weight="700">章节脚本</text>
-    <text x="462" y="228" text-anchor="middle" fill="#475569" font-size="14">build / demo / ctest</text>
-    <text x="462" y="254" text-anchor="middle" fill="#475569" font-size="14">固定临时 build</text>
+      <rect x="110" y="228" width="660" height="82" rx="14" fill="#ccfbf1" stroke="#115e59" stroke-width="2"/>
+      <text x="138" y="262" fill="#134e4a" font-size="18" font-weight="700">L1 不变量</text>
+      <text x="138" y="288" fill="#334155" font-size="14">终态不可恢复、进度单调、块独占、容量守恒</text>
+      <text x="742" y="274" text-anchor="end" fill="#115e59" font-size="13">table / sequence</text>
 
-    <rect x="635" y="155" width="235" height="130" rx="14" fill="#fef3c7" stroke="#334155" stroke-width="2"/>
-    <text x="752" y="198" text-anchor="middle" fill="#0f172a" font-size="17" font-weight="700">全局回归</text>
-    <text x="752" y="228" text-anchor="middle" fill="#475569" font-size="14">Foundation / core / engine</text>
-    <text x="752" y="254" text-anchor="middle" fill="#475569" font-size="14">Chapter01-09 关键入口</text>
+      <rect x="150" y="326" width="620" height="82" rx="14" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
+      <text x="178" y="360" fill="#78350f" font-size="18" font-weight="700">L2 组件协作</text>
+      <text x="178" y="386" fill="#334155" font-size="14">Scheduler、KV Cache、Runtime 的预留、提交与回滚</text>
+      <text x="742" y="372" text-anchor="end" fill="#92400e" font-size="13">component</text>
 
-    <rect x="925" y="155" width="220" height="130" rx="14" fill="#fce7f3" stroke="#334155" stroke-width="2"/>
-    <text x="1035" y="198" text-anchor="middle" fill="#0f172a" font-size="17" font-weight="700">文档检查</text>
-    <text x="1035" y="228" text-anchor="middle" fill="#475569" font-size="14">links / style / build</text>
-    <text x="1035" y="254" text-anchor="middle" fill="#475569" font-size="14">SVG / 源码索引</text>
+      <rect x="190" y="424" width="580" height="82" rx="14" fill="#fee2e2" stroke="#991b1b" stroke-width="2"/>
+      <text x="218" y="458" fill="#7f1d1d" font-size="18" font-weight="700">L3 跨章主线</text>
+      <text x="218" y="484" fill="#334155" font-size="14">Loader → Decoder → Generation → ServiceCore</text>
+      <text x="742" y="470" text-anchor="end" fill="#991b1b" font-size="13">integration</text>
 
-    <path d="M290 220 H340 M580 220 H630 M870 220 H920" stroke="#334155" stroke-width="3" fill="none" marker-end="url(#arrow)"/>
+      <rect x="230" y="522" width="540" height="82" rx="14" fill="#e0e7ff" stroke="#3730a3" stroke-width="2"/>
+      <text x="258" y="556" fill="#312e81" font-size="18" font-weight="700">L4 真实模型</text>
+      <text x="258" y="582" fill="#334155" font-size="14">TinyLlama token、logits、生成结果与 HTTP/SSE</text>
+      <text x="742" y="568" text-anchor="end" fill="#3730a3" font-size="13">real-model</text>
+    </g>
 
-    <rect x="345" y="330" width="525" height="82" rx="14" fill="#e0f2fe" stroke="#334155" stroke-width="2"/>
-    <text x="607" y="362" text-anchor="middle" fill="#0f172a" font-size="17" font-weight="700">可选能力验证</text>
-    <text x="607" y="390" text-anchor="middle" fill="#475569" font-size="14">real-model / transport / performance / CUDA device CTest（不进入默认回归）</text>
-    <path d="M462 285 V310 H607 V325" stroke="#64748b" stroke-width="2" stroke-dasharray="7 6" fill="none" marker-end="url(#arrow)"/>
+    <path d="M810 171 H850" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <rect x="862" y="128" width="275" height="184" rx="16" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+    <text x="888" y="163" fill="#0f172a" font-size="18" font-weight="700">默认回归</text>
+    <text x="888" y="194" fill="#475569" font-size="14">• CTest 退出码</text>
+    <text x="888" y="221" fill="#475569" font-size="14">• 命名用例与失败位置</text>
+    <text x="888" y="248" fill="#475569" font-size="14">• 文档、链接、源码头检查</text>
+    <text x="888" y="282" fill="#1e3a8a" font-size="13">npm run test:regression</text>
 
-    <text x="600" y="475" text-anchor="middle" fill="#0f172a" font-size="17" font-weight="700">通过标准</text>
-    <text x="600" y="508" text-anchor="middle" fill="#475569" font-size="14">正确性先通过；性能结果保存条件；文档入口可点击；空白和头注释检查无误</text>
+    <path d="M810 465 H850" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+    <rect x="862" y="374" width="275" height="230" rx="16" fill="#fff7ed" stroke="#c2410c" stroke-width="2"/>
+    <text x="888" y="409" fill="#7c2d12" font-size="18" font-weight="700">可选证据</text>
+    <text x="888" y="440" fill="#475569" font-size="14">• GGUF 真实模型</text>
+    <text x="888" y="467" fill="#475569" font-size="14">• CUDA 设备测试</text>
+    <text x="888" y="494" fill="#475569" font-size="14">• HTTP transport</text>
+    <text x="888" y="521" fill="#475569" font-size="14">• Benchmark / Profiling</text>
+    <line x1="888" y1="548" x2="1110" y2="548" stroke="#fdba74" stroke-width="2"/>
+    <text x="888" y="578" fill="#9a3412" font-size="13">前提：L0-L3 正确性通过</text>
+
+    <rect x="70" y="645" width="1067" height="42" rx="12" fill="#172554"/>
+    <text x="603" y="672" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="700">失败定位顺序：对象契约 → 不变量 → 组件事务 → 跨章接口 → 外部环境与性能</text>
   </g>
 </svg>

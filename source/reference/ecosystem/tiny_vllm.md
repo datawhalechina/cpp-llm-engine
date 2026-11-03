@@ -16,5 +16,5 @@ Tiny-VLLM 采用线性模块目录；本教程额外拆出 Loader、Tensor/View�
 
 - Foundation：CUDA thread/block、内存和最小 kernel
 - Chapter03-04：GEMM、RoPE、Attention 与 backend
-- Chapter05-06：KV、分页管理和量化执行
+- Chapter05-06：量化执行、KV 和分页管理
 - `code/cuda`：单卡 CUDA 纵向切片

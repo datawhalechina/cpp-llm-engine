@@ -13,8 +13,8 @@ This tutorial moves along one inference-engine main line instead of being a loos
 | Stage | Main responsibility |
 | --- | --- |
 | `chapter01` - `chapter03` | inputs, tensor semantics, and operator boundaries |
-| `chapter04` - `chapter05` | structure and runtime |
-| `chapter06` | representation and cost |
+| `chapter04` - `chapter06` | structure and runtime |
+| `chapter05` | representation and cost |
 | `chapter07` | verification and evidence |
 
 After `chapter07`, continue to profiling and serving, then use `reference` and `guides` as needed:
@@ -37,7 +37,7 @@ If you want the shortest route map, start from [the English entry](/en/README).
 ## Recommended path
 
 1. Start from [README.md](README) to see the English entry.
-2. If your background is thin, read [foundation/README.md](foundation/README) first.
+2. If your background is thin, read [Foundation](foundation/intro) first.
 3. If you want a runnable baseline first, start with [chapter00_quickstart](chapter00_quickstart/intro).
 4. If you need engineering help, open [guides/README.md](guides/README).
 5. If you want design context, open [reference/README.md](reference/README).
@@ -50,7 +50,7 @@ If you want the shortest route map, start from [the English entry](/en/README).
 
 ## Where to look next
 
-- [foundation/README.md](foundation/README)
+- [Foundation](foundation/intro)
 - [chapter00_quickstart](chapter00_quickstart/intro)
 - [guides/README.md](guides/README)
 - [reference/README.md](reference/README)

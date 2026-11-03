@@ -67,8 +67,8 @@ benchmark 是证据，profiling 是证据说明书。
 | --- | --- | --- |
 | `chapter07_benchmark` | 正确性、benchmark、结果记录 | 为什么快、为什么慢 |
 | `chapter08_profiling` | profiling、A/B 对比、优化闭环 | 把瓶颈解释变成可执行优化流程 |
-| `chapter05_generation` | 生成 runtime 骨架 | runtime 内部哪个环节在吃时间 |
-| `chapter06_quantization` | 表示和成本变化 | 误差和成本变化到底落在哪一层 |
+| `chapter06_generation` | 生成 runtime 骨架 | runtime 内部哪个环节在吃时间 |
+| `chapter05_quantization` | 表示和成本变化 | 误差和成本变化到底落在哪一层 |
 
 profiling 是把 benchmark 的结论变成下一步优化动作的桥梁。
 

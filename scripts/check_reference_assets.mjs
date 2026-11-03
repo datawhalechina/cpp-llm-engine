@@ -88,11 +88,11 @@ const requiredTerms = [
   '模型元数据',
   '注意力',
   '键值缓存',
-  'Token 预算',
-  '首 token 延迟',
+  '词元预算',
+  '首词元延迟',
   '准入控制',
   '多模态推理',
-  '黄金结果',
+  '基准结果',
 ]
 for (const term of requiredTerms) {
   if (!termSet.has(term)) findings.push(`${glossaryFile}: missing required term ${term}`)
@@ -104,8 +104,8 @@ const chapterSlugs = [
   'chapter02_tensor_ops',
   'chapter03_matmul',
   'chapter04_attention',
-  'chapter05_generation',
-  'chapter06_quantization',
+  'chapter06_generation',
+  'chapter05_quantization',
   'chapter07_benchmark',
   'chapter08_profiling',
   'chapter09_serving',

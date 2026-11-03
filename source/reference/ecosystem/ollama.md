@@ -21,5 +21,5 @@
 `Ollama` 主要对应教程里的这些章节：
 
 - `chapter00_quickstart`
-- `chapter05_generation`
+- `chapter06_generation`
 - `chapter07_benchmark`

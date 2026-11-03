@@ -44,7 +44,7 @@ view 保存的是 shape、offset、stride 和 storage handle，不应该单独�
 
 - `chapter01` 定义权重和 Tensor 的 storage 入口
 - `chapter02` 定义 view、reshape、slice 和共享存储
-- `chapter05` 将相同的生命周期思想扩展到 Request token history、模型 Context 和 block ownership
+- `chapter06` 将相同的生命周期思想扩展到 Request token history、模型 Context 和 block ownership
 
 ## 4. 请求级历史状态
 
@@ -128,7 +128,7 @@ sequenceDiagram
 对应验证入口：
 
 - `chapter02`：共享 storage、reshape、slice 测试
-- `chapter05`：KV Cache、Request、scheduler 和 streaming 测试
+- `chapter06`：KV Cache、Request、scheduler 和 streaming 测试
 - `chapter07`：benchmark 中的内存分配、释放和阶段计时
 - `chapter08`：内存热点、带宽和 A/B 归因
 - Foundation：`FQ01`、`FQ03`、`FQ05`、`FQ08`
@@ -139,7 +139,7 @@ sequenceDiagram
 
 - `chapter01` 先建立权重 storage
 - `chapter02` 再建立 view 和共享存储
-- `chapter05` 把生命周期扩展到请求和 KV Cache
+- `chapter06` 把生命周期扩展到请求和 KV Cache
 - `chapter07` 验证分配与释放是否影响结果和性能
 - `chapter08` 解释内存和带宽是否成为瓶颈
 

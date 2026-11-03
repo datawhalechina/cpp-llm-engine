@@ -201,6 +201,6 @@ If you want the shortest route map, start from [guide.md](/en/guide) or [README.
 - `chapter02_tensor_ops`
 - `chapter03_matmul`
 - `chapter04_attention`
-- `chapter05_generation`
-- `chapter06_quantization`
+- `chapter06_generation`
+- `chapter05_quantization`
 - `chapter07_benchmark`

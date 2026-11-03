@@ -46,7 +46,7 @@ This tutorial is designed to teach both sides together, but the main line focuse
 ## Start here
 
 1. Read [guide.md](/en/guide) first if you want a route map.
-2. Read [foundation/README.md](/en/foundation/README) if you need background.
+2. Read [Foundation](/en/foundation/intro) if you need background.
 3. Open [chapter00_quickstart](/en/chapter00_quickstart/intro) when you want the first runnable baseline.
 4. Use [guides/README.md](/en/guides/README) for build or environment help.
 5. Use [reference/README.md](/en/reference/README) when you need concept mapping or ecosystem context.
@@ -60,8 +60,8 @@ This tutorial is designed to teach both sides together, but the main line focuse
 - chapter02_tensor_ops
 - chapter03_matmul
 - chapter04_attention
-- chapter05_generation
-- chapter06_quantization
+- chapter05_quantization
+- chapter06_generation
 - chapter07_benchmark
 
 ## Reference Layers

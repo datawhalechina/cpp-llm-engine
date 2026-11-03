@@ -78,7 +78,7 @@ git --version
 - 如果你当前只是验证代码结构，先把编译和测试链路跑通
 - 如果你后面要对比 GPU 版本，再回头补 CUDA 配置
 - 当前教程主线没有任何章节把 CUDA 作为绝对前置条件
-- `chapter00`、`chapter01`、`chapter02`、`chapter04`、`chapter05`、`chapter06`、`chapter07` 都可以先用 CPU 路径建立可验证基线
+- `chapter00`、`chapter01`、`chapter02`、`chapter04`、`chapter06`、`chapter05`、`chapter07` 都可以先用 CPU 路径建立可验证基线
 
 更明确地说：
 
@@ -137,8 +137,8 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON
 - `chapter02_tensor_ops`：CPU 就够
 - `chapter03_matmul`：CPU 能学会接口和基线，CUDA 用于加速对比
 - `chapter04_attention`：CPU 能学会结构，CUDA 不是硬前置
-- `chapter05_generation`：CPU 能跑通生成链路，CUDA 用于后续优化
-- `chapter06_quantization`：CPU 可以理解原理，GPU 场景更适合做性能对照
+- `chapter06_generation`：CPU 能跑通生成链路，CUDA 用于后续优化
+- `chapter05_quantization`：CPU 可以理解原理，GPU 场景更适合做性能对照
 - `chapter07_benchmark`：CPU 可以完成正确性与基础对照，GPU 用于性能评估
 
 ## 11. 哪些地方必须要 CUDA
@@ -149,7 +149,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON
 - 你可以先把 CPU 版本跑通，再考虑 GPU 加速
 - 只有当你要做 GPU 加速实验、对照 GPU 路径，或者尝试 CUDA 相关优化时，才需要真正启用 CUDA
 
-现有 CUDA 实现集中在 `code/cuda`，通过独立脚本显式构建和运行；Chapter03、Chapter06 的 CPU 默认脚本不会自动启用它。后续 Attention、device KV 和 GPU Decoder 也应继续在对应 README 与章节导读中标出运行条件。
+现有 CUDA 实现集中在 `code/cuda`，通过独立脚本显式构建和运行；Chapter03、Chapter05 的 CPU 默认脚本不会自动启用它。后续 Attention、device KV 和 GPU Decoder 也应继续在对应 README 与章节导读中标出运行条件。
 
 ## 12. 验证清单
 

@@ -17,9 +17,9 @@ npm run test:regression
 回归通过后，按下面的顺序开始学习：
 
 1. 运行 `bash code/chapter00_quickstart/run.sh`，建立真实推理基线。
-2. C++、CMake 或测试基础不足时，按需学习 [Foundation](source/foundation/README.md)。
+2. C++、CMake 或测试基础不足时，按需学习 [Foundation](source/foundation/intro.md)。
 3. 按 Chapter 01 到 Chapter 09 完成 CPU 主线。
-4. 需要阶段任务时，使用[第一期 CPU 学习计划](source/guides/phase1_cpu_learning_plan.md)。
+4. 需要按产物分解主线时，使用 [CPU 六任务学习计划](source/guides/phase1_cpu_learning_plan.md)。
 5. CPU 基线稳定后，再选择 CUDA 或多模态扩展。
 
 ## 选择学习路线
@@ -28,7 +28,7 @@ npm run test:regression
 | --- | --- | --- |
 | 完整 CPU 主线 | Foundation（按需）→ Chapter00 → Chapter01-09 | 默认回归通过，能解释从权重到服务的完整链路 |
 | 引擎执行核心 | Chapter00 → Chapter01-06 | 能连接 Tensor、Operator、Decoder、Runtime 和量化表示 |
-| Runtime 与服务 | Chapter05 → Chapter07-09 | 能运行多请求、benchmark、profiling 和最小服务闭环 |
+| Runtime 与服务 | Chapter06 → Chapter07-09 | 能运行多请求、benchmark、profiling 和最小服务闭环 |
 | GPU 扩展 | 先完成 CPU 执行核心 → `code/cuda` | CPU/CUDA 数值对照和设备测试通过 |
 | 多模态扩展 | 先完成 CPU Decoder → `code/multimodal` | 图像输入可以转换并接入已有 LLM Runtime |
 
@@ -42,8 +42,8 @@ npm run test:regression
 | Chapter02 | 共享 Storage 的 Tensor view | `bash code/chapter02_tensor_ops/scripts/run.sh` |
 | Chapter03 | 可验证的 CPU MatMul backend | `bash code/chapter03_matmul/scripts/run.sh` |
 | Chapter04 | Attention、FFN 与单层 Decoder | `bash code/chapter04_attention/scripts/run.sh` |
-| Chapter05 | Prefill、Decode、KV Cache 与 Scheduler | `bash code/chapter05_generation/scripts/run.sh` |
-| Chapter06 | Q4_K/Q6_K 量化 Linear | `bash code/chapter06_quantization/scripts/run.sh` |
+| Chapter05 | Q4_K/Q6_K 量化 Linear | `bash code/chapter05_quantization/scripts/run.sh` |
+| Chapter06 | Prefill、Decode、KV Cache 与 Scheduler | `bash code/chapter06_generation/scripts/run.sh` |
 | Chapter07 | 可重复 benchmark 和结果文件 | `bash code/chapter07_benchmark/scripts/run.sh` |
 | Chapter08 | profiling、hotspot 与 A/B 判断 | `bash code/chapter08_profiling/scripts/run.sh` |
 | Chapter09 | ServiceCore、HTTP/SSE 与 metrics | `bash code/chapter09_serving/scripts/run.sh` |
@@ -58,7 +58,7 @@ npm run test:regression
 | --- | --- | --- |
 | CUDA | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备资源、cuBLAS、量化 Linear、RoPE、连续 KV、GQA 和合成 Decoder |
 | Engine 集成 | `bash code/engine/scripts/run.sh` | 章节组件到统一 Engine 的集成与测试 |
-| CPU v1 验收 | `bash scripts/run_cpu_v1_acceptance.sh` | 第一期六个 CPU 学习任务 |
+| 真实 CPU 全链路验收 | `bash scripts/run_cpu_v1_acceptance.sh` | 六个 CPU 学习任务及真实模型服务闭环 |
 | 多模态 | `bash code/multimodal/scripts/run.sh` | SmolVLM CPU 输入、Vision、Projector 和 Decoder golden |
 
 真实 TinyLlama GPU Decoder 仍在建设，不应把当前合成 Decoder 测试描述成完整 GPU 端到端推理。

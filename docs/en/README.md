@@ -26,7 +26,7 @@ This tutorial teaches both sides together, but the main line focuses on the engi
 ## Start here
 
 1. Read [guide.md](guide) first if you want a route map.
-2. Read [foundation/README.md](foundation/README) if you need background.
+2. Read [Foundation](foundation/intro) if you need background.
 3. Open [chapter00_quickstart](chapter00_quickstart/intro) when you want the first runnable baseline.
 4. Use [guides/README.md](guides/README) for build or environment help.
 5. Use [reference/README.md](reference/README) when you need concept mapping or ecosystem context.
@@ -35,8 +35,8 @@ This tutorial teaches both sides together, but the main line focuses on the engi
 ## Coverage status
 
 - English navigation and entry pages: available
-- Chapter intros and summaries: rolling out in Phase 1
-- Full chapter body translation: planned for later phases
+- Selected chapter introductions: available
+- The Chinese source remains authoritative while full chapter translation is incomplete
 
 ## Main line
 
@@ -46,8 +46,8 @@ This tutorial teaches both sides together, but the main line focuses on the engi
 - chapter02_tensor_ops
 - chapter03_matmul
 - chapter04_attention
-- chapter05_generation
-- chapter06_quantization
+- chapter05_quantization
+- chapter06_generation
 - chapter07_benchmark
 
 ## Notes

@@ -5,10 +5,11 @@ import { join } from 'node:path'
 
 const roots = ['source/chapter00_quickstart', 'source/chapter01_tensor_loader',
   'source/chapter02_tensor_ops', 'source/chapter03_matmul', 'source/chapter04_attention',
-  'source/chapter05_generation', 'source/chapter06_quantization', 'source/chapter07_benchmark',
+  'source/chapter05_quantization', 'source/chapter06_generation', 'source/chapter07_benchmark',
   'source/chapter08_profiling', 'source/chapter09_serving', 'source/foundation',
   'source/guides', 'source/reference', 'docs/code', 'exercises/foundation']
 const entryFiles = ['README.md', 'USAGE.md', 'docs/README.md', 'docs/index.md', 'docs/guide.md']
+const chineseFirstTitleRoots = roots.slice(0, 5)
 const patterns = [
   /##\s+这一页要解决什么/,
   /##\s+本节概览/,
@@ -45,6 +46,10 @@ for (const file of files) {
   lines.forEach((line, index) => {
     if (patterns.some((pattern) => pattern.test(line))) {
       findings.push(`${file}:${index + 1}: ${line.trim()}`)
+    }
+    if (chineseFirstTitleRoots.some((root) => file.startsWith(`${root}/`)) &&
+        /^#\s+\d+\.\d+\s+[A-Za-z]/.test(line)) {
+      findings.push(`${file}:${index + 1}: chapter title must put the Chinese concept first`)
     }
   })
 }

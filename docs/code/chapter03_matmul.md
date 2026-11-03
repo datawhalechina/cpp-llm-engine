@@ -23,7 +23,8 @@
 | --- | --- |
 | <a href="/_code/chapter03_matmul/src/matrix.cpp"><code>src/matrix.cpp</code></a> | CPU reference |
 | <a href="/_code/chapter03_matmul/examples/main_matmul.cpp"><code>examples/main_matmul.cpp</code></a> | 示例入口 |
-| <a href="/_code/chapter03_matmul/tests/chapter03_matmul_test.cpp"><code>tests/chapter03_matmul_test.cpp</code></a> | 章节测试 |
+| <a href="/_code/chapter03_matmul/tests/chapter03_matmul_test.cpp"><code>tests/chapter03_matmul_test.cpp</code></a> | Matrix 数值、边界和 Backend 失败原子性 |
+| <a href="/_code/chapter03_matmul/tests/chapter02_tensor_matmul_integration_test.cpp"><code>tests/chapter02_tensor_matmul_integration_test.cpp</code></a> | Tensor View、显式连续化和跨章适配契约 |
 | <a href="/_code/chapter03_matmul/scripts/run.sh"><code>scripts/run.sh</code></a> | 运行脚本 |
 
 ## 对应文档

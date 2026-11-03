@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 06 真实模型批量解码执行路径</title>
+  <desc id="desc">两个请求经过位置校验后共享只读模型权重。每层先合并 QKV 量化 Linear，再由独立 Context 执行 RoPE、Attention 和连续 KV 读写，随后合并输出投影与 FFN，最终通过批量 LM Head 分别返回 logits；失败时所有 Context 回滚。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#475569"/></marker>
+    <style>
+      .title { font-family: "Noto Sans CJK SC"; font-size: 26px; font-weight: 700; fill: #172033; }
+      .label { font-family: "Noto Sans CJK SC"; font-size: 17px; font-weight: 700; fill: #172033; }
+      .text { font-family: "Noto Sans CJK SC"; font-size: 14px; fill: #334155; }
+      .small { font-family: "Noto Sans CJK SC"; font-size: 13px; fill: #475569; }
+      .line { stroke: #475569; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="760" rx="22" fill="#f8fafc"/>
+  <text x="42" y="48" class="title">Chapter 06 · 两个真实 Context 怎样完成一次 batch decode</text>
+  <text x="42" y="76" class="small">共享模型权重，独立 position 与连续 KV；以下层内结构按 layer 0 → 21 顺序重复</text>
+
+  <rect x="54" y="108" width="300" height="82" rx="14" fill="#e8f1ff" stroke="#93c5fd"/>
+  <text x="78" y="140" class="label">Request A</text><text x="78" y="168" class="text">token A + expected position A</text>
+  <rect x="846" y="108" width="300" height="82" rx="14" fill="#e0f2fe" stroke="#7dd3fc"/>
+  <text x="870" y="140" class="label">Request B</text><text x="870" y="168" class="text">token B + expected position B</text>
+  <rect x="400" y="105" width="400" height="90" rx="16" fill="#ede9fe" stroke="#a78bfa"/>
+  <text x="600" y="139" text-anchor="middle" class="label">批量入口与前置校验</text>
+  <text x="600" y="166" text-anchor="middle" class="small">decode_batch · Context 唯一 · position 一致</text>
+  <path d="M354 149H395" class="line"/><path d="M846 149H805" class="line"/>
+
+  <rect x="170" y="230" width="360" height="82" rx="15" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="350" y="263" text-anchor="middle" class="label">共享只读 Model</text>
+  <text x="350" y="289" text-anchor="middle" class="small">22 层量化权重 · RMSNorm · LM Head</text>
+  <rect x="670" y="230" width="360" height="82" rx="15" fill="#ecfdf5" stroke="#86efac"/>
+  <text x="850" y="263" text-anchor="middle" class="label">独立 Context A / B</text>
+  <text x="850" y="289" text-anchor="middle" class="small">position · 每层连续 K/V · profile</text>
+  <path d="M600 195V211H350V225" class="line"/><path d="M600 195V211H850V225" class="line"/>
+  <path d="M350 312V343" class="line"/><path d="M850 312V343" class="line"/>
+
+  <rect x="42" y="348" width="1116" height="260" rx="18" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="66" y="382" class="label">每个 Decoder Layer 重复的批量与独立阶段</text>
+  <text x="66" y="406" class="small">scalar 后端合并多行；AVX2 policy 当前逐行兼容执行</text>
+  <rect x="68" y="446" width="220" height="94" rx="14" fill="#fef3c7" stroke="#fbbf24"/>
+  <text x="178" y="478" text-anchor="middle" class="label">Batch Q / K / V</text>
+  <text x="178" y="506" text-anchor="middle" class="text">LinearBatchRequest</text><text x="178" y="528" text-anchor="middle" class="small">输入两行激活</text>
+  <circle cx="322" cy="493" r="6" fill="#64748b"/>
+  <path d="M288 493H311" class="line"/><path d="M322 493V450H354" class="line"/><path d="M322 493V552H354" class="line"/>
+  <rect x="360" y="420" width="285" height="82" rx="14" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="502" y="451" text-anchor="middle" class="label">Context A Attention</text><text x="502" y="478" text-anchor="middle" class="small">RoPE · score · 连续 KV A</text>
+  <rect x="360" y="522" width="285" height="82" rx="14" fill="#e0f2fe" stroke="#7dd3fc"/>
+  <text x="502" y="553" text-anchor="middle" class="label">Context B Attention</text><text x="502" y="580" text-anchor="middle" class="small">RoPE · score · 连续 KV B</text>
+  <path d="M645 461H682V493H711" class="line"/><path d="M645 563H682V493H711" class="line"/><circle cx="682" cy="493" r="6" fill="#64748b"/>
+  <rect x="717" y="446" width="250" height="94" rx="14" fill="#fef3c7" stroke="#fbbf24"/>
+  <text x="842" y="477" text-anchor="middle" class="label">Batch Output + FFN</text>
+  <text x="842" y="505" text-anchor="middle" class="text">out · gate · up · down</text><text x="842" y="528" text-anchor="middle" class="small">再拆回两行 hidden</text>
+  <rect x="1005" y="446" width="128" height="94" rx="14" fill="#ede9fe" stroke="#a78bfa"/>
+  <text x="1069" y="477" text-anchor="middle" class="label">下一层</text><text x="1069" y="505" text-anchor="middle" class="text">layer + 1</text><text x="1069" y="528" text-anchor="middle" class="small">直到 21</text>
+  <path d="M967 493H1000" class="line"/>
+
+  <rect x="260" y="644" width="440" height="72" rx="15" fill="#fef3c7" stroke="#fbbf24"/>
+  <text x="480" y="674" text-anchor="middle" class="label">Batch LM Head</text><text x="480" y="699" text-anchor="middle" class="small">两行 hidden → 两行 logits</text>
+  <path d="M842 540V626H480V639" class="line"/>
+  <text x="827" y="616" text-anchor="end" class="small">layer 21 完成后进入 LM Head</text>
+  <rect x="770" y="632" width="376" height="96" rx="15" fill="#ecfdf5" stroke="#86efac"/>
+  <text x="794" y="663" class="label">提交或整批回滚</text><text x="794" y="690" class="text">成功：分别提交 A / B position 与 logits</text>
+  <text x="794" y="714" class="small">失败：恢复两个 Context 的 position、KV 长度和统计</text>
+  <path d="M700 680H765" class="line"/>
+</svg>

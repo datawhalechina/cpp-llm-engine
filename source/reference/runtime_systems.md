@@ -92,8 +92,8 @@ backpressure 解决的是：
 
 | 章节 | 教程实现 | 生产系统常见扩展 |
 | --- | --- | --- |
-| `chapter05_generation` | generation runtime、chunked prefill、基础公平性、token/block-budget batch | 抢占、优先级和并行 batch executor |
-| `chapter06_quantization` | 稳定 runtime 上的表示变化 | 资源边界和调度边界继续保持清楚 |
+| `chapter06_generation` | generation runtime、chunked prefill、基础公平性、token/block-budget batch | 抢占、优先级和并行 batch executor |
+| `chapter05_quantization` | 稳定 runtime 上的表示变化 | 资源边界和调度边界继续保持清楚 |
 | `chapter07_benchmark` | 验证和结果记录 | 运行时缺口对应的性能和稳定性问题 |
 | `chapter09_serving` | waiting/running 队列、`dispatch_step()`、Block KV ownership、终态释放 | device K/V payload、抢占和业务优先级 |
 
@@ -101,9 +101,9 @@ backpressure 解决的是：
 
 ## 8. 使用顺序
 
-- 先完成 `chapter05_generation` 的主线阅读
+- 先完成 `chapter06_generation` 的主线阅读
 - 再回到这里确认真实 serving runtime 还缺什么
 - 再根据系统缺口决定后续先补调度、内存还是服务化
 
 如果只想抓最关键的结论，记住一句话就够了：  
-`chapter05` 解决“能持续生成”，运行时系统参考页补充“能持续服务”。
+`chapter06` 解决“能持续生成”，运行时系统参考页补充“能持续服务”。

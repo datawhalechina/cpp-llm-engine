@@ -11,7 +11,7 @@
 - Prefill 与 Decode 怎样共享执行器又保持不同 workload
 - Prefix caching、抢占和恢复需要增加哪些状态与资源约束
 
-本教程用 Chapter05 的 CPU Runtime 固定请求推进语义，用 Chapter09 固定服务生命周期，再用这些对象理解 vLLM 的多进程和 GPU 执行路径。
+本教程用 Chapter06 的 CPU Runtime 固定请求推进语义，用 Chapter09 固定服务生命周期，再用这些对象理解 vLLM 的多进程和 GPU 执行路径。
 
 ## 源码坐标
 
@@ -29,6 +29,6 @@
 ## 对应教程章节
 
 - Chapter04：模型层、Attention backend 和权重映射
-- Chapter05：Request、Scheduler、Continuous Batching 和 Block KV
+- Chapter06：Request、Scheduler、Continuous Batching 和 Block KV
 - Chapter07-08：服务 workload、吞吐/延迟指标和 profiling
 - Chapter09：EngineCore、worker 与服务入口的分工

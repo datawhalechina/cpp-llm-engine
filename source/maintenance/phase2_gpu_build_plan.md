@@ -71,7 +71,7 @@ GPU 内容优先补入已有职责位置，避免先新增一批平行章节。�
 | --- | --- | --- |
 | 环境、DeviceBuffer、stream/event 小题 | Foundation 与 `exercises/foundation` | 先隔离 CUDA 工程和资源管理能力 |
 | CUDA/cuBLAS backend | Chapter03 | 复用 `MatmulBackend` 和 CPU reference |
-| Quantized Linear CUDA | Chapter06 | 复用 Q4_K/Q6_K 格式与 correctness 基线 |
+| Quantized Linear CUDA | Chapter05 | 复用 Q4_K/Q6_K 格式与 correctness 基线 |
 | Attention、RoPE、device KV | Chapter04 | 保持模型数学和执行 backend 的对照 |
 | GPU Model/Context adapter | Engine | 不让 Runtime 依赖具体模型与设备实现 |
 | GPU benchmark/profiling | Chapter07-08 | 复用 workload、指标和单变量实验方法 |

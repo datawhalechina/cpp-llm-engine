@@ -24,7 +24,8 @@
 | 文件 | 作用 |
 | --- | --- |
 | <a href="/_code/chapter04_attention/examples/main_attention.cpp"><code>examples/main_attention.cpp</code></a> | 示例入口 |
-| <a href="/_code/chapter04_attention/tests/chapter04_attention_test.cpp"><code>tests/chapter04_attention_test.cpp</code></a> | 章节测试 |
+| <a href="/_code/chapter04_attention/tests/chapter04_attention_test.cpp"><code>tests/chapter04_attention_test.cpp</code></a> | Attention、KV Cache 和 Decoder 结构测试 |
+| <a href="/_code/chapter04_attention/tests/chapter02_tensor_attention_integration_test.cpp"><code>tests/chapter02_tensor_attention_integration_test.cpp</code></a> | Tensor View 基础组件与 3D/4D Attention 集成测试 |
 | <a href="/_code/chapter04_attention/scripts/run.sh"><code>scripts/run.sh</code></a> | 运行脚本 |
 
 ## 对应文档

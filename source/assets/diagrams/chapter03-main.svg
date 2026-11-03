@@ -1,1 +1,110 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 330" role="img" aria-labelledby="title desc"><title id="title">Chapter 03 position and contents</title><desc id="desc">Operator semantics use an implemented CPU backend and retain a planned cuBLAS extension point.</desc><defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#6b7280"/></marker></defs><rect width="1200" height="330" rx="18" fill="#f8fafc"/><text x="36" y="38" font-family="sans-serif" font-size="22" font-weight="700" fill="#172033">Chapter 03 · MatMul 与计算后端</text><rect x="36" y="65" width="500" height="225" rx="14" fill="#e8f1ff"/><text x="60" y="98" font-family="sans-serif" font-size="17" font-weight="700" fill="#24548f">整体位置</text><g font-family="sans-serif" font-size="14" text-anchor="middle"><rect x="62" y="145" width="105" height="48" rx="9" fill="#fff"/><text x="114" y="175">Tensor View</text><rect x="205" y="135" width="140" height="68" rx="9" fill="#2563eb"/><text x="275" y="165" fill="#fff">Chapter 03</text><text x="275" y="185" fill="#fff">Operator Boundary</text><rect x="385" y="145" width="115" height="48" rx="9" fill="#fff"/><text x="442" y="175">Decoder</text></g><path d="M167 169H205M345 169H385" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/><rect x="566" y="65" width="598" height="225" rx="14" fill="#fff7ed"/><text x="590" y="98" font-family="sans-serif" font-size="17" font-weight="700" fill="#9a4d13">内容概要</text><g font-family="sans-serif" font-size="14" text-anchor="middle"><rect x="590" y="145" width="105" height="48" rx="9" fill="#fed7aa"/><text x="642" y="175">Operator</text><rect x="720" y="145" width="110" height="48" rx="9" fill="#fed7aa"/><text x="775" y="175">MatMul</text><rect x="850" y="145" width="110" height="48" rx="9" fill="#fed7aa"/><text x="905" y="175">CPU 已实现</text><rect x="980" y="145" width="155" height="48" rx="9" fill="#fde68a"/><text x="1057" y="175" fill="#78350f">cuBLAS 设计</text></g><path d="M695 169H720M830 169H850M960 169H980" stroke="#9a4d13" stroke-width="2" marker-end="url(#a)"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 03 用同一矩阵乘法语义验证 CPU 与 CUDA 执行路径</title>
+  <desc id="desc">Chapter 03 的 A 教学闭环用固定矩阵和 CPU 循环建立正确性；B 真实执行区分主机 TensorViewRef 到 CPU 计算后端，以及设备指针和 CUDA 流到独立 cuBLAS 目标。</desc>
+  <defs>
+    <style>text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif !important; }</style>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#eef6f4"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#52606d"/>
+    </marker>
+    <marker id="arrow-teal" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#0f766e"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="680" rx="24" fill="url(#background)"/>
+  <text x="54" y="55" font-family="Noto Sans SC, sans-serif" font-size="27" font-weight="700" fill="#172033">Chapter 03：同一矩阵乘法语义，两条内存执行路径</text>
+  <text x="54" y="84" font-family="Noto Sans SC, sans-serif" font-size="15" fill="#52606d">CPU 使用 host pointer；可选 cuBLAS 使用 device pointer、stream 和独立执行上下文</text>
+
+  <!-- Position in the learning path -->
+  <rect x="54" y="112" width="1092" height="124" rx="18" fill="#ffffff" stroke="#d8e2e8"/>
+  <text x="78" y="143" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="700" fill="#52606d">在推理引擎中的位置</text>
+  <g font-family="Noto Sans SC, sans-serif" text-anchor="middle">
+    <rect x="102" y="163" width="254" height="50" rx="12" fill="#e8f1f7"/>
+    <text x="229" y="185" font-size="15" font-weight="700" fill="#28536b">Chapter 02</text>
+    <text x="229" y="203" font-size="13" fill="#476878">存储基址与 TensorViewRef</text>
+
+    <rect x="473" y="155" width="254" height="66" rx="13" fill="#0f766e" filter="url(#shadow)"/>
+    <text x="600" y="183" font-size="16" font-weight="700" fill="#ffffff">Chapter 03</text>
+    <text x="600" y="204" font-size="14" fill="#d9fffa">矩阵乘法、算子与后端</text>
+
+    <rect x="844" y="163" width="254" height="50" rx="12" fill="#fff0dc"/>
+    <text x="971" y="185" font-size="15" font-weight="700" fill="#9a4d13">Chapter 04</text>
+    <text x="971" y="203" font-size="13" fill="#8a5b32">线性层、注意力与前馈网络</text>
+  </g>
+  <path d="M356 188 H463" fill="none" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M727 188 H834" fill="none" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- MatMul contract -->
+  <text x="54" y="278" font-family="Noto Sans SC, sans-serif" font-size="18" font-weight="700" fill="#172033">A 教学闭环：固定矩阵与 CPU 正确性</text>
+  <text x="1146" y="278" font-family="Noto Sans SC, sans-serif" font-size="12" text-anchor="end" fill="#64748b">B 真实执行：区分主机视图与设备缓冲区</text>
+
+  <g font-family="Noto Sans SC, sans-serif" text-anchor="middle">
+    <rect x="54" y="302" width="150" height="92" rx="15" fill="#ffffff" stroke="#93b6c8" stroke-width="2"/>
+    <text x="129" y="333" font-size="16" font-weight="700" fill="#28536b">左矩阵 A</text>
+    <text x="129" y="359" font-size="16" font-weight="700" fill="#172033">M 行 × K 列</text>
+    <text x="129" y="380" font-size="12" fill="#52606d">[M,K] · 行优先</text>
+
+    <text x="225" y="355" font-size="27" font-weight="700" fill="#52606d">×</text>
+
+    <rect x="246" y="302" width="150" height="92" rx="15" fill="#ffffff" stroke="#93b6c8" stroke-width="2"/>
+    <text x="321" y="333" font-size="16" font-weight="700" fill="#28536b">右矩阵 B</text>
+    <text x="321" y="359" font-size="16" font-weight="700" fill="#172033">K 行 × N 列</text>
+    <text x="321" y="380" font-size="12" fill="#52606d">[K,N] · 行优先</text>
+
+    <rect x="445" y="294" width="220" height="108" rx="17" fill="#e7f6f3" stroke="#0f766e" stroke-width="2"/>
+    <text x="555" y="329" font-size="16" font-weight="700" fill="#0f5f59">公共 MatMul 语义</text>
+    <text x="555" y="353" font-size="12" fill="#244b49">A[M,K] × B[K,N] = C[M,N]</text>
+    <text x="555" y="377" font-size="12" fill="#52606d">rows · inner · cols</text>
+
+    <rect x="990" y="302" width="156" height="92" rx="15" fill="#fff7ed" stroke="#e58b36" stroke-width="2"/>
+    <text x="1068" y="333" font-size="16" font-weight="700" fill="#9a4d13">输出矩阵 C</text>
+    <text x="1068" y="359" font-size="16" font-weight="700" fill="#172033">M 行 × N 列</text>
+    <text x="1068" y="380" font-size="12" fill="#52606d">[M,N]</text>
+  </g>
+  <path d="M396 348 H435" fill="none" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Parallel backends -->
+  <path d="M665 348 H688 V331 H704" fill="none" stroke="#0f766e" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <path d="M665 348 H688 V419 H704" fill="none" stroke="#0f766e" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <text x="676" y="321" font-family="Noto Sans SC, sans-serif" font-size="12" fill="#0f766e">分开执行</text>
+
+  <g font-family="Noto Sans SC, sans-serif">
+    <rect x="714" y="294" width="226" height="74" rx="14" fill="#e8f1f7" stroke="#79a4ba"/>
+    <text x="736" y="323" font-size="15" font-weight="700" fill="#28536b">Host → CPU backend</text>
+    <text x="736" y="348" font-size="12" fill="#52606d">Matrix / TensorViewRef · 三重循环</text>
+
+    <rect x="714" y="382" width="226" height="74" rx="14" fill="#fff0dc" stroke="#e8a765"/>
+    <text x="736" y="411" font-size="15" font-weight="700" fill="#9a4d13">Device → 独立 cuBLAS target</text>
+    <text x="736" y="436" font-size="12" fill="#6f5438">device pointer + stream · SGEMM</text>
+  </g>
+
+  <!-- Invariants shared by all backends -->
+  <rect x="54" y="490" width="1092" height="92" rx="18" fill="#ffffff" stroke="#d8e2e8"/>
+  <text x="80" y="520" font-family="Noto Sans SC, sans-serif" font-size="14" font-weight="700" fill="#52606d">两个计算后端使用同一验收条件</text>
+  <g font-family="Noto Sans SC, sans-serif" text-anchor="middle">
+    <rect x="318" y="506" width="220" height="58" rx="12" fill="#edf8f6"/>
+    <text x="428" y="530" font-size="13" font-weight="700" fill="#0f5f59">形状一致</text>
+    <text x="428" y="551" font-size="12" fill="#52606d">输出 [M, N]</text>
+
+    <rect x="554" y="506" width="246" height="58" rx="12" fill="#edf8f6"/>
+    <text x="677" y="530" font-size="13" font-weight="700" fill="#0f5f59">数值一致</text>
+    <text x="677" y="551" font-size="12" fill="#52606d">对照 CPU 结果</text>
+
+    <rect x="816" y="506" width="248" height="58" rx="12" fill="#edf8f6"/>
+    <text x="940" y="530" font-size="13" font-weight="700" fill="#0f5f59">失败语义一致</text>
+    <text x="940" y="551" font-size="12" fill="#52606d">非法请求返回 Status</text>
+  </g>
+
+  <path d="M940 331 H966 V348 H980" fill="none" stroke="#e58b36" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M940 419 H966 V348" fill="none" stroke="#e58b36" stroke-width="2"/>
+
+  <rect x="54" y="613" width="1092" height="42" rx="12" fill="#173f3c"/>
+  <text x="600" y="640" font-family="Noto Sans SC, sans-serif" font-size="15" font-weight="700" text-anchor="middle" fill="#ffffff">学习结果：用 CPU 建立正确性基线，再辨认 host 与 device 执行所需的不同资源</text>
+</svg>

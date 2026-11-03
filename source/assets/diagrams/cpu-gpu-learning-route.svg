@@ -21,7 +21,7 @@
   <text x="325" y="282" text-anchor="middle" class="label">CPU 完整学习路线</text>
   <text x="325" y="320" text-anchor="middle" class="small">Chapter02 Tensor view</text>
   <text x="325" y="348" text-anchor="middle" class="small">Chapter03-04 Operator / Decoder</text>
-  <text x="325" y="376" text-anchor="middle" class="small">Chapter05 Runtime / Chapter06 Q4_K</text>
+  <text x="325" y="376" text-anchor="middle" class="small">Chapter05 Q4_K / Chapter06 Runtime</text>
   <text x="325" y="404" text-anchor="middle" class="small">Chapter07 Benchmark / Chapter08 Profiling</text>
   <text x="325" y="432" text-anchor="middle" class="small">Chapter09 CPU Service Core</text>
   <rect x="620" y="245" width="510" height="220" rx="14" fill="#dbeafe" stroke="#334155" stroke-width="2"/>

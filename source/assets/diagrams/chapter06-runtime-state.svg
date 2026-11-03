@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 560" role="img" aria-labelledby="title desc">
-  <title id="title">Chapter 05 runtime request state and resource lifecycle</title>
+  <title id="title">Chapter 06 runtime request state and resource lifecycle</title>
   <desc id="desc">A request moves through admission, chunked prefill with a committed cursor, final logits, decode, streaming output, and terminal cleanup.</desc>
   <defs>
     <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#64748b"/></marker>
@@ -15,7 +15,7 @@
     </style>
   </defs>
   <rect width="1280" height="560" rx="20" fill="#f8fafc"/>
-  <text x="40" y="42" class="title">Chapter 05 · Runtime 状态与资源生命周期</text>
+  <text x="40" y="42" class="title">Chapter 06 · Runtime 状态与资源生命周期</text>
 
   <rect x="40" y="70" width="1200" height="230" rx="16" fill="#eff6ff" stroke="#bfdbfe"/>
   <text x="64" y="104" class="label" fill="#1d4ed8">Request 状态流</text>

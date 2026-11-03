@@ -50,7 +50,7 @@
   <rect x="735" y="305" width="210" height="120" class="box" fill="#e7f3e8"/>
   <text x="760" y="340" class="label">Runtime</text>
   <text x="760" y="373" class="body">Request / KV / Scheduler</text>
-  <text x="760" y="398" class="small">复用 Chapter05</text>
+  <text x="760" y="398" class="small">复用 Chapter06</text>
 
   <rect x="735" y="465" width="210" height="120" class="box" fill="#e7f3e8"/>
   <text x="760" y="500" class="label">Serving</text>

@@ -34,6 +34,6 @@
 
 - `chapter03_matmul`
 - `chapter04_attention`
-- `chapter05_generation`
-- `chapter06_quantization`
+- `chapter06_generation`
+- `chapter05_quantization`
 - `chapter07_benchmark`

@@ -26,11 +26,11 @@ This usually means the CPU path and CUDA path have different prerequisites. Chec
 
 ### 3.1 Why does memory usage keep growing during generation?
 
-The most common reason is that cache, buffer, or intermediate results are not being reused as expected. Check the `KV Cache`, scheduler, and request lifecycle in `chapter05_generation` first.
+The most common reason is that cache, buffer, or intermediate results are not being reused as expected. Check the `KV Cache`, scheduler, and request lifecycle in `chapter06_generation` first.
 
 ### 3.2 Why does quantization still consume a lot of memory?
 
-Quantization usually lowers weight storage cost first, but it does not automatically solve activation, cache, or temporary buffer usage. Check the quantization scope in `chapter06_quantization`, then see whether the runtime still needs optimization.
+Quantization usually lowers weight storage cost first, but it does not automatically solve activation, cache, or temporary buffer usage. Check the quantization scope in `chapter05_quantization`, then see whether the runtime still needs optimization.
 
 ## 4. Verification-related
 

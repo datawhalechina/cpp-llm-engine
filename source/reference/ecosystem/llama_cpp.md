@@ -42,4 +42,4 @@
 
 - `chapter00_quickstart`
 - `chapter01_tensor_loader`
-- `chapter05_generation`
+- `chapter06_generation`

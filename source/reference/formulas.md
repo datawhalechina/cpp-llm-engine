@@ -64,7 +64,7 @@ stride[i] = stride[i + 1] × shape[i + 1]
 storage_index = offset + sum(index[i] × stride[i])
 ```
 
-代码对应：Chapter02 reshape、slice 和共享 Storage。验证重点：view 不复制、offset 正确、越界拒绝。
+代码对应：Chapter02 N 维索引、reshape、slice、transpose 和共享 Storage。验证重点：view 不复制、offset/stride 正确、越界拒绝。
 
 ## Linear 与复杂度
 
@@ -84,7 +84,7 @@ Y: [M, N]
 multiply-add complexity = O(M × N × K)
 ```
 
-代码对应：Chapter03 MatMul、Chapter04 Linear、Chapter06 Quantized Linear 和 CUDA cuBLAS backend。验证重点：shape、row-major 映射、CPU golden 和误差容限。
+代码对应：Chapter03 MatMul、Chapter04 Linear、Chapter05 Quantized Linear 和 CUDA cuBLAS backend。验证重点：shape、row-major 映射、CPU golden 和误差容限。
 
 ## Normalization
 
@@ -111,7 +111,7 @@ rms = sqrt(sum(x[i]^2) / D + epsilon)
 y[i] = x[i] / rms × weight[i]
 ```
 
-代码对应：Chapter01 `RealLlamaCpuModel` 的 Attention/FFN/Final RMSNorm。验证重点：22 层有限值、最终 logits 和 llama.cpp 数值对照。
+代码对应：`code/model` 中 `RealLlamaCpuModel` 的 Attention/FFN/Final RMSNorm，由 Chapter04 讲解。验证重点：22 层有限值、最终 logits 和 llama.cpp 数值对照。
 
 ## Attention、GQA 与 RoPE
 
@@ -125,9 +125,9 @@ Q = X × Wq^T
 K = X × Wk^T
 V = X × Wv^T
 
-Q: [T, Hq, Dh]
-K: [T, Hkv, Dh]
-V: [T, Hkv, Dh]
+Q: [T, Hq, Dh] or [B, T, Hq, Dh]
+K: [T, Hkv, Dh] or [B, T, Hkv, Dh]
+V: [T, Hkv, Dh] or [B, T, Hkv, Dh]
 ```
 
 代码对应：Chapter04 Attention 和 Chapter01 真实 TinyLlama Decoder。
@@ -171,7 +171,7 @@ y[2i]     = x[2i] × cos(theta) - x[2i+1] × sin(theta)
 y[2i + 1] = x[2i] × sin(theta) + x[2i+1] × cos(theta)
 ```
 
-代码对应：Chapter05 `position_encoding` 和 Chapter01 真实 Decoder。验证重点：position 0、不同位置、Q/K 同规则和 rotary dimension。
+代码对应：Chapter06 `position_encoding` 和 Chapter01 真实 Decoder。验证重点：position 0、不同位置、Q/K 同规则和 rotary dimension。
 
 ## FFN
 
@@ -200,7 +200,7 @@ elements = L × 2 × S × Hkv × Dh
 bytes = elements × bytes_per_element
 ```
 
-代码对应：Chapter01 `RealLlamaCpuContext`、Chapter04 连续 KV 和 Chapter05 请求状态。Block KV 只改变分配与映射，不改变逻辑 K/V 元素数。
+代码对应：Model `RealLlamaCpuContext`、Chapter04 连续 KV，以及 Chapter06 `CpuPagedKvCache`。Block KV 改变物理分配与寻址，不改变逻辑 K/V 元素数。
 
 <a id="f-sched-01"></a>
 ### F-SCHED-01 调度预算与 KV Block 数
@@ -216,7 +216,7 @@ required: scheduled_requests <= available_slots
 required: sum(required_blocks[i]) <= free_blocks
 ```
 
-代码对应：Chapter05 `Scheduler`、`KvBlockPool` 和 Chapter09 `ServiceCore::dispatch_step()`。验证重点：预算不足不执行、整除边界、终态释放和 block 复用。
+代码对应：Chapter06 `Scheduler`、`KvBlockPool` 和 Chapter09 `ServiceCore::dispatch_step()`。验证重点：预算不足不执行、整除边界、终态释放和 block 复用。
 
 ## Quantization
 
@@ -230,7 +230,7 @@ symmetric:  x_approx = scale × q
 asymmetric: x_approx = scale × (q - zero_point)
 ```
 
-代码对应：Chapter06 Q4_K/Q6_K reference、fused CPU kernel 和 CUDA dequantize backend。
+代码对应：Chapter05 Q4_K/Q6_K reference、fused CPU kernel 和 CUDA dequantize backend。
 
 <a id="f-quant-02"></a>
 ### F-QUANT-02 压缩率与误差
@@ -243,7 +243,7 @@ absolute_error = abs(reference - actual)
 relative_error = absolute_error / max(abs(reference), epsilon)
 ```
 
-代码对应：Chapter06 block contract 和 correctness 测试。
+代码对应：Chapter05 block contract 和 correctness 测试。
 
 ## CUDA 执行
 
@@ -274,7 +274,7 @@ p[i] = exp(logit[i] / temperature) / sum(exp(logit[j] / temperature))
 greedy_token = argmax(logit)
 ```
 
-代码对应：Chapter05 当前可执行实现为 Greedy；Temperature、Top-K 和 Top-P 仍是扩展项。
+代码对应：Chapter06 当前可执行实现为 Greedy；Temperature、Top-K 和 Top-P 仍是扩展项。
 
 ## Benchmark 与 Serving
 

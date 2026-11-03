@@ -1,63 +1,71 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 590" role="img" aria-labelledby="title desc">
-  <title id="title">Chapter 04 decoder and attention data flow</title>
-  <desc id="desc">A decoder layer combines tensor views, matmul operators, layer normalization, attention, feed-forward network, residual paths, and position or KV boundaries.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 04 单层解码器的双残差数据流</title>
+  <desc id="desc">输入依次经过第一次归一化、注意力和残差相加，再经过第二次归一化、前馈网络和残差相加；教学层与 TinyLlama 使用不同算子，但共享相同骨架。</desc>
   <defs>
-    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#64748b"/></marker>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#52606d"/></marker>
+    <marker id="arrow-orange" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#c45b16"/></marker>
+    <marker id="arrow-teal" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#0f766e"/></marker>
     <style>
-      .title { font: 700 24px sans-serif; fill: #172033; }
-      .label { font: 700 16px sans-serif; }
-      .text { font: 14px sans-serif; }
-      .arrow { stroke: #64748b; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
-      .boundary { stroke: #7c3aed; stroke-width: 2; fill: none; stroke-dasharray: 7 6; }
+      .title { font-family: sans-serif; font-size: 25px; font-weight: 700; fill: #172033; }
+      .label { font-family: sans-serif; font-size: 15px; font-weight: 700; }
+      .text { font-family: sans-serif; font-size: 13px; fill: #52606d; }
+      .light { font-family: sans-serif; font-size: 13px; fill: #fff7ed; }
+      .main { stroke: #52606d; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .residual1 { stroke: #c45b16; stroke-width: 2.7; fill: none; marker-end: url(#arrow-orange); }
+      .residual2 { stroke: #0f766e; stroke-width: 2.7; fill: none; marker-end: url(#arrow-teal); }
     </style>
   </defs>
-  <rect width="1280" height="590" rx="20" fill="#f8fafc"/>
-  <text x="40" y="42" class="title">Chapter 04 · Decoder / Attention 数据流</text>
+  <rect width="1200" height="560" rx="22" fill="#f8fafc"/>
+  <text x="44" y="48" class="title">单层解码器：两次前置归一化，两次残差相加</text>
+  <text x="44" y="76" class="text">沿主路径读取子模块，沿彩色旁路确认每次加法保留的是哪一个 hidden state</text>
 
-  <rect x="40" y="70" width="320" height="470" rx="16" fill="#eff6ff" stroke="#bfdbfe"/>
-  <text x="64" y="104" class="label" fill="#1d4ed8">整体位置</text>
-  <g text-anchor="middle" class="text">
-    <rect x="88" y="145" width="220" height="52" rx="10" fill="#fff" stroke="#64748b" stroke-width="2"/>
-    <text x="198" y="176">Chapter 01 · Weights</text>
-    <rect x="88" y="235" width="220" height="52" rx="10" fill="#fff" stroke="#64748b" stroke-width="2"/>
-    <text x="198" y="266">Chapter 02 · Tensor View</text>
-    <rect x="68" y="325" width="260" height="70" rx="10" fill="#2563eb" stroke="#1d4ed8" stroke-width="2"/>
-    <text x="198" y="354" fill="#fff" font-weight="700">Chapter 04</text><text x="198" y="377" fill="#dbeafe">Decoder Structure</text>
-    <rect x="88" y="445" width="220" height="52" rx="10" fill="#fff" stroke="#64748b" stroke-width="2"/>
-    <text x="198" y="476">Chapter 05 · Runtime</text>
+  <rect x="44" y="106" width="1112" height="292" rx="18" fill="#fffaf5" stroke="#fed7aa"/>
+  <g text-anchor="middle">
+    <rect x="72" y="172" width="96" height="64" rx="12" fill="#fff" stroke="#93b6c8" stroke-width="2"/>
+    <text x="120" y="199" class="label" fill="#28536b">输入 x</text><text x="120" y="220" class="text">[T,D]</text>
+
+    <rect x="204" y="172" width="112" height="64" rx="12" fill="#fff0dc" stroke="#e8a765"/>
+    <text x="260" y="198" class="label" fill="#9a4d13">Norm 1</text><text x="260" y="219" class="text">Pre-Norm</text>
+
+    <rect x="352" y="160" width="136" height="88" rx="13" fill="#c45b16"/>
+    <text x="420" y="196" class="label" fill="#fff">注意力</text><text x="420" y="220" class="light">词元间聚合</text>
+
+    <circle cx="538" cy="204" r="27" fill="#fff" stroke="#c45b16" stroke-width="2"/>
+    <text x="538" y="213" font-family="sans-serif" font-size="27" font-weight="700" fill="#c45b16">+</text>
+
+    <rect x="598" y="172" width="112" height="64" rx="12" fill="#fff0dc" stroke="#e8a765"/>
+    <text x="654" y="198" class="label" fill="#9a4d13">Norm 2</text><text x="654" y="219" class="text">Pre-Norm</text>
+
+    <rect x="746" y="160" width="136" height="88" rx="13" fill="#0f766e"/>
+    <text x="814" y="196" class="label" fill="#fff">FFN</text><text x="814" y="220" class="light">逐词元变换</text>
+
+    <circle cx="932" cy="204" r="27" fill="#fff" stroke="#0f766e" stroke-width="2"/>
+    <text x="932" y="213" font-family="sans-serif" font-size="27" font-weight="700" fill="#0f766e">+</text>
+
+    <rect x="992" y="172" width="112" height="64" rx="12" fill="#e7f6f3" stroke="#0f766e" stroke-width="2"/>
+    <text x="1048" y="199" class="label" fill="#0f5f59">输出 y</text><text x="1048" y="220" class="text">[T,D]</text>
   </g>
-  <path d="M198 197V235M198 287V325M198 395V445" class="arrow"/>
 
-  <rect x="400" y="70" width="840" height="470" rx="16" fill="#fff7ed" stroke="#fed7aa"/>
-  <text x="424" y="104" class="label" fill="#c2410c">单层 Decoder 的闭合数据流</text>
-  <g text-anchor="middle" class="text">
-    <rect x="430" y="160" width="110" height="58" rx="10" fill="#fff" stroke="#64748b" stroke-width="2"/>
-    <text x="485" y="194">hidden state</text>
-    <rect x="575" y="160" width="110" height="58" rx="10" fill="#fed7aa" stroke="#ea580c" stroke-width="2"/>
-    <text x="630" y="194">Pre-LN</text>
-    <rect x="720" y="145" width="160" height="88" rx="10" fill="#f97316" stroke="#c2410c" stroke-width="2"/>
-    <text x="800" y="181" fill="#fff" font-weight="700">Q / K / V</text><text x="800" y="205" fill="#ffedd5">Attention</text>
-    <rect x="915" y="160" width="110" height="58" rx="10" fill="#fed7aa" stroke="#ea580c" stroke-width="2"/>
-    <text x="970" y="194">Residual</text>
-    <rect x="1060" y="160" width="110" height="58" rx="10" fill="#fed7aa" stroke="#ea580c" stroke-width="2"/>
-    <text x="1115" y="194">Pre-LN</text>
-  </g>
-  <path d="M540 189H575M685 189H720M880 189H915M1025 189H1060" class="arrow"/>
+  <path d="M168 204H204M316 204H352M488 204H511M565 204H598M710 204H746M882 204H905M959 204H992" class="main"/>
+  <circle cx="180" cy="204" r="4" fill="#c45b16"/>
+  <path d="M180 204V308H538V231" class="residual1"/>
+  <text x="328" y="300" class="text" fill="#9a4d13">保留 x：h = x + Attention(Norm1(x))</text>
+  <circle cx="580" cy="204" r="4" fill="#0f766e"/>
+  <path d="M580 204V346H932V231" class="residual2"/>
+  <text x="722" y="338" class="text" fill="#0f5f59">保留 h：y = h + FFN(Norm2(h))</text>
 
-  <g text-anchor="middle" class="text">
-    <rect x="520" y="345" width="160" height="72" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
-    <text x="600" y="375" fill="#1e40af" font-weight="700">Residual branch</text><text x="600" y="398" fill="#1e40af">x + attention(x)</text>
-    <rect x="745" y="345" width="160" height="72" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
-    <text x="825" y="375" fill="#1e40af" font-weight="700">FFN</text><text x="825" y="398" fill="#1e40af">Linear → Act → Linear</text>
-    <rect x="970" y="345" width="180" height="72" rx="10" fill="#2563eb" stroke="#1d4ed8" stroke-width="2"/>
-    <text x="1060" y="375" fill="#fff" font-weight="700">Decoder output</text><text x="1060" y="398" fill="#dbeafe">x + attention + ffn</text>
-  </g>
-  <path d="M1115 218V280H600V345M600 417H745M905 381H970" class="arrow"/>
-  <path d="M485 218V290H1060V345" class="arrow"/>
+  <rect x="44" y="426" width="348" height="94" rx="15" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="68" y="456" class="label" fill="#1d4ed8">教学解码器层</text>
+  <text x="68" y="481" class="text">LayerNorm · MHA · ReLU FFN</text>
+  <text x="68" y="503" class="text">无状态前向计算；KV 测试使用独立对象</text>
 
-  <rect x="430" y="465" width="265" height="48" rx="10" fill="#faf5ff" stroke="#a78bfa"/>
-  <text x="562" y="495" text-anchor="middle" class="text" fill="#6d28d9">Position / causal mask 边界</text>
-  <rect x="745" y="465" width="405" height="48" rx="10" fill="#faf5ff" stroke="#a78bfa"/>
-  <text x="947" y="495" text-anchor="middle" class="text" fill="#6d28d9">KV Cache：运行时复用 K / V，不改变层结构</text>
-  <path d="M800 233V465M970 218V465" class="boundary"/>
+  <rect x="426" y="426" width="348" height="94" rx="15" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="450" y="456" class="label" fill="#c2410c">TinyLlama 真实 Block</text>
+  <text x="450" y="481" class="text">RMSNorm · GQA + RoPE · SwiGLU</text>
+  <text x="450" y="503" class="text">量化 Linear 由 Chapter 05 backend 执行</text>
+
+  <rect x="808" y="426" width="348" height="94" rx="15" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="832" y="456" class="label" fill="#047857">请求级执行上下文</text>
+  <text x="832" y="481" class="text">每层 K/V · 位置 · 注意力统计</text>
+  <text x="832" y="503" class="text">状态属于请求，不属于共享解码器权重</text>
 </svg>

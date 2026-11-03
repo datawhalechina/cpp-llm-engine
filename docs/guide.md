@@ -17,30 +17,30 @@
   Chapter 07 -> Chapter 08
 
 服务扩展与参考
-  Chapter 09（Chapter05 后可提前阅读）-> reference / guides
+  Chapter 09（Chapter06 后可提前阅读）-> reference / guides
 ```
 
 各部分提供以下学习产物：
 
 - `foundation`：补 C++、CMake、CUDA、调试和测试基础
 - `chapter00_quickstart`：用 `llama.cpp` 完成一次真实推理，确认环境和模型链路成立
-- `chapter01` - `chapter06`：逐层构建 Tensor、算子、Decoder、Runtime 和量化能力
+- `chapter01` - `chapter06`：逐层构建 Tensor、算子、Decoder、量化 Linear 和 Runtime
 - `chapter07` - `chapter08`：用回归、Benchmark 和 Profiling 形成证据闭环
-- `chapter09`：接收 Chapter05 的服务化扩展，当前包含 C++ Service Core、metrics、真实模型 HTTP/SSE completion 和可选 cpp-httplib loopback
+- `chapter09`：接收 Chapter06 的服务化扩展，当前包含 C++ Service Core、metrics、真实模型 HTTP/SSE completion 和可选 cpp-httplib loopback
 - `reference` / `guides`：查阅概念、实验资产和工程方法
 
 如果你想先理解“训练框架、推理框架和本教程分别负责什么”，再看 [训练框架 vs 推理框架](/reference/framework_comparison)。`foundation` 是按需前置能力区，`chapter00` 是所有学习者共用的真实推理起跑线。
 
 ## 从这里开始
 
-需要按可验证产物控制阅读量时，使用[第一期 CPU 学习计划](/guides/phase1_cpu_learning_plan)中的“首轮与进阶范围”；第一次学习只完成首轮必读和主验证命令。
+需要按可验证产物控制阅读量时，使用 [CPU 六任务学习计划](/guides/phase1_cpu_learning_plan)中的“首轮与进阶范围”；第一次学习只完成首轮必读和主验证命令。
 
 1. 先看 [教程主入口](/README) 了解总图
 2. 需要 C++、构建工具或 CUDA 背景时，按需进入 `foundation`
 3. 进入 `chapter00_quickstart`，用 `llama.cpp` 完成 First Success
 4. 按 `chapter01` 到 `chapter06` 学习引擎核心
 5. 进入 `chapter07` 和 `chapter08` 做验证与性能归因
-6. 完成 Chapter05 后，如果关注服务化，提前进入 Chapter09；否则按 Chapter06-08 完成量化、Benchmark 和 Profiling，再回到 Chapter09
+6. 完成 Chapter06 后，如果关注服务化，可以提前进入 Chapter09；否则先完成 Chapter07-08 的 Benchmark 和 Profiling，再回到 Chapter09
 
 ## 如何运行代码
 
@@ -50,8 +50,8 @@
 - `bash code/chapter02_tensor_ops/scripts/run.sh`
 - `bash code/chapter03_matmul/scripts/run.sh`
 - `bash code/chapter04_attention/scripts/run.sh`
-- `bash code/chapter05_generation/scripts/run.sh`
-- `bash code/chapter06_quantization/scripts/run.sh`
+- `bash code/chapter05_quantization/scripts/run.sh`
+- `bash code/chapter06_generation/scripts/run.sh`
 - `bash code/chapter07_benchmark/scripts/run.sh`
 - `bash code/chapter08_profiling/scripts/run.sh`
 - `bash code/chapter09_serving/scripts/run.sh`
@@ -142,12 +142,12 @@ CPU 和 GPU 的环境差异，以及它们在章节中的分叉位置：
 
 ## 按需补充
 
-主线从 Chapter 00 走到 Chapter 09。基础薄弱时先补 Foundation；已有推理系统经验时可以在完成 Chapter 05 后提前阅读 Runtime、Benchmark、Profiling 和 Serving，并用对应章节脚本确认实现。
+主线从 Chapter 00 走到 Chapter 09。基础薄弱时先补 Foundation；已有推理系统经验时可以在完成 Chapter 06 后提前阅读 Runtime、Benchmark、Profiling 和 Serving，并用对应章节脚本确认实现。
 
 | 情况 | 补充内容 | 验证 |
 | --- | --- | --- |
 | C++、CMake 基础不稳 | Foundation 必读题和至少 4 道练习 | `bash exercises/foundation/run_all.sh` |
-| 关注 Runtime 与服务 | Chapter 05、07、08、09 | 章节 `run.sh` 与 `npm run test:regression` |
+| 关注 Runtime 与服务 | Chapter 06、07、08、09 | 章节 `run.sh` 与 `npm run test:regression` |
 | 关注框架实现差异 | `reference/ecosystem` 与各章对照页 | 回到本教程代码确认对应契约 |
 | 需要 GPU | Chapter 03 CUDA 设计与 `code/cuda` | `bash code/cuda/scripts/run.sh`，完成 CPU/CUDA 数值对照和设备测试 |
 
@@ -159,8 +159,8 @@ CPU 和 GPU 的环境差异，以及它们在章节中的分叉位置：
 
 - `chapter00`、`chapter01`：先看 `llama.cpp`，建立最小本地推理直觉
 - `chapter02`、`chapter03`：再看 `gemma.cpp` 和 `TensorRT-LLM`，理解对象、算子和后端分层
-- `chapter04`、`chapter05`：再看 `vLLM`、`SGLang`，理解 runtime、调度和 serving 组织方式
-- `chapter06`：再看 `TensorRT-LLM`，理解量化和部署如何接到 GPU engine
+- `chapter04`、`chapter06`：再看 `vLLM`、`SGLang`，理解 runtime、调度和 serving 组织方式
+- `chapter05`：再看 `TensorRT-LLM`，理解量化和部署如何接到 GPU engine
 - `chapter07`：再看 `vLLM`、`SGLang`、`Ollama`，理解 benchmark、验证和交付怎么落到真实系统
 - `chapter08`、`chapter09`：再看 `vLLM`、`SGLang` 和 DeepInfer，理解 profiling、服务边界与生产扩展
 

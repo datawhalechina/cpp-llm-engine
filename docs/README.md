@@ -41,6 +41,6 @@ bash code/chapter00_quickstart/run.sh
 
 | 路线 | 状态 | 当前能力 |
 | --- | --- | --- |
-| CPU v1 | 完成 | TinyLlama 22 层 Decoder、Generation Runtime 和 HTTP/SSE 服务 |
-| 多模态 CPU v1 | 完成 | SmolVLM Vision、Projector、Decoder 和 ServiceCore |
-| GPU v1 | 建设中 | CUDA 资源、量化 Linear、RoPE、KV、GQA 和合成 Decoder |
+| CPU 主线 | 已闭环 | TinyLlama 22 层 Decoder、Generation Runtime 和 HTTP/SSE 服务 |
+| 多模态输入 | 已闭环 | SmolVLM Vision、Projector、Decoder 和 ServiceCore |
+| CUDA 后端 | 建设中 | CUDA 资源、量化 Linear、RoPE、KV、GQA 和合成 Decoder |

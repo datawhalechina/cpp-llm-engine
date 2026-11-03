@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="690" viewBox="0 0 1200 690" role="img" aria-labelledby="title desc">
   <title id="title">多模态请求阶段与现有 Runtime 的交接</title>
-  <desc id="desc">图片与文本经过多模态输入管线组成统一 embedding，再通过每请求适配器进入已有 Chapter05 Runtime 和 Chapter09 ServiceCore。</desc>
+  <desc id="desc">图片与文本经过多模态输入管线组成统一 embedding，再通过每请求适配器进入已有 Chapter06 Runtime 和 Chapter09 ServiceCore。</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#f8f3e7"/>
@@ -65,7 +65,7 @@
   <text x="828" y="232" class="small">统一 embedding + 每请求 Decoder Context</text>
 
   <rect x="800" y="305" width="330" height="100" class="box" fill="#e7f3e8"/>
-  <text x="828" y="341" class="label">Chapter05 Generation Runtime</text>
+  <text x="828" y="341" class="label">Chapter06 Generation Runtime</text>
   <text x="828" y="369" class="body">prefill / decode / sample / KV lifecycle</text>
   <text x="828" y="391" class="small">图片来源不进入调度与采样逻辑</text>
 

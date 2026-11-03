@@ -49,7 +49,7 @@ PAIRS: tuple[DocPair, ...] = (
         rewrites=(
             (r"\]\(README\)", r"](/en/README)"),
             (r"\]\(guide\)", r"](/en/guide)"),
-            (r"\]\(foundation/README\)", r"](/en/foundation/README)"),
+            (r"\]\(foundation/intro\)", r"](/en/foundation/intro)"),
             (r"\]\(chapter00_quickstart/intro\)", r"](/en/chapter00_quickstart/intro)"),
             (r"\]\(guides/README\)", r"](/en/guides/README)"),
             (r"\]\(reference/README\)", r"](/en/reference/README)"),

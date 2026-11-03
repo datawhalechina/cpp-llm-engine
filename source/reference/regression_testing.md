@@ -13,7 +13,20 @@
 - 正常样例通过，但异常样例开始退化
 - 性能看起来没坏，但长上下文或大 batch 开始不稳定
 
-## 2. 回归测试和 e2e / benchmark 的分工
+## 2. 分层测试体系
+
+测试按发现问题的范围逐层扩大。下层没有通过时，不继续用端到端结果或性能数据解释问题。
+
+| 层级 | 检查对象 | 典型证据 |
+| --- | --- | --- |
+| L0 对象契约 | 单个类型、函数和错误路径 | 命名单元测试、表驱动状态转换 |
+| L1 不变量 | 一组操作前后必须保持的条件 | 进度单调、容量守恒、资源独占 |
+| L2 组件协作 | Scheduler、Cache、Runtime 等组件事务 | 预留、提交、回滚和释放测试 |
+| L3 跨章主线 | Loader 到 ServiceCore 的接口连接 | 集成测试和默认 CPU 回归 |
+| L4 真实模型 | GGUF、token、logits、HTTP/SSE | TinyLlama golden 和真实服务测试 |
+| L5 性能实验 | 固定软硬件条件下的执行表现 | benchmark、profiling 和历史结果 |
+
+## 3. 回归测试和 e2e / benchmark 的分工
 
 | 问题 | e2e correctness | regression test | benchmark |
 | --- | --- | --- | --- |
@@ -25,7 +38,7 @@
 这三者不能互相替代。  
 e2e 证明“这次能跑对”，benchmark 证明“这次快多少”，回归测试证明“这次没有把旧问题带回来”。
 
-## 3. 回归测试应该覆盖什么
+## 4. 回归测试应该覆盖什么
 
 ### golden corpus
 
@@ -76,7 +89,7 @@ golden corpus 是一组固定、版本化的测试样例，稳定覆盖最容易
 
 这类测试不一定看绝对性能，更看趋势是否符合预期。
 
-## 4. 一个可维护的回归基线长什么样
+## 5. 一个可维护的回归基线长什么样
 
 可维护的回归基线通常有几个特征：
 
@@ -88,7 +101,7 @@ golden corpus 是一组固定、版本化的测试样例，稳定覆盖最容易
 
 可维护的结果需要同时指出失败样例和失败阶段，而不只是“通过”或“失败”。
 
-## 5.1 最小基线矩阵
+## 6. 最小基线矩阵
 
 第一版不追求覆盖所有模型，先固定一组能在 CPU 上重复执行的样例：
 
@@ -102,19 +115,51 @@ golden corpus 是一组固定、版本化的测试样例，稳定覆盖最容易
 
 验收顺序固定为：先跑局部测试，再跑端到端正确性，再跑固定 benchmark，最后把结果与历史基线比较。任何一层失败，都不应只用下一层的“通过”覆盖。
 
-当前仓库的最小执行入口是 `npm run test:regression`，它串联 Foundation 12 题、Chapter 05 和 Chapter 07 的稳定入口，并检查测试结果、请求完成状态和 benchmark 正确性标记。新增基线样例时，应让失败信息包含样例名称、输入长度、请求状态和对应阶段。
+当前仓库的最小执行入口是 `npm run test:regression`。它串联 Foundation、Core、Engine、Chapter01-09 和多模态预处理，以命令退出码判断构建与 CTest 是否成功，并只对示例保留稳定的行为标记。`npm run test:release-contracts` 另用 Release 构建覆盖 Core、Chapter01-06、Chapter09、Engine 和多模态输入链的关键契约，防止测试依赖 Debug `assert`。测试数量会随能力增长，不作为成功条件。
 
-## 6. 和主线章节的关系
+`npm run test:check-assets` 在构建前检查测试资产：`tests/` 下的 C++/CUDA 测试源码必须被 CMake 引用；测试可执行目标必须调用 `cpp_llm_prepare_test`、注册到 CTest 并设置标签。该检查只验证测试是否接入体系，不替代测试执行和结果断言。
+
+故障测试使用固定输入、手动时钟或显式失败执行器，不依赖随机调度。定位状态泄漏时，先运行下表中的最小测试，再运行所属章节回归。
+
+| 对象 | 故障注入 | 必须保持的状态 | 最小测试 |
+| --- | --- | --- | --- |
+| Loader | 非法 magic、版本、shape、截断 payload | 加载失败后不暴露部分 tensor | `chapter01_tensor_loader_test` |
+| BlockPool | 容量不足、越界提交、回退提交 | 容量守恒、块独占、原请求不变 | `chapter06_kv_block_pool_contract_test` |
+| Scheduler | prefill 失败、缺少 decode 写槽 | 请求进入失败终态，临时预留回滚 | `chapter06_execution_transaction_test` |
+| ServiceCore | 成功、模型失败、取消、超时交错 | inflight 归零、块全部归还、指标只计一次 | `chapter09_fault_sequence_test` |
+
+## 7. 测试基础设施
+
+`code/testing` 提供不受 `NDEBUG` 影响的命名检查。`CHECK` 记录失败并继续当前用例，`REQUIRE` 在前置条件失败后停止当前用例，避免后续索引或解引用掩盖最初错误；`CHECK_EQ` 和异常检查补充左右值及预期异常信息。公共 CMake 配置保证尚未迁移的 `assert` 在 Release 构建中继续执行。CTest 负责发现、筛选和运行测试；`unit`、`contract`、`component`、`integration` 等标签表达验证层级，模块名标签用于缩小失败范围。
+
+默认回归检查教学主线，Release 契约回归专门检查编译优化不能关闭断言与契约测试：
+
+```bash
+npm run test:regression
+npm run test:release-contracts
+```
+
+该入口使用 Release 配置验证测试框架、Core、Chapter 01 Loader、Tensor、MatMul、Attention/Decoder、Chapter 06 Runtime、
+Chapter 09 ServiceCore 与 Engine 组合链。它不下载模型，也不运行 GPU 和性能实验。
+
+新增能力时按以下顺序补证据：
+
+1. 先写对象契约和错误路径。
+2. 再写跨操作不变量，包括失败后的原子性。
+3. 接入组件测试和跨章回归。
+4. 正确性稳定后再登记真实模型与性能结果。
+
+## 8. 和主线章节的关系
 
 | 章节 | 已经做了什么 | 回归测试继续补什么 |
 | --- | --- | --- |
 | `chapter07_benchmark` | 正确性、benchmark、结果记录 | 长期回归基线和版本化样例 |
-| `chapter05_generation` | runtime、KV Cache、scheduler | 长上下文和请求生命周期的稳定性 |
-| `chapter01` 到 `chapter06` | 局部模块正确性 | 关键路径是否在后续改动中退化 |
+| `chapter06_generation` | runtime、KV Cache、scheduler | 长上下文和请求生命周期的稳定性 |
+| `chapter01` 到 `chapter05` | 局部模块正确性 | 关键路径是否在后续改动中退化 |
 
 单测和 e2e 提供当前正确性证据，版本化样例将这些证据保存为长期回归基线。
 
-## 7. 如何使用回归测试参考页
+## 9. 如何使用回归测试参考页
 
 - 先用 `chapter07_benchmark` 确认当前测试矩阵已经固定
 - 再把历史上容易回退的样例整理成固定基线

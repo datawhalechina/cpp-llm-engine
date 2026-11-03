@@ -7,7 +7,7 @@
 - 回看 `chapter02_tensor_ops`，重点关注 view 语义和存储共享
 - 回看 `chapter03_matmul`，重点关注算子边界和后端拆分
 - 回看 `chapter04_attention`，重点关注 decoder 结构
-- 回看 `chapter05_generation`，重点关注 runtime state、KV Cache 和 sampling
+- 回看 `chapter06_generation`，重点关注 runtime state、KV Cache 和 sampling
 
 ## 2. 走向 vLLM-like serving
 

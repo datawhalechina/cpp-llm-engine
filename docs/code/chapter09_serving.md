@@ -12,6 +12,11 @@
 - <a href="/_code/chapter09_serving/src/serving_core.cpp"><code>serving_core.cpp</code></a>
 - <a href="/_code/chapter09_serving/examples/main_serving.cpp"><code>main_serving.cpp</code></a>
 - <a href="/_code/chapter09_serving/tests/chapter09_serving_test.cpp"><code>chapter09_serving_test.cpp</code></a>
+- <a href="/_code/chapter09_serving/tests/step_dispatch_test.cpp"><code>step_dispatch_test.cpp</code></a>
+- <a href="/_code/chapter09_serving/tests/parallel_dispatch_test.cpp"><code>parallel_dispatch_test.cpp</code></a>
+- <a href="/_code/chapter09_serving/tests/cancellation_release_test.cpp"><code>cancellation_release_test.cpp</code></a>
+- <a href="/_code/chapter09_serving/tests/service_metrics_test.cpp"><code>service_metrics_test.cpp</code></a>
+- <a href="/_code/chapter09_serving/tests/fault_sequence_test.cpp"><code>fault_sequence_test.cpp</code></a>
 - <a href="/_code/chapter09_serving/include/chapter09_serving/response_writer.h"><code>response_writer.h</code></a>
 - <a href="/_code/chapter09_serving/include/chapter09_serving/cpp_httplib_transport.h"><code>cpp_httplib_transport.h</code></a>
 - <a href="/_code/chapter09_serving/src/cpp_httplib_transport.cpp"><code>cpp_httplib_transport.cpp</code></a>

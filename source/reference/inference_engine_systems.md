@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | 输入处理 | Tokenizer、Prompt Template、ModelConfig | 文本和模型文件 → token、配置与权重 | Chapter00-01 |
 | 数据与计算 | Tensor、Operator、Backend、Decoder | token 与权重 → hidden state、logits | Chapter02-04、06 |
-| 生成运行时 | Request、Scheduler、KV Cache、Sampler | prompt token → 逐 token 输出 | Chapter05 |
+| 生成运行时 | Request、Scheduler、KV Cache、Sampler | prompt token → 逐 token 输出 | Chapter06 |
 | 验证与归因 | Golden、Benchmark、ProfileRecord | 执行结果 → 正确性和性能证据 | Chapter07-08 |
 | 服务接入 | ServiceCore、HTTP Adapter、ResponseWriter | 外部请求 → 同步响应或 SSE | Chapter09 |
 
@@ -114,8 +114,8 @@ flowchart LR
 | --- | --- | --- |
 | token 或模型配置错误 | tokenizer、metadata、tensor schema | Chapter01、[输入链路](./input_pipeline.md) |
 | shape 或数值错误 | Tensor view、Operator、CPU reference | Chapter02-04 |
-| 长上下文结果异常 | position、KV append、请求 Context | Chapter05、[内存管理](./memory_management.md) |
-| 多请求卡住或资源未释放 | Request 终态、Scheduler、ServiceCore | Chapter05、Chapter09 |
-| 量化输出偏差 | block layout、scale、Linear backend | Chapter06 |
+| 长上下文结果异常 | position、KV append、请求 Context | Chapter06、[内存管理](./memory_management.md) |
+| 多请求卡住或资源未释放 | Request 终态、Scheduler、ServiceCore | Chapter06、Chapter09 |
+| 量化输出偏差 | block layout、scale、Linear backend | Chapter05 |
 | 性能下降 | workload、阶段计时、hotspot | Chapter07-08、[Profiling](./profiling.md) |
 | HTTP/SSE 行为异常 | adapter、ResponseWriter、terminal callback | Chapter09、[服务化基础](./service_basics.md) |

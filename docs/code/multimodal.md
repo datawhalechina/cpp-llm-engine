@@ -1,6 +1,6 @@
 # 多模态 CPU 输入扩展代码导航
 
-这组代码把图片解码、IDEFICS3 动态切图、SigLIP Vision Encoder、Projector 和 SmolVLM 文本 embedding 组合成统一序列，并通过 Engine adapter 接入 Chapter05 Runtime 与 Chapter09 Service Core。默认测试使用小型 fixture；真实模型验证需要 SmolVLM GGUF、mmproj 和测试图片。
+这组代码把图片解码、IDEFICS3 动态切图、SigLIP Vision Encoder、Projector 和 SmolVLM 文本 embedding 组合成统一序列，并通过 Engine adapter 接入 Chapter06 Runtime 与 Chapter09 Service Core。默认测试使用小型 fixture；真实模型验证需要 SmolVLM GGUF、mmproj 和测试图片。
 
 ## 阅读与验证入口
 

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
   <title id="title">cpp-llm-engine 教程主图</title>
-  <desc id="desc">展示教程从真实模型基线出发，沿 C++ CPU 主线构建推理服务，并扩展到单消费级 GPU、多模态输入和成熟框架对照。</desc>
+  <desc id="desc">展示教程从真实模型基线出发，沿 C++ CPU 主线构建推理服务，并用数据层、算子层和系统层组织代码骨架，最后扩展到单消费级 GPU、多模态输入和成熟框架对照。</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#f8fafc"/>
@@ -61,7 +61,7 @@
   <rect x="783" y="138" width="204" height="104" class="card" fill="#dcfce7"/>
   <text x="885" y="171" text-anchor="middle" class="label">运行时与表示</text>
   <text x="885" y="198" text-anchor="middle" class="small">Chapter05 - 06</text>
-  <text x="885" y="220" text-anchor="middle" class="tiny">Request · KV · Quantization</text>
+  <text x="885" y="220" text-anchor="middle" class="tiny">Quantization · Request · KV</text>
 
   <rect x="1028" y="138" width="204" height="104" class="card" fill="#fce7f3"/>
   <text x="1130" y="171" text-anchor="middle" class="label">证据与服务</text>
@@ -73,40 +73,40 @@
   <path d="M742 190 H778" class="line"/>
   <path d="M987 190 H1023" class="line"/>
 
-  <text x="48" y="296" class="section">软件骨架 · 契约稳定，执行路径可替换</text>
+  <text x="48" y="296" class="section">三条横向观察线 · 数据进入计算，计算进入持续运行的系统</text>
 
   <rect x="100" y="318" width="260" height="92" class="card" fill="#fef3c7"/>
-  <text x="230" y="351" text-anchor="middle" class="label">code/core</text>
-  <text x="230" y="378" text-anchor="middle" class="small">Tensor / Backend / Decoder Contract</text>
-  <text x="230" y="398" text-anchor="middle" class="tiny">CPU 与 CUDA 共用语义</text>
+  <text x="230" y="351" text-anchor="middle" class="label">数据层</text>
+  <text x="230" y="378" text-anchor="middle" class="small">Model · Tensor / View · Context</text>
+  <text x="230" y="398" text-anchor="middle" class="tiny">形状、布局、所有权与请求状态</text>
 
   <rect x="500" y="318" width="280" height="92" class="card" fill="#dbeafe"/>
-  <text x="640" y="351" text-anchor="middle" class="label">code/engine</text>
-  <text x="640" y="378" text-anchor="middle" class="small">Model → Context → Runtime</text>
-  <text x="640" y="398" text-anchor="middle" class="tiny">真实权重、请求隔离和执行适配</text>
+  <text x="640" y="351" text-anchor="middle" class="label">算子层</text>
+  <text x="640" y="378" text-anchor="middle" class="small">Operator · Backend · Decoder</text>
+  <text x="640" y="398" text-anchor="middle" class="tiny">CPU / CUDA 实现同一数值语义</text>
 
   <rect x="920" y="318" width="260" height="92" class="card" fill="#dcfce7"/>
-  <text x="1050" y="351" text-anchor="middle" class="label">ServiceCore</text>
-  <text x="1050" y="378" text-anchor="middle" class="small">Scheduler / Metrics / HTTP / SSE</text>
-  <text x="1050" y="398" text-anchor="middle" class="tiny">CPU 服务闭环，可替换 transport</text>
+  <text x="1050" y="351" text-anchor="middle" class="label">系统层</text>
+  <text x="1050" y="378" text-anchor="middle" class="small">Runtime · Scheduler · ServiceCore</text>
+  <text x="1050" y="398" text-anchor="middle" class="tiny">资源、测量、HTTP / SSE 与终态回收</text>
 
   <path d="M360 364 H495" class="line"/>
   <path d="M780 364 H915" class="line"/>
 
   <text x="48" y="464" class="section">能力扩展 · 不复制主线，只替换输入或执行后端</text>
 
-  <rect x="48" y="486" width="365" height="120" class="card" fill="#dbeafe"/>
-  <text x="70" y="518" class="label">CUDA 执行扩展</text>
-  <text x="70" y="545" class="small">Device / Stream · cuBLAS · Q4_K/Q6_K Linear</text>
-  <text x="70" y="568" class="small">RoPE · 连续 KV · GQA · 合成 Decoder</text>
-  <text x="70" y="591" class="tiny">下一里程碑：真实 TinyLlama GPU Decoder</text>
+  <rect x="48" y="486" width="365" height="120" class="card" fill="#fef3c7"/>
+  <text x="70" y="518" class="label">SmolVLM 多模态 CPU 扩展</text>
+  <text x="70" y="545" class="small">动态切图 · Vision Encoder · Projector</text>
+  <text x="70" y="568" class="small">图文 Embedding · Decoder · ServiceCore</text>
+  <text x="70" y="591" class="tiny">真实图片、同步/SSE 与 profiling golden 已闭环</text>
   <path d="M230 410 V481" class="dash"/>
 
-  <rect x="458" y="486" width="365" height="120" class="card" fill="#fef3c7"/>
-  <text x="480" y="518" class="label">SmolVLM 多模态 CPU 扩展</text>
-  <text x="480" y="545" class="small">动态切图 · Vision Encoder · Projector</text>
-  <text x="480" y="568" class="small">图文 Embedding · Decoder · ServiceCore</text>
-  <text x="480" y="591" class="tiny">真实图片、同步/SSE 与 profiling golden 已闭环</text>
+  <rect x="458" y="486" width="365" height="120" class="card" fill="#dbeafe"/>
+  <text x="480" y="518" class="label">CUDA 执行扩展</text>
+  <text x="480" y="545" class="small">Device / Stream · cuBLAS · Q4_K/Q6_K Linear</text>
+  <text x="480" y="568" class="small">RoPE · 连续 KV · GQA · 合成 Decoder</text>
+  <text x="480" y="591" class="tiny">下一里程碑：真实 TinyLlama GPU Decoder</text>
   <path d="M640 410 V481" class="dash"/>
 
   <rect x="868" y="486" width="364" height="120" class="card" fill="#f1f5f9"/>

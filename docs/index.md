@@ -38,8 +38,8 @@ features:
 | 阶段 | 主要职责 |
 | --- | --- |
 | `chapter01` - `chapter03` | 输入、张量语义、算子边界 |
-| `chapter04` - `chapter05` | 结构与运行时 |
-| `chapter06` | 表示与成本 |
+| `chapter04` - `chapter06` | 结构与运行时 |
+| `chapter05` | 表示与成本 |
 | `chapter07` | 验证与证据 |
 | `chapter08` | 性能归因与优化闭环 |
 | `chapter09` | ServiceCore、HTTP/SSE 与资源释放 |

@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+  <title id="title">从生成请求到量化 Linear 的跨章调用链</title>
+  <desc id="desc">Chapter 06 的请求经过 Runtime 和模型执行器接口进入真实请求 Context，再调用 Chapter 04 的 Decoder。Decoder 内部的 Linear 由 Chapter 05 的策略分派到 scalar、AVX2 或 CUDA 后端，最终 logits 返回 Runtime 交给采样器。</desc>
+  <defs>
+    <style>text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif !important; }</style>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#fff7ed"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#52606d"/>
+    </marker>
+    <marker id="arrow-teal" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#0f766e"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#c45b16"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="700" rx="24" fill="url(#background)"/>
+  <text x="54" y="55" font-size="27" font-weight="700" fill="#172033">从生成请求到量化 Linear：Chapter 05–06 接口交接</text>
+  <text x="54" y="84" font-size="15" fill="#52606d">Runtime 只依赖模型执行接口；Decoder 内部再选择权重格式和计算后端</text>
+
+  <rect x="54" y="112" width="1092" height="246" rx="18" fill="#ffffff" stroke="#d8e2e8"/>
+  <text x="78" y="143" font-size="15" font-weight="700" fill="#52606d">一次 prefill 或 decode 的调用路径</text>
+
+  <g text-anchor="middle">
+    <rect x="78" y="182" width="142" height="88" rx="14" fill="#e7f6f3" stroke="#79b8b1"/>
+    <text x="149" y="214" font-size="15" font-weight="700" fill="#0f5f59">生成请求</text>
+    <text x="149" y="239" font-size="12" fill="#52606d">Request</text>
+    <text x="149" y="257" font-size="11" fill="#708090">token 与停止条件</text>
+
+    <rect x="264" y="174" width="158" height="104" rx="15" fill="#0f766e" filter="url(#shadow)"/>
+    <text x="343" y="207" font-size="15" font-weight="700" fill="#ffffff">生成运行时</text>
+    <text x="343" y="233" font-size="12" fill="#d9fffa">Runtime</text>
+    <text x="343" y="254" font-size="11" fill="#c5eee8">prefill / decode</text>
+
+    <rect x="466" y="174" width="180" height="104" rx="15" fill="#e8f1f7" stroke="#79a4ba"/>
+    <text x="556" y="207" font-size="15" font-weight="700" fill="#28536b">模型执行接口</text>
+    <text x="556" y="233" font-size="12" fill="#476878">RequestModelExecutor</text>
+    <text x="556" y="254" font-size="11" fill="#708090">稳定的 Runtime 契约</text>
+
+    <rect x="690" y="174" width="180" height="104" rx="15" fill="#fff0dc" stroke="#e8a765"/>
+    <text x="780" y="207" font-size="15" font-weight="700" fill="#9a4d13">请求模型上下文</text>
+    <text x="780" y="233" font-size="12" fill="#6f5438">RealLlamaCpuContext</text>
+    <text x="780" y="254" font-size="11" fill="#7b624b">position 与分层 K/V</text>
+
+    <rect x="914" y="174" width="190" height="104" rx="15" fill="#c45b16" filter="url(#shadow)"/>
+    <text x="1009" y="207" font-size="15" font-weight="700" fill="#ffffff">真实 Decoder</text>
+    <text x="1009" y="233" font-size="12" fill="#fff2e8">22 层 Attention + FFN</text>
+    <text x="1009" y="254" font-size="11" fill="#ffe1cf">最终产生 logits</text>
+  </g>
+
+  <path d="M220 226 H264" fill="none" stroke="#0f766e" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <path d="M422 226 H466" fill="none" stroke="#0f766e" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <path d="M646 226 H690" fill="none" stroke="#52606d" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M870 226 H914" fill="none" stroke="#c45b16" stroke-width="2.5" marker-end="url(#arrow-orange)"/>
+
+  <path d="M1009 278 V318 H343 V278" fill="none" stroke="#28536b" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="676" y="310" font-size="12" text-anchor="middle" fill="#28536b">logits 返回 Runtime，再交给 Sampler 选择下一个 token</text>
+
+  <text x="54" y="401" font-size="18" font-weight="700" fill="#172033">放大 Decoder 内的一次量化 Linear 调用</text>
+  <path d="M1009 278 V374" fill="none" stroke="#c45b16" stroke-width="2" stroke-dasharray="6 6"/>
+  <circle cx="1009" cy="374" r="4" fill="#c45b16"/>
+
+  <g text-anchor="middle">
+    <rect x="54" y="432" width="190" height="82" rx="14" fill="#ffffff" stroke="#93b6c8"/>
+    <text x="149" y="462" font-size="14" font-weight="700" fill="#28536b">激活与量化权重</text>
+    <text x="149" y="487" font-size="12" fill="#52606d">Float32 input + packed weight</text>
+
+    <rect x="292" y="424" width="196" height="98" rx="15" fill="#fff0dc" stroke="#e8a765"/>
+    <text x="390" y="456" font-size="14" font-weight="700" fill="#9a4d13">后端策略</text>
+    <text x="390" y="481" font-size="12" fill="#6f5438">QuantizedLinearPolicy</text>
+    <text x="390" y="501" font-size="11" fill="#7b624b">按格式与能力选择实现</text>
+
+    <rect x="550" y="392" width="164" height="54" rx="12" fill="#f8fafc" stroke="#b8c4cc"/>
+    <text x="632" y="425" font-size="13" font-weight="700" fill="#52606d">Scalar fused</text>
+    <rect x="550" y="456" width="164" height="54" rx="12" fill="#e7f6f3" stroke="#79b8b1"/>
+    <text x="632" y="489" font-size="13" font-weight="700" fill="#0f5f59">AVX2 / FMA fused</text>
+    <rect x="550" y="520" width="164" height="54" rx="12" fill="#e8f1f7" stroke="#79a4ba"/>
+    <text x="632" y="553" font-size="13" font-weight="700" fill="#28536b">CUDA baseline</text>
+
+    <rect x="794" y="424" width="174" height="98" rx="15" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+    <text x="881" y="456" font-size="14" font-weight="700" fill="#0f5f59">统一 Linear 输出</text>
+    <text x="881" y="481" font-size="12" fill="#52606d">相同 shape 与状态语义</text>
+    <text x="881" y="501" font-size="11" fill="#708090">返回 Decoder 继续本层</text>
+
+    <rect x="1016" y="432" width="130" height="82" rx="14" fill="#fff0dc" stroke="#e8a765"/>
+    <text x="1081" y="462" font-size="14" font-weight="700" fill="#9a4d13">继续 Decoder</text>
+    <text x="1081" y="487" font-size="12" fill="#6f5438">下一投影或下一层</text>
+  </g>
+
+  <path d="M244 473 H292" fill="none" stroke="#52606d" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M488 473 H518 V419 H550" fill="none" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M488 473 H550" fill="none" stroke="#0f766e" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <path d="M488 473 H518 V547 H550" fill="none" stroke="#28536b" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M714 419 H750 V473 H794" fill="none" stroke="#52606d" stroke-width="2"/>
+  <path d="M714 483 H794" fill="none" stroke="#0f766e" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
+  <path d="M714 547 H750 V473 H794" fill="none" stroke="#28536b" stroke-width="2"/>
+  <circle cx="750" cy="473" r="4" fill="#52606d"/>
+  <path d="M968 473 H1016" fill="none" stroke="#c45b16" stroke-width="2.5" marker-end="url(#arrow-orange)"/>
+
+  <rect x="54" y="615" width="1092" height="54" rx="14" fill="#173f3c"/>
+  <text x="600" y="638" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">跨章验证：量化 backend 数值通过 → 22 层生成得到固定 token → 重复请求保持 Context 隔离</text>
+  <text x="600" y="658" font-size="11" text-anchor="middle" fill="#d9fffa">失败时按 Backend → Decoder → Executor → Runtime 的顺序定位最早偏离点</text>
+</svg>

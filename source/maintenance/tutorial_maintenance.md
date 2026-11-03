@@ -41,11 +41,11 @@
 - 明确中文教程优先，英文版整体计划先挂起
 - 将教程定位整理为“推理引擎原理 + 最小实现 + 验证”
 - 在 README / guide / reference / maintenance 中补充推理服务、推理引擎、推理框架之间的关系说明
-- 为 `chapter04`、`chapter05`、`chapter06` 增加与 `vLLM` / `nano-vLLM` 的工程坐标桥接
-- 为 `chapter00` 增加可选 `vLLM` serving baseline 小节
+- 为 `chapter04`、`chapter06`、`chapter05` 增加与 `vLLM` / `nano-vLLM` 的工程坐标桥接
+- 在 `guides` 维护可选 `vLLM` serving baseline，不加入 Chapter00 必读路径
 - 为 `chapter03` 增加 backend / executor / runtime 视角桥接
-- 为 `chapter05` 增加 request lifecycle、continuous batching、block KV cache 相关小节
-- 为 `chapter06` 增加量化在 serving runtime 中位置的小节
+- 为 `chapter06` 增加 request lifecycle、continuous batching、block KV cache 相关小节
+- 为 `chapter05` 增加量化在 serving runtime 中位置的小节
 - 新增 `chapter08_profiling`，覆盖 profiling、latency breakdown、memory bandwidth、CUDA Graph、A/B 实验和优化闭环
 - 收敛 `chapter00` 到 `chapter08` 的 intro 风格，统一章节导读、源码顺序和验证入口
 - 将同章小节链接改为源码可点击的 `./xxx.md`
@@ -57,14 +57,14 @@
 - 整理 `tutorial_maintenance.md` 历史编号和重复段落，重新归并站点构建、同步规则、代码映射、写作流程和验收清单
 - 完成 `chapter01` 到 `chapter07` 正文入口质量抽查：压短 intro 的源码直达，正文页只保留与本页任务直接相关的 1 到 3 个源码链接
 - 完成 `chapter01` 到 `chapter04` 正文小节层级合并：在不删减内容的前提下，将正文页中过细的二级 / 三级标题收敛为更少的主层级
-- 完成 `chapter05` 正文小节层级合并：将 runtime 主线正文页的编号标题和三级标题收敛为 `核心设计 / 核心基线 / 测试设计 / 验证与衔接` 等主层级
-- 完成 `chapter06`、`chapter07` 正文小节层级合并：将量化和 benchmark 主线正文页的厚模板收敛为 `核心设计 / 验证设计 / 指标设计 / 判断流程 / 验证与排查` 等主层级
+- 完成 `chapter06` 正文小节层级合并：将 runtime 主线正文页的编号标题和三级标题收敛为 `核心设计 / 核心基线 / 测试设计 / 验证与衔接` 等主层级
+- 完成 `chapter05`、`chapter07` 正文小节层级合并：将量化和 benchmark 主线正文页的厚模板收敛为 `核心设计 / 验证设计 / 指标设计 / 判断流程 / 验证与排查` 等主层级
 - 完成 `chapter03` 到 `chapter07` 正文页入口合并：将独立 `代码直达` 标题并入 `阅读入口` 的 `源码直达` 项，减少正文开头停顿
 - 完成 `chapter00` 到 `chapter08` summary 专项收敛：统一小结标题顺序为 `本章解决了什么 / 为什么重要 / 下一步 / 复盘路径`，清理编号标题和过厚的回看源码层级
-- 完成 `chapter05`、`chapter06`、`chapter07` 的阅读入口瘦身：intro 不再重复设置第二套“代码直达”，正文页不再在“阅读入口”和“代码直达”里重复列同一批源码
+- 完成 `chapter06`、`chapter05`、`chapter07` 的阅读入口瘦身：intro 不再重复设置第二套“代码直达”，正文页不再在“阅读入口”和“代码直达”里重复列同一批源码
 - 完成 `chapter01`、`chapter02`、`chapter03` 的工程桥接层补强：三章已分别收口为 `权重进入 runtime`、`Tensor view / shared storage`、`MatMul backend` 主线，不再只是组件说明
-- 完成 `chapter01` 到 `chapter05` 顶层命名统一：章节标题和导航已切换到系统层次命名，分别为 `Model Weights and Tensor Objects`、`Tensor Views and Shared Storage`、`MatMul and Compute Backends`、`Decoder Structure and Attention`、`Generation Runtime and Serving Basics`
-- 完成 `chapter04_attention` 结构收口：`intro`、`attention`、`decoder layer`、`structure bridge`、`summary` 已明确收束为 `chapter01` 到 `chapter03` 的第一次结构汇合点，并作为 `chapter05_generation` runtime 主线的结构前置章
+- 完成 `chapter01` 到 `chapter06` 顶层命名统一：章节标题和导航已切换到系统层次命名，分别为 `Model Weights and Tensor Objects`、`Tensor Views and Shared Storage`、`MatMul and Compute Backends`、`Decoder Structure and Attention`、`Generation Runtime and Serving Basics`
+- 完成 `chapter04_attention` 结构收口：`intro`、`attention`、`decoder layer`、`structure bridge`、`summary` 已明确收束为 `chapter01` 到 `chapter03` 的第一次结构汇合点，并作为 `chapter06_generation` runtime 主线的结构前置章
 - 完成 `chapter08_profiling` 第二轮质量评审：补充源码锚点、延迟拆解表、profiling 记录格式、A/B 报告模板和优化保留边界
 - 完成 `chapter07_benchmark` 最小阶段计时补强：baseline demo 现可输出 `input / prefill / decode / sampling / output` 的真实阶段时间、占比和吞吐
 - 完成 `chapter07_benchmark` 最小事件级 trace 补强：baseline demo 现可输出事件名、起始时间、持续时间和注释，供 `chapter08_profiling` 引用
@@ -107,15 +107,15 @@ git diff --stat
 - `docs/README.md`
 - `docs/index.md`
 - `docs/guide.md`
-- `source/foundation/README.md`
+- `source/foundation/intro.md`
 - `source/chapter00_quickstart/intro.md`
 - `source/chapter01_tensor_loader/intro.md`
 - `source/chapter02_tensor_ops/intro.md`
 - `source/chapter03_matmul/intro.md`
 - `source/chapter04_attention/intro.md`
-- `source/chapter04_attention/06_gemma_tensorrt_comparison.md`
-- `source/chapter05_generation/intro.md`
-- `source/chapter06_quantization/intro.md`
+- `source/chapter04_attention/07_framework_comparison.md`
+- `source/chapter06_generation/intro.md`
+- `source/chapter05_quantization/intro.md`
 - `source/chapter07_benchmark/intro.md`
 - `source/chapter08_profiling/intro.md`
 
@@ -146,8 +146,8 @@ git diff --stat
 - `code/chapter02_tensor_ops/`
 - `code/chapter03_matmul/`
 - `code/chapter04_attention/`
-- `code/chapter05_generation/`
-- `code/chapter06_quantization/`
+- `code/chapter06_generation/`
+- `code/chapter05_quantization/`
 - `code/chapter07_benchmark/`
 
 ### 0.7 重要设计决策
@@ -162,7 +162,7 @@ git diff --stat
 - `preserveSymlinks` 保持开启，配合 `docs/` 到 `source/` 的软链接结构
 - `_code` 静态入口同时服务源码阅读和站点构建
 - `reference` 保留完整展开，正文只放 1 到 3 句短桥接并互相挂链接
-- `chapter01` 到 `chapter05` 的顶层命名统一按“系统层次命名”维护，不再使用单纯动作式英文标题；当前标准名称见对应 `intro.md` 与 `docs/.vitepress/config.mts`
+- `chapter01` 到 `chapter06` 的顶层命名统一按“系统层次命名”维护，不再使用单纯动作式英文标题；当前标准名称见对应 `intro.md` 与 `docs/.vitepress/config.mts`
 
 ### 0.8 已知问题
 
@@ -176,9 +176,9 @@ git diff --stat
 
 建议后续按优先级推进：
 
-1. 优先审查并精修 `chapter05_generation`：确认它已经稳定承担“运行时主线章”的职责，而不是再次滑回组件说明；重点看 `intro / request lifecycle / KV cache / vLLM bridge`
+1. 优先审查并精修 `chapter06_generation`：确认它已经稳定承担“运行时主线章”的职责，而不是再次滑回组件说明；重点看 `intro / request lifecycle / KV cache / vLLM bridge`
 2. 检查 `chapter00` 到 `chapter08` 的兼容页和旧链接，确认章节收口已经统一迁移到 intro
-3. 按 `chapter01` 到 `chapter04` 的方式继续审查 `chapter06`、`chapter07` 正文小节层级，优先合并重复标题，不删减正文信息
+3. 按 `chapter01` 到 `chapter04` 的方式继续审查 `chapter05`、`chapter07` 正文小节层级，优先合并重复标题，不删减正文信息
 4. `chapter08_profiling` 的最小工程证据链已基本收口；后续优先转向其他章节，而不是继续扩成 profiler 工具
 5. 做一次全教程标题层级审计，确认正文、intro、summary、sidebar 四类入口的命名规则已经一致
 6. 如果需要源码预览友好的站点入口页，再单独处理 `docs/README.md`、`docs/guide.md`、`docs/index.md`
@@ -246,7 +246,7 @@ V2 的重点是：
 ### 3.7 测试分层推进
 
 - `chapter00` 用 smoke test
-- `chapter01` 到 `chapter06` 用 `assert` 或最小测试
+- `chapter01` 到 `chapter05` 用 `assert` 或最小测试
 - `chapter07` 用统一测试 harness 收口
 - 未来若复杂度上升，再从 `chapter07` 迁移到 Google Test
 
@@ -367,7 +367,7 @@ V2 的重点是：
 
 - `chapter00_quickstart`
   - 使用 smoke test 和命令行验证
-- `chapter01` 到 `chapter06`
+- `chapter01` 到 `chapter05`
   - 使用章节内最小可执行测试或 `assert` 级测试作为过渡
 - `chapter07`
   - 统一引入正式测试体系，承担命名单元测试和端到端测试
@@ -381,7 +381,7 @@ V2 的重点是：
 | 阶段 | 主要测试方式 | 目标 | 说明 |
 | --- | --- | --- | --- |
 | `chapter00_quickstart` | smoke test / 命令行验证 | 快速确认环境和链路能跑通 | 关注启动、路径、模型下载和首次推理 |
-| `chapter01` - `chapter06` | 章节内最小测试 / `assert` / 小脚本 | 验证当前模块语义正确 | 关注 Tensor、算子、量化等局部正确性 |
+| `chapter01` - `chapter05` | 章节内最小测试 / `assert` / 小脚本 | 验证当前模块语义正确 | 关注 Tensor、算子、量化等局部正确性 |
 | `chapter07` | 正式测试体系 / 端到端测试 | 统一正式测试体系 | 关注回归、可维护性和跨模块一致性 |
 
 测试方式的选择原则：
@@ -398,7 +398,7 @@ V2 的重点是：
 - `chapter00_quickstart`
   - 以 smoke test 和脚本验证为主
   - 关注环境、路径和首次推理链路
-- `chapter01` 到 `chapter06`
+- `chapter01` 到 `chapter05`
   - 以章节内最小可执行测试和 `assert` 级测试为主
   - 关注局部语义正确性和回归稳定性
 - `chapter07`
@@ -417,7 +417,7 @@ V2 的重点是：
 
 - `chapter00_quickstart`
   - 通过脚本和命令行做 smoke test
-- `chapter01` 到 `chapter06`
+- `chapter01` 到 `chapter05`
   - 通过章节内最小可执行测试和 `assert` 做局部验证
 - `chapter07`
   - 通过命名测试用例 + 统一测试入口的 harness 做收口
@@ -596,7 +596,7 @@ npm run docs:dev
 - 先补桥，再补深度
 - 先补主线必需的增量，再补进阶分支
 - 每次新增内容都要能回答“它补的是哪一个前置缺口”
-- `chapter05` 主要承接 scheduler、continuous batching、streaming 进阶
+- `chapter06` 主要承接 scheduler、continuous batching、streaming 进阶
 - `chapter07` 主要承接 memory pool、profiling、A/B benchmark 进阶
 - `chapter08` 主要承接 profiling、A/B 实验和优化闭环
 
@@ -604,7 +604,7 @@ npm run docs:dev
 
 - `intro.md` 必须有可跳转的章节导读，并承载定位、顺序和验证
 - 章节结论与验证统一写入 `intro.md`，不再创建独立 `summary.md`
-- 章节正文的标题编号要和章节号保持一致，避免 `05.x`、`04.x`、`07.x` 混写
+- 章节正文的标题编号要和章节号保持一致，避免 `06.x`、`04.x`、`07.x` 混写
 - 同一章内，intro 的结构保持一致，减少读者重新适应成本
 
 ### 10.3 语言规则固定

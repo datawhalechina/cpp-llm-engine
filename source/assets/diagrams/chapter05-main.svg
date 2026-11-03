@@ -1,39 +1,110 @@
-<?xml version="1.0"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 330" role="img" aria-labelledby="title desc">
-  <title id="title">Chapter 05 position and contents</title>
-  <desc id="desc">The generation runtime connects model execution to request scheduling and serving.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 05 用同一输入比较浮点与量化 Linear</title>
+  <desc id="desc">Chapter 05 位于 Decoder 结构和 Generation Runtime 之间。A 教学参考线解释量化误差，B 真实执行线将 GGUF 量化权重接入 Decoder 和后端。</desc>
   <defs>
-    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-      <path d="M0 0L8 4L0 8Z" fill="#6b7280"/>
+    <style>text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif !important; }</style>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#fff7ed"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#52606d"/>
     </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#28536b"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#c45b16"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
   </defs>
-  <rect width="1200" height="330" rx="18" fill="#f8fafc"/>
-  <text x="36" y="38" font-family="Noto Sans CJK SC" font-size="22" font-weight="700" fill="#172033">Chapter 05 &#xB7; Generation Runtime</text>
-  <rect x="36" y="65" width="500" height="225" rx="14" fill="#e8f1ff"/>
-  <text x="60" y="98" font-family="Noto Sans CJK SC" font-size="17" font-weight="700" fill="#24548f">&#x6574;&#x4F53;&#x4F4D;&#x7F6E;</text>
-  <g font-family="Noto Sans CJK SC" font-size="14" text-anchor="middle">
-    <rect x="62" y="145" width="105" height="48" rx="9" fill="#fff"/>
-    <text x="114" y="175">Decoder</text>
-    <rect x="205" y="135" width="140" height="68" rx="9" fill="#2563eb"/>
-    <text x="275" y="165" fill="#fff">Chapter 05</text>
-    <text x="275" y="185" fill="#fff">Runtime</text>
-    <rect x="385" y="145" width="115" height="48" rx="9" fill="#fff"/>
-    <text x="442" y="175">Serving</text>
+
+  <rect width="1200" height="680" rx="24" fill="url(#background)"/>
+  <text x="54" y="55" font-size="27" font-weight="700" fill="#172033">Chapter 05：用同一输入比较浮点与量化 Linear</text>
+  <text x="54" y="84" font-size="15" fill="#52606d">权重表示和执行后端可以改变，Linear 输入输出与 Runtime 调用方式保持不变</text>
+
+  <!-- Position in the engine -->
+  <rect x="54" y="112" width="1092" height="124" rx="18" fill="#ffffff" stroke="#d8e2e8"/>
+  <text x="78" y="143" font-size="15" font-weight="700" fill="#52606d">在推理引擎中的位置</text>
+  <g text-anchor="middle">
+    <rect x="102" y="163" width="254" height="50" rx="12" fill="#e7f6f3"/>
+    <text x="229" y="185" font-size="15" font-weight="700" fill="#0f5f59">Chapter 04</text>
+    <text x="229" y="203" font-size="13" fill="#376963">Decoder 结构与 Linear 语义</text>
+
+    <rect x="473" y="155" width="254" height="66" rx="13" fill="#c45b16" filter="url(#shadow)"/>
+    <text x="600" y="183" font-size="16" font-weight="700" fill="#ffffff">Chapter 05</text>
+    <text x="600" y="204" font-size="14" fill="#fff2e8">量化权重与 Linear 后端</text>
+
+    <rect x="844" y="163" width="254" height="50" rx="12" fill="#e8f1f7"/>
+    <text x="971" y="185" font-size="15" font-weight="700" fill="#28536b">Chapter 06</text>
+    <text x="971" y="203" font-size="13" fill="#476878">请求状态与 Generation Runtime</text>
   </g>
-  <path d="M167 169H205M345 169H385" stroke="#6b7280" stroke-width="2" marker-end="url(#a)"/>
-  <rect x="566" y="65" width="598" height="225" rx="14" fill="#fef2f2"/>
-  <text x="590" y="98" font-family="Noto Sans CJK SC" font-size="17" font-weight="700" fill="#991b1b">&#x5185;&#x5BB9;&#x6982;&#x8981;</text>
-  <g font-family="Noto Sans CJK SC" font-size="14" text-anchor="middle">
-    <rect x="590" y="145" width="100" height="48" rx="9" fill="#fecaca"/>
-    <text x="640" y="165">Chunked</text><text x="640" y="183">Prefill</text>
-    <rect x="710" y="145" width="100" height="48" rx="9" fill="#fecaca"/>
-    <text x="760" y="175">Block KV</text>
-    <rect x="830" y="145" width="100" height="48" rx="9" fill="#fecaca"/>
-    <text x="880" y="175">Decode</text>
-    <rect x="950" y="145" width="100" height="48" rx="9" fill="#fecaca"/>
-    <text x="1000" y="175">Sampler</text>
-    <rect x="1060" y="145" width="80" height="48" rx="9" fill="#ef4444"/>
-    <text x="1100" y="175" fill="#fff">Step Batch</text>
+  <path d="M356 188 H473" fill="none" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M727 188 H844" fill="none" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Parallel reference and quantized paths -->
+  <text x="54" y="278" font-size="18" font-weight="700" fill="#172033">本章核心：A 教学参考与 B 真实量化使用同一输入，再比较结果与成本</text>
+
+  <rect x="54" y="338" width="126" height="84" rx="15" fill="#ffffff" stroke="#93b6c8" stroke-width="2"/>
+  <text x="117" y="369" font-size="15" font-weight="700" text-anchor="middle" fill="#28536b">浮点输入 x</text>
+  <text x="117" y="395" font-size="12" text-anchor="middle" fill="#52606d">同一 shape · 同一数值</text>
+
+  <path d="M180 380 H220" fill="none" stroke="#52606d" stroke-width="2.5"/>
+  <circle cx="220" cy="380" r="4" fill="#52606d"/>
+  <path d="M220 380 V330 H270" fill="none" stroke="#28536b" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
+  <path d="M220 380 V430 H270" fill="none" stroke="#c45b16" stroke-width="2.5" marker-end="url(#arrow-orange)"/>
+
+  <g text-anchor="middle">
+    <rect x="270" y="294" width="170" height="72" rx="14" fill="#e8f1f7" stroke="#79a4ba"/>
+    <text x="355" y="322" font-size="14" font-weight="700" fill="#28536b">A 浮点参考</text>
+    <text x="355" y="347" font-size="12" fill="#52606d">Float32 / reference</text>
+
+    <rect x="488" y="294" width="170" height="72" rx="14" fill="#e8f1f7" stroke="#79a4ba"/>
+    <text x="573" y="322" font-size="14" font-weight="700" fill="#28536b">浮点 Linear</text>
+    <text x="573" y="347" font-size="12" fill="#52606d">产生基线输出</text>
+
+    <rect x="706" y="294" width="144" height="72" rx="14" fill="#ffffff" stroke="#79a4ba"/>
+    <text x="778" y="322" font-size="14" font-weight="700" fill="#28536b">基线结果</text>
+    <text x="778" y="347" font-size="12" fill="#52606d">y_ref</text>
+
+    <rect x="270" y="394" width="170" height="72" rx="14" fill="#fff0dc" stroke="#e8a765"/>
+    <text x="355" y="422" font-size="14" font-weight="700" fill="#9a4d13">B GGUF 量化权重</text>
+    <text x="355" y="447" font-size="12" fill="#6f5438">整数值 + scale + block</text>
+
+    <rect x="488" y="386" width="170" height="88" rx="14" fill="#c45b16" filter="url(#shadow)"/>
+    <text x="573" y="417" font-size="14" font-weight="700" fill="#ffffff">量化 Linear</text>
+    <text x="573" y="442" font-size="12" fill="#fff2e8">reference / fused / CUDA</text>
+    <text x="573" y="460" font-size="11" fill="#ffe1cf">外部接口保持一致</text>
+
+    <rect x="706" y="394" width="144" height="72" rx="14" fill="#ffffff" stroke="#e8a765"/>
+    <text x="778" y="422" font-size="14" font-weight="700" fill="#9a4d13">量化结果</text>
+    <text x="778" y="447" font-size="12" fill="#6f5438">y_quant</text>
+
+    <rect x="914" y="306" width="232" height="148" rx="17" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
+    <text x="1030" y="339" font-size="15" font-weight="700" fill="#0f5f59">用证据决定是否保留</text>
+    <text x="1030" y="369" font-size="13" fill="#52606d">输出误差</text>
+    <text x="1030" y="395" font-size="13" fill="#52606d">权重 payload 大小</text>
+    <text x="1030" y="421" font-size="13" fill="#52606d">延迟与执行路径</text>
   </g>
-  <path d="M690 169H710M810 169H830M930 169H950M1050 169H1060" stroke="#991b1b" stroke-width="2" marker-end="url(#a)"/>
+
+  <path d="M440 330 H488" fill="none" stroke="#28536b" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
+  <path d="M658 330 H706" fill="none" stroke="#28536b" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
+  <path d="M440 430 H488" fill="none" stroke="#c45b16" stroke-width="2.5" marker-end="url(#arrow-orange)"/>
+  <path d="M658 430 H706" fill="none" stroke="#c45b16" stroke-width="2.5" marker-end="url(#arrow-orange)"/>
+  <path d="M850 330 H914" fill="none" stroke="#28536b" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
+  <path d="M850 430 H914" fill="none" stroke="#c45b16" stroke-width="2.5" marker-end="url(#arrow-orange)"/>
+
+  <rect x="54" y="510" width="1092" height="72" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
+  <text x="78" y="539" font-size="14" font-weight="700" fill="#52606d">本章使用的权重格式与执行路径</text>
+  <g text-anchor="middle" font-size="12">
+    <rect x="340" y="526" width="140" height="38" rx="10" fill="#fff0dc"/><text x="410" y="550" fill="#9a4d13">INT8 + scale</text>
+    <rect x="494" y="526" width="140" height="38" rx="10" fill="#fff0dc"/><text x="564" y="550" fill="#9a4d13">GGUF Q4_K</text>
+    <rect x="648" y="526" width="140" height="38" rx="10" fill="#fff0dc"/><text x="718" y="550" fill="#9a4d13">GGUF Q6_K</text>
+    <rect x="802" y="526" width="140" height="38" rx="10" fill="#fff0dc"/><text x="872" y="550" fill="#9a4d13">GGUF Q8_0</text>
+  </g>
+
+  <rect x="54" y="613" width="1092" height="42" rx="12" fill="#173f3c"/>
+  <text x="600" y="640" font-size="14" font-weight="700" text-anchor="middle" fill="#ffffff">学习结果：能先证明量化结果正确，再判断存储、带宽或延迟收益是否值得采用</text>
 </svg>
