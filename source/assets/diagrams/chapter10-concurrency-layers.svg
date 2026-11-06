@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter10 连接并发、请求并发与 Tensor Batch</title>
+  <desc id="desc">多个网络连接可以并发解析和写回，ServiceCore 可以同时保存多个 waiting 和 running 请求，Chapter08 Scheduler 每步选择请求并形成 StepBatchPlan，真实 Tensor Batch 才把多行激活交给同一次模型调用。RequestWorkerPool 是独立 Context 的 CPU 线程重叠路径，不等同于 Tensor Batch。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#52606d"/></marker>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 27px; font-weight: 700; fill: #172033; }
+      .label { font-size: 16px; font-weight: 700; fill: #172033; }
+      .text { font-size: 13px; fill: #475569; }
+      .small { font-size: 12px; fill: #64748b; }
+      .line { fill: none; stroke: #52606d; stroke-width: 2.4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="700" rx="24" fill="#f8fafc"/>
+  <text x="48" y="52" class="title">Chapter10 · “同时处理多个请求”发生在哪一层</text>
+  <text x="48" y="80" class="text">上层并发扩大可接入请求数；只有最下层 Tensor Batch 合并模型计算</text>
+
+  <rect x="64" y="116" width="1072" height="108" rx="18" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="90" y="150" class="label">1 Transport 连接并发</text>
+  <text x="90" y="182" class="text">网络线程并行不代表模型并行</text>
+  <rect x="368" y="136" width="176" height="60" rx="12" fill="#fff" stroke="#60a5fa"/><text x="456" y="162" text-anchor="middle" class="text">Connection A</text><text x="456" y="183" text-anchor="middle" class="small">解析 / SSE 写回</text>
+  <rect x="568" y="136" width="176" height="60" rx="12" fill="#fff" stroke="#60a5fa"/><text x="656" y="162" text-anchor="middle" class="text">Connection B</text><text x="656" y="183" text-anchor="middle" class="small">解析 / SSE 写回</text>
+  <rect x="768" y="136" width="176" height="60" rx="12" fill="#fff" stroke="#60a5fa"/><text x="856" y="162" text-anchor="middle" class="text">Connection C</text><text x="856" y="183" text-anchor="middle" class="small">解析 / SSE 写回</text>
+
+  <path d="M600 224V252" class="line"/>
+  <rect x="126" y="258" width="948" height="104" rx="18" fill="#ede9fe" stroke="#a78bfa" stroke-width="2"/>
+  <text x="152" y="292" class="label">2 ServiceCore 请求并发</text>
+  <text x="152" y="320" class="text">waiting 与 running 中同时保存多个 Request、Deadline、Writer 和独立 Executor/Context</text>
+  <rect x="720" y="278" width="152" height="56" rx="11" fill="#fff" stroke="#a78bfa"/><text x="796" y="312" text-anchor="middle" class="text">Request A</text>
+  <rect x="888" y="278" width="152" height="56" rx="11" fill="#fff" stroke="#a78bfa"/><text x="964" y="312" text-anchor="middle" class="text">Request B</text>
+
+  <path d="M600 362V390" class="line"/>
+  <rect x="188" y="396" width="824" height="104" rx="18" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+  <text x="214" y="430" class="label">3 Chapter08 Step batch</text>
+  <text x="214" y="458" class="text">Scheduler 按 token、请求数和 K/V 预算选择本步行，不执行网络写回</text>
+  <rect x="704" y="416" width="274" height="56" rx="11" fill="#fff" stroke="#f59e0b"/><text x="841" y="450" text-anchor="middle" class="text">StepBatchPlan: A + B</text>
+
+  <path d="M600 500V528" class="line"/>
+  <rect x="250" y="534" width="700" height="104" rx="18" fill="#0f766e"/>
+  <text x="600" y="570" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">4 真实 Tensor Batch</text>
+  <text x="600" y="598" text-anchor="middle" font-size="13" fill="#d9fffa">多行激活 → 一次批量 Linear / Decoder 调用 → 多行 logits</text>
+  <text x="600" y="622" text-anchor="middle" font-size="12" fill="#b5e4de">共享只读权重；position、BlockTable 和分页 K/V 仍按请求隔离</text>
+
+  <rect x="24" y="426" width="140" height="184" rx="16" fill="#fff" stroke="#94a3b8" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="94" y="458" text-anchor="middle" class="label">Worker Pool</text>
+  <text x="94" y="486" text-anchor="middle" class="small">CPU 线程重叠</text>
+  <text x="94" y="510" text-anchor="middle" class="small">独立 Context</text>
+  <text x="94" y="550" text-anchor="middle" class="small">绕过 StepPlan</text>
+  <text x="94" y="574" text-anchor="middle" class="small">不是 Tensor Batch</text>
+  <path d="M126 310H94V421" class="line"/>
+
+  <text x="48" y="674" class="text">判断是否“真正批量执行”，要看多个请求是否进入同一次模型算子调用，而不是只看线程数或连接数。</text>
+</svg>

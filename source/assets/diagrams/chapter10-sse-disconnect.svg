@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter10 SSE 写回、断连与资源释放</title>
+  <desc id="desc">HTTP Adapter 完成准入并写出 SSE headers。每个词元先由 Runtime 提交到 Request，再交给 ResponseWriter。写回成功则继续；客户端断开或背压则取消请求，结束 Writer，并通过 ServiceCore 统一释放 Executor、Context 和分页 K/V。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#52606d"/></marker>
+    <marker id="good" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#0f766e"/></marker>
+    <marker id="bad" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#b45309"/></marker>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 27px; font-weight: 700; fill: #172033; }
+      .label { font-size: 16px; font-weight: 700; fill: #172033; }
+      .text { font-size: 13px; fill: #475569; }
+      .light-label { font-size: 16px; font-weight: 700; fill: #ffffff; }
+      .light-text { font-size: 13px; fill: #d9fffa; }
+      .line { fill: none; stroke: #52606d; stroke-width: 2.4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="650" rx="24" fill="#f8fafc"/>
+  <text x="48" y="52" class="title">Chapter10 · 一个 SSE 词元从模型到连接</text>
+  <text x="48" y="80" class="text">模型提交与网络写回是两个检查点；连接失败不能撤回已经发送的事件</text>
+
+  <g text-anchor="middle">
+    <rect x="48" y="122" width="190" height="96" rx="15" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+    <text x="143" y="156" class="label">1 请求准入</text><text x="143" y="184" class="text">创建 Request 与 Executor</text><text x="143" y="204" class="text">进入 ServiceCore</text>
+    <rect x="286" y="122" width="190" height="96" rx="15" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+    <text x="381" y="156" class="label">2 写 SSE headers</text><text x="381" y="184" class="text">HTTP 200</text><text x="381" y="204" class="text">text/event-stream</text>
+    <rect x="524" y="114" width="200" height="112" rx="15" fill="#0f766e"/>
+    <text x="624" y="152" class="light-label">3 执行一步</text><text x="624" y="181" class="light-text">Scheduler → Runtime</text><text x="624" y="205" class="light-text">词元先提交到 Request</text>
+    <rect x="772" y="122" width="190" height="96" rx="15" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+    <text x="867" y="156" class="label">4 写词元事件</text><text x="867" y="184" class="text">ResponseWriter</text><text x="867" y="204" class="text">返回 WriteResult</text>
+    <rect x="1010" y="122" width="142" height="96" rx="15" fill="#fff" stroke="#94a3b8" stroke-width="2"/>
+    <text x="1081" y="156" class="label">5 判断结果</text><text x="1081" y="184" class="text">ok / closed</text><text x="1081" y="204" class="text">/ backpressure</text>
+  </g>
+  <path d="M238 170H281" class="line"/><path d="M476 170H519" class="line"/><path d="M724 170H767" class="line"/><path d="M962 170H1005" class="line"/>
+
+  <rect x="112" y="316" width="418" height="118" rx="17" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+  <text x="138" y="352" class="label" fill="#065f46">写回成功：继续或正常结束</text>
+  <text x="138" y="382" class="text">继续：下一步生成并写出递增的 step</text>
+  <text x="138" y="408" class="text">终态：写唯一 finish event，再调用 writer.finish()</text>
+  <path d="M1081 218V268H321V311" fill="none" stroke="#0f766e" stroke-width="2.5" marker-end="url(#good)"/>
+  <text x="700" y="260" class="text" fill="#065f46">WriteResult::ok</text>
+
+  <rect x="650" y="316" width="438" height="118" rx="17" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+  <text x="676" y="352" class="label" fill="#92400e">断连或背压：停止生成</text>
+  <text x="676" y="382" class="text">ServiceCore::cancel(request_id)</text>
+  <text x="676" y="408" class="text">不重发已写词元；当前实现不暂停等待连接恢复</text>
+  <path d="M1081 218V311" fill="none" stroke="#b45309" stroke-width="2.5" marker-end="url(#bad)"/>
+
+  <rect x="236" y="502" width="728" height="88" rx="17" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2"/>
+  <text x="600" y="536" text-anchor="middle" class="label">统一结束与释放</text>
+  <text x="600" y="564" text-anchor="middle" class="text">writer.finish() → release_terminal() → 解绑 Request → 释放 Context 与分页 K/V</text>
+  <path d="M321 434V497" fill="none" stroke="#0f766e" stroke-width="2.5" marker-end="url(#good)"/>
+  <path d="M869 434V497" fill="none" stroke="#b45309" stroke-width="2.5" marker-end="url(#bad)"/>
+
+  <text x="48" y="624" class="text">headers 发出后，连接上的 HTTP 状态已经确定；后续错误通过关闭连接、最终事件（若仍可写）和服务指标表达。</text>
+</svg>

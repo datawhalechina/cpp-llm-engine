@@ -10,6 +10,10 @@
 | Step batch | 一个调度步选择多个请求 | Chapter08 StepBatchPlan |
 | Tensor batch | 多行激活进入一次模型/算子调用 | Chapter08 批量执行证据 |
 
+下图从连接入口一直追踪到模型调用。连接、请求和 Worker 可以同时存在多个对象，但只有多个请求的激活进入同一次模型调用时，才属于真实 Tensor Batch。
+
+![连接并发、请求并发与 Tensor Batch](../../assets/diagrams/chapter10-concurrency-layers.svg)
+
 ## 并发对象必须隔离
 
 共享 Model 权重可以只读复用，每个请求的 token history、位置、Sampler 状态、Context 和 K/V 所有权必须独立。ServiceCore 只把可运行集合提交给 Scheduler，不在 Worker 内复制全局队列。

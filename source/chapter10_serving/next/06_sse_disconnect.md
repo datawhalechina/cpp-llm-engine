@@ -12,6 +12,10 @@ SSE 在 headers 发出后持续写入词元事件。<a href="../../_code/chapter
 | `write_event` → Backpressure | 暂时无法写出 | 当前取消请求并释放资源 |
 | `finish` | Transport 结束响应 | 不重复释放模型资源 |
 
+下图把模型词元提交和网络写回分成两个检查点。词元进入 Request 后才调用 Writer；如果连接在此时断开，服务停止后续生成并释放资源，但不会重发已经成功写出的事件。
+
+![SSE 写回、断连与资源释放](../../assets/diagrams/chapter10-sse-disconnect.svg)
+
 ## 词元事件必须保持顺序
 
 每个 event 携带 request ID 隐含的连接归属、token 和 step。Worker 可以并发产生不同请求的事件，但同一请求不能重排、重复或在终态后继续发送。
