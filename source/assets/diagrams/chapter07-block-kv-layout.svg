@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 07 分页 K/V 的逻辑位置与物理布局</title>
+  <desc id="desc">请求的连续逻辑词元先经 BlockTable 映射到非连续物理块，CpuPagedKvCache 按层、块、槽位、KV 头和向量维度保存 payload，Attention 按页表读取。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0 0L9 4.5L0 9Z" fill="#475569"/>
+    </marker>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 26px; font-weight: 700; fill: #172033; }
+      .label { font-size: 17px; font-weight: 700; fill: #172033; }
+      .text { font-size: 14px; fill: #334155; }
+      .small { font-size: 13px; fill: #475569; }
+      .line { stroke: #475569; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1200" height="650" rx="22" fill="#f8fafc"/>
+  <text x="42" y="48" class="title">Chapter 07 · 从逻辑词元到分页 K/V payload</text>
+
+  <rect x="42" y="82" width="310" height="270" rx="16" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+  <text x="66" y="118" class="label">请求 A · 连续逻辑词元</text>
+  <text x="66" y="144" class="small">block_size = 3，token_count = 6</text>
+  <g class="text" text-anchor="middle">
+    <rect x="66" y="178" width="78" height="56" rx="9" fill="#dbeafe"/><text x="105" y="201">token 0</text><text x="105" y="220">slot 0</text>
+    <rect x="152" y="178" width="78" height="56" rx="9" fill="#dbeafe"/><text x="191" y="201">token 1</text><text x="191" y="220">slot 1</text>
+    <rect x="238" y="178" width="78" height="56" rx="9" fill="#dbeafe"/><text x="277" y="201">token 2</text><text x="277" y="220">slot 2</text>
+    <rect x="66" y="260" width="78" height="56" rx="9" fill="#bfdbfe"/><text x="105" y="283">token 3</text><text x="105" y="302">slot 0</text>
+    <rect x="152" y="260" width="78" height="56" rx="9" fill="#bfdbfe"/><text x="191" y="283">token 4</text><text x="191" y="302">slot 1</text>
+    <rect x="238" y="260" width="78" height="56" rx="9" fill="#bfdbfe"/><text x="277" y="283">token 5</text><text x="277" y="302">slot 2</text>
+  </g>
+
+  <rect x="415" y="102" width="255" height="230" rx="16" fill="#fff7ed" stroke="#d97706" stroke-width="2"/>
+  <text x="439" y="138" class="label">BlockTable A</text>
+  <text x="439" y="164" class="small">逻辑块不要求物理连续</text>
+  <g class="text">
+    <rect x="439" y="190" width="207" height="48" rx="9" fill="#ffedd5"/>
+    <text x="458" y="220">logical 0</text><text x="558" y="220">→ physical 2</text>
+    <rect x="439" y="252" width="207" height="48" rx="9" fill="#fed7aa"/>
+    <text x="458" y="282">logical 1</text><text x="558" y="282">→ physical 0</text>
+  </g>
+
+  <rect x="735" y="82" width="423" height="270" rx="16" fill="#ecfdf5" stroke="#16a34a" stroke-width="2"/>
+  <text x="759" y="118" class="label">KvBlockPool · 物理块</text>
+  <text x="759" y="144" class="small">块 ID 可被不同请求分配和回收</text>
+  <g class="text" text-anchor="middle">
+    <rect x="759" y="178" width="174" height="62" rx="10" fill="#86efac"/><text x="846" y="203">physical 0 · A</text><text x="846" y="224">tokens 3–5</text>
+    <rect x="947" y="178" width="174" height="62" rx="10" fill="#fde68a"/><text x="1034" y="203">physical 1 · B</text><text x="1034" y="224">其他请求</text>
+    <rect x="759" y="256" width="174" height="62" rx="10" fill="#bbf7d0"/><text x="846" y="281">physical 2 · A</text><text x="846" y="302">tokens 0–2</text>
+    <rect x="947" y="256" width="174" height="62" rx="10" fill="#e2e8f0"/><text x="1034" y="281">physical 3</text><text x="1034" y="302">free</text>
+  </g>
+
+  <path d="M352 217H410" class="line"/>
+  <path d="M670 217H730" class="line"/>
+
+  <rect x="42" y="382" width="760" height="110" rx="14" fill="#f5f3ff" stroke="#7c3aed" stroke-width="2"/>
+  <text x="66" y="416" class="label">CpuPagedKvCache · K/V 数据面</text>
+  <text x="66" y="444" class="text">[layer][physical block][slot][kv head][head dimension]</text>
+  <text x="66" y="470" class="small">页表管位置，payload 保存每层真实 key/value 向量</text>
+
+  <rect x="860" y="382" width="298" height="110" rx="14" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+  <text x="884" y="416" class="label">分页 Attention</text>
+  <text x="884" y="444" class="text">query + BlockTable</text>
+  <text x="884" y="470" class="small">按页读取历史 K/V，不拼回连续数组</text>
+
+  <path d="M542 332V377" class="line"/>
+  <path d="M846 352V365H780V377" class="line"/>
+  <path d="M802 437H855" class="line"/>
+
+  <rect x="42" y="530" width="1116" height="86" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
+  <g class="text" text-anchor="middle">
+    <text x="172" y="564" class="label">reserve</text><text x="172" y="590">足量才一次性分配</text>
+    <text x="450" y="564" class="label">write / commit</text><text x="450" y="590">逐层写完后才可读</text>
+    <text x="728" y="564" class="label">locate / attention</text><text x="728" y="590">页表定位并直接读取</text>
+    <text x="1006" y="564" class="label">release / reuse</text><text x="1006" y="590">清理 payload 后才能复用</text>
+  </g>
+  <path d="M282 572H330" class="line"/>
+  <path d="M560 572H608" class="line"/>
+  <path d="M838 572H886" class="line"/>
+</svg>

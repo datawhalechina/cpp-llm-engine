@@ -41,6 +41,10 @@ BlockTable 再把 `logical_block` 查成 `physical_block`。最终位置由 `{ph
 
 控制面只保存物理 Block ID、Slot 和有效 token 数；数据面保存真正的 key/value 浮点数。源码分别位于 <a href="/_code/chapter07_kv_cache/include/chapter07_kv_cache/block_table.h"><code>block_table.h</code></a> 和 <a href="/_code/chapter07_kv_cache/src/paged_kv_cache.cpp"><code>paged_kv_cache.cpp</code></a>。
 
+下图把两步地址转换和最终 payload 布局放在同一条链上。请求 A 的逻辑位置始终连续，物理块却可以分散且与其他请求共用同一内存池。
+
+![逻辑词元经块表映射到物理块和分页 K/V payload](../../assets/diagrams/chapter07-block-kv-layout.svg)
+
 ## 验证跨 Block 读写
 
 ```bash

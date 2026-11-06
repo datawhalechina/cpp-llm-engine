@@ -46,3 +46,7 @@ ctest --test-dir /tmp/cpp-llm-chapter08-overlap \
 | 同步与预计算路径结果一致 | CPU 调度已经与 GPU Kernel 并行 |
 | 取消、前序推进和策略变化使计划失效 | 已有设备完成事件 |
 | 关闭后安全回退 | 已有双缓冲模型输出 |
+
+下图将“提前准备”和“可以执行”分开。预计算计划必须等第 N 步提交后重新校验；任何状态变化都会使其失效。
+
+![重叠调度的快照与失效](../../assets/diagrams/chapter08-overlap-timeline.svg)

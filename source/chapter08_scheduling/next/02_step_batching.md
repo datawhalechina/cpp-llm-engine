@@ -35,6 +35,10 @@ build read-only plan
 | 失败或无进展 | 失败或保持原状态 | 裁剪到执行前计数 | 不产生词元事件 |
 | 已处于终态 | 不进入计划 | 不变 | 不计入候选 |
 
+下图把 Chapter06 的模型执行、Chapter07 的分页缓存与本章调度放进同一事务。终态后的资源释放由 Chapter10 ServiceCore 负责，不属于单步 Planner。
+
+![一次调度步的资源事务](../../assets/diagrams/chapter08-step-transaction.svg)
+
 ## Prefill 和 Decode 怎样共享预算
 
 Decode 默认先进入计划以保护逐词元延迟；检测到可分块 Prefill 时，Planner 为新请求保留最小词元和请求槽。假设预算为 4，A 需要 Decode 一个词元，B 有三个输入词元，计划可以同时容纳 `A:1 + B:3`。

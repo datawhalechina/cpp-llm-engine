@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter08 从调度计划到真实 Tensor Batch</title>
+  <desc id="desc">StepBatchPlan 补齐 token、position 和分页 K/V 槽位后形成 ExecutorBatchInput。多请求共享模型权重和批量 Linear，各请求按自己的页表执行 Attention，最后批量 LM Head 输出结果并统一提交或回滚。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#475569"/></marker>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 27px; font-weight: 700; fill: #172033; }
+      .label { font-size: 16px; font-weight: 700; fill: #172033; }
+      .text { font-size: 13px; fill: #475569; }
+      .line { stroke: #475569; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="720" rx="24" fill="#f8fafc"/>
+  <text x="48" y="52" class="title">Chapter08 · 三层批次怎样进入一次真实模型调用</text>
+  <text x="48" y="80" class="text">批次不是循环调用单请求接口，而是让多行激活共同经过模型算子</text>
+
+  <rect x="48" y="114" width="260" height="92" rx="15" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="178" y="148" text-anchor="middle" class="label">Step batch</text><text x="178" y="176" text-anchor="middle" class="text">请求、Prefill/Decode、token 数</text>
+  <rect x="470" y="114" width="260" height="92" rx="15" fill="#fff7ed" stroke="#fb923c" stroke-width="2"/>
+  <text x="600" y="148" text-anchor="middle" class="label">Executor batch</text><text x="600" y="176" text-anchor="middle" class="text">token、position、分页 K/V 槽</text>
+  <rect x="892" y="114" width="260" height="92" rx="15" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+  <text x="1022" y="148" text-anchor="middle" class="label">Tensor batch</text><text x="1022" y="176" text-anchor="middle" class="text">多行激活进入共享算子</text>
+  <path d="M308 160H465" class="line"/><path d="M730 160H887" class="line"/>
+  <text x="389" y="146" text-anchor="middle" class="text">补齐模型输入</text><text x="811" y="146" text-anchor="middle" class="text">打包多行</text>
+
+  <rect x="48" y="258" width="1104" height="300" rx="19" fill="#fff" stroke="#cbd5e1"/>
+  <text x="72" y="292" class="label">一个 Decoder Layer 内的共享计算与独立历史</text>
+  <rect x="76" y="340" width="220" height="104" rx="15" fill="#fef3c7" stroke="#f59e0b"/>
+  <text x="186" y="374" text-anchor="middle" class="label">Batch Q / K / V</text><text x="186" y="403" text-anchor="middle" class="text">多行共同遍历量化权重</text><text x="186" y="427" text-anchor="middle" class="text">共享只读 Model</text>
+  <rect x="378" y="318" width="300" height="96" rx="15" fill="#dbeafe" stroke="#60a5fa"/>
+  <text x="528" y="352" text-anchor="middle" class="label">Request A Attention</text><text x="528" y="380" text-anchor="middle" class="text">position A · BlockTable A</text><text x="528" y="402" text-anchor="middle" class="text">读取/写入分页 K/V A</text>
+  <rect x="378" y="438" width="300" height="96" rx="15" fill="#e0f2fe" stroke="#38bdf8"/>
+  <text x="528" y="472" text-anchor="middle" class="label">Request B Attention</text><text x="528" y="500" text-anchor="middle" class="text">position B · BlockTable B</text><text x="528" y="522" text-anchor="middle" class="text">读取/写入分页 K/V B</text>
+  <path d="M296 392H334V366H373" class="line"/><path d="M334 392V486H373" class="line"/>
+  <rect x="760" y="340" width="240" height="104" rx="15" fill="#fef3c7" stroke="#f59e0b"/>
+  <text x="880" y="374" text-anchor="middle" class="label">Batch Output + FFN</text><text x="880" y="403" text-anchor="middle" class="text">合并多行继续计算</text><text x="880" y="427" text-anchor="middle" class="text">再拆回各请求 hidden</text>
+  <path d="M678 366H718V392H755" class="line"/><path d="M678 486H718V392" class="line"/>
+  <rect x="1032" y="340" width="96" height="104" rx="15" fill="#ede9fe" stroke="#a78bfa"/>
+  <text x="1080" y="378" text-anchor="middle" class="label">下一层</text><text x="1080" y="407" text-anchor="middle" class="text">重复</text>
+  <path d="M1000 392H1027" class="line"/>
+
+  <rect x="126" y="610" width="340" height="72" rx="15" fill="#fef3c7" stroke="#f59e0b"/>
+  <text x="296" y="640" text-anchor="middle" class="label">Batch LM Head</text><text x="296" y="665" text-anchor="middle" class="text">多行 hidden → 多行 logits</text>
+  <rect x="650" y="598" width="424" height="96" rx="15" fill="#ecfdf5" stroke="#10b981"/>
+  <text x="674" y="630" class="label">整批提交或回滚</text><text x="674" y="658" class="text">成功：分别推进请求位置并提交分页 K/V</text><text x="674" y="681" class="text">失败：所有请求裁剪到本步执行前计数</text>
+  <path d="M880 444V578H296V605" class="line"/><path d="M466 646H645" class="line"/>
+</svg>

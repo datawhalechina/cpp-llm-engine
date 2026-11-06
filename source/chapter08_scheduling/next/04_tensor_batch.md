@@ -41,6 +41,10 @@ admission bind request ID
 | ServiceCore 自动传递 request ID 并选择真实 batch | 协作式抢占和设备事件重叠 |
 | Context position、页表和分页 payload 同步提交 | 跨请求 Prefix Cache |
 
+下图强调共享模型计算与独立请求历史的分界：Linear 和 LM Head 接收多行激活，每个请求的 Attention 仍通过自己的 BlockTable 访问分页 K/V。
+
+![从调度计划到真实 Tensor Batch](../../assets/diagrams/chapter08-real-batch-execution.svg)
+
 ## 验证教学批次和真实模型
 
 ```bash

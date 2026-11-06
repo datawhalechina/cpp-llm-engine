@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter08 一次调度步的资源事务</title>
+  <desc id="desc">运行请求先生成只读计划，再向 Chapter07 分页缓存预留空间，交给 Chapter06 Runtime 执行。成功时提交请求和缓存进度，失败时裁剪到执行前计数；终态资源由 Chapter10 服务层统一释放。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#52606d"/></marker>
+    <marker id="good" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#0f766e"/></marker>
+    <marker id="bad" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#b45309"/></marker>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 27px; font-weight: 700; fill: #172033; }
+      .label { font-size: 16px; font-weight: 700; fill: #172033; }
+      .text { font-size: 13px; fill: #475569; }
+      .light-label { font-size: 16px; font-weight: 700; fill: #ffffff; }
+      .light-text { font-size: 13px; fill: #d9fffa; }
+      .line { fill: none; stroke: #52606d; stroke-width: 2.4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="610" rx="24" fill="#f8fafc"/>
+  <text x="50" y="52" class="title">Chapter08 · 一次调度步怎样保持请求与 K/V 一致</text>
+  <text x="50" y="82" class="text">计划阶段只读；资源预留和模型执行发生在执行阶段；提交或回滚必须成对出现</text>
+
+  <g text-anchor="middle">
+    <rect x="48" y="128" width="190" height="108" rx="16" fill="#fff" stroke="#94a3b8" stroke-width="2"/>
+    <text x="143" y="162" class="label">1 读取运行集合</text><text x="143" y="190" class="text">Request 与预算</text><text x="143" y="214" class="text">不改变任何状态</text>
+    <rect x="282" y="128" width="190" height="108" rx="16" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+    <text x="377" y="162" class="label">2 生成只读计划</text><text x="377" y="190" class="text">StepBatchPlan</text><text x="377" y="214" class="text">候选、阶段与 token 数</text>
+    <rect x="516" y="128" width="190" height="108" rx="16" fill="#fff7ed" stroke="#fb923c" stroke-width="2"/>
+    <text x="611" y="162" class="label">3 预留分页 K/V</text><text x="611" y="190" class="text">Chapter07 Block Pool</text><text x="611" y="214" class="text">记录执行前 token 数</text>
+    <rect x="750" y="120" width="200" height="124" rx="16" fill="#0f766e"/>
+    <text x="850" y="158" class="light-label">4 执行模型</text><text x="850" y="187" class="light-text">Chapter06 Runtime</text><text x="850" y="212" class="light-text">Prefill chunk / Decode</text><text x="850" y="232" font-size="12" fill="#b5e4de">逐层写入 K/V payload</text>
+    <rect x="994" y="128" width="158" height="108" rx="16" fill="#fff" stroke="#0f766e" stroke-width="2"/>
+    <text x="1073" y="162" class="label">5 检查结果</text><text x="1073" y="190" class="text">是否成功推进</text><text x="1073" y="214" class="text">advanced?</text>
+  </g>
+  <path d="M238 182H277" class="line"/><path d="M472 182H511" class="line"/><path d="M706 182H745" class="line"/><path d="M950 182H989" class="line"/>
+
+  <rect x="160" y="330" width="390" height="120" rx="17" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+  <text x="186" y="365" class="label" fill="#065f46">成功并前进：提交</text>
+  <text x="186" y="395" class="text">更新 Prefill 游标或追加生成词元</text>
+  <text x="186" y="422" class="text">提交 BlockTable token 数，保留本步 K/V</text>
+  <rect x="650" y="330" width="390" height="120" rx="17" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+  <text x="676" y="365" class="label" fill="#92400e">失败或未前进：回滚</text>
+  <text x="676" y="395" class="text">请求失败或保持执行前进度</text>
+  <text x="676" y="422" class="text">trim_to_tokens(previous_count) 撤销预留</text>
+  <path d="M1073 236V286H355V325" fill="none" stroke="#0f766e" stroke-width="2.5" marker-end="url(#good)"/>
+  <text x="605" y="278" font-size="12" fill="#0f766e">是</text>
+  <path d="M1073 236V286H845V325" fill="none" stroke="#b45309" stroke-width="2.5" marker-end="url(#bad)"/>
+  <text x="960" y="278" font-size="12" fill="#92400e">否</text>
+
+  <rect x="160" y="506" width="880" height="62" rx="15" fill="#e2e8f0" stroke="#94a3b8"/>
+  <text x="600" y="532" text-anchor="middle" class="label">终态后的统一释放属于 Chapter10 ServiceCore</text>
+  <text x="600" y="555" text-anchor="middle" class="text">结束流式响应、解绑请求、释放 Context，并归还物理块</text>
+  <path d="M355 450V501" fill="none" stroke="#0f766e" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#good)"/>
+  <path d="M845 450V501" fill="none" stroke="#b45309" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#bad)"/>
+</svg>
