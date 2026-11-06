@@ -16,6 +16,10 @@
 - [chapter02_nd_tensor_design.md](./chapter02_nd_tensor_design.md)：Chapter02 N 维 Tensor 重构规格
 - [chapter04_tensor_handoff_design.md](./chapter04_tensor_handoff_design.md)：Chapter02 到 Chapter04 的 Attention Tensor 交接规格
 - [tensor_type_migration.md](./tensor_type_migration.md)：跨章 Tensor 类型、公共 View、adapter 收口和逐步验证路线
+- [chapter06_10_restructure_plan.md](./chapter06_10_restructure_plan.md)：Chapter06–10 目标小节、旧资产迁移和分阶段验收矩阵
+- [chapter01_10_content_design.md](./chapter01_10_content_design.md)：Chapter01–10 主图、正文小节和章间交接矩阵
+- [chapter00_10_teaching_audit.md](./chapter00_10_teaching_audit.md)：Chapter00–10 教学职责、成熟度和发布门槛审核
+- [chapter04_06_test_ownership_audit.md](./chapter04_06_test_ownership_audit.md)：Chapter04–08 测试归属、有效证据和迁移结论
 - [summary_template.md](./summary_template.md)：章节收口模板
 
 ## 怎么用

@@ -28,7 +28,7 @@
 
 ### 2.1 正文与学习计划独立
 
-`Foundation`、`Chapter00-09` 和 `reference` 是稳定知识资产；`source/guides/` 下的学习计划是这些资产的可变编排。仓库可以同时维护 CPU 入门、源码阅读、性能优化或 GPU 等多套计划。
+`Foundation`、`Chapter00-10` 和 `reference` 是稳定知识资产；`source/guides/` 下的学习计划是这些资产的可变编排。仓库可以同时维护 CPU 入门、源码阅读、性能优化或 GPU 等多套计划。
 
 - 学习计划可以引用章节、代码、练习和验证命令。
 - 章节正文不得引用 `Task 1`、`任务 4` 或“第一期计划”等具体计划编号。
@@ -38,7 +38,7 @@
 
 ### 2.2 学习者内容与维护内容分离
 
-学习者页面包括根 README、站点首页、阅读指南、Foundation、Chapter00-09、guides、reference 和 exercises。维护内容只保存在 `source/maintenance/`、`SESSION_HANDOFF.md` 和贡献者入口中。
+学习者页面包括根 README、站点首页、阅读指南、Foundation、Chapter00-10、guides、reference 和 exercises。维护内容只保存在 `source/maintenance/`、`SESSION_HANDOFF.md` 和贡献者入口中。
 
 - 学习者页面只写可执行的学习目标、运行条件、技术限制和验收标准。
 - 教程建设进度、英文覆盖率、当前就绪度、P0/P1、缺口清单和内容补强顺序不得出现在学习者导航中。

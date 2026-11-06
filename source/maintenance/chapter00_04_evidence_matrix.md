@@ -20,7 +20,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | Chapter00 工具链 smoke | `code/chapter00_quickstart/main_quick.cpp` | `bash code/chapter00_quickstart/run.sh` | 不适用 | `source/chapter00_quickstart/intro.md` | `chapter00-main.svg` | 默认 CPU 证据完整 |
 | Chapter00 外部真实推理 | `run_real_inference.sh`、`llama-simple` | 不进入无模型回归 | `bash code/chapter00_quickstart/run_real_inference.sh` | `04_first_inference.md` | `chapter00-real-inference-chain.svg` | 真实连通性 smoke 完整；不声明固定 token golden |
-| Chapter01 教学 Loader 与 Tokenizer | `Tensor`、`ModelLoader`、`Tokenizer` | `chapter01_tensor_loader_test` | 不适用 | `01_tensor_object.md` 至 `04_input_contract_and_tokenizer.md` | `chapter01-main.svg` | 默认 fixture 证据完整 |
+| Chapter01 教学 Loader 与 Tokenizer | `Tensor`、`ModelLoader`、`Tokenizer` | `chapter01_loader_test`、`chapter01_schema_test`、`chapter01_tokenizer_payload_test` | 不适用 | `01_tensor_object.md` 至 `04_input_contract_and_tokenizer.md` | `chapter01-main.svg` | 默认 fixture 证据完整 |
 | Chapter01 GGUF 配置与权重布局 | `GgufReader`、`ModelMetadataAdapter`、`GgufTensorLoader`、`ModelBuilder` | 默认 GGUF fixture 与 schema 错误测试 | `gguf_inspect <model> --validate-schema` | `05_model_metadata_and_gguf.md` | `chapter01-gguf-loading-chain.svg` | Reader 到 `LoadedModel` / `DecoderInput` 可核对 |
 | Chapter01 真实 Tokenizer | `RealTokenizer`、`llama_tokenizer_compare` | 不进入无 llama.cpp 回归 | `bash code/chapter01_tensor_loader/run_real_tokenizer.sh` | `04_input_contract_and_tokenizer.md` | `chapter01-input-contract.svg` | 固定 TinyLlama token IDs 可复现；脚本与 Chapter00 共用 `build-cpu` 优先规则 |
 | Chapter02 Tensor View | `Tensor`、`TensorContract`、`TensorViewRef` | Chapter02 三个 CTest | 不适用 | `source/chapter02_tensor_ops/` | `chapter02-main.svg`、`chapter02-view-materialization.svg` | 1–4 维、共享 Storage 和显式连续化证据完整 |
