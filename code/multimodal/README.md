@@ -251,7 +251,7 @@ python3 code/multimodal/reference/verify_smolvlm_dynamic_tiles_golden.py \
 
 ## 真实 ServiceCore 与 SSE 验证
 
-服务 smoke 复用动态图片产生的 `486x960` embedding，为同步 completion 和 SSE 分别创建独立的 32 层 SmolVLM Context。图片与 prompt 在进入 HttpAdapter 前已经转换为每请求 Executor；Chapter09 不解析 JPEG，也不持有 Vision Encoder。当前接口验证模型执行与服务生命周期，multipart/base64 图片协议属于后续 transport 设计。
+服务 smoke 复用动态图片产生的 `486x960` embedding，为同步 completion 和 SSE 分别创建独立的 32 层 SmolVLM Context。图片与 prompt 在进入 HttpAdapter 前已经转换为每请求 Executor；Chapter10 不解析 JPEG，也不持有 Vision Encoder。当前接口验证模型执行与服务生命周期，multipart/base64 图片协议属于后续 transport 设计。
 
 该路径需要显式启用服务集成，并使用已有 OpenBLAS、llama.cpp build、语言模型、mmproj 和固定 JPEG。运行时间明显长于单次 logits 检查，因为同步与 SSE 不能共享请求 KV 状态。
 

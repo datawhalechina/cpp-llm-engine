@@ -22,7 +22,7 @@
 #ifdef CPP_LLM_MULTIMODAL_HAS_SERVICE
 #include "chapter06_generation/runtime.h"
 #include "chapter06_generation/sampler.h"
-#include "chapter09_serving/http_adapter.h"
+#include "chapter10_serving/http_adapter.h"
 #include "cpp_llm_engine/embedding_request_executor.h"
 #endif
 #include "chapter05_quantization/q8_0_dequantize.h"
@@ -49,22 +49,22 @@ enum class InspectMode {
 };
 
 #ifdef CPP_LLM_MULTIMODAL_HAS_SERVICE
-class RecordingWriter final : public chapter09_serving::ResponseWriter {
+class RecordingWriter final : public chapter10_serving::ResponseWriter {
 public:
-    bool write_headers(const chapter09_serving::ResponseHead& value) override {
+    bool write_headers(const chapter10_serving::ResponseHead& value) override {
         head = value;
         return true;
     }
 
-    chapter09_serving::WriteResult write_event(std::string_view event) override {
+    chapter10_serving::WriteResult write_event(std::string_view event) override {
         body += event;
-        return chapter09_serving::WriteResult::Ok;
+        return chapter10_serving::WriteResult::ok;
     }
 
     void finish() override { finished = true; }
     bool client_connected() const override { return true; }
 
-    chapter09_serving::ResponseHead head;
+    chapter10_serving::ResponseHead head;
     std::string body;
     bool finished = false;
 };
@@ -574,9 +574,9 @@ int main(int argc, char** argv) {
             generation_config.eos_token_id = language_metadata.eos_token_id;
             chapter06_generation::Runtime runtime(generation_config);
             chapter06_generation::GreedySampler sampler;
-            chapter09_serving::ServingCore service(2, 2);
+            chapter10_serving::ServiceCore service(2, 2);
             std::size_t factory_calls = 0;
-            chapter09_serving::HttpAdapter adapter(
+            chapter10_serving::HttpAdapter adapter(
                 service,
                 runtime,
                 sampler,

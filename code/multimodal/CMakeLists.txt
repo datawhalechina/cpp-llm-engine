@@ -10,7 +10,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/../testing/cmake/CppLlmTesting.cmake)
 option(MULTIMODAL_ENABLE_LLAMA_CPP_TOKENIZER "Enable the optional real tokenizer path" OFF)
 option(MULTIMODAL_ENABLE_CBLAS "Enable the optional CBLAS vision compute backend" OFF)
 option(MULTIMODAL_ENABLE_SERVICE_INTEGRATION
-    "Enable the optional Chapter09 service smoke in the real projector inspector" OFF)
+    "Enable the optional Chapter10 service smoke in the real projector inspector" OFF)
 set(MULTIMODAL_CBLAS_LIBRARY "" CACHE FILEPATH "Optional CBLAS library override")
 set(LLAMA_CPP_ROOT "" CACHE PATH "llama.cpp source checkout")
 set(LLAMA_CPP_BUILD_DIR "" CACHE PATH "llama.cpp build directory containing bin/")
@@ -131,8 +131,8 @@ if(MULTIMODAL_ENABLE_SERVICE_INTEGRATION)
         ${CMAKE_CURRENT_BINARY_DIR}/chapter06_generation
     )
     add_subdirectory(
-        ${CMAKE_CURRENT_SOURCE_DIR}/../chapter09_serving
-        ${CMAKE_CURRENT_BINARY_DIR}/chapter09_serving
+        ${CMAKE_CURRENT_SOURCE_DIR}/../chapter10_serving
+        ${CMAKE_CURRENT_BINARY_DIR}/chapter10_serving
     )
     target_sources(multimodal_vision_projector_inspect PRIVATE
         ../engine/src/embedding_request_executor.cpp
@@ -141,7 +141,7 @@ if(MULTIMODAL_ENABLE_SERVICE_INTEGRATION)
         ${CMAKE_CURRENT_SOURCE_DIR}/../engine/include
     )
     target_link_libraries(multimodal_vision_projector_inspect PRIVATE
-        chapter09_serving
+        chapter10_serving
     )
     target_compile_definitions(multimodal_vision_projector_inspect PRIVATE
         CPP_LLM_MULTIMODAL_HAS_SERVICE=1
