@@ -8,7 +8,7 @@ SmolVLM 500M 的 IDEFICS3 图片路径用于说明图片进入模型前发生的
 
 ## 为什么选择 SmolVLM 和固定图片
 
-SmolVLM 500M Instruct 的规模允许在单机 CPU 上逐阶段执行，IDEFICS3 又把多模态输入的关键结构显式分开：动态 tiles 与 overview、SigLIP Vision Encoder、空间合并 Projector，以及与语言模型同宽的 visual embedding。语言侧仍是 Llama 风格 Decoder，因此图片进入统一 embedding sequence 后可以复用 Chapter06 Runtime 和 Chapter09 ServiceCore。
+SmolVLM 500M Instruct 的规模允许在单机 CPU 上逐阶段执行，IDEFICS3 又把多模态输入的关键结构显式分开：动态 tiles 与 overview、SigLIP Vision Encoder、空间合并 Projector，以及与语言模型同宽的 visual embedding。语言侧仍是 Llama 风格 Decoder，因此图片进入统一 embedding sequence 后可以复用 Chapter06 Runtime 和 Chapter10 ServiceCore。
 
 当前选择 Q8_0 是为了让视觉权重保持量化表示，同时使用规则明确的 `FP16 scale + 32×int8` block 建立第一条解码和 Linear golden。`llama.cpp` 的 mtmd 路径能够加载同一语言模型、mmproj、图片和 prompt，提供独立外部答案与切图数量。
 
@@ -88,11 +88,13 @@ overview 将原图直接缩放为一张 512×512 全局图，保留整体关系�
 | Chapter03-04 | 实现 Vision Linear、Attention、Norm 和 FFN |
 | Chapter06 | 接收统一 embedding sequence 并推进生成 |
 | Chapter05 | 执行量化视觉权重和 Projector Linear |
-| Chapter07-09 | 验证视觉正确性、阶段耗时、服务输入和资源释放 |
+| Chapter07-08 | 复用 K/V 资源和多请求调度契约 |
+| Chapter09 | 验证视觉正确性、阶段耗时和性能证据 |
+| Chapter10 | 接入服务输入、同步/SSE 输出和终态释放 |
 
 ## 一个图文请求怎样进入现有 Runtime
 
-图片输入管线在统一 embedding sequence 处结束。Engine 的 `EmbeddingRequestExecutor` 持有该序列和独立 Decoder Context，并实现 Chapter06 已有的 `RequestModelExecutor`：prefill 消费整段 embedding，decode 消费上一步 token。Chapter06 继续负责 Request 状态、采样、KV 生命周期和调度，Chapter09 继续负责 admission、HTTP/SSE 与服务指标。
+图片输入管线在统一 embedding sequence 处结束。Engine 的 `EmbeddingRequestExecutor` 持有该序列和独立 Decoder Context，并实现 Chapter06 已有的 `RequestModelExecutor`：prefill 消费整段 embedding，decode 消费上一步 token。Chapter06 继续负责 Request 状态和采样，Chapter07-08 提供 K/V 与调度契约，Chapter10 负责 admission、HTTP/SSE 与服务指标。
 
 阶段指标把一次请求拆成图片解码、动态切图、prompt tokenize、Vision Encoder、Projector、embedding 组装和 LLM prefill。重复处理多个 tile 时，Vision Encoder 与 Projector 记录累计耗时和调用次数。内存指标只统计请求持有的中间数据估算，不等同于进程 RSS，也不包含共享模型权重。
 
@@ -100,14 +102,14 @@ overview 将原图直接缩放为一张 512×512 全局图，保留整体关系�
 
 真实重复 benchmark 使用独立进程重复同一动态图片请求，wall time 包含完整进程成本，阶段计时不含权重加载。当前两轮 OpenBLAS 结果的阶段总计 mean 为 `176.98s`、CV 为 `0.0177%`；Vision Encoder mean 为 `16.35s`，同步/SSE 两次语言 prefill 合计 mean 为 `160.49s`。结果说明当前 workload 的主要时间位于语言 Decoder，但两轮样本只用于确认可重复采集闭环，不代表跨机器性能结论。
 
-图片和 prompt 在进入 HttpAdapter 前由多模态输入层转换为 Executor，因此该验证不等于已经定义图片上传协议。Chapter09 仍只负责服务状态和输出；multipart/base64、上传限制与图片缓存应作为 transport/API 设计单独建设。
+图片和 prompt 在进入 HttpAdapter 前由多模态输入层转换为 Executor，因此该验证不等于已经定义图片上传协议。Chapter10 仍只负责服务状态和输出；multipart/base64、上传限制与图片缓存应作为 transport/API 设计单独建设。
 
 | 交接点 | 输入 | 输出 | 所有者 |
 | --- | --- | --- | --- |
 | 图片管线 | 图片、prompt、模型配置 | text/visual embedding | 多模态输入处理器 |
 | Engine 适配 | `DecoderEmbeddingSequence`、Context | `RequestModelExecutor` | 单个请求 |
 | Chapter06 Runtime | position 数量、Executor | generated token、Request 终态 | Runtime / Request |
-| Chapter09 ServiceCore | 服务请求、Executor factory | 同步结果或 SSE event | 服务核心；合成 embedding 已验证 |
+| Chapter10 ServiceCore | 服务请求、Executor factory | 同步结果或 SSE event | 服务核心；合成 embedding 已验证 |
 
 ![多模态请求阶段与现有 Runtime 的交接](../assets/diagrams/multimodal-runtime-stages.svg)
 

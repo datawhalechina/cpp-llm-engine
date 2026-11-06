@@ -7,7 +7,7 @@ const roots = ['README.md', 'docs', 'source', 'exercises']
 const skippedDirectories = new Set(['.vitepress', 'build', 'node_modules'])
 const tableSeparator = /^\s*\|(?:\s*:?-{3,}:?\s*\|)+\s*$/
 const numberedLearningTask = /(?:\btask\s*\d+\b|任务\s*[0-9一二三四五六七八九十]+)/i
-const chapterSource = /^source\/chapter(?:0[0-9])_[^/]+\/.+\.md$/
+const chapterSource = /^source\/chapter\d{2}_[^/]+\/.+\.md$/
 const maintainerOnlyLink = /(?:source\/maintenance\/|(?:^|[.]{0,2}\/+)maintenance\/)/
 const maintainerOnlyStatus = /(?:当前就绪度|后续补强顺序|审核结论与补强顺序|English coverage status)/i
 const sidebarConfig = readFileSync('docs/.vitepress/config.mts', 'utf8')
@@ -66,14 +66,18 @@ for (const root of roots) {
 const chapterDirectories = readdirSync('source', { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && /^chapter\d{2}_/.test(entry.name))
   .map((entry) => entry.name)
-  .filter((entry) => existsSync(join('source', entry, 'intro.md')))
+  .filter((entry) =>
+    existsSync(join('source', entry, 'intro.md')) ||
+    existsSync(join('source', entry, 'next', 'intro.md')))
   .sort()
 
 for (const chapterDirectory of chapterDirectories) {
   const chapterCode = chapterDirectory.match(/^chapter(\d{2})_/)?.[1]
   if (!chapterCode) continue
 
-  const chapterPath = join('source', chapterDirectory)
+  const chapterRoot = join('source', chapterDirectory)
+  const usesRestructuredPages = existsSync(join(chapterRoot, 'next', 'intro.md'))
+  const chapterPath = usesRestructuredPages ? join(chapterRoot, 'next') : chapterRoot
   const pages = readdirSync(chapterPath)
     .filter((file) => file.endsWith('.md'))
     .sort()
@@ -99,7 +103,9 @@ for (const chapterDirectory of chapterDirectories) {
   if (!existsSync(codeReadme)) {
     findings.push(`${codeReadme}: chapter code README is missing`)
   } else {
-    const expectedReturnLink = `../../source/${chapterDirectory}/intro.md`
+    const expectedReturnLink = usesRestructuredPages
+      ? `../../source/${chapterDirectory}/next/intro.md`
+      : `../../source/${chapterDirectory}/intro.md`
     if (!readFileSync(codeReadme, 'utf8').includes(expectedReturnLink)) {
       findings.push(`${codeReadme}: missing return link to ${expectedReturnLink}`)
     }

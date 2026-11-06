@@ -11,22 +11,23 @@
   Foundation -> Chapter 00 Quick Start
 
 引擎主线
-  Chapter 01 -> Chapter 06
+  Chapter 01 -> Chapter 08
 
 验证与优化
-  Chapter 07 -> Chapter 08
+  Chapter 09
 
 服务扩展与参考
-  Chapter 09（Chapter06 后可提前阅读）-> reference / guides
+  Chapter 10 -> reference / guides
 ```
 
 各部分提供以下学习产物：
 
 - `foundation`：补 C++、CMake、CUDA、调试和测试基础
 - `chapter00_quickstart`：用 `llama.cpp` 完成一次真实推理，确认环境和模型链路成立
-- `chapter01` - `chapter06`：逐层构建 Tensor、算子、Decoder、量化 Linear 和 Runtime
-- `chapter07` - `chapter08`：用回归、Benchmark 和 Profiling 形成证据闭环
-- `chapter09`：接收 Chapter06 的服务化扩展，当前包含 C++ Service Core、metrics、真实模型 HTTP/SSE completion 和可选 cpp-httplib loopback
+- `chapter01` - `chapter06`：逐层构建 Tensor、算子、Decoder、量化 Linear 和 Generation Core
+- `chapter07` - `chapter08`：构建分页 K/V、缓存事务、调度和真实 Tensor batch
+- `chapter09`：用 Benchmark、Profiling 和 A/B 形成统一性能证据
+- `chapter10`：提供 C++ ServiceCore、metrics、HTTP/SSE 和可选 cpp-httplib loopback
 - `reference` / `guides`：查阅概念、实验资产和工程方法
 
 如果你想先理解“训练框架、推理框架和本教程分别负责什么”，再看 [训练框架 vs 推理框架](/reference/framework_comparison)。`foundation` 是按需前置能力区，`chapter00` 是所有学习者共用的真实推理起跑线。
@@ -38,9 +39,9 @@
 1. 先看 [教程主入口](/README) 了解总图
 2. 需要 C++、构建工具或 CUDA 背景时，按需进入 `foundation`
 3. 进入 `chapter00_quickstart`，用 `llama.cpp` 完成 First Success
-4. 按 `chapter01` 到 `chapter06` 学习引擎核心
-5. 进入 `chapter07` 和 `chapter08` 做验证与性能归因
-6. 完成 Chapter06 后，如果关注服务化，可以提前进入 Chapter09；否则先完成 Chapter07-08 的 Benchmark 和 Profiling，再回到 Chapter09
+4. 按 `chapter01` 到 `chapter08` 学习引擎、缓存和调度
+5. 进入 `chapter09` 建立性能证据
+6. 进入 `chapter10` 完成推理服务闭环
 
 ## 如何运行代码
 
@@ -52,9 +53,10 @@
 - `bash code/chapter04_attention/scripts/run.sh`
 - `bash code/chapter05_quantization/scripts/run.sh`
 - `bash code/chapter06_generation/scripts/run.sh`
-- `bash code/chapter07_benchmark/scripts/run.sh`
-- `bash code/chapter08_profiling/scripts/run.sh`
-- `bash code/chapter09_serving/scripts/run.sh`
+- `bash code/chapter07_kv_cache/scripts/run.sh`
+- `bash code/chapter08_scheduling/scripts/run.sh`
+- `bash code/chapter09_performance/scripts/run.sh`
+- `bash code/chapter10_serving/scripts/run.sh`
 
 对于 `chapter01_tensor_loader`，使用隔离构建脚本：
 
@@ -75,7 +77,7 @@ bash code/multimodal/scripts/run.sh
 
 ### 1. 本地 CPU 学习环境
 
-本地 CPU 环境可以完整跑通 `foundation` 和 Chapter00-09 的默认路径。
+本地 CPU 环境可以完整跑通 `foundation` 和 Chapter00-10 的默认路径。
 
 建议配置：
 
@@ -142,12 +144,12 @@ CPU 和 GPU 的环境差异，以及它们在章节中的分叉位置：
 
 ## 按需补充
 
-主线从 Chapter 00 走到 Chapter 09。基础薄弱时先补 Foundation；已有推理系统经验时可以在完成 Chapter 06 后提前阅读 Runtime、Benchmark、Profiling 和 Serving，并用对应章节脚本确认实现。
+主线从 Chapter 00 走到 Chapter 10。基础薄弱时先补 Foundation；已有推理系统经验时可以在完成 Chapter 06 后按需进入 K/V、调度、性能或服务章节，并用对应章节脚本确认实现。
 
 | 情况 | 补充内容 | 验证 |
 | --- | --- | --- |
 | C++、CMake 基础不稳 | Foundation 必读题和至少 4 道练习 | `bash exercises/foundation/run_all.sh` |
-| 关注 Runtime 与服务 | Chapter 06、07、08、09 | 章节 `run.sh` 与 `npm run test:regression` |
+| 关注 Runtime 与服务 | Chapter 06-10 | 章节 `run.sh` 与 `npm run test:regression` |
 | 关注框架实现差异 | `reference/ecosystem` 与各章对照页 | 回到本教程代码确认对应契约 |
 | 需要 GPU | Chapter 03 CUDA 设计与 `code/cuda` | `bash code/cuda/scripts/run.sh`，完成 CPU/CUDA 数值对照和设备测试 |
 
@@ -159,10 +161,11 @@ CPU 和 GPU 的环境差异，以及它们在章节中的分叉位置：
 
 - `chapter00`、`chapter01`：先看 `llama.cpp`，建立最小本地推理直觉
 - `chapter02`、`chapter03`：再看 `gemma.cpp` 和 `TensorRT-LLM`，理解对象、算子和后端分层
-- `chapter04`、`chapter06`：再看 `vLLM`、`SGLang`，理解 runtime、调度和 serving 组织方式
+- `chapter04`、`chapter06`：再看 `llama.cpp`、nano-vLLM，理解 Decoder 与单请求 Runtime
 - `chapter05`：再看 `TensorRT-LLM`，理解量化和部署如何接到 GPU engine
-- `chapter07`：再看 `vLLM`、`SGLang`、`Ollama`，理解 benchmark、验证和交付怎么落到真实系统
-- `chapter08`、`chapter09`：再看 `vLLM`、`SGLang` 和 DeepInfer，理解 profiling、服务边界与生产扩展
+- `chapter07`、`chapter08`：再看 `vLLM`、`SGLang`，理解分页 K/V、前缀复用和调度策略
+- `chapter09`：再看 `TensorRT-LLM` 和 DeepInfer，理解性能证据与热点归因
+- `chapter10`：再看 `vLLM`、`SGLang` 和 `Ollama`，理解服务边界与生产扩展
 
 如果你想先看总览，直接进 [生态对照](/reference/ecosystem/README)。
 
@@ -185,8 +188,8 @@ npm run test:regression
 
 | 验证层级 | 当前入口 | 覆盖范围 |
 | --- | --- | --- |
-| 默认 CPU | `npm run test:regression` | Foundation、Core、Engine 和 Chapter01-09 轻量路径 |
+| 默认 CPU | `npm run test:regression` | Foundation、Core、Engine 和 Chapter00-10 轻量路径 |
 | 真实模型 | `code/engine` 中设置 `CPP_LLM_ENGINE_REAL_MODEL` 的 CTest | TinyLlama golden、Context 隔离、HTTP adapter、profiling |
 | 真实 transport | `run_cpp_httplib_loopback.sh` | loopback HTTP、metrics、同步与 SSE |
-| 性能实验 | Chapter07-08 与 Engine benchmark 脚本 | 固定 workload 的结果文件和 A/B 判定 |
+| 性能实验 | Chapter09 与 Engine benchmark 脚本 | 固定 workload 的结果文件和 A/B 判定 |
 | GPU | `bash code/cuda/scripts/run.sh` | CUDA 资源、算子、KV、GQA 和合成 Decoder；不包含真实模型端到端生成 |

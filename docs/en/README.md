@@ -48,7 +48,7 @@ This tutorial teaches both sides together, but the main line focuses on the engi
 - chapter04_attention
 - chapter05_quantization
 - chapter06_generation
-- chapter07_benchmark
+- chapter07_kv_cache through chapter10_serving (Chinese source of truth)
 
 ## Notes
 

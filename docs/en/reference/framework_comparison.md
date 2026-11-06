@@ -203,4 +203,4 @@ If you want the shortest route map, start from [guide.md](/en/guide) or [README.
 - `chapter04_attention`
 - `chapter06_generation`
 - `chapter05_quantization`
-- `chapter07_benchmark`
+- `chapter09_performance`

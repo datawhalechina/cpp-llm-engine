@@ -115,7 +115,7 @@ golden corpus 是一组固定、版本化的测试样例，稳定覆盖最容易
 
 验收顺序固定为：先跑局部测试，再跑端到端正确性，再跑固定 benchmark，最后把结果与历史基线比较。任何一层失败，都不应只用下一层的“通过”覆盖。
 
-当前仓库的最小执行入口是 `npm run test:regression`。它串联 Foundation、Core、Engine、Chapter01-09 和多模态预处理，以命令退出码判断构建与 CTest 是否成功，并只对示例保留稳定的行为标记。`npm run test:release-contracts` 另用 Release 构建覆盖 Core、Chapter01-06、Chapter09、Engine 和多模态输入链的关键契约，防止测试依赖 Debug `assert`。测试数量会随能力增长，不作为成功条件。
+当前仓库的最小执行入口是 `npm run test:regression`。它串联 Foundation、Core、Engine、Chapter00-10 和多模态预处理，以命令退出码判断构建与 CTest 是否成功，并只对示例保留稳定的行为标记。`npm run test:release-contracts` 另用 Release 构建覆盖 Core、Chapter00-10、Engine 和多模态输入链的关键契约，防止测试依赖 Debug `assert`。测试数量会随能力增长，不作为成功条件。
 
 `npm run test:check-assets` 在构建前检查测试资产：`tests/` 下的 C++/CUDA 测试源码必须被 CMake 引用；测试可执行目标必须调用 `cpp_llm_prepare_test`、注册到 CTest 并设置标签。该检查只验证测试是否接入体系，不替代测试执行和结果断言。
 
@@ -123,10 +123,10 @@ golden corpus 是一组固定、版本化的测试样例，稳定覆盖最容易
 
 | 对象 | 故障注入 | 必须保持的状态 | 最小测试 |
 | --- | --- | --- | --- |
-| Loader | 非法 magic、版本、shape、截断 payload | 加载失败后不暴露部分 tensor | `chapter01_tensor_loader_test` |
-| BlockPool | 容量不足、越界提交、回退提交 | 容量守恒、块独占、原请求不变 | `chapter06_kv_block_pool_contract_test` |
-| Scheduler | prefill 失败、缺少 decode 写槽 | 请求进入失败终态，临时预留回滚 | `chapter06_execution_transaction_test` |
-| ServiceCore | 成功、模型失败、取消、超时交错 | inflight 归零、块全部归还、指标只计一次 | `chapter09_fault_sequence_test` |
+| Loader | 非法 magic、版本、shape、截断 payload | 加载失败后不暴露部分 tensor | `chapter01_loader_test`、`chapter01_schema_test` |
+| BlockPool | 容量不足、越界提交、回退提交 | 容量守恒、块独占、原请求不变 | `chapter07_block_pool_test` |
+| Scheduler | prefill 失败、缺少 decode 写槽 | 请求进入失败终态，临时预留回滚 | `chapter06_generation_test`、`chapter08_cache_transaction_test` |
+| ServiceCore | 成功、模型失败、取消、超时交错 | inflight 归零、块全部归还、指标只计一次 | `chapter10_service_core_test`、`chapter10_terminal_release_test` |
 
 ## 7. 测试基础设施
 
@@ -139,8 +139,8 @@ npm run test:regression
 npm run test:release-contracts
 ```
 
-该入口使用 Release 配置验证测试框架、Core、Chapter 01 Loader、Tensor、MatMul、Attention/Decoder、Chapter 06 Runtime、
-Chapter 09 ServiceCore 与 Engine 组合链。它不下载模型，也不运行 GPU 和性能实验。
+该入口使用 Release 配置验证测试框架、Core、Chapter 01 Loader、Tensor、MatMul、Attention/Decoder、Chapter 06-08 Runtime 链、
+Chapter 10 ServiceCore 与 Engine 组合链。它不下载模型，也不运行 GPU 和性能实验。
 
 新增能力时按以下顺序补证据：
 
@@ -153,15 +153,15 @@ Chapter 09 ServiceCore 与 Engine 组合链。它不下载模型，也不运行 
 
 | 章节 | 已经做了什么 | 回归测试继续补什么 |
 | --- | --- | --- |
-| `chapter07_benchmark` | 正确性、benchmark、结果记录 | 长期回归基线和版本化样例 |
-| `chapter06_generation` | runtime、KV Cache、scheduler | 长上下文和请求生命周期的稳定性 |
+| `chapter09_performance` | correctness、benchmark、结果记录 | 长期回归基线和版本化样例 |
+| `chapter06_generation` 到 `chapter08_scheduling` | 生成、K/V 与调度 | 长上下文和请求生命周期的稳定性 |
 | `chapter01` 到 `chapter05` | 局部模块正确性 | 关键路径是否在后续改动中退化 |
 
 单测和 e2e 提供当前正确性证据，版本化样例将这些证据保存为长期回归基线。
 
 ## 9. 如何使用回归测试参考页
 
-- 先用 `chapter07_benchmark` 确认当前测试矩阵已经固定
+- 先用 `chapter09_performance` 确认 correctness 和 workload 已固定
 - 再把历史上容易回退的样例整理成固定基线
 - 然后在新改动后重复跑这些样例，观察是否偏离历史结果
 

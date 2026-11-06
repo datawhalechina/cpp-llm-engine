@@ -79,12 +79,13 @@ SLA 解决的是“系统承诺的响应边界是什么”。
 | 章节 | 已经做了什么 | 服务化页继续补什么 |
 | --- | --- | --- |
 | `chapter06_generation` | 最小 generation runtime、streaming callback | 如何把 runtime 变成可持续服务 |
-| `chapter07_benchmark` | 验证、对照和结果记录 | 服务化场景下如何读结果 |
+| `chapter09_performance` | 验证、对照和结果记录 | 服务化场景下如何读结果 |
+| `chapter10_serving` | 准入、终态释放和 HTTP/SSE | 如何把 runtime 变成持续服务 |
 | `reference/runtime_systems.md` | 请求生命周期、continuous batching、backpressure | 面向外部服务的最小规则 |
 
 服务化基础先固定 production serving 的基础语义。
 
-相关阅读：[`06.9 Request 生命周期`](../chapter06_generation/09_request_lifecycle.md)、[`06.10 Continuous Batching 入门`](../chapter06_generation/10_continuous_batching.md)、[`推理引擎内存管理`](./memory_management.md)、[`推理引擎回归测试`](./regression_testing.md)
+相关阅读：[`06.4 Request 生命周期`](../chapter06_generation/next/04_request_lifecycle.md)、[`08.2 Step Batching`](../chapter08_scheduling/next/02_step_batching.md)、[`推理引擎内存管理`](./memory_management.md)、[`推理引擎回归测试`](./regression_testing.md)
 
 ## 7. 使用顺序
 

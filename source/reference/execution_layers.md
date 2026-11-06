@@ -92,9 +92,9 @@ runtime 关心的是系统，不只是单次执行。
 
 | 观察线 | 起点 | 中段 | 终点 | 当前实现深度 |
 | --- | --- | --- | --- | --- |
-| 数据层 | Chapter01 加载配置、Tokenizer 与权重 | Chapter02 管理 Storage/View；Chapter04 追踪 Q/K/V 与 hidden state | Chapter06 管理 token history、Context、连续 K/V、分页 payload 和 BlockTable | CPU 分页参考已验证；真实 TinyLlama 仍使用连续 K/V |
-| 算子层 | Chapter03 定义 Operator/Backend | Chapter04 组合 Attention、FFN 与 Decoder；Chapter05 执行量化 Linear | CUDA 使用相同语义替换设备后端，Chapter08 根据 profile 选择优化点 | CPU 真实 Decoder 完成；GPU 仍是可选算子与合成 Decoder |
-| 系统层 | Chapter00 建立真实外部基线 | Chapter06 组织 Request、prefill/decode、Scheduler 和缓存生命周期 | Chapter07-09 固定 workload、定位瓶颈并接入 ServiceCore、HTTP/SSE | CPU 服务闭环完成；生产级抢占、分页数据面和分布式只作参照 |
+| 数据层 | Chapter01 加载配置、Tokenizer 与权重 | Chapter02 管理 Storage/View；Chapter04 追踪 Q/K/V 与 hidden state | Chapter06 管理 token history 与 Context；Chapter07 管理分页 payload 和 BlockTable | CPU 分页参考和真实 TinyLlama 分页路径已验证 |
+| 算子层 | Chapter03 定义 Operator/Backend | Chapter04 组合 Attention、FFN 与 Decoder；Chapter05 执行量化 Linear | CUDA 使用相同语义替换设备后端，Chapter09 根据 Profile 选择优化点 | CPU 真实 Decoder 完成；GPU 仍是可选算子与合成 Decoder |
+| 系统层 | Chapter00 建立真实外部基线 | Chapter06-08 组织 Request、K/V 资源、Scheduler 和批处理 | Chapter09 固定 workload 并定位瓶颈；Chapter10 接入 ServiceCore、HTTP/SSE | CPU 服务闭环完成；生产级抢占和分布式只作参照 |
 
 一次功能升级也应同时检查三条线。例如实现 Paged KV 时，数据层定义 block layout 与 ownership，算子层让 Attention 按页表读写，系统层负责容量预算、回滚和终态回收。只完成其中一条，不能宣称完整的生产级能力。
 
@@ -105,9 +105,11 @@ runtime 关心的是系统，不只是单次执行。
 | `chapter01_tensor_loader` | GGUF、真实 Model/Context、TinyLlama 对照 | `model` + `context` 实现 |
 | `chapter03_matmul` | 算子边界、CPU reference、cuBLAS | `operator` + `backend` |
 | `chapter04_attention` | Attention、FFN、单层 Decoder、结构契约 | `operator` + 模型结构 |
-| `chapter06_generation` | 生成链路、request、scheduler、cache | `runtime` |
+| `chapter06_generation` | 单请求生成链路与 request | `runtime` |
+| `chapter07_kv_cache` | 连续/分页 K/V 和 BlockTable | `cache` |
+| `chapter08_scheduling` | 多请求选择与批量执行计划 | `scheduler` |
 | `code/engine` | Core Context 到 Runtime executor 的适配 | `executor` |
-| `chapter07_benchmark` | 正确性和性能记录 | `executor` + `runtime` 的验证结果 |
+| `chapter09_performance` | 正确性和性能记录 | `executor` + `runtime` 的验证结果 |
 
 ## 6. 执行路径检查
 

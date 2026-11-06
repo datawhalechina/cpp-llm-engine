@@ -65,8 +65,7 @@ benchmark 是证据，profiling 是证据说明书。
 
 | 章节 | 已经做了什么 | profiling 继续补什么 |
 | --- | --- | --- |
-| `chapter07_benchmark` | 正确性、benchmark、结果记录 | 为什么快、为什么慢 |
-| `chapter08_profiling` | profiling、A/B 对比、优化闭环 | 把瓶颈解释变成可执行优化流程 |
+| `chapter09_performance` | correctness、benchmark、profiling 和 A/B | 把瓶颈解释变成可执行优化流程 |
 | `chapter06_generation` | 生成 runtime 骨架 | runtime 内部哪个环节在吃时间 |
 | `chapter05_quantization` | 表示和成本变化 | 误差和成本变化到底落在哪一层 |
 
@@ -74,8 +73,8 @@ profiling 是把 benchmark 的结论变成下一步优化动作的桥梁。
 
 ## 7. 如何使用 profiling 参考页
 
-- 先用 `chapter07_benchmark` 确认结果可信
-- 再读 [`chapter08_profiling`](../chapter08_profiling/intro.md) 建立 profiling 和 A/B 对比流程
+- 先用 [`chapter09_performance`](../chapter09_performance/next/intro.md) 固定 correctness、workload 和原始样本
+- 再按问题选择 profiling 工具并完成单变量 A/B
 - 最后回到这里找瓶颈归因的切入点
 - 最后再决定是改 runtime、改内存，还是改后端
 

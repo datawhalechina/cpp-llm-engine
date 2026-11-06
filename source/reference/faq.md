@@ -22,11 +22,11 @@
 
 ### 3.1 为什么生成过程中会越来越占内存？
 
-最常见的原因是 cache、buffer 或中间结果没有按预期复用。先看 `chapter06_generation` 的 `KV Cache`、scheduler 和请求生命周期，再判断是不是把本该复用的状态重新分配了。
+最常见的原因是 cache、buffer 或中间结果没有按预期复用。先看 `chapter06_generation` 的请求生命周期、`chapter07_kv_cache` 的缓存所有权和 `chapter08_scheduling` 的资源预算，再判断是不是把本该复用的状态重新分配了。
 
 ### 3.2 为什么量化后还是很占内存？
 
-量化通常先降低权重表示成本，但不一定自动解决激活、cache 或临时 buffer。先看 `chapter05_quantization` 的量化范围，再看是不是该在 `chapter06_generation` 或 `chapter07_benchmark` 里继续优化 runtime。
+量化通常先降低权重表示成本，但不一定自动解决激活、cache 或临时 buffer。先看 `chapter05_quantization` 的量化范围，再由 `chapter09_performance` 判断应该优化算子、缓存还是 runtime。
 
 ## 4. 验证相关
 

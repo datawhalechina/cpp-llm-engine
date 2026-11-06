@@ -36,4 +36,4 @@
 - `chapter04_attention`
 - `chapter06_generation`
 - `chapter05_quantization`
-- `chapter07_benchmark`
+- `chapter09_performance`

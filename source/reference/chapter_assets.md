@@ -14,21 +14,22 @@
 | Chapter03 Operator、MatMul 与 Backend | [导读](../chapter03_matmul/intro.md) | [代码资产](/code/chapter03_matmul) | [主图](/diagrams/chapter03-main.svg)；[执行分层图](/diagrams/chapter03-operator-backend-kernel.svg)；[F-LINEAR-01](./formulas.md#f-linear-01) | `bash code/chapter03_matmul/scripts/run.sh` |
 | Chapter04 Attention、FFN 与 Decoder | [导读](../chapter04_attention/intro.md) | [代码资产](/code/chapter04_attention) | [主图](/diagrams/chapter04-main.svg)；[Decoder 数据流](/diagrams/chapter04-decoder-attention-flow.svg)；[F-ATTN-01](./formulas.md#f-attn-01) 至 [F-FFN-01](./formulas.md#f-ffn-01) | `bash code/chapter04_attention/scripts/run.sh` |
 
-## Chapter 06-09：从生成 Runtime 到服务
+## Chapter 06-10：从生成 Runtime 到服务
 
 后五章把 Decoder 放进请求生命周期，补上量化、可重复测量、性能归因和网络协议之外的 Service Core。
 
 | 章节 | 文档入口 | 代码入口 | 主图与公式 | 最小验证 |
 | --- | --- | --- | --- | --- |
 | Chapter05 Quantization | [导读](../chapter05_quantization/intro.md) | [代码资产](/code/chapter05_quantization) | [主图](/diagrams/chapter05-main.svg)；[05→06 接口交接](/diagrams/chapter05-06-execution-handoff.svg)；[Q4_K Backend](/diagrams/chapter05-q4k-backend.svg)；[F-QUANT-01/02](./formulas.md#f-quant-01) | `bash code/chapter05_quantization/scripts/run.sh` |
-| Chapter06 Generation Runtime | [导读](../chapter06_generation/intro.md) | [代码资产](/code/chapter06_generation) | [主图](/diagrams/chapter06-main.svg)；[Runtime 状态图](/diagrams/chapter06-runtime-state.svg)；[F-KV-01](./formulas.md#f-kv-01)、[F-SCHED-01](./formulas.md#f-sched-01)、[F-SAMPLE-01](./formulas.md#f-sample-01) | `bash code/chapter06_generation/scripts/run.sh` |
-| Chapter07 Benchmark 与 Correctness | [导读](../chapter07_benchmark/intro.md) | [代码资产](/code/chapter07_benchmark) | [主图](/diagrams/chapter07-main.svg)；[F-PERF-01/02](./formulas.md#f-perf-01) | `bash code/chapter07_benchmark/scripts/run.sh` |
-| Chapter08 Profiling 与 Optimization | [导读](../chapter08_profiling/intro.md) | [代码资产](/code/chapter08_profiling) | [主图](/diagrams/chapter08-main.svg)；[真实服务分解图](/diagrams/chapter08-real-service-profile.svg)；[F-PERF-01/02](./formulas.md#f-perf-01) | `bash code/chapter08_profiling/scripts/run.sh` |
-| Chapter09 Serving Extensions | [导读](../chapter09_serving/intro.md) | [代码资产](/code/chapter09_serving) | [主图](/diagrams/chapter09-main.svg)；[延迟时间线](/diagrams/chapter09-latency-timeline.svg)；[F-SERVE-01](./formulas.md#f-serve-01) | `bash code/chapter09_serving/scripts/run.sh` |
+| Chapter06 Generation Core | [导读](../chapter06_generation/next/intro.md) | [代码资产](/code/chapter06_generation) | [主图](/diagrams/chapter06-generation-core.svg)；[F-SAMPLE-01](./formulas.md#f-sample-01) | `bash code/chapter06_generation/scripts/run_generation_core.sh` |
+| Chapter07 K/V Cache | [导读](../chapter07_kv_cache/next/intro.md) | [代码资产](/code/chapter07_kv_cache) | [主图](/diagrams/chapter07-kv-cache.svg)；[F-KV-01](./formulas.md#f-kv-01) | `bash code/chapter07_kv_cache/scripts/run.sh` |
+| Chapter08 Scheduling 与 Batching | [导读](../chapter08_scheduling/next/intro.md) | [代码资产](/code/chapter08_scheduling) | [主图](/diagrams/chapter08-scheduling.svg)；[F-SCHED-01](./formulas.md#f-sched-01) | `bash code/chapter08_scheduling/scripts/run.sh` |
+| Chapter09 Performance | [导读](../chapter09_performance/next/intro.md) | [代码资产](/code/chapter09_performance) | [主图](/diagrams/chapter09-performance.svg)；[F-PERF-01/02](./formulas.md#f-perf-01) | `bash code/chapter09_performance/scripts/run.sh` |
+| Chapter10 Serving | [导读](../chapter10_serving/next/intro.md) | [代码资产](/code/chapter10_serving) | [主图](/diagrams/chapter10-serving.svg)；[F-SERVE-01](./formulas.md#f-serve-01) | `bash code/chapter10_serving/scripts/run.sh` |
 
 ## 跨章节扩展资产
 
-GPU、Engine 和多模态复用 Chapter01-09 的公共契约，不另建一套主线章节。它们的资产入口和默认依赖条件如下。
+GPU、Engine 和多模态复用 Chapter01-10 的公共契约，不另建一套主线章节。它们的资产入口和默认依赖条件如下。
 
 | 扩展 | 文档入口 | 代码入口 | 图与公式 | 默认验证 |
 | --- | --- | --- | --- | --- |

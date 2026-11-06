@@ -25,5 +25,5 @@ Continue to [summary](summary) or move to [the next chapter](/en/chapter06_gener
 ## Related Reading
 
 - Prerequisites: read the Chapter 04 Decoder pages first, because this chapter replaces the Linear weight representation inside that model structure.
-- Later use: Chapter 06 will run the resulting model through prefill and decode; Chapter 07 will measure the complete path.
+- Later use: Chapter 06 runs the model through prefill and decode, Chapter 07 manages paged K/V, and Chapter 09 measures the complete path.
 - Roadmap: if you want the full 03–06 path first, start from [the Chapter 03 intro](/en/chapter03_matmul/intro). It summarizes the reading order from operators to quantization.

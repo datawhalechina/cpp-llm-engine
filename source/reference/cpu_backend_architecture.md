@@ -21,10 +21,12 @@ CPU 后端架构参考页固定教程后续实现顺序：先完成 CPU referenc
 | --- | --- | --- | --- |
 | 输入和对象 | Chapter 01-02 | GGUF schema、Tensor view、共享 storage | 真实 TinyLlama index、view 边界测试 |
 | 计算契约 | Chapter 03 | Operator、CPU Backend、Matmul、Linear | reference 输出和 shape 异常 |
-| 量化路径 | Chapter 05 | Q4_K decode、fused Linear、SIMD 预留 | llama.cpp 交叉验证、真实多 tensor benchmark |
 | 模型执行 | Chapter 04 | DecoderLayer、Attention、RoPE、KV Cache | 单层 golden tensor |
+| 量化路径 | Chapter 05 | Q4_K decode、fused Linear、SIMD 预留 | llama.cpp 交叉验证、真实多 tensor benchmark |
 | 生成闭环 | Chapter 06 | Prefill、Decode、Sampling、Request | CPU First Success、取消和资源回收 |
-| 证据闭环 | Chapter 07-08 | benchmark、profiling、回归基线 | 多轮统计和热点解释 |
+| 缓存与调度 | Chapter 07-08 | 分页 K/V、缓存事务、Step Scheduler、Tensor batch | 跨块一致、回滚和多请求结果 |
+| 证据闭环 | Chapter 09 | benchmark、profiling、A/B 和回归基线 | 多轮统计和热点解释 |
+| 服务闭环 | Chapter 10 | ServiceCore、HTTP/SSE、并发和指标 | 终态释放与真实模型回环 |
 
 ## 代码接入规则
 

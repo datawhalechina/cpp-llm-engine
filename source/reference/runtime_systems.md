@@ -92,10 +92,12 @@ backpressure 解决的是：
 
 | 章节 | 教程实现 | 生产系统常见扩展 |
 | --- | --- | --- |
-| `chapter06_generation` | generation runtime、chunked prefill、基础公平性、token/block-budget batch | 抢占、优先级和并行 batch executor |
+| `chapter06_generation` | 单请求 generation runtime | 异步模型执行 |
 | `chapter05_quantization` | 稳定 runtime 上的表示变化 | 资源边界和调度边界继续保持清楚 |
-| `chapter07_benchmark` | 验证和结果记录 | 运行时缺口对应的性能和稳定性问题 |
-| `chapter09_serving` | waiting/running 队列、`dispatch_step()`、Block KV ownership、终态释放 | device K/V payload、抢占和业务优先级 |
+| `chapter07_kv_cache` | 连续/分页 K/V 与 BlockTable | 前缀共享和设备缓存 |
+| `chapter08_scheduling` | token/block budget、chunked prefill 和 batch plan | 抢占和更完整的优先级策略 |
+| `chapter09_performance` | 运行时证据和结果记录 | 长期回归与硬件 profiling |
+| `chapter10_serving` | waiting/running、终态释放和 HTTP/SSE | 多 worker 与生产级限流 |
 
 运行时系统参考页在主线 runtime 骨架上继续补充服务化能力。
 

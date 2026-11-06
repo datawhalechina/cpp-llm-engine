@@ -106,17 +106,30 @@ const chapterSlugs = [
   'chapter04_attention',
   'chapter06_generation',
   'chapter05_quantization',
-  'chapter07_benchmark',
-  'chapter08_profiling',
-  'chapter09_serving',
+  'chapter07_kv_cache',
+  'chapter08_scheduling',
+  'chapter09_performance',
+  'chapter10_serving',
 ]
+
+const restructuredChapterAssets = {
+  chapter06_generation: ['../chapter06_generation/next/intro.md', '/diagrams/chapter06-generation-core.svg'],
+  chapter07_kv_cache: ['../chapter07_kv_cache/next/intro.md', '/diagrams/chapter07-kv-cache.svg'],
+  chapter08_scheduling: ['../chapter08_scheduling/next/intro.md', '/diagrams/chapter08-scheduling.svg'],
+  chapter09_performance: ['../chapter09_performance/next/intro.md', '/diagrams/chapter09-performance.svg'],
+  chapter10_serving: ['../chapter10_serving/next/intro.md', '/diagrams/chapter10-serving.svg'],
+}
 
 for (const slug of chapterSlugs) {
   const chapterNumber = slug.slice(7, 9)
-  const requiredAssets = [
+  const [introAsset, diagramAsset] = restructuredChapterAssets[slug] ?? [
     `../${slug}/intro.md`,
-    `/code/${slug}`,
     `/diagrams/chapter${chapterNumber}-main.svg`,
+  ]
+  const requiredAssets = [
+    introAsset,
+    `/code/${slug}`,
+    diagramAsset,
   ]
   for (const asset of requiredAssets) {
     if (!chapterAssetsText.includes(asset)) {

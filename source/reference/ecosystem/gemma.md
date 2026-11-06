@@ -36,4 +36,4 @@
 - `chapter01_tensor_loader`
 - `chapter04_attention`
 - `chapter05_quantization`
-- `chapter07_benchmark`
+- `chapter09_performance`

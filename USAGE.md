@@ -18,7 +18,7 @@ npm run test:regression
 
 1. 运行 `bash code/chapter00_quickstart/run.sh`，建立真实推理基线。
 2. C++、CMake 或测试基础不足时，按需学习 [Foundation](source/foundation/intro.md)。
-3. 按 Chapter 01 到 Chapter 09 完成 CPU 主线。
+3. 按 Chapter 01 到 Chapter 10 完成 CPU 主线。
 4. 需要按产物分解主线时，使用 [CPU 六任务学习计划](source/guides/phase1_cpu_learning_plan.md)。
 5. CPU 基线稳定后，再选择 CUDA 或多模态扩展。
 
@@ -26,9 +26,9 @@ npm run test:regression
 
 | 目标 | 建议顺序 | 完成标志 |
 | --- | --- | --- |
-| 完整 CPU 主线 | Foundation（按需）→ Chapter00 → Chapter01-09 | 默认回归通过，能解释从权重到服务的完整链路 |
+| 完整 CPU 主线 | Foundation（按需）→ Chapter00 → Chapter01-10 | 默认回归通过，能解释从权重到服务的完整链路 |
 | 引擎执行核心 | Chapter00 → Chapter01-06 | 能连接 Tensor、Operator、Decoder、Runtime 和量化表示 |
-| Runtime 与服务 | Chapter06 → Chapter07-09 | 能运行多请求、benchmark、profiling 和最小服务闭环 |
+| Runtime 与服务 | Chapter06 → Chapter07-10 | 能运行分页缓存、调度、性能证据和服务闭环 |
 | GPU 扩展 | 先完成 CPU 执行核心 → `code/cuda` | CPU/CUDA 数值对照和设备测试通过 |
 | 多模态扩展 | 先完成 CPU Decoder → `code/multimodal` | 图像输入可以转换并接入已有 LLM Runtime |
 
@@ -43,10 +43,11 @@ npm run test:regression
 | Chapter03 | 可验证的 CPU MatMul backend | `bash code/chapter03_matmul/scripts/run.sh` |
 | Chapter04 | Attention、FFN 与单层 Decoder | `bash code/chapter04_attention/scripts/run.sh` |
 | Chapter05 | Q4_K/Q6_K 量化 Linear | `bash code/chapter05_quantization/scripts/run.sh` |
-| Chapter06 | Prefill、Decode、KV Cache 与 Scheduler | `bash code/chapter06_generation/scripts/run.sh` |
-| Chapter07 | 可重复 benchmark 和结果文件 | `bash code/chapter07_benchmark/scripts/run.sh` |
-| Chapter08 | profiling、hotspot 与 A/B 判断 | `bash code/chapter08_profiling/scripts/run.sh` |
-| Chapter09 | ServiceCore、HTTP/SSE 与 metrics | `bash code/chapter09_serving/scripts/run.sh` |
+| Chapter06 | 单请求 Prefill、Decode、采样与流式输出 | `bash code/chapter06_generation/scripts/run.sh` |
+| Chapter07 | BlockTable、分页 K/V 与缓存事务 | `bash code/chapter07_kv_cache/scripts/run.sh` |
+| Chapter08 | Step Scheduler、Continuous Batching 与 Tensor batch | `bash code/chapter08_scheduling/scripts/run.sh` |
+| Chapter09 | benchmark、profiling 与统一性能证据 | `bash code/chapter09_performance/scripts/run.sh` |
+| Chapter10 | ServiceCore、HTTP/SSE 与 metrics | `bash code/chapter10_serving/scripts/run.sh` |
 
 每章正文解释概念、数据流和设计取舍；`code/<chapter>/README.md` 列出该章代码资产；运行脚本负责构建并执行相应验证。
 

@@ -18,8 +18,8 @@
 | 2 | 打通输入、Tokenizer 与模型加载 | Chapter01 | 能检查 GGUF、真实 tokenizer、模型结构和权重映射 | 轻量测试只需 CPU；真实验证需要 GGUF |
 | 3 | 建立 Tensor、View、Operator 与 MatMul 底座 | Chapter02、Chapter03 | 共享 Storage 的 view 与正确的 CPU MatMul backend | C++ 工具链 |
 | 4 | 完成真实 Decoder CPU 前向 | Chapter04、Chapter05、Engine | TinyLlama 22 层 prefill/decode 与 llama.cpp golden 对齐 | GGUF；AVX2 实验需要 CPU 支持 |
-| 5 | 完成 Generation Runtime | Chapter06 | Request、KV、chunked prefill、采样和多请求 step 可运行 | 默认路径只需 CPU；真实回归需要 GGUF |
-| 6 | 完成最小 CPU 推理服务 | Chapter07、Chapter08、Chapter09 | ServiceCore、HTTP/SSE contract、metrics 和 benchmark 闭环 | CPU；真实模型路径需要 GGUF |
+| 5 | 完成生成、K/V 与调度链 | Chapter06、Chapter07、Chapter08 | 单请求生成、分页 K/V、chunked prefill 和多请求批次可运行 | 默认路径只需 CPU；真实回归需要 GGUF |
+| 6 | 完成性能证据与最小 CPU 服务 | Chapter09、Chapter10 | 可比较的性能证据、ServiceCore、HTTP/SSE 和 metrics 闭环 | CPU；真实模型路径需要 GGUF |
 | 7 | GPU 初探，可选 | Foundation GPU、Chapter00、Chapter03、Chapter05 | CUDA 环境、llama.cpp GPU 基线和自研 CPU/CUDA backend 对照 | NVIDIA GPU、驱动和 CUDA Toolkit |
 
 ## 首轮与进阶范围
@@ -34,10 +34,11 @@
 | Chapter03 | 03.1-03.3 Operator、MatMul、CPU reference | 03.5-03.7 数值/复杂度/真实 backend；03.4 cuBLAS 留到 GPU 阶段 |
 | Chapter04 | 04.1-04.5 Attention、Norm/FFN、Decoder、首层接线 | 04.6 成熟框架对照 |
 | Chapter05 | 05.1、05.4-05.6 原理、反量化、Linear、精度 | 05.2-05.3 dtype/loader 深入；05.7-05.8 框架与 serving 对照 |
-| Chapter06 | 06.3-06.7 与 06.9 Generation Core | 06.10-06.12 Serving Preview；06.1-06.2 smoke model 和 06.8 框架对照按需 |
-| Chapter07 | 07.1-07.4、07.6 correctness、指标、脚本、解读 | 07.5 优化提示；07.7 框架 benchmark 对照 |
-| Chapter08 | 08.1、08.2、08.5、08.6 归因、A/B、优化闭环 | 08.3-08.4 硬件深入；08.7-08.8 框架与真实案例 |
-| Chapter09 | 09.1 Service Core、09.4 HTTP completion | 09.2 transport、09.3 benchmark、09.5 框架对照 |
+| Chapter06 | 06.1-06.8 请求、Prefill/Decode、生成循环和真实单请求 | 06.9 框架生成核心对照 |
+| Chapter07 | 07.1-07.7 K/V 形状、连续基线、分页存储和事务 | 07.8-07.10 前缀复用、真实迁移和框架对照 |
+| Chapter08 | 08.1-08.4 调度契约、连续批处理、chunked prefill 和真实批量执行 | 08.5-08.6 重叠调度与框架对照 |
+| Chapter09 | 09.1-09.4 correctness、workload、样本与统计 | 09.5-09.9 工具、热点、A/B 和框架对照 |
+| Chapter10 | 10.1-10.5 生命周期、准入、释放和同步 Completion | 10.6-10.10 SSE、并发、指标、真实模型和框架对照 |
 
 ## 任务 1：建立真实 CPU 推理基线
 
@@ -103,27 +104,27 @@
 
 ## 任务 5：完成 Generation Runtime
 
-本任务把模型前向变成持续生成系统。首轮学习 Generation Core 的 Naive Generation、KV Cache、Scheduler、Sampler、端到端测试和 Request 生命周期；第二轮再进入 chunked prefill、continuous batching 和 Block KV，HTTP API 由任务 6 接入。
+本任务把模型前向扩展为三段可独立验证的系统：Chapter06 负责单请求生成语义，Chapter07 负责连续与分页 K/V，Chapter08 负责多请求选择、chunked prefill 和批量执行。HTTP API 由任务 6 接入。
 
-练习按 `FQ07 → FQ09 → FQ11 → FQ13 → FQ14 → FQ15 → FQ16` 执行。正文先学习[`逐词元生成`](../chapter06_generation/03_naive_generation.md)，再读[`连续批处理`](../chapter06_generation/10_continuous_batching.md)、[`真实模型批量执行`](../chapter06_generation/11_real_model_batch.md)和[`分块 KV Cache`](../chapter06_generation/12_block_kv_cache.md)。
+练习按 `FQ07 → FQ09 → FQ11 → FQ13 → FQ14 → FQ15 → FQ16` 执行。正文从 [`Chapter06 导读`](../chapter06_generation/next/intro.md)进入，再依次学习 [`Chapter07 K/V Cache`](../chapter07_kv_cache/next/intro.md)和 [`Chapter08 Scheduling`](../chapter08_scheduling/next/intro.md)。
 
 | 任务卡 | 内容 |
 | --- | --- |
-| 主阅读入口 | [`逐词元生成`](../chapter06_generation/03_naive_generation.md) |
-| 主验证命令 | `bash code/chapter06_generation/scripts/run.sh` |
+| 主阅读入口 | [`Chapter06 导读`](../chapter06_generation/next/intro.md) |
+| 主验证命令 | `bash code/chapter06_generation/scripts/run_generation_core.sh && bash code/chapter07_kv_cache/scripts/run.sh && bash code/chapter08_scheduling/scripts/run.sh` |
 | 学习记录 | `generation-runtime.md`：状态迁移、step 计划、chunk 和 block 回滚 |
 | 单请求生成 | prefill、decode、greedy sampling、EOS 和 token budget 测试通过 |
 | 多请求状态 | executor、取消、超时、失败和资源状态不互相污染 |
 | Chunked prefill | 中间 chunk 不采样，final chunk 产生 logits，失败时游标和 block 正确回滚 |
-| 调度与内存 | 能解释 token/block budget、BlockTable、物理 block 释放和真实模型 K/V 的区别 |
+| 调度与内存 | 能解释 token/block budget、BlockTable、分页 payload、批次计划和终态释放 |
 
 ## 任务 6：完成最小 CPU 推理服务
 
-先用 Chapter09 把 Request 接到 admission、waiting/running、取消、超时和回收，再用 Chapter07 固定正确性与 benchmark 条件。Chapter08 首轮学习 Profiling Basics、Latency Breakdown、A/B Experiment 和 Optimization Loop；内存带宽、CUDA Graph、真实案例与框架桥按需深入。网络库承载 transport，并通过稳定接口调用 ServiceCore。
+先用 Chapter09 固定 correctness、workload、原始样本和 A/B 判断，再用 Chapter10 把 Request 接到 admission、waiting/running、取消、超时和回收。网络库只承载 transport，并通过稳定接口调用 ServiceCore。
 
 | 任务卡 | 内容 |
 | --- | --- |
-| 主阅读入口 | [`Chapter09 导读`](../chapter09_serving/intro.md) |
+| 主阅读入口 | [`Chapter09 导读`](../chapter09_performance/next/intro.md)，随后进入 [`Chapter10`](../chapter10_serving/next/intro.md) |
 | 主验证命令 | `CPP_LLM_ENGINE_MODEL_PATH=... bash scripts/run_cpu_service_learning.sh` |
 | 学习记录 | `cpu-service.md`：请求数、token budget、correctness、TTFT、吞吐和环境 |
 | Service Core | admission、waiting/running、step dispatch、取消、超时和统一释放测试通过 |

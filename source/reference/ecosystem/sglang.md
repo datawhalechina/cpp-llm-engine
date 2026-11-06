@@ -24,6 +24,8 @@ LPM 是调度策略，Radix Cache 是缓存与索引机制，HiCache 是多级�
 
 ## 对应教程章节
 
-- Chapter06：Prefill/Decode、Chunked Prefill、Scheduler 和 Block KV
-- Chapter07-08：前缀命中 workload、TTFT 和资源成本
-- Chapter09：admission、前缀复用、缓存回收和服务指标
+- Chapter06：Prefill/Decode 与单请求 Runtime
+- Chapter07：Block KV、前缀复用和缓存回收
+- Chapter08：Chunked Prefill、Scheduler 和资源预算
+- Chapter09：前缀命中 workload、TTFT 和资源成本
+- Chapter10：admission、网络接入和服务指标

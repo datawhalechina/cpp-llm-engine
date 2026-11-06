@@ -3,13 +3,14 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-const roots = ['source/chapter00_quickstart', 'source/chapter01_tensor_loader',
-  'source/chapter02_tensor_ops', 'source/chapter03_matmul', 'source/chapter04_attention',
-  'source/chapter05_quantization', 'source/chapter06_generation', 'source/chapter07_benchmark',
-  'source/chapter08_profiling', 'source/chapter09_serving', 'source/foundation',
+const chapterRoots = readdirSync('source', { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && /^chapter\d{2}_/.test(entry.name))
+  .map((entry) => join('source', entry.name))
+  .sort()
+const roots = [...chapterRoots, 'source/foundation',
   'source/guides', 'source/reference', 'docs/code', 'exercises/foundation']
 const entryFiles = ['README.md', 'USAGE.md', 'docs/README.md', 'docs/index.md', 'docs/guide.md']
-const chineseFirstTitleRoots = roots.slice(0, 5)
+const chineseFirstTitleRoots = chapterRoots
 const patterns = [
   /##\s+这一页要解决什么/,
   /##\s+本节概览/,

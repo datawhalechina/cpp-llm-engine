@@ -15,6 +15,7 @@
 
 ## 对应教程章节
 
-- Chapter09：Engine、Service 与集群基础设施边界
-- Chapter07-08：分阶段 workload、指标和联合优化
+- Chapter08：异步调度与批量执行边界
+- Chapter09：分阶段 workload、指标和联合优化
+- Chapter10：Engine、Service 与集群基础设施边界
 - 多模态进阶：本地 Vision 路径与生产阶段分离

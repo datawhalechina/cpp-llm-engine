@@ -13,11 +13,12 @@ This tutorial moves along one inference-engine main line instead of being a loos
 | Stage | Main responsibility |
 | --- | --- |
 | `chapter01` - `chapter03` | inputs, tensor semantics, and operator boundaries |
-| `chapter04` - `chapter06` | structure and runtime |
-| `chapter05` | representation and cost |
-| `chapter07` | verification and evidence |
+| `chapter04` - `chapter06` | decoder structure, quantization, and single-request runtime |
+| `chapter07` - `chapter08` | paged K/V, scheduling, and tensor batches |
+| `chapter09` | benchmark, profiling, and performance evidence |
+| `chapter10` | ServiceCore, HTTP/SSE, and terminal resource release |
 
-After `chapter07`, continue to profiling and serving, then use `reference` and `guides` as needed:
+After `chapter10`, use `reference` and `guides` as needed:
 
 - `reference`: concept explanations, terminology, and ecosystem comparison
 - `guides`: build, environment, migration, and engineering methods
@@ -32,15 +33,16 @@ If you want the shortest route map, start from [the English entry](/en/README).
 
 - foundation prepares you for the main line.
 - chapter00_quickstart gets you to the first working baseline.
-- chapter01 to chapter07 form the main teaching path.
+- chapter01 to chapter10 form the main teaching path.
 
 ## Recommended path
 
 1. Start from [README.md](README) to see the English entry.
 2. If your background is thin, read [Foundation](foundation/intro) first.
 3. If you want a runnable baseline first, start with [chapter00_quickstart](chapter00_quickstart/intro).
-4. If you need engineering help, open [guides/README.md](guides/README).
-5. If you want design context, open [reference/README.md](reference/README).
+4. Continue through the translated Chapter 01-06 pages, then use the Chinese source of truth for Chapter 07-10.
+5. If you need engineering help, open [guides/README.md](guides/README).
+6. If you want design context, open [reference/README.md](reference/README).
 
 ## CPU / GPU split
 

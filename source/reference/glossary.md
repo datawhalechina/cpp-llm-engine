@@ -64,20 +64,20 @@
 | --- | --- | --- | --- | --- |
 | 词元 | token | tokenizer 和模型处理的离散输入输出单位 | Chapter00-01 | - |
 | 提示输入 | prompt | 用户提供并在生成前完成 prefill 的输入序列 | Chapter00、Chapter06 | - |
-| 请求 | Request | 保存 prompt、生成 token、执行阶段、停止原因和请求级资源的运行时对象 | [Chapter06 Request 生命周期](../chapter06_generation/09_request_lifecycle.md) | [F-SCHED-01](./formulas.md#f-sched-01) |
+| 请求 | Request | 保存 prompt、生成 token、执行阶段、停止原因和请求级资源的运行时对象 | [Chapter06 Request 生命周期](../chapter06_generation/next/04_request_lifecycle.md) | [F-SCHED-01](./formulas.md#f-sched-01) |
 | 预填充 | prefill | 批量处理 prompt 并建立初始 KV Cache 的阶段 | Chapter06 | [F-KV-01](./formulas.md#f-kv-01) |
 | 逐词元解码 | decode | 利用已有 KV Cache 每步生成一个新词元的阶段 | Chapter06 | [F-KV-01](./formulas.md#f-kv-01) |
-| 键值缓存 | Key-Value Cache, KV Cache | 保存历史 token 的 Attention key/value tensor | Chapter04-05 | [F-KV-01](./formulas.md#f-kv-01) |
-| 分块预填充 | chunked prefill | 按词元预算将长输入分多个调度步执行 | Chapter06 | [F-KV-01](./formulas.md#f-kv-01) |
-| 连续批处理 | continuous batching | 每个调度 step 按请求状态重新组成执行 batch | Chapter06 | [F-PERF-02](./formulas.md#f-perf-02) |
-| 词元预算 | token budget | 单个调度步允许处理的词元上限 | Chapter06 | [F-SCHED-01](./formulas.md#f-sched-01) |
-| KV 块池 | KV block pool | 按固定大小 block 分配、复用和回收 KV Cache 容量的资源池 | Chapter06、Chapter09 | [F-SCHED-01](./formulas.md#f-sched-01) |
-| 分页注意力 | PagedAttention | 通过逻辑 block 到物理 block 的映射读取非连续 KV Cache 的注意力方法 | Chapter06 框架对照 | [F-KV-01](./formulas.md#f-kv-01) |
+| 键值缓存 | Key-Value Cache, KV Cache | 保存历史 token 的 Attention key/value tensor | Chapter04、Chapter07 | [F-KV-01](./formulas.md#f-kv-01) |
+| 分块预填充 | chunked prefill | 按词元预算将长输入分多个调度步执行 | Chapter08 | [F-KV-01](./formulas.md#f-kv-01) |
+| 连续批处理 | continuous batching | 每个调度 step 按请求状态重新组成执行 batch | Chapter08 | [F-PERF-02](./formulas.md#f-perf-02) |
+| 词元预算 | token budget | 单个调度步允许处理的词元上限 | Chapter08 | [F-SCHED-01](./formulas.md#f-sched-01) |
+| KV 块池 | KV block pool | 按固定大小 block 分配、复用和回收 KV Cache 容量的资源池 | Chapter07 | [F-SCHED-01](./formulas.md#f-sched-01) |
+| 分页注意力 | PagedAttention | 通过逻辑 block 到物理 block 的映射读取非连续 KV Cache 的注意力方法 | Chapter07 | [F-KV-01](./formulas.md#f-kv-01) |
 | 采样器 | Sampler | 根据 logits 选择下一 token 的组件 | Chapter06 | [F-SAMPLE-01](./formulas.md#f-sample-01) |
 | 贪心采样 | Greedy Sampling | 每步选择最大 logit 对应 token | Chapter06 | [F-SAMPLE-01](./formulas.md#f-sample-01) |
 | 运行时 | Runtime | 组织模型执行、缓存、采样和请求状态推进的组件 | Chapter06 | - |
-| 调度器 | Scheduler | 根据 slot、token 和内存预算选择本 step 请求 | Chapter06 | - |
-| 流式输出 | streaming | token 生成后立即向调用方持续返回事件 | Chapter06、Chapter09 | [F-PERF-01](./formulas.md#f-perf-01) |
+| 调度器 | Scheduler | 根据 slot、token 和内存预算选择本 step 请求 | Chapter08 | - |
+| 流式输出 | streaming | token 生成后立即向调用方持续返回事件 | Chapter06、Chapter10 | [F-PERF-01](./formulas.md#f-perf-01) |
 
 ## 量化、性能与服务
 
@@ -90,18 +90,18 @@
 | 反量化 | dequantization | 根据 scale、zero point 或 block metadata 恢复近似浮点值 | Chapter05 | [F-QUANT-01](./formulas.md#f-quant-01) |
 | 仅权重量化 | weight-only quantization | 权重使用低比特格式、激活与输出仍保持浮点表示的推理方式 | [Chapter05 Quantized Linear](../chapter05_quantization/05_linear_with_quant.md) | [F-QUANT-02](./formulas.md#f-quant-02) |
 | 融合内核 | fused kernel | 在一次 kernel 或紧密循环中完成原本分离的多个阶段 | Chapter05、GPU 路线 | [F-QUANT-02](./formulas.md#f-quant-02) |
-| 性能基准 | benchmark | 在固定 workload 和环境下测量延迟、吞吐与资源使用 | Chapter07 | [F-PERF-02](./formulas.md#f-perf-02) |
-| 性能剖析 | profiling | 将性能结果归因到阶段、算子、带宽或同步 | Chapter08 | [F-PERF-02](./formulas.md#f-perf-02) |
-| 首词元延迟 | Time to First Token, TTFT | 请求接收到首个生成词元的时间 | Chapter07-09 | [F-PERF-01](./formulas.md#f-perf-01) |
-| 每词元输出时间 | Time per Output Token, TPOT | 首词元之后每个输出词元的平均耗时 | Chapter07-09 | [F-PERF-01](./formulas.md#f-perf-01) |
-| 吞吐 | throughput | 单位时间完成的 token 数或请求数 | Chapter07 | [F-PERF-02](./formulas.md#f-perf-02) |
-| 排队时间 | queue wait | 请求从 accepted 到获得执行机会的时间 | Chapter09 | [F-PERF-01](./formulas.md#f-perf-01) |
-| 回压 | backpressure | 服务过载时限制新请求或输出速度的机制 | Chapter09 | - |
-| 服务核心 | Service Core | 与网络 transport 解耦的 admission、调度、执行和指标核心 | Chapter09 | - |
-| 传输层 | transport | HTTP/SSE 等连接、协议解析和字节发送实现 | Chapter09 | - |
-| 准入控制 | admission control | 在请求进入等待队列前按容量或策略决定接受或拒绝 | Chapter09 | [F-SERVE-01](./formulas.md#f-serve-01) |
-| 服务器发送事件 | Server-Sent Events, SSE | 服务端通过一个 HTTP 响应持续发送文本事件的单向流协议 | Chapter09 | - |
-| 在途请求 | in-flight request | 已接受但尚未进入完成、失败、取消或超时终态的请求 | Chapter09 | [F-SERVE-01](./formulas.md#f-serve-01) |
+| 性能基准 | benchmark | 在固定 workload 和环境下测量延迟、吞吐与资源使用 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
+| 性能剖析 | profiling | 将性能结果归因到阶段、算子、带宽或同步 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
+| 首词元延迟 | Time to First Token, TTFT | 请求接收到首个生成词元的时间 | Chapter09-10 | [F-PERF-01](./formulas.md#f-perf-01) |
+| 每词元输出时间 | Time per Output Token, TPOT | 首词元之后每个输出词元的平均耗时 | Chapter09-10 | [F-PERF-01](./formulas.md#f-perf-01) |
+| 吞吐 | throughput | 单位时间完成的 token 数或请求数 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
+| 排队时间 | queue wait | 请求从 accepted 到获得执行机会的时间 | Chapter10 | [F-PERF-01](./formulas.md#f-perf-01) |
+| 回压 | backpressure | 服务过载时限制新请求或输出速度的机制 | Chapter10 | - |
+| 服务核心 | Service Core | 与网络 transport 解耦的 admission、调度、执行和指标核心 | Chapter10 | - |
+| 传输层 | transport | HTTP/SSE 等连接、协议解析和字节发送实现 | Chapter10 | - |
+| 准入控制 | admission control | 在请求进入等待队列前按容量或策略决定接受或拒绝 | Chapter10 | [F-SERVE-01](./formulas.md#f-serve-01) |
+| 服务器发送事件 | Server-Sent Events, SSE | 服务端通过一个 HTTP 响应持续发送文本事件的单向流协议 | Chapter10 | - |
+| 在途请求 | in-flight request | 已接受但尚未进入完成、失败、取消或超时终态的请求 | Chapter10 | [F-SERVE-01](./formulas.md#f-serve-01) |
 
 ## 多模态
 
@@ -126,10 +126,10 @@
 | 中文术语 | 英文或缩写 | 定义 | 首次学习 | 相关公式 |
 | --- | --- | --- | --- | --- |
 | 测试夹具 | fixture | 为测试固定的输入、配置和期望属性，可来自合成数据或外部工具 | Foundation、Chapter01 | - |
-| 基准结果 | golden result | 由可信来源或已审核基线产生、用于数值或输出序列比较的期望结果 | Chapter01、Chapter07 | - |
+| 基准结果 | golden result | 由可信来源或已审核基线产生、用于数值或输出序列比较的期望结果 | Chapter01、Chapter09 | - |
 | 参考实现 | reference implementation | 优先保证语义清晰和正确性、用于校验优化实现的实现路径 | Chapter03、Chapter05 | - |
-| 回归测试 | regression test | 防止已通过行为在后续修改中退化的自动化检查 | Chapter07 | - |
-| A/B 实验 | A/B experiment | 固定 workload 和环境，只改变一个目标因素的对照测量 | Chapter08 | [F-PERF-02](./formulas.md#f-perf-02) |
+| 回归测试 | regression test | 防止已通过行为在后续修改中退化的自动化检查 | Chapter09 | - |
+| A/B 实验 | A/B experiment | 固定 workload 和环境，只改变一个目标因素的对照测量 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
 
 ## 参考框架与格式
 

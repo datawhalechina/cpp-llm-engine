@@ -71,17 +71,17 @@ prompt template 的作用，是把不同来源的请求整理成统一结构。
 | --- | --- | --- |
 | `chapter01_tensor_loader` | 权重、`Tensor`、`ModelLoader` | 输入请求如何进入系统 |
 | `chapter06_generation` | embedding、位置编码、生成 runtime | 请求契约如何进入 runtime |
-| `chapter07_benchmark` | 测试和性能记录 | 不同输入契约如何影响比较结果 |
+| `chapter09_performance` | 测试和性能记录 | 不同输入契约如何影响比较结果 |
 
 输入链路为 Runtime 提供结构稳定、长度合法且终止条件明确的请求。
 
 最小学习顺序是：`chapter00` 先用固定 prompt 跑通外部输入，`chapter01` 固定权重和 `Tensor` 对象，`chapter06` 再把 token ids、停止条件和长度限制放进 `Request`。这样输入链路与模型加载、生成调度各自保持清楚。
 
-相关阅读：[`00.4 First Inference`](../chapter00_quickstart/04_first_inference.md)、[`01.0 Model Weights and Tensor Objects`](../chapter01_tensor_loader/intro.md)、[`06.9 Request 生命周期`](../chapter06_generation/09_request_lifecycle.md)、[`推理引擎回归测试`](./regression_testing.md)
+相关阅读：[`00.4 First Inference`](../chapter00_quickstart/04_first_inference.md)、[`01.0 Model Weights and Tensor Objects`](../chapter01_tensor_loader/intro.md)、[`06.4 Request 生命周期`](../chapter06_generation/next/04_request_lifecycle.md)、[`推理引擎回归测试`](./regression_testing.md)
 
 ## 7. 如何使用输入链路参考页
 
-- 先看 `chapter06_generation/01_embedding_and_position`
+- 先看 `chapter06_generation/next/01_request_contract`
 - 再回到这里补充 tokenizer 和请求契约
 - 如果后面看起来像模型有问题，先检查输入链路是否已经统一
 

@@ -21,5 +21,6 @@
 ## 对应教程章节
 
 - Chapter04：模型层与 Attention 结构
-- Chapter06：Generation Runtime、KV 和 Scheduler
-- Chapter08：优化对象和 profiling 观测点
+- Chapter06：Generation Runtime 与单请求循环
+- Chapter07-08：K/V 资源管理、Scheduler 与批处理
+- Chapter09：优化对象和 Profiling 观测点

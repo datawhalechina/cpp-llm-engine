@@ -139,7 +139,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON
 - `chapter04_attention`：CPU 能学会结构，CUDA 不是硬前置
 - `chapter06_generation`：CPU 能跑通生成链路，CUDA 用于后续优化
 - `chapter05_quantization`：CPU 可以理解原理，GPU 场景更适合做性能对照
-- `chapter07_benchmark`：CPU 可以完成正确性与基础对照，GPU 用于性能评估
+- `chapter09_performance`：CPU 可以完成正确性与基础对照，GPU 用于性能评估
 
 ## 11. 哪些地方必须要 CUDA
 

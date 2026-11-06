@@ -200,7 +200,7 @@ elements = L × 2 × S × Hkv × Dh
 bytes = elements × bytes_per_element
 ```
 
-代码对应：Model `RealLlamaCpuContext`、Chapter04 连续 KV，以及 Chapter06 `CpuPagedKvCache`。Block KV 改变物理分配与寻址，不改变逻辑 K/V 元素数。
+代码对应：Model `RealLlamaCpuContext`、Chapter04 连续 KV，以及 Chapter07 `CpuPagedKvCache`。Block KV 改变物理分配与寻址，不改变逻辑 K/V 元素数。
 
 <a id="f-sched-01"></a>
 ### F-SCHED-01 调度预算与 KV Block 数
@@ -216,7 +216,7 @@ required: scheduled_requests <= available_slots
 required: sum(required_blocks[i]) <= free_blocks
 ```
 
-代码对应：Chapter06 `Scheduler`、`KvBlockPool` 和 Chapter09 `ServiceCore::dispatch_step()`。验证重点：预算不足不执行、整除边界、终态释放和 block 复用。
+代码对应：Chapter07 `KvBlockPool`、Chapter08 `StepScheduler` 和 Chapter10 `ServiceCore::dispatch_step()`。验证重点：预算不足不执行、整除边界、终态释放和 block 复用。
 
 ## Quantization
 
@@ -290,7 +290,7 @@ completion_latency = finished_time - accepted_time
 TPOT = (finished_time - first_token_time) / max(generated_tokens - 1, 1)
 ```
 
-代码对应：Chapter07 benchmark、Chapter09 `ServiceMetrics`。
+代码对应：Chapter09 性能证据、Chapter10 `ServiceMetrics`。
 
 <a id="f-perf-02"></a>
 ### F-PERF-02 吞吐与加速比
@@ -303,7 +303,7 @@ request_throughput = completed_requests / measured_seconds
 speedup = baseline_time / optimized_time
 ```
 
-代码对应：Chapter07 多请求 benchmark 和 Chapter08 A/B profile。
+代码对应：Chapter09 多请求 benchmark、Profiling 和 A/B 证据。
 
 <a id="f-serve-01"></a>
 ### F-SERVE-01 请求计数与终态守恒
@@ -319,7 +319,7 @@ closed-window required: inflight = 0
 resource required: released = terminal
 ```
 
-代码对应：Chapter09 `ServiceMetrics`、Engine 的 embedding request service 测试。验证重点：成功、异常、客户端断开、超时和 Context 生命周期释放。
+代码对应：Chapter10 `ServiceMetrics`、Engine 的 embedding request service 测试。验证重点：成功、异常、客户端断开、超时和 Context 生命周期释放。
 
 ## 多模态
 

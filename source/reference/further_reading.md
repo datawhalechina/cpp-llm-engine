@@ -7,7 +7,8 @@
 - 回看 `chapter02_tensor_ops`，重点关注 view 语义和存储共享
 - 回看 `chapter03_matmul`，重点关注算子边界和后端拆分
 - 回看 `chapter04_attention`，重点关注 decoder 结构
-- 回看 `chapter06_generation`，重点关注 runtime state、KV Cache 和 sampling
+- 回看 `chapter06_generation`，重点关注 runtime state 和 sampling
+- 回看 `chapter07_kv_cache` 与 `chapter08_scheduling`，重点关注缓存所有权和批处理
 
 ## 2. 走向 vLLM-like serving
 
@@ -18,7 +19,7 @@
 ## 3. 继续看性能
 
 - 阅读 `reference/ecosystem/tensorrt_llm.md`
-- 回看 `chapter07_benchmark`，重点关注测量和比较纪律
+- 回看 `chapter09_performance`，重点关注测量和比较纪律
 - 优化前先分清正确性、性能和 profiling
 
 ## 4. 扩展模型或交付视角

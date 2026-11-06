@@ -22,4 +22,4 @@
 
 - `chapter00_quickstart`
 - `chapter06_generation`
-- `chapter07_benchmark`
+- `chapter10_serving`

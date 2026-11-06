@@ -1,12 +1,16 @@
-# cpp-llm-engine
+# 从零构建 C++ LLM 推理引擎
 
-用 C++ 构建 LLM 推理引擎
+`cpp-llm-engine`
+
+从 GGUF、Tensor、Decoder 到 KV Cache、调度与推理服务
 
 _A Practical Tutorial for Building a C++ LLM Inference Engine_
 
 [![CPU and docs CI](https://github.com/lynnyulinlin-debug/cpp-llm-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/lynnyulinlin-debug/cpp-llm-engine/actions/workflows/ci.yml)
 
-这是一套中文优先、以 C++ 为实现主线、CPU 可完整学习、GPU 可选加速的推理引擎工程教程。目标是从真实模型基线出发，逐步构建可以自行修改和验证的推理服务框架。
+这是一套中文优先、以 C++ 为实现主线、CPU 可完整学习、GPU 可选加速的推理引擎工程教程。最终目标是从真实模型基线出发，构建一个可 DIY 的单机推理服务框架：学习者可以替换或扩展 Loader、Backend、KV Cache、Scheduler 和 Transport，并用统一测试与性能证据验证改动。
+
+当前可运行承诺聚焦单机 CPU 主线和可选单卡 CUDA；多 GPU、分布式执行和生产级多租户只作为成熟框架对照，不是当前能力承诺。
 
 主图从上到下展示学习阶段、代码骨架和能力扩展。CPU 主线负责形成完整推理服务，CUDA 替换执行后端，多模态扩展输入路径，成熟框架用于核对工程策略。
 
@@ -43,30 +47,29 @@ bash code/chapter00_quickstart/run.sh
 
 ```text
 Foundation -> Chapter00 -> Chapter01 -> Chapter02 -> Chapter03 -> Chapter04
-    -> Chapter05 -> Chapter06 -> Chapter07 -> Chapter08 -> Chapter09
+    -> Chapter05 -> Chapter06 -> Chapter07 -> Chapter08 -> Chapter09 -> Chapter10
 ```
-
-Chapter09 位于主线末尾，也可以在完成 Chapter06 后提前进入服务专题。
 
 | 阶段 | 章节 | 产物 |
 | --- | --- | --- |
 | 真实基线 | Foundation（按需）、Chapter00 | TinyLlama 本地推理与工具链基线 |
 | 引擎对象 | Chapter01-03 | Model、Tensor/View、Operator 和 Backend |
-| 模型与 Runtime | Chapter04-06 | Decoder、Request、KV Cache、Scheduler、Streaming 和量化 Linear |
-| 证据与服务 | Chapter07-09 | Benchmark、Profiling、ServiceCore 和 HTTP/SSE |
+| 模型与 Runtime | Chapter04-06 | Decoder、量化 Linear、Request、Prefill/Decode 和 Streaming |
+| 缓存与调度 | Chapter07-08 | 分页 K/V、BlockTable、Continuous Batching 和 Tensor batch |
+| 证据与服务 | Chapter09-10 | Benchmark、Profiling、ServiceCore 和 HTTP/SSE |
 | 可选扩展 | CUDA、多模态 | GPU Backend 或视觉输入接入现有 Runtime |
 
 章节是从输入到服务的纵向学习顺序；数据、算子和系统是贯穿各章的横向观察线。数据层追踪模型与请求状态怎样表示，算子层追踪数值计算怎样执行，系统层追踪多请求怎样调度、分配资源并对外服务。
 
 | 横向视角 | 主要章节 | 重点对象 | 完成后能回答什么 |
 | --- | --- | --- | --- |
-| 数据层 | Chapter01-02、04、06 | GGUF、Tensor/View、Q/K/V、Context、BlockTable | 数据是什么形状、由谁持有、怎样随请求增长 |
+| 数据层 | Chapter01-02、04、06-07 | GGUF、Tensor/View、Q/K/V、Context、BlockTable | 数据是什么形状、由谁持有、怎样随请求增长 |
 | 算子层 | Chapter03-05、CUDA | MatMul、Attention、FFN、量化 Linear、Backend | 一次计算做什么、由哪个 CPU/GPU 实现执行 |
-| 系统层 | Chapter00、06-09 | Runtime、Scheduler、Benchmark、Profiling、ServiceCore | 请求怎样持续推进、测量、回收并通过 HTTP/SSE 输出 |
+| 系统层 | Chapter00、06-10 | Runtime、Scheduler、Benchmark、Profiling、ServiceCore | 请求怎样持续推进、测量、回收并通过 HTTP/SSE 输出 |
 
 ## 建设进度
 
-更新时间：**2026-11-03**。详细实验条件与复现入口见[实验资产表](source/reference/experiment_assets.md)。
+更新时间：**2026-11-05**。详细实验条件与复现入口见[实验资产表](source/reference/experiment_assets.md)。
 
 | 时间 | 里程碑 | 状态 | 可验证产物 |
 | --- | --- | --- | --- |
