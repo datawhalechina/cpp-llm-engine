@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
-  <title id="title">cpp-llm-engine 教程主图</title>
-  <desc id="desc">展示教程从真实模型基线出发，沿 C++ CPU 主线构建推理服务，并用数据层、算子层和系统层组织代码骨架，最后扩展到单消费级 GPU、多模态输入和成熟框架对照。</desc>
+  <title id="title">从零构建 C++ LLM 推理引擎</title>
+  <desc id="desc">展示《从零构建 C++ LLM 推理引擎》从 GGUF、Tensor 和 Decoder 逐步进入 KV Cache、调度与推理服务，并扩展到单消费级 GPU、多模态输入和成熟框架对照。</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#f8fafc"/>
@@ -31,8 +31,8 @@
   <circle cx="1175" cy="58" r="115" fill="#bfdbfe" opacity="0.28"/>
   <circle cx="88" cy="715" r="135" fill="#bbf7d0" opacity="0.28"/>
 
-  <text x="48" y="48" class="title">从真实模型到可验证的 C++ 推理服务</text>
-  <text x="48" y="76" class="subtitle">CPU 完整主线 · 单消费级 NVIDIA GPU 可选 · 多模态复用同一 Runtime</text>
+  <text x="48" y="48" class="title">从零构建 C++ LLM 推理引擎</text>
+  <text x="48" y="76" class="subtitle">从 GGUF、Tensor、Decoder 到 KV Cache、调度与推理服务</text>
 
   <rect x="925" y="34" width="92" height="28" rx="14" fill="#dcfce7"/>
   <text x="971" y="53" text-anchor="middle" class="badge" fill="#166534">CPU 完整</text>
@@ -43,35 +43,53 @@
 
   <text x="48" y="116" class="section">学习主线 · 每一阶段都有可运行产物</text>
 
-  <rect x="48" y="138" width="204" height="104" class="card" fill="#fef3c7"/>
-  <text x="150" y="171" text-anchor="middle" class="label">起点与基线</text>
-  <text x="150" y="198" text-anchor="middle" class="small">Foundation · Chapter00</text>
-  <text x="150" y="220" text-anchor="middle" class="tiny">工具链 + llama.cpp / TinyLlama</text>
+  <rect x="48" y="138" width="128" height="104" class="card" fill="#ffffff"/>
+  <text x="112" y="170" text-anchor="middle" class="label">起点与基线</text>
+  <text x="112" y="197" text-anchor="middle" class="small">Foundation · Ch00</text>
+  <text x="112" y="220" text-anchor="middle" class="tiny">工具链 · llama.cpp</text>
 
-  <rect x="293" y="138" width="204" height="104" class="card" fill="#e0f2fe"/>
-  <text x="395" y="171" text-anchor="middle" class="label">输入与对象</text>
-  <text x="395" y="198" text-anchor="middle" class="small">Chapter01 - 02</text>
-  <text x="395" y="220" text-anchor="middle" class="tiny">Tokenizer · GGUF · Tensor View</text>
+  <rect x="198" y="138" width="128" height="104" class="card" fill="#ffffff"/>
+  <text x="262" y="170" text-anchor="middle" class="label">输入与对象</text>
+  <text x="262" y="197" text-anchor="middle" class="small">Chapter01 - 02</text>
+  <text x="262" y="220" text-anchor="middle" class="tiny">GGUF · Tensor</text>
 
-  <rect x="538" y="138" width="204" height="104" class="card" fill="#dbeafe"/>
-  <text x="640" y="171" text-anchor="middle" class="label">计算与结构</text>
-  <text x="640" y="198" text-anchor="middle" class="small">Chapter03 - 04</text>
-  <text x="640" y="220" text-anchor="middle" class="tiny">Backend · Attention · Decoder</text>
+  <rect x="348" y="138" width="128" height="104" class="card" fill="#ffffff"/>
+  <text x="412" y="170" text-anchor="middle" class="label">计算与结构</text>
+  <text x="412" y="197" text-anchor="middle" class="small">Chapter03 - 04</text>
+  <text x="412" y="220" text-anchor="middle" class="tiny">Backend · Decoder</text>
 
-  <rect x="783" y="138" width="204" height="104" class="card" fill="#dcfce7"/>
-  <text x="885" y="171" text-anchor="middle" class="label">运行时与表示</text>
-  <text x="885" y="198" text-anchor="middle" class="small">Chapter05 - 06</text>
-  <text x="885" y="220" text-anchor="middle" class="tiny">Quantization · Request · KV</text>
+  <rect x="498" y="138" width="128" height="104" class="card" fill="#ffffff"/>
+  <text x="562" y="170" text-anchor="middle" class="label">量化与生成</text>
+  <text x="562" y="197" text-anchor="middle" class="small">Chapter05 - 06</text>
+  <text x="562" y="220" text-anchor="middle" class="tiny">Quantized · Request</text>
 
-  <rect x="1028" y="138" width="204" height="104" class="card" fill="#fce7f3"/>
-  <text x="1130" y="171" text-anchor="middle" class="label">证据与服务</text>
-  <text x="1130" y="198" text-anchor="middle" class="small">Chapter07 - 09</text>
-  <text x="1130" y="220" text-anchor="middle" class="tiny">Benchmark · Profile · HTTP</text>
+  <rect x="648" y="138" width="128" height="104" class="card" fill="#ffffff"/>
+  <text x="712" y="170" text-anchor="middle" class="label">分页缓存</text>
+  <text x="712" y="197" text-anchor="middle" class="small">Chapter07</text>
+  <text x="712" y="220" text-anchor="middle" class="tiny">BlockTable · K/V</text>
 
-  <path d="M252 190 H288" class="line"/>
-  <path d="M497 190 H533" class="line"/>
-  <path d="M742 190 H778" class="line"/>
-  <path d="M987 190 H1023" class="line"/>
+  <rect x="798" y="138" width="128" height="104" class="card" fill="#ffffff"/>
+  <text x="862" y="170" text-anchor="middle" class="label">请求调度</text>
+  <text x="862" y="197" text-anchor="middle" class="small">Chapter08</text>
+  <text x="862" y="220" text-anchor="middle" class="tiny">Priority · Batch</text>
+
+  <rect x="948" y="138" width="128" height="104" class="card" fill="#ffffff"/>
+  <text x="1012" y="170" text-anchor="middle" class="label">性能证据</text>
+  <text x="1012" y="197" text-anchor="middle" class="small">Chapter09</text>
+  <text x="1012" y="220" text-anchor="middle" class="tiny">Benchmark · Profile</text>
+
+  <rect x="1098" y="138" width="128" height="104" class="card" fill="#ffffff"/>
+  <text x="1162" y="170" text-anchor="middle" class="label">推理服务</text>
+  <text x="1162" y="197" text-anchor="middle" class="small">Chapter10</text>
+  <text x="1162" y="220" text-anchor="middle" class="tiny">ServiceCore · HTTP</text>
+
+  <path d="M176 190 H193" class="line"/>
+  <path d="M326 190 H343" class="line"/>
+  <path d="M476 190 H493" class="line"/>
+  <path d="M626 190 H643" class="line"/>
+  <path d="M776 190 H793" class="line"/>
+  <path d="M926 190 H943" class="line"/>
+  <path d="M1076 190 H1093" class="line"/>
 
   <text x="48" y="296" class="section">三条横向观察线 · 数据进入计算，计算进入持续运行的系统</text>
 
