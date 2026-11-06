@@ -2,6 +2,7 @@
 // 职责：比较顺序 decode 与共享 Model 的多 Context 分层推进结果。
 // 验证：不同长度 prompt 的 logits、golden token、position 拒绝和状态提交。
 #include "chapter06_generation/sampler.h"
+#include "chapter07_kv_cache/paged_kv_cache.h"
 #include "cpp_llm_engine/real_llama_executor_factory.h"
 #include "cpp_llm_engine/real_tokenizer_backend.h"
 
@@ -75,20 +76,53 @@ int main(int argc, char** argv) {
         batched[0]->execution_state().committed_tokens,
         batched[1]->execution_state().committed_tokens,
     };
+    const auto contract = factory->decoder_contract();
+    chapter07_kv_cache::CpuPagedKvCache paged_cache(
+        contract.layer_count,
+        16,
+        4,
+        contract.layer.kv_head_count,
+        contract.layer.head_dimension);
+    const std::vector<std::size_t> request_ids{100, 101};
+    bool paged_kv_match = true;
+    for (std::size_t index = 0; index < batched.size(); ++index) {
+        paged_kv_match = paged_kv_match && factory->sync_paged_kv(
+            batched[index], request_ids[index], &paged_cache, &error);
+        paged_kv_match = paged_kv_match &&
+            paged_cache.block_pool().token_count(request_ids[index]) ==
+                initial_positions[index];
+    }
+    if (!paged_kv_match) {
+        std::cerr << "paged KV initial sync failed: " << error << '\n';
+        return 1;
+    }
     LogitsBatch rejected_logits;
-    const bool position_rejected = !factory->decode_batch(
-        batched, {1, 1}, {initial_positions[0] + 1, initial_positions[1]},
-        &rejected_logits, &error);
+    const bool position_rejected = !factory->decode_batch_paged(
+        batched,
+        {1, 1},
+        {initial_positions[0] + 1, initial_positions[1]},
+        request_ids,
+        &paged_cache,
+        &rejected_logits,
+        &error);
     const bool rejection_preserved_state =
         batched[0]->execution_state().committed_tokens == initial_positions[0] &&
         batched[1]->execution_state().committed_tokens == initial_positions[1];
     const auto invalid_token = static_cast<chapter06_generation::TokenId>(
         factory->vocab_size());
-    const bool invalid_token_rejected = !factory->decode_batch(
-        batched, {1, invalid_token}, initial_positions, &rejected_logits, &error);
+    const bool invalid_token_rejected = !factory->decode_batch_paged(
+        batched,
+        {1, invalid_token},
+        initial_positions,
+        request_ids,
+        &paged_cache,
+        &rejected_logits,
+        &error);
     const bool rollback_preserved_state =
         batched[0]->execution_state().committed_tokens == initial_positions[0] &&
-        batched[1]->execution_state().committed_tokens == initial_positions[1];
+        batched[1]->execution_state().committed_tokens == initial_positions[1] &&
+        paged_cache.block_pool().token_count(request_ids[0]) == initial_positions[0] &&
+        paged_cache.block_pool().token_count(request_ids[1]) == initial_positions[1];
 
     chapter06_generation::GreedySampler sampler;
     std::vector<TokenSequence> sequential_tokens(2);
@@ -119,8 +153,14 @@ int main(int argc, char** argv) {
             }
             expected_positions[index] = batched[index]->execution_state().committed_tokens;
         }
-        if (!factory->decode_batch(
-                batched, next_tokens, expected_positions, &batch_logits, &error)) {
+        if (!factory->decode_batch_paged(
+                batched,
+                next_tokens,
+                expected_positions,
+                request_ids,
+                &paged_cache,
+                &batch_logits,
+                &error)) {
             std::cerr << "batch decode failed: " << error << '\n';
             return 1;
         }
@@ -129,6 +169,9 @@ int main(int argc, char** argv) {
                 logits_match(sequential_logits[index], batch_logits[index]);
             states_committed = states_committed &&
                 batched[index]->execution_state().committed_tokens ==
+                    expected_positions[index] + 1;
+            paged_kv_match = paged_kv_match &&
+                paged_cache.block_pool().token_count(request_ids[index]) ==
                     expected_positions[index] + 1;
         }
     }
@@ -144,9 +187,11 @@ int main(int argc, char** argv) {
               << "invalid_token_rejected: " << invalid_token_rejected << '\n'
               << "rollback_preserved_state: " << rollback_preserved_state << '\n'
               << "states_committed: " << states_committed << '\n'
+              << "paged_kv_match: " << paged_kv_match << '\n'
               << "batch_logits_match: " << logits_equal << '\n'
               << "batch_tokens_match: " << batch_match << '\n'
               << "batch_golden_match: " << golden_match << '\n';
     return position_rejected && rejection_preserved_state && invalid_token_rejected &&
-        rollback_preserved_state && states_committed && batch_match && golden_match ? 0 : 1;
+        rollback_preserved_state && states_committed && paged_kv_match &&
+        batch_match && golden_match ? 0 : 1;
 }

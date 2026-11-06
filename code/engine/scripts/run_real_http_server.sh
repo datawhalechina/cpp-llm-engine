@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Engine/Chapter 09：构建并启动真实 TinyLlama CPU HTTP 服务。
+# Engine/Chapter 10：构建并启动真实 TinyLlama CPU HTTP 服务。
 # 使用 --check 时执行 health、同步 completion、SSE 和 metrics 的本地 curl 闭环后退出。
 set -euo pipefail
 
@@ -16,7 +16,7 @@ build_dir="${REAL_HTTP_BUILD_DIR:-/tmp/cpp-llm-engine-real-http-server}"
 port="${REAL_HTTP_PORT:-18082}"
 bind_address="${REAL_HTTP_BIND_ADDRESS:-127.0.0.1}"
 startup_timeout_seconds="${REAL_HTTP_STARTUP_TIMEOUT_SECONDS:-180}"
-httplib_include="${CHAPTER09_CPPHTTPLIB_INCLUDE_DIR:-${repo_root}/llama.cpp/vendor/cpp-httplib}"
+httplib_include="${CHAPTER10_CPPHTTPLIB_INCLUDE_DIR:-${repo_root}/llama.cpp/vendor/cpp-httplib}"
 server_pid=""
 
 cleanup() {
@@ -38,8 +38,8 @@ cmake -S "${repo_root}/code/engine" -B "${build_dir}" \
     -DLLAMA_CPP_ROOT="${repo_root}/llama.cpp" \
     -DCHAPTER05_SOURCE_DIR="${repo_root}/code/chapter05_quantization" \
     -DCPP_LLM_ENGINE_REAL_MODEL="${model_path}" \
-    -DCHAPTER09_ENABLE_CPPHTTPLIB=ON \
-    -DCHAPTER09_CPPHTTPLIB_INCLUDE_DIR="${httplib_include}" \
+    -DCHAPTER10_ENABLE_CPPHTTPLIB=ON \
+    -DCHAPTER10_CPPHTTPLIB_INCLUDE_DIR="${httplib_include}" \
     -DCMAKE_BUILD_TYPE=Release
 cmake --build "${build_dir}" --target real_tinyllama_http_server -j2
 

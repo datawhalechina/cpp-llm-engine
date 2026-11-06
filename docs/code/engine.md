@@ -24,9 +24,9 @@ Engine 将 prompt、token tensor、Request、真实 Model/Context、Chapter 06 R
 | <a href="/_code/chapter01_tensor_loader/src/model_config.h"><code>model_config.h</code></a> | Chapter 01 提供的模型配置边界 |
 | <a href="/_code/engine/src/engine.cpp"><code>engine.cpp</code></a> | token tensor、tokenize 和 generation bridge |
 | <a href="/_code/engine/src/real_llama_engine.cpp"><code>real_llama_engine.cpp</code></a> | 真实 tokenizer、Decoder 与 Chapter06 Runtime bridge |
-| <a href="/_code/engine/examples/real_tinyllama_serving_smoke.cpp"><code>real_tinyllama_serving_smoke.cpp</code></a> | Chapter09 真实双请求隔离与资源释放验证 |
+| <a href="/_code/engine/examples/real_tinyllama_serving_smoke.cpp"><code>real_tinyllama_serving_smoke.cpp</code></a> | Chapter10 真实双请求、K/V 资源释放验证 |
 | <a href="/_code/engine/examples/real_tinyllama_http_adapter_smoke.cpp"><code>real_tinyllama_http_adapter_smoke.cpp</code></a> | 真实同步/SSE completion 与 metrics 验证 |
-| <a href="/_code/engine/examples/real_tinyllama_serving_benchmark.cpp"><code>real_tinyllama_serving_benchmark.cpp</code></a> | 真实双请求阶段计时、吞吐和 JSON 输出 |
+| <a href="/_code/engine/examples/real_tinyllama_serving_benchmark.cpp"><code>real_tinyllama_serving_benchmark.cpp</code></a> | Chapter10 请求级 Worker 的顺序/并行计时、吞吐和 JSON 输出 |
 | <a href="/_code/engine/scripts/run_real_serving_benchmark.sh"><code>run_real_serving_benchmark.sh</code></a> | 固定 Release 构建与结果归档入口 |
 | <a href="/_code/engine/examples/main.cpp"><code>examples/main.cpp</code></a> | 命令行 First Success |
 | <a href="/_code/engine/tests/engine_smoke_test.cpp"><code>tests/engine_smoke_test.cpp</code></a> | 纵向切片 smoke test |
@@ -42,11 +42,10 @@ code/engine/build/cpp_llm_engine_demo --prompt "hello" --max-new-tokens 4
 ctest --test-dir code/engine/build --output-on-failure
 ```
 
-默认命令验证 toy Engine。真实 TinyLlama 路径的构建命令和当前 greedy 输出见 <a href="/_code/engine/README.md"><code>code/engine/README.md</code></a>；它复用 Chapter06 Request/Runtime contract，并通过 Factory 把 22 层 CPU Model 接入 Chapter09 双请求调度和 HTTP adapter。当前范围是单线程 Round Robin 正确性，不含生产并发优化。
+默认命令验证 toy Engine。真实 TinyLlama 路径的构建命令和当前 greedy 输出见 <a href="/_code/engine/README.md"><code>code/engine/README.md</code></a>；它复用 Chapter06 Request/Runtime contract，并通过 Factory 把 22 层 CPU Model 接入 Chapter10 HTTP Adapter 和请求级 Worker。
 
 ## 对应文档
 
-- [Chapter 06 导读](../chapter06_generation/intro.md)
-- [Chapter 06 Generation Runtime](../chapter06_generation/07_end_to_end_generation.md)
-- [Chapter 09 Service Core](../chapter09_serving/01_service_core.md)
-- [Chapter 09 真实模型 HTTP Completion](../chapter09_serving/04_real_http_completion.md)
+- [Chapter 06 导读](../chapter06_generation/next/intro.md)
+- [Chapter 06 真实 TinyLlama 生成](../chapter06_generation/next/08_real_tinyllama_generation.md)
+- [Chapter 10 服务代码导航](./chapter10_serving.md)

@@ -1,11 +1,11 @@
-// Engine/Chapter 09：真实 TinyLlama HTTP adapter 组合 smoke。
+// Engine/Chapter 10：真实 TinyLlama HTTP adapter 组合 smoke。
 // 职责：验证同步 completion 与 SSE 共用 ServiceCore，并按请求创建独立 Executor。
 // 运行：real_tinyllama_http_adapter_smoke <model.gguf>。
 #include "cpp_llm_engine/real_llama_executor_factory.h"
 #include "cpp_llm_engine/real_tokenizer_backend.h"
 #include "chapter06_generation/runtime.h"
 #include "chapter06_generation/sampler.h"
-#include "chapter09_serving/http_adapter.h"
+#include "chapter10_serving/http_adapter.h"
 
 #include <iostream>
 #include <sstream>
@@ -14,23 +14,23 @@
 
 namespace {
 
-class RecordingWriter final : public chapter09_serving::ResponseWriter {
+class RecordingWriter final : public chapter10_serving::ResponseWriter {
 public:
-    bool write_headers(const chapter09_serving::ResponseHead& value) override {
+    bool write_headers(const chapter10_serving::ResponseHead& value) override {
         head = value;
         headers_written = true;
         return true;
     }
 
-    chapter09_serving::WriteResult write_event(std::string_view event) override {
+    chapter10_serving::WriteResult write_event(std::string_view event) override {
         body += event;
-        return chapter09_serving::WriteResult::Ok;
+        return chapter10_serving::WriteResult::ok;
     }
 
     void finish() override { finished = true; }
     bool client_connected() const override { return true; }
 
-    chapter09_serving::ResponseHead head;
+    chapter10_serving::ResponseHead head;
     std::string body;
     bool headers_written = false;
     bool finished = false;
@@ -87,15 +87,20 @@ int main(int argc, char** argv) {
     config.eos_token_id = factory->eos_token_id();
     chapter06_generation::Runtime runtime(config);
     chapter06_generation::GreedySampler sampler;
-    chapter09_serving::ServingCore service(2, 2);
-    chapter09_serving::HttpAdapter adapter(
+    if (!factory->configure_paged_kv_cache(8, 4, &error)) {
+        std::cerr << "paged KV setup failed: " << error << '\n';
+        return 1;
+    }
+    chapter10_serving::ServiceCore service(
+        2, 2, {}, factory->paged_block_pool(), {}, factory.get());
+    chapter10_serving::HttpAdapter adapter(
         service,
         runtime,
         sampler,
         [&factory]() { return factory->create_executor(); });
 
     const auto sync_prompt = tokenizer->encode("Hello TinyLlama");
-    const chapter09_serving::HttpResponse sync_response = adapter.handle({
+    const chapter10_serving::HttpResponse sync_response = adapter.handle({
         "POST", "/v1/completions", completion_body(101, sync_prompt)});
     const std::string expected_sync =
         "\"generated_token_ids\":[29892,306,29915,29885]";
@@ -105,7 +110,7 @@ int main(int argc, char** argv) {
 
     const auto stream_prompt = tokenizer->encode("Hi");
     RecordingWriter writer;
-    const chapter09_serving::HttpResponse stream_response = adapter.handle_stream({
+    const chapter10_serving::HttpResponse stream_response = adapter.handle_stream({
         "POST", "/v1/completions", completion_body(102, stream_prompt)}, writer);
     const chapter06_generation::TokenSequence expected_stream{839, 744, 29892, 263};
     const bool stream_golden_match =
@@ -115,7 +120,7 @@ int main(int argc, char** argv) {
         contains_in_order(writer.body, expected_stream) &&
         writer.body.find("\"finish_reason\":\"stop\"") != std::string::npos;
 
-    const chapter09_serving::HttpResponse metrics =
+    const chapter10_serving::HttpResponse metrics =
         adapter.handle({"GET", "/metrics", {}});
     const bool metrics_match =
         metrics.status_code == 200 &&

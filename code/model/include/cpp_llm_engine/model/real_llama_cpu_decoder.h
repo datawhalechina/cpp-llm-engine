@@ -52,6 +52,31 @@ struct RealLlamaDecoderProfile {
 
 class RealLlamaCpuContext;
 
+class RealLlamaKvDataPlane {
+public:
+    virtual ~RealLlamaKvDataPlane() = default;
+
+    virtual std::size_t token_count() const = 0;
+    virtual bool reserve(std::size_t total_tokens, std::string* error) = 0;
+    virtual bool write_token(
+        std::size_t layer,
+        std::size_t token_index,
+        const float* key,
+        const float* value,
+        std::size_t element_count,
+        std::string* error) = 0;
+    virtual const float* key_data(
+        std::size_t layer,
+        std::size_t token_index,
+        std::size_t kv_head) const = 0;
+    virtual const float* value_data(
+        std::size_t layer,
+        std::size_t token_index,
+        std::size_t kv_head) const = 0;
+    virtual bool commit(std::size_t total_tokens, std::string* error) = 0;
+    virtual bool trim(std::size_t total_tokens) = 0;
+};
+
 struct RealLlamaCpuBatchItem {
     RealLlamaCpuContext* context = nullptr;
     TokenId token = 0;
@@ -125,6 +150,16 @@ public:
         cpp_llm_engine::core::DecoderLogits* logits) override;
     std::size_t token_count() const override;
     std::size_t kv_cache_bytes() const;
+    bool copy_kv_token(
+        std::size_t layer,
+        std::size_t token_index,
+        std::vector<float>* key,
+        std::vector<float>* value,
+        std::string* error = nullptr) const;
+    bool attach_kv_data_plane(
+        std::shared_ptr<RealLlamaKvDataPlane> data_plane,
+        std::string* error = nullptr);
+    bool uses_external_kv() const;
     cpp_llm_engine::core::DecoderModelContract model_contract() const override;
 
     void set_profiling_enabled(bool enabled);

@@ -1,4 +1,4 @@
-// Engine/Chapter 09：真实 TinyLlama 双请求 ServiceCore benchmark。
+// Engine/Chapter 10：真实 TinyLlama 双请求 ServiceCore benchmark。
 // 职责：记录模型加载、prefill/decode、TTFT、完成时间、吞吐和正确性证据。
 // 运行：real_tinyllama_serving_benchmark <model.gguf> [--warmup N] [--iterations N] [--output PATH]。
 #include "cpp_llm_engine/real_llama_executor_factory.h"
@@ -6,7 +6,7 @@
 #include "chapter06_generation/request.h"
 #include "chapter06_generation/runtime.h"
 #include "chapter06_generation/sampler.h"
-#include "chapter09_serving/serving_core.h"
+#include "chapter10_serving/service_core.h"
 
 #include <algorithm>
 #include <array>
@@ -103,6 +103,10 @@ class TimedExecutor final : public RequestModelExecutor {
 public:
     TimedExecutor(std::shared_ptr<RequestModelExecutor> inner, ExecutorTiming* timing)
         : inner_(std::move(inner)), timing_(timing) {}
+
+    RequestModelExecutor* underlying_executor() override {
+        return inner_->underlying_executor();
+    }
 
     bool prefill(const TokenSequence& prompt, Logits* logits, std::string* error) override {
         const auto start = Clock::now();
@@ -206,12 +210,24 @@ RunMeasurement run_once(
     auto inner_a = factory.create_executor();
     auto inner_b = factory.create_executor();
     if (inner_a == nullptr || inner_b == nullptr) return {};
+    std::string profile_error;
+    if (!factory.set_executor_profiling(inner_a, true, &profile_error) ||
+        !factory.set_executor_profiling(inner_b, true, &profile_error)) {
+        return {};
+    }
     auto executor_a = std::make_shared<TimedExecutor>(std::move(inner_a), &timing_a);
     auto executor_b = std::make_shared<TimedExecutor>(std::move(inner_b), &timing_b);
     std::weak_ptr<TimedExecutor> weak_a = executor_a;
     std::weak_ptr<TimedExecutor> weak_b = executor_b;
 
-    chapter09_serving::ServingCore service(2, 2);
+    chapter10_serving::ServiceCore service(
+        2,
+        2,
+        {},
+        parallel_requests ? std::shared_ptr<chapter07_kv_cache::KvBlockPool>{}
+                          : factory.paged_block_pool(),
+        {},
+        parallel_requests ? nullptr : &factory);
     const bool admitted_a = service.admit(
         request_a_id, request_a, sampler, std::move(executor_a)).accepted();
     const bool admitted_b = service.admit(
@@ -220,25 +236,39 @@ RunMeasurement run_once(
     std::array<double, 2> ttft_ms{};
     std::array<double, 2> completion_ms{};
     const auto dispatch_start = Clock::now();
-    chapter09_serving::ServiceStats stats;
+    chapter10_serving::DispatchStats stats;
     if (parallel_requests) {
         stats = service.dispatch_parallel_requests(
             runtime,
             2,
-            [&](const chapter09_serving::ParallelRequestObservation& observation) {
+            [&](const chapter10_serving::ParallelRequestObservation& observation) {
                 const std::size_t index = observation.request_id == request_a_id ? 0 : 1;
                 ttft_ms[index] = observation.ttft_seconds * 1000.0;
                 completion_ms[index] = observation.completion_seconds * 1000.0;
             });
     } else {
-        stats = service.dispatch(
-            runtime,
-            [&](std::size_t request_id, TokenId, std::size_t step) {
-                const std::size_t index = request_id == request_a_id ? 0 : 1;
-                const double current_ms = elapsed_ms(dispatch_start, Clock::now());
-                if (step == 0) ttft_ms[index] = current_ms;
-                if (step + 1 == max_new_tokens) completion_ms[index] = current_ms;
-            });
+        while ((!request_a.terminal() || !request_b.terminal()) &&
+               stats.scheduled_requests < 64) {
+            const auto step_stats = service.dispatch_step(
+                runtime,
+                prompt_a.size() + prompt_b.size(),
+                [&](std::size_t request_id, TokenId, std::size_t step) {
+                    const std::size_t index = request_id == request_a_id ? 0 : 1;
+                    const double current_ms = elapsed_ms(dispatch_start, Clock::now());
+                    if (step == 0) ttft_ms[index] = current_ms;
+                    if (step + 1 == max_new_tokens) completion_ms[index] = current_ms;
+                });
+            stats.promoted_requests += step_stats.promoted_requests;
+            stats.scheduled_requests += step_stats.scheduled_requests;
+            stats.scheduled_tokens += step_stats.scheduled_tokens;
+            stats.generated_tokens += step_stats.generated_tokens;
+            stats.deferred_requests += step_stats.deferred_requests;
+            stats.model_batch_calls += step_stats.model_batch_calls;
+            stats.tensor_batch_requests += step_stats.tensor_batch_requests;
+            if (step_stats.scheduled_requests == 0) break;
+        }
+        stats.completed = static_cast<std::size_t>(request_a.finished()) +
+            static_cast<std::size_t>(request_b.finished());
     }
     const auto dispatch_end = Clock::now();
 
@@ -248,6 +278,7 @@ RunMeasurement run_once(
     std::array<std::size_t, 2> committed_tokens{};
     std::array<std::size_t, 2> kv_cache_bytes{};
     bool memory_observed = false;
+    double profiled_compute_ms = 0.0;
     auto observed_a = weak_a.lock();
     auto observed_b = weak_b.lock();
     if (observed_a != nullptr && observed_b != nullptr) {
@@ -259,8 +290,14 @@ RunMeasurement run_once(
             factory.executor_memory(observed_b->inner(), &memory_b, &memory_error);
         committed_tokens = {memory_a.committed_tokens, memory_b.committed_tokens};
         kv_cache_bytes = {memory_a.kv_cache_bytes, memory_b.kv_cache_bytes};
+        cpp_llm_engine::RealLlamaExecutorProfile profile_a;
+        cpp_llm_engine::RealLlamaExecutorProfile profile_b;
+        if (factory.executor_profile(observed_a->inner(), &profile_a, &memory_error) &&
+            factory.executor_profile(observed_b->inner(), &profile_b, &memory_error)) {
+            profiled_compute_ms = profile_a.total_ms + profile_b.total_ms;
+        }
     }
-    const std::size_t released = service.release_completed();
+    const std::size_t released = service.release_terminal();
     observed_a.reset();
     observed_b.reset();
     const auto end_to_end_end = Clock::now();
@@ -268,16 +305,22 @@ RunMeasurement run_once(
 
     const double dispatch_ms = elapsed_ms(dispatch_start, dispatch_end);
     const double prefill_compute_ms = timing_a.prefill_ms + timing_b.prefill_ms;
-    const double decode_compute_ms = timing_a.decode_ms + timing_b.decode_ms;
+    const double measured_decode_ms = timing_a.decode_ms + timing_b.decode_ms;
+    const double decode_compute_ms = measured_decode_ms > 0.0
+        ? measured_decode_ms
+        : std::max(0.0, profiled_compute_ms - prefill_compute_ms);
     const double aggregate_compute_ms = prefill_compute_ms + decode_compute_ms;
     const auto contract = factory.decoder_contract();
     const std::size_t kv_bytes_per_token = contract.layer_count *
         contract.layer.kv_head_count * contract.layer.head_dimension * 2 * sizeof(float);
+    const bool decode_path_observed = parallel_requests
+        ? timing_a.decode_calls == 3 && timing_b.decode_calls == 3
+        : stats.model_batch_calls == 3 && stats.tensor_batch_requests == 6;
     const bool correctness =
         admitted_a && admitted_b && stats.completed == 2 && stats.generated_tokens == 8 &&
         request_a.generated() == expected_a && request_b.generated() == expected_b &&
         timing_a.prefill_calls == 1 && timing_b.prefill_calls == 1 &&
-        timing_a.decode_calls == 3 && timing_b.decode_calls == 3 && cache_isolated &&
+        decode_path_observed && cache_isolated &&
         memory_observed &&
         committed_tokens[0] == prompt_a.size() + max_new_tokens - 1 &&
         committed_tokens[1] == prompt_b.size() + max_new_tokens - 1 &&
@@ -358,7 +401,7 @@ void write_json(
 
     output << std::setprecision(10)
            << "{\n"
-           << "  \"schema_version\": 1,\n"
+           << "  \"schema_version\": 2,\n"
            << "  \"benchmark\": \"tinyllama_service_core_cpu\",\n"
            << "  \"model\": \"TinyLlama-1.1B-Chat-v1.0.Q4_K_M\",\n"
            << "  \"device\": \"cpu\",\n"
@@ -407,6 +450,21 @@ void write_json(
            << ", \"mean\": " << throughput_summary.mean
            << ", \"p50\": " << throughput_summary.p50
            << ", \"max\": " << throughput_summary.maximum << "},\n"
+           << "  \"samples\": [\n";
+    for (std::size_t index = 0; index < runs.size(); ++index) {
+        const auto& run = runs[index];
+        output << "    {\"iteration\": " << index
+               << ", \"prefill_compute_ms\": " << run.prefill_compute_ms
+               << ", \"decode_compute_ms\": " << run.decode_compute_ms
+               << ", \"dispatch_ms\": " << run.dispatch_ms
+               << ", \"end_to_end_ms\": " << run.end_to_end_ms
+               << ", \"ttft_ms\": [" << run.ttft_ms[0] << ", " << run.ttft_ms[1]
+               << "], \"throughput_tokens_per_second\": "
+               << run.throughput_tokens_per_second
+               << ", \"correctness\": " << (run.correctness ? "true" : "false")
+               << "}" << (index + 1 == runs.size() ? "\n" : ",\n");
+    }
+    output << "  ],\n"
            << "  \"correctness\": {\n"
            << "    \"all_iterations\": " << (correctness ? "true" : "false") << ",\n"
            << "    \"request_a_golden\": \"29892 306 29915 29885\",\n"
@@ -480,6 +538,10 @@ int main(int argc, char** argv) {
         const double model_load_ms = elapsed_ms(model_start, Clock::now());
         if (tokenizer == nullptr || factory == nullptr) {
             std::cerr << "benchmark load failed: " << error << '\n';
+            return 1;
+        }
+        if (!parallel_requests && !factory->configure_paged_kv_cache(16, 4, &error)) {
+            std::cerr << "paged KV setup failed: " << error << '\n';
             return 1;
         }
         const TokenSequence prompt_a = tokenizer->encode("Hello TinyLlama");

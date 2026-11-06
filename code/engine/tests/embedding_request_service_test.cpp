@@ -1,4 +1,4 @@
-// Engine 集成测试：验证预计算 embedding 复用 Chapter09 同步与 SSE 服务链路。
+// Engine 集成测试：验证预计算 embedding 复用 Chapter10 同步与 SSE 服务链路。
 // 覆盖：每请求 Executor、token 一致性、失败终态、metrics 和 Context 释放。
 // 依赖：使用合成 Decoder Context，不依赖模型、图片、socket、Python 或 GPU。
 // 运行：由 Engine CTest 执行 embedding_request_service_test。
@@ -6,7 +6,7 @@
 
 #include "chapter06_generation/runtime.h"
 #include "chapter06_generation/sampler.h"
-#include "chapter09_serving/http_adapter.h"
+#include "chapter10_serving/http_adapter.h"
 #include "cpp_llm_engine/testing/test.h"
 
 #include <memory>
@@ -78,22 +78,22 @@ private:
     std::size_t token_count_ = 0;
 };
 
-class RecordingWriter final : public chapter09_serving::ResponseWriter {
+class RecordingWriter final : public chapter10_serving::ResponseWriter {
 public:
-    bool write_headers(const chapter09_serving::ResponseHead& value) override {
+    bool write_headers(const chapter10_serving::ResponseHead& value) override {
         head = value;
         return true;
     }
 
-    chapter09_serving::WriteResult write_event(std::string_view event) override {
+    chapter10_serving::WriteResult write_event(std::string_view event) override {
         body += event;
-        return chapter09_serving::WriteResult::Ok;
+        return chapter10_serving::WriteResult::ok;
     }
 
     void finish() override { finished = true; }
     bool client_connected() const override { return true; }
 
-    chapter09_serving::ResponseHead head;
+    chapter10_serving::ResponseHead head;
     std::string body;
     bool finished = false;
 };
@@ -130,9 +130,9 @@ int main() {
     chapter06_generation::Runtime runtime(config);
     chapter06_generation::GreedySampler sampler;
     suite.run("sync and SSE requests release per-request contexts", [&] {
-        chapter09_serving::ServingCore service(2, 2);
+        chapter10_serving::ServiceCore service(2, 2);
         std::vector<std::weak_ptr<ContextState>> states;
-        chapter09_serving::HttpAdapter adapter(
+        chapter10_serving::HttpAdapter adapter(
             service,
             runtime,
             sampler,
@@ -169,9 +169,9 @@ int main() {
     });
 
     suite.run("failed visual prefill reaches terminal state and releases context", [&] {
-        chapter09_serving::ServingCore service(1, 1);
+        chapter10_serving::ServiceCore service(1, 1);
         std::vector<std::weak_ptr<ContextState>> states;
-        chapter09_serving::HttpAdapter adapter(
+        chapter10_serving::HttpAdapter adapter(
             service,
             runtime,
             sampler,
@@ -189,9 +189,9 @@ int main() {
     });
 
     suite.run("mixed sync and SSE requests do not retain contexts", [&] {
-        chapter09_serving::ServingCore service(4, 4);
+        chapter10_serving::ServiceCore service(4, 4);
         std::vector<std::weak_ptr<ContextState>> states;
-        chapter09_serving::HttpAdapter adapter(
+        chapter10_serving::HttpAdapter adapter(
             service,
             runtime,
             sampler,
@@ -233,9 +233,9 @@ int main() {
     });
 
     suite.run("repeated failures release every context", [&] {
-        chapter09_serving::ServingCore service(2, 2);
+        chapter10_serving::ServiceCore service(2, 2);
         std::vector<std::weak_ptr<ContextState>> states;
-        chapter09_serving::HttpAdapter adapter(
+        chapter10_serving::HttpAdapter adapter(
             service,
             runtime,
             sampler,
@@ -256,14 +256,14 @@ int main() {
     });
 
     suite.run("disconnect and timeout release terminal contexts", [&] {
-        chapter09_serving::ServingCore service(2, 2);
+        chapter10_serving::ServiceCore service(2, 2);
         std::vector<std::weak_ptr<ContextState>> states;
-        chapter09_serving::HttpAdapter adapter(
+        chapter10_serving::HttpAdapter adapter(
             service,
             runtime,
             sampler,
             [&states]() { return make_executor(false, &states); });
-        chapter09_serving::HttpRequest disconnected{
+        chapter10_serving::HttpRequest disconnected{
             "POST", "/v1/completions",
             "{\"request_id\":3001,\"prompt_tokens\":[0,0,0]}"};
         disconnected.disconnect_after_tokens = 1;
@@ -271,7 +271,7 @@ int main() {
         CPP_LLM_REQUIRE(suite, states.size() == 1);
         CPP_LLM_CHECK(suite, states.back().expired());
 
-        chapter09_serving::HttpRequest timed_out{
+        chapter10_serving::HttpRequest timed_out{
             "POST", "/v1/completions",
             "{\"request_id\":3002,\"prompt_tokens\":[0,0,0]}"};
         timed_out.timeout_after_tokens = 1;

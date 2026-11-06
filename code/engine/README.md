@@ -31,7 +31,7 @@ ctest --test-dir code/engine/build --output-on-failure
 
 `EmbeddingRequestExecutor` 接收 Core `DecoderEmbeddingSequence` 和每请求 `DecoderExecutionContext`，把预计算 embedding 适配为 Chapter06 `RequestModelExecutor`。Request 中的 prompt position 只承担序列长度和调度计数，真实 hidden values 由 Context 消费；prefill 成功后适配器立即释放 embedding storage，decode 继续使用同一 Context 和既有 KV 生命周期。默认测试用合成 Context 验证 Runtime 生成、长度校验、错误传播与释放，不要求多模态模型文件。
 
-`embedding_request_service_test` 将同一个适配器注入 Chapter09 `HttpAdapter`。同步 completion 与真实 `ResponseWriter` SSE 都生成 `[2,4]`；压力段连续执行 32 个成功请求、8 个 prefill 失败请求，再覆盖客户端断开和 deadline 超时。每次终态后都检查 Context 析构、inflight 归零以及 accepted 与 completed/failed/cancelled/timed_out/released 计数。该测试固定服务复用契约，不解析图片 HTTP body，也不代替真实 SmolVLM 服务 benchmark。
+`embedding_request_service_test` 将同一个适配器注入 Chapter10 `HttpAdapter`。同步 completion 与真实 `ResponseWriter` SSE 都生成 `[2,4]`；压力段连续执行 32 个成功请求、8 个 prefill 失败请求，再覆盖客户端断开和 deadline 超时。每次终态后都检查 Context 析构、inflight 归零以及 accepted 与 completed/failed/cancelled/timed_out/released 计数。该测试固定服务复用契约，不解析图片 HTTP body，也不代替真实 SmolVLM 服务 benchmark。
 
 Engine 已支持通过 `TokenizerBackend` 注入 tokenizer。默认路径使用 toy tokenizer；启用 llama.cpp 后，可验证真实 TinyLlama tokenizer 已进入 Engine 的 prompt、Request 和 Runtime 链路：
 
@@ -70,7 +70,7 @@ ctest --test-dir /tmp/cpp-llm-engine-real-generation \
 
 真实服务 smoke 用同一 Factory 为 `Hello TinyLlama` 和 `Hi` 创建两个 Executor；长 prompt 分块追加到同一 Context，中间 chunk 不产生 logits，固定输出仍分别为 `29892 306 29915 29885` 与 `839 744 29892 263`。terminal release 后，两个 Executor/Context 和 block table 均被释放。服务调度仍是单线程 step 正确性路径，不宣称线程安全。
 
-`real_tinyllama_http_adapter_smoke` 把同一 Factory 注入 Chapter09 `HttpAdapter`，验证同步 JSON 返回第一组 token、SSE 按顺序返回第二组 token，并核对两个请求的 accepted/completed/released/generated metrics。需要继续验证真实 socket 时运行 `bash code/engine/scripts/run_real_http_server.sh --check`；去掉 `--check` 会保留服务供手工 curl。transport 只处理 HTTP/SSE，并用互斥锁串行调用当前单线程 ServiceCore。
+`real_tinyllama_http_adapter_smoke` 把同一 Factory 注入 Chapter10 `HttpAdapter`，验证同步 JSON 返回第一组 token、SSE 按顺序返回第二组 token，并核对两个请求的 accepted/completed/released/generated metrics。需要继续验证真实 socket 时运行 `bash code/engine/scripts/run_real_http_server.sh --check`；去掉 `--check` 会保留服务供手工 curl。transport 只处理 HTTP/SSE，并用互斥锁串行调用当前单线程 ServiceCore。
 
 真实服务性能基线使用独立脚本，默认执行一次 warmup 和三轮测量：
 
@@ -78,7 +78,7 @@ ctest --test-dir /tmp/cpp-llm-engine-real-generation \
 bash code/engine/scripts/run_real_serving_benchmark.sh
 ```
 
-结果写入 `code/chapter09_serving/results/tinyllama_service_cpu_baseline.json`。`memory_bytes` 分别保存共享模型的 Tensor payload、两个 Context 在释放前实际提交的连续 K/V 和进程峰值 RSS；三者不是可直接相加的互斥分类。比较前必须保持 CPU、编译器、Release 构建、模型、prompt 和 token budget 一致；正确性字段失败时，不使用延迟、吞吐或内存数字做优化结论。
+结果写入 `code/chapter09_performance/results/tinyllama_service_cpu_baseline.json`。`memory_bytes` 分别保存共享模型的 Tensor payload、两个 Context 在释放前实际提交的连续 K/V 和进程峰值 RSS；三者不是可直接相加的互斥分类。比较前必须保持 CPU、编译器、Release 构建、模型、prompt 和 token budget 一致；正确性字段失败时，不使用延迟、吞吐或内存数字做优化结论。
 
 真实 scalar Linear batch 使用另一个配对实验：
 
@@ -94,15 +94,8 @@ bash code/engine/scripts/run_real_batch_benchmark.sh
 bash code/engine/scripts/run_real_decoder_profile.sh
 ```
 
-该脚本只在专用 Context 上开启 profiling，默认生成路径不读取时钟。结果写入 `code/chapter08_profiling/results/tinyllama_decoder_phase_profile.txt`；只有 golden token、Decoder 顶层计时和 FFN 子项闭合全部通过，脚本才接受并归档结果。
+该脚本只在专用 Context 上开启 profiling，默认生成路径不读取时钟。结果写入 Chapter09 的历史性能资产目录；只有 golden token、Decoder 顶层计时和 FFN 子项闭合全部通过，脚本才接受并归档结果。
 
-profile CLI 的第三个参数可以选择 `scalar`、`q4-avx2`、`q6-avx2`、`q4-attention-avx2` 或 `optimized-avx2`。前三个实验模式分别只切换 FFN gate/up、FFN down 或 Attention QKV/out，组合模式同时启用三个已验证作用域并保持 LM Head scalar；正常生成和服务仍默认使用 scalar。Chapter08 用下面四个封装完成固定 workload A/B：
-
-```bash
-bash code/chapter08_profiling/scripts/run_real_q6k_down_ab.sh
-bash code/chapter08_profiling/scripts/run_real_q4k_ffn_ab.sh
-bash code/chapter08_profiling/scripts/run_real_q4k_attention_ab.sh
-bash code/chapter08_profiling/scripts/run_real_optimized_policy_ab.sh
-```
+profile CLI 的第三个参数可以选择 `scalar`、`q4-avx2`、`q6-avx2`、`q4-attention-avx2` 或 `optimized-avx2`。前三个实验模式分别只切换 FFN gate/up、FFN down 或 Attention QKV/out，组合模式同时启用三个已验证作用域并保持 LM Head scalar；历史 A/B 脚本归档在 `code/chapter09_performance/legacy/chapter08_profiling/scripts/`。
 
 AVX2 路径会在选择时检查 AVX2 与 FMA，不能运行时直接返回错误，不静默回退。

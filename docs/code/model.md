@@ -21,4 +21,4 @@
 
 - [Chapter01 模型权重与配置](../chapter01_tensor_loader/intro.md)
 - [Chapter04 真实 TinyLlama Decoder](../chapter04_attention/06_real_tinyllama_decoder.md)
-- [Chapter06 Generation Runtime](../chapter06_generation/intro.md)
+- [Chapter06 Generation Runtime](../chapter06_generation/next/intro.md)

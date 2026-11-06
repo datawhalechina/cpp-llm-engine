@@ -1,13 +1,13 @@
-// Engine/Chapter 09：真实 TinyLlama 双请求服务 smoke。
-// 职责：验证共享 Model、独立 Context、Round Robin 推进和 terminal 资源释放。
+// Engine/Chapter 10：真实 TinyLlama 双请求服务 smoke。
+// 职责：验证共享 Model、独立 Context、Step batch 执行和终态资源释放。
 // 运行：real_tinyllama_serving_smoke <model.gguf>。
 #include "cpp_llm_engine/real_llama_executor_factory.h"
 #include "cpp_llm_engine/real_tokenizer_backend.h"
 #include "chapter06_generation/request.h"
 #include "chapter06_generation/runtime.h"
 #include "chapter06_generation/sampler.h"
-#include "chapter06_generation/serving_preview.h"
-#include "chapter09_serving/serving_core.h"
+#include "chapter07_kv_cache/block_table.h"
+#include "chapter10_serving/service_core.h"
 
 #include <iostream>
 #include <memory>
@@ -62,17 +62,24 @@ int main(int argc, char** argv) {
     std::weak_ptr<chapter06_generation::RequestModelExecutor> weak_a = executor_a;
     std::weak_ptr<chapter06_generation::RequestModelExecutor> weak_b = executor_b;
 
-    auto block_pool = std::make_shared<chapter06_generation::KvBlockPool>(8, 4);
-    chapter09_serving::ServingCore service(2, 2, {}, block_pool);
+    if (!factory->configure_paged_kv_cache(8, 4, &error)) {
+        std::cerr << "paged KV setup failed: " << error << '\n';
+        return 1;
+    }
+    auto block_pool = factory->paged_block_pool();
+    chapter10_serving::ServiceCore service(
+        2, 2, {}, block_pool, {}, factory.get());
     const bool admitted_a = service.admit(
         101, request_a, sampler, std::move(executor_a)).accepted();
     const bool admitted_b = service.admit(
         102, request_b, sampler, std::move(executor_b)).accepted();
-    chapter09_serving::ServiceStats stats;
+    chapter10_serving::DispatchStats stats;
     std::size_t dispatch_steps = 0;
     while ((!request_a.terminal() || !request_b.terminal()) && dispatch_steps < 32) {
         const auto step = service.dispatch_step(runtime, 3);
         stats.generated_tokens += step.generated_tokens;
+        stats.model_batch_calls += step.model_batch_calls;
+        stats.tensor_batch_requests += step.tensor_batch_requests;
         ++dispatch_steps;
         if (step.scheduled_requests == 0) break;
     }
@@ -84,7 +91,8 @@ int main(int argc, char** argv) {
     const bool request_isolation_match =
         admitted_a && admitted_b && stats.completed == 2 &&
         stats.generated_tokens == 8 && request_a.generated() == expected_a &&
-        request_b.generated() == expected_b;
+        request_b.generated() == expected_b && stats.model_batch_calls > 0 &&
+        stats.tensor_batch_requests >= 2;
     const bool cache_isolated =
         request_a.cache().size() == request_a.prompt_size() + expected_a.size() &&
         request_b.cache().size() == request_b.prompt_size() + expected_b.size();
@@ -93,8 +101,11 @@ int main(int argc, char** argv) {
         request_b.prefill_offset() == request_b.prompt_size() && dispatch_steps > 1 &&
         block_pool->token_count(101) == request_a.prompt_size() + expected_a.size() - 1 &&
         block_pool->token_count(102) == request_b.prompt_size() + expected_b.size() - 1;
+    const bool paged_payload_active =
+        factory->executor_uses_paged_kv(weak_a.lock()) &&
+        factory->executor_uses_paged_kv(weak_b.lock());
 
-    const std::size_t released = service.release_completed();
+    const std::size_t released = service.release_terminal();
     const bool resources_released =
         released == 2 && request_a.cache().empty() && request_b.cache().empty() &&
         weak_a.expired() && weak_b.expired() && block_pool->free_blocks() == 8;
@@ -114,11 +125,13 @@ int main(int argc, char** argv) {
               << request_isolation_match << '\n'
               << "cache_isolated: " << cache_isolated << '\n'
               << "chunked_prefill_match: " << chunked_prefill_match << '\n'
+              << "paged_payload_active: " << paged_payload_active << '\n'
               << "resources_released: " << resources_released << '\n'
               << "metrics_match: " << metrics_match << '\n'
               << "decoder_contract_match: " << decoder_contract_match << '\n'
               << "real_serving: ready\n";
 
     return request_isolation_match && cache_isolated && chunked_prefill_match &&
+        paged_payload_active &&
         resources_released && metrics_match && decoder_contract_match ? 0 : 1;
 }

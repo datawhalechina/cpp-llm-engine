@@ -15,13 +15,14 @@ fi
 
 echo "[cpu-service] benchmark contracts"
 CHAPTER07_RESULT_DIR="${TMPDIR:-/tmp}/cpp-llm-engine-chapter07-learning-results" \
-    bash "${repo_root}/code/chapter07_benchmark/scripts/run.sh"
+    bash "${repo_root}/code/chapter07_kv_cache/scripts/run.sh"
 
 echo "[cpu-service] profiling method"
-bash "${repo_root}/code/chapter08_profiling/scripts/run.sh"
+bash "${repo_root}/code/chapter08_scheduling/scripts/run.sh"
 
 echo "[cpu-service] service and HTTP contracts"
-bash "${repo_root}/code/chapter09_serving/scripts/run.sh"
+bash "${repo_root}/code/chapter09_performance/scripts/run.sh"
+bash "${repo_root}/code/chapter10_serving/scripts/run.sh"
 
 echo "[cpu-service] real HTTP socket loopback"
 CPP_LLM_ENGINE_MODEL_PATH="${model_path}" \

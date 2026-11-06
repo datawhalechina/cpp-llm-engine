@@ -12,6 +12,11 @@
 #include <string>
 #include <vector>
 
+namespace chapter07_kv_cache {
+class CpuPagedKvCache;
+class KvBlockPool;
+}
+
 namespace cpp_llm_engine {
 
 enum class RealLlamaExecutionMode : std::uint8_t {
@@ -46,7 +51,7 @@ struct RealLlamaExecutorMemory {
     std::size_t kv_cache_bytes = 0;
 };
 
-class RealLlamaExecutorFactory final {
+class RealLlamaExecutorFactory final : public chapter06_generation::ExecutorBatchRunner {
 public:
     static std::unique_ptr<RealLlamaExecutorFactory> load(
         const std::string& model_path,
@@ -64,10 +69,40 @@ public:
     RealLlamaExecutorFactory& operator=(const RealLlamaExecutorFactory&) = delete;
 
     std::shared_ptr<chapter06_generation::RequestModelExecutor> create_executor() const;
+    bool configure_paged_kv_cache(
+        std::size_t total_blocks,
+        std::size_t block_size,
+        std::string* error = nullptr);
+    std::shared_ptr<chapter07_kv_cache::KvBlockPool> paged_block_pool() const;
+    bool bind_request(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+        std::size_t request_id,
+        std::string* error = nullptr) const override;
+    void release_request(std::size_t request_id) const override;
     bool decode_batch(
         const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>& executors,
         const chapter06_generation::TokenSequence& tokens,
         const std::vector<std::size_t>& expected_positions,
+        const std::vector<std::size_t>& request_ids,
+        std::vector<chapter06_generation::Logits>* logits,
+        std::string* error = nullptr) const override;
+    bool decode_batch(
+        const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>& executors,
+        const chapter06_generation::TokenSequence& tokens,
+        const std::vector<std::size_t>& expected_positions,
+        std::vector<chapter06_generation::Logits>* logits,
+        std::string* error = nullptr) const;
+    bool sync_paged_kv(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+        std::size_t request_id,
+        chapter07_kv_cache::CpuPagedKvCache* cache,
+        std::string* error = nullptr) const;
+    bool decode_batch_paged(
+        const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>& executors,
+        const chapter06_generation::TokenSequence& tokens,
+        const std::vector<std::size_t>& expected_positions,
+        const std::vector<std::size_t>& request_ids,
+        chapter07_kv_cache::CpuPagedKvCache* cache,
         std::vector<chapter06_generation::Logits>* logits,
         std::string* error = nullptr) const;
     bool set_executor_profiling(
@@ -82,6 +117,8 @@ public:
         const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
         RealLlamaExecutorMemory* memory,
         std::string* error = nullptr) const;
+    bool executor_uses_paged_kv(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor) const;
     std::size_t model_weight_payload_bytes() const;
     std::size_t vocab_size() const;
     chapter06_generation::TokenId eos_token_id() const;

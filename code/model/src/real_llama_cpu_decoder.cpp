@@ -378,6 +378,7 @@ struct RealLlamaCpuModel::Impl {
 struct RealLlamaCpuContext::Impl {
     std::shared_ptr<const ModelData> model;
     std::vector<ContextLayer> layers;
+    std::shared_ptr<RealLlamaKvDataPlane> external_kv;
     std::size_t position = 0;
     std::size_t attention_score_count = 0;
     bool profiling_enabled = false;
@@ -450,16 +451,25 @@ struct RealLlamaCpuContext::Impl {
         std::vector<float> attention_output(model->metadata.hidden_size, 0.0f);
         {
             ProfileTimer timer(profiling_enabled ? &profile.attention_ms : nullptr);
-            cache.keys.insert(cache.keys.end(), key.begin(), key.end());
-            cache.values.insert(cache.values.end(), value.begin(), value.end());
+            if (external_kv != nullptr) {
+                if (!external_kv->write_token(
+                        layer_index, position, key.data(), value.data(), key.size(), error)) {
+                    return false;
+                }
+            } else {
+                cache.keys.insert(cache.keys.end(), key.begin(), key.end());
+                cache.values.insert(cache.values.end(), value.begin(), value.end());
+            }
             const float scale = 1.0f / std::sqrt(static_cast<float>(model->head_dim));
             for (std::size_t query_head = 0; query_head < model->query_heads; ++query_head) {
                 const std::size_t kv_head = query_head /
                     (model->query_heads / model->kv_heads);
                 std::vector<float> scores(position + 1, 0.0f);
                 for (std::size_t key_position = 0; key_position <= position; ++key_position) {
-                    const float* cached_key = cache.keys.data() +
-                        (key_position * model->kv_heads + kv_head) * model->head_dim;
+                    const float* cached_key = external_kv != nullptr
+                        ? external_kv->key_data(layer_index, key_position, kv_head)
+                        : cache.keys.data() +
+                            (key_position * model->kv_heads + kv_head) * model->head_dim;
                     scores[key_position] = dot(
                         query.data() + query_head * model->head_dim,
                         cached_key, model->head_dim) * scale;
@@ -468,8 +478,10 @@ struct RealLlamaCpuContext::Impl {
                 softmax(&scores);
                 float* output = attention_output.data() + query_head * model->head_dim;
                 for (std::size_t key_position = 0; key_position <= position; ++key_position) {
-                    const float* cached_value = cache.values.data() +
-                        (key_position * model->kv_heads + kv_head) * model->head_dim;
+                    const float* cached_value = external_kv != nullptr
+                        ? external_kv->value_data(layer_index, key_position, kv_head)
+                        : cache.values.data() +
+                            (key_position * model->kv_heads + kv_head) * model->head_dim;
                     for (std::size_t dimension = 0; dimension < model->head_dim; ++dimension) {
                         output[dimension] += scores[key_position] * cached_value[dimension];
                     }
@@ -532,7 +544,6 @@ struct RealLlamaCpuContext::Impl {
         std::vector<float> hidden,
         std::vector<float>* logits,
         std::string* error) {
-        ++position;
         if (logits != nullptr) {
             std::vector<float> final_hidden;
             {
@@ -552,6 +563,10 @@ struct RealLlamaCpuContext::Impl {
                 return false;
             }
         }
+        if (external_kv != nullptr && !external_kv->commit(position + 1, error)) {
+            return false;
+        }
+        ++position;
         if (profiling_enabled) ++profile.forward_tokens;
         return true;
     }
@@ -559,10 +574,22 @@ struct RealLlamaCpuContext::Impl {
     bool forward_hidden(std::vector<float> hidden,
                         std::vector<float>* logits,
                         std::string* error) {
-        for (std::size_t layer_index = 0; layer_index < model->layers.size(); ++layer_index) {
-            if (!forward_layer(&hidden, layer_index, error)) return false;
+        const std::size_t initial_position = position;
+        if (external_kv != nullptr &&
+            !external_kv->reserve(initial_position + 1, error)) {
+            return false;
         }
-        return finish_hidden(std::move(hidden), logits, error);
+        for (std::size_t layer_index = 0; layer_index < model->layers.size(); ++layer_index) {
+            if (!forward_layer(&hidden, layer_index, error)) {
+                if (external_kv != nullptr) external_kv->trim(initial_position);
+                return false;
+            }
+        }
+        if (!finish_hidden(std::move(hidden), logits, error)) {
+            if (external_kv != nullptr) external_kv->trim(initial_position);
+            return false;
+        }
+        return true;
     }
 };
 
@@ -729,9 +756,24 @@ bool RealLlamaCpuModel::decode_batch(
         snapshot.position = snapshot.context->position;
         snapshot.attention_score_count = snapshot.context->attention_score_count;
         snapshot.profile = snapshot.context->profile;
-        snapshot.cache_sizes.reserve(snapshot.context->layers.size());
-        for (const auto& layer : snapshot.context->layers) {
-            snapshot.cache_sizes.emplace_back(layer.keys.size(), layer.values.size());
+        if (snapshot.context->external_kv != nullptr) {
+            if (snapshot.context->external_kv->token_count() != snapshot.position ||
+                !snapshot.context->external_kv->reserve(snapshot.position + 1, error)) {
+                if (error != nullptr && error->empty()) {
+                    *error = "external KV state does not match batch context";
+                }
+                for (auto& previous : snapshots) {
+                    if (previous.context->external_kv != nullptr) {
+                        previous.context->external_kv->trim(previous.position);
+                    }
+                }
+                return false;
+            }
+        } else {
+            snapshot.cache_sizes.reserve(snapshot.context->layers.size());
+            for (const auto& layer : snapshot.context->layers) {
+                snapshot.cache_sizes.emplace_back(layer.keys.size(), layer.values.size());
+            }
         }
         snapshots.push_back(std::move(snapshot));
     }
@@ -753,9 +795,13 @@ bool RealLlamaCpuModel::decode_batch(
             snapshot.context->position = snapshot.position;
             snapshot.context->attention_score_count = snapshot.attention_score_count;
             snapshot.context->profile = snapshot.profile;
-            for (std::size_t layer = 0; layer < snapshot.cache_sizes.size(); ++layer) {
-                snapshot.context->layers[layer].keys.resize(snapshot.cache_sizes[layer].first);
-                snapshot.context->layers[layer].values.resize(snapshot.cache_sizes[layer].second);
+            if (snapshot.context->external_kv != nullptr) {
+                snapshot.context->external_kv->trim(snapshot.position);
+            } else {
+                for (std::size_t layer = 0; layer < snapshot.cache_sizes.size(); ++layer) {
+                    snapshot.context->layers[layer].keys.resize(snapshot.cache_sizes[layer].first);
+                    snapshot.context->layers[layer].values.resize(snapshot.cache_sizes[layer].second);
+                }
             }
         }
     };
@@ -828,8 +874,17 @@ bool RealLlamaCpuModel::decode_batch(
         for (std::size_t index = 0; index < items.size(); ++index) {
             auto* context = snapshots[index].context;
             auto& cache = context->layers[layer];
-            cache.keys.insert(cache.keys.end(), key[index].begin(), key[index].end());
-            cache.values.insert(cache.values.end(), value[index].begin(), value[index].end());
+            if (context->external_kv != nullptr) {
+                if (!context->external_kv->write_token(
+                        layer, context->position, key[index].data(), value[index].data(),
+                        key[index].size(), error)) {
+                    rollback();
+                    return false;
+                }
+            } else {
+                cache.keys.insert(cache.keys.end(), key[index].begin(), key[index].end());
+                cache.values.insert(cache.values.end(), value[index].begin(), value[index].end());
+            }
             const float scale = 1.0f / std::sqrt(static_cast<float>(impl_->data->head_dim));
             for (std::size_t query_head = 0; query_head < impl_->data->query_heads;
                  ++query_head) {
@@ -838,9 +893,11 @@ bool RealLlamaCpuModel::decode_batch(
                 std::vector<float> scores(context->position + 1, 0.0f);
                 for (std::size_t key_position = 0; key_position <= context->position;
                      ++key_position) {
-                    const float* cached_key = cache.keys.data() +
-                        (key_position * impl_->data->kv_heads + kv_head) *
-                            impl_->data->head_dim;
+                    const float* cached_key = context->external_kv != nullptr
+                        ? context->external_kv->key_data(layer, key_position, kv_head)
+                        : cache.keys.data() +
+                            (key_position * impl_->data->kv_heads + kv_head) *
+                                impl_->data->head_dim;
                     scores[key_position] = dot(
                         query[index].data() + query_head * impl_->data->head_dim,
                         cached_key, impl_->data->head_dim) * scale;
@@ -851,9 +908,11 @@ bool RealLlamaCpuModel::decode_batch(
                     query_head * impl_->data->head_dim;
                 for (std::size_t key_position = 0; key_position <= context->position;
                      ++key_position) {
-                    const float* cached_value = cache.values.data() +
-                        (key_position * impl_->data->kv_heads + kv_head) *
-                            impl_->data->head_dim;
+                    const float* cached_value = context->external_kv != nullptr
+                        ? context->external_kv->value_data(layer, key_position, kv_head)
+                        : cache.values.data() +
+                            (key_position * impl_->data->kv_heads + kv_head) *
+                                impl_->data->head_dim;
                     for (std::size_t dimension = 0; dimension < impl_->data->head_dim;
                          ++dimension) {
                         output[dimension] += scores[key_position] * cached_value[dimension];
@@ -957,6 +1016,12 @@ bool RealLlamaCpuModel::decode_batch(
             rollback();
             return false;
         }
+        if (snapshots[index].context->external_kv != nullptr &&
+            !snapshots[index].context->external_kv->commit(
+                snapshots[index].position + 1, error)) {
+            rollback();
+            return false;
+        }
         ++snapshots[index].context->position;
         if (snapshots[index].context->profiling_enabled) {
             ++snapshots[index].context->profile.forward_tokens;
@@ -988,6 +1053,7 @@ RealLlamaCpuContext::RealLlamaCpuContext(RealLlamaCpuContext&&) noexcept = defau
 RealLlamaCpuContext& RealLlamaCpuContext::operator=(RealLlamaCpuContext&&) noexcept = default;
 
 void RealLlamaCpuContext::reset() {
+    if (impl_->external_kv != nullptr) impl_->external_kv->trim(0);
     impl_->position = 0;
     impl_->attention_score_count = 0;
     impl_->profile = {};
@@ -1091,11 +1157,82 @@ std::size_t RealLlamaCpuContext::token_count() const {
 }
 
 std::size_t RealLlamaCpuContext::kv_cache_bytes() const {
+    if (impl_->external_kv != nullptr) {
+        return impl_->position * impl_->model->layers.size() * impl_->model->kv_heads *
+            impl_->model->head_dim * 2 * sizeof(float);
+    }
     std::size_t values = 0;
     for (const auto& layer : impl_->layers) {
         values += layer.keys.size() + layer.values.size();
     }
     return values * sizeof(float);
+}
+
+bool RealLlamaCpuContext::copy_kv_token(
+    std::size_t layer,
+    std::size_t token_index,
+    std::vector<float>* key,
+    std::vector<float>* value,
+    std::string* error) const {
+    const auto fail = [&](const char* message) {
+        if (key != nullptr) key->clear();
+        if (value != nullptr) value->clear();
+        if (error != nullptr) *error = message;
+        return false;
+    };
+    if (key == nullptr || value == nullptr) return fail("KV copy outputs must not be null");
+    if (layer >= impl_->layers.size() || token_index >= impl_->position) {
+        return fail("KV copy index is outside the committed context");
+    }
+    const std::size_t width = impl_->model->kv_heads * impl_->model->head_dim;
+    if (impl_->external_kv != nullptr) {
+        key->resize(width);
+        value->resize(width);
+        for (std::size_t head = 0; head < impl_->model->kv_heads; ++head) {
+            const float* source_key = impl_->external_kv->key_data(layer, token_index, head);
+            const float* source_value = impl_->external_kv->value_data(layer, token_index, head);
+            std::copy_n(source_key, impl_->model->head_dim,
+                        key->begin() + head * impl_->model->head_dim);
+            std::copy_n(source_value, impl_->model->head_dim,
+                        value->begin() + head * impl_->model->head_dim);
+        }
+    } else {
+        const auto& cache = impl_->layers[layer];
+        const std::size_t offset = token_index * width;
+        if (offset > cache.keys.size() || width > cache.keys.size() - offset ||
+            offset > cache.values.size() || width > cache.values.size() - offset) {
+            return fail("KV context payload does not match committed tokens");
+        }
+        key->assign(cache.keys.begin() + offset, cache.keys.begin() + offset + width);
+        value->assign(
+            cache.values.begin() + offset, cache.values.begin() + offset + width);
+    }
+    if (error != nullptr) error->clear();
+    return true;
+}
+
+bool RealLlamaCpuContext::attach_kv_data_plane(
+    std::shared_ptr<RealLlamaKvDataPlane> data_plane,
+    std::string* error) {
+    if (data_plane == nullptr) {
+        if (error != nullptr) *error = "KV data plane must not be null";
+        return false;
+    }
+    if (data_plane->token_count() != impl_->position) {
+        if (error != nullptr) *error = "KV data plane token count does not match context";
+        return false;
+    }
+    impl_->external_kv = std::move(data_plane);
+    for (auto& layer : impl_->layers) {
+        layer.keys.clear();
+        layer.values.clear();
+    }
+    if (error != nullptr) error->clear();
+    return true;
+}
+
+bool RealLlamaCpuContext::uses_external_kv() const {
+    return impl_->external_kv != nullptr;
 }
 
 cpp_llm_engine::core::DecoderModelContract RealLlamaCpuContext::model_contract() const {

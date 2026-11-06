@@ -1,13 +1,13 @@
-// Engine/Chapter 09：启动真实 TinyLlama CPU HTTP 服务。
+// Engine/Chapter 10：启动真实 TinyLlama CPU HTTP 服务。
 // 职责：组装 tokenizer、共享 Model、每请求 Context、ServiceCore 和 cpp-httplib transport。
 // 运行：real_tinyllama_http_server <model.gguf> [port] [bind-address]。
 #include "cpp_llm_engine/real_llama_executor_factory.h"
 #include "cpp_llm_engine/real_tokenizer_backend.h"
 #include "chapter06_generation/runtime.h"
 #include "chapter06_generation/sampler.h"
-#include "chapter09_serving/cpp_httplib_transport.h"
-#include "chapter09_serving/http_adapter.h"
-#include "chapter09_serving/serving_core.h"
+#include "chapter10_serving/cpp_httplib_transport.h"
+#include "chapter10_serving/http_adapter.h"
+#include "chapter10_serving/service_core.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -44,8 +44,13 @@ int main(int argc, char** argv) {
     config.eos_token_id = factory->eos_token_id();
     chapter06_generation::Runtime runtime(config);
     chapter06_generation::GreedySampler sampler;
-    chapter09_serving::ServingCore service(16, 16);
-    chapter09_serving::HttpAdapter adapter(
+    if (!factory->configure_paged_kv_cache(128, 16, &error)) {
+        std::cerr << "paged KV setup failed: " << error << '\n';
+        return 1;
+    }
+    chapter10_serving::ServiceCore service(
+        16, 16, {}, factory->paged_block_pool(), {}, factory.get());
+    chapter10_serving::HttpAdapter adapter(
         service,
         runtime,
         sampler,
@@ -58,6 +63,6 @@ int main(int argc, char** argv) {
     for (const auto token : example_tokens) std::cout << ' ' << token;
     std::cout << std::endl;
 
-    chapter09_serving::CppHttplibServer server(adapter, bind_address, port);
+    chapter10_serving::CppHttplibServer server(adapter, bind_address, port);
     return server.listen();
 }

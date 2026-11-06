@@ -28,8 +28,8 @@ add_subdirectory(
 )
 
 add_subdirectory(
-    ${CMAKE_CURRENT_SOURCE_DIR}/../chapter09_serving
-    ${CMAKE_CURRENT_BINARY_DIR}/chapter09_serving
+    ${CMAKE_CURRENT_SOURCE_DIR}/../chapter10_serving
+    ${CMAKE_CURRENT_BINARY_DIR}/chapter10_serving
 )
 
 add_library(cpp_llm_engine
@@ -61,6 +61,7 @@ target_link_libraries(cpp_llm_engine
         cpp_llm_engine_core
         chapter01_tensor_loader
         chapter06_generation
+        chapter07_kv_cache
 )
 
 if(CHAPTER01_ENABLE_LLAMA_CPP)
@@ -119,7 +120,7 @@ target_link_libraries(embedding_request_executor_test
 cpp_llm_prepare_test(embedding_request_executor_test)
 
 target_link_libraries(embedding_request_service_test
-    PRIVATE cpp_llm_engine chapter09_serving
+    PRIVATE cpp_llm_engine chapter10_serving
 )
 cpp_llm_prepare_test(embedding_request_service_test)
 
@@ -163,6 +164,49 @@ if(CPP_LLM_ENGINE_REAL_MODEL)
         LABELS "real_model;slow"
         PASS_REGULAR_EXPRESSION "golden_tokens_match: true"
     )
+    cpp_llm_set_test_contract(
+        real_tinyllama_generation_test
+        OWNER 06 LEVEL real_model STATUS active)
+
+    add_test(
+        NAME real_tinyllama_first_layer_structure_test
+        COMMAND gguf_first_layer_inspect "${CPP_LLM_ENGINE_REAL_MODEL}"
+    )
+    set_tests_properties(real_tinyllama_first_layer_structure_test PROPERTIES
+        LABELS "real_model;slow;decoder;structure"
+        PASS_REGULAR_EXPRESSION "first_layer_weight_contract=ready"
+    )
+    cpp_llm_set_test_contract(
+        real_tinyllama_first_layer_structure_test
+        OWNER 04 LEVEL real_model STATUS active)
+
+    add_test(
+        NAME gguf_decoder_multilayer
+        COMMAND gguf_decoder_multilayer "${CPP_LLM_ENGINE_REAL_MODEL}" 22
+    )
+    cpp_llm_set_test_labels(
+        gguf_decoder_multilayer real_model slow decoder quantization)
+    cpp_llm_set_test_contract(
+        gguf_decoder_multilayer OWNER 05 LEVEL real_model STATUS active)
+
+    add_executable(real_tinyllama_paged_kv_smoke
+        examples/real_tinyllama_paged_kv_smoke.cpp
+    )
+    target_link_libraries(real_tinyllama_paged_kv_smoke PRIVATE cpp_llm_engine)
+    set_target_properties(real_tinyllama_paged_kv_smoke PROPERTIES
+        BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
+    )
+    add_test(
+        NAME real_tinyllama_paged_kv_test
+        COMMAND real_tinyllama_paged_kv_smoke "${CPP_LLM_ENGINE_REAL_MODEL}"
+    )
+    set_tests_properties(real_tinyllama_paged_kv_test PROPERTIES
+        LABELS "real_model;slow;paged_kv"
+        PASS_REGULAR_EXPRESSION "paged_kv_real_match: true"
+    )
+    cpp_llm_set_test_contract(
+        real_tinyllama_paged_kv_test
+        OWNER 07 LEVEL real_model STATUS active)
 
     add_executable(real_tinyllama_batch_smoke
         examples/real_tinyllama_batch_smoke.cpp
@@ -179,6 +223,8 @@ if(CPP_LLM_ENGINE_REAL_MODEL)
         LABELS "real_model;slow;batch"
         PASS_REGULAR_EXPRESSION "batch_golden_match: true"
     )
+    cpp_llm_set_test_contract(
+        real_tinyllama_batch_test OWNER 08 LEVEL real_model STATUS active)
 
     add_executable(real_tinyllama_batch_benchmark
         examples/real_tinyllama_batch_benchmark.cpp
@@ -203,17 +249,11 @@ if(CPP_LLM_ENGINE_REAL_MODEL)
         PASS_REGULAR_EXPRESSION "correctness=PASS"
     )
 
-    if(NOT TARGET chapter09_serving)
-        add_subdirectory(
-            ${CMAKE_CURRENT_SOURCE_DIR}/../chapter09_serving
-            ${CMAKE_CURRENT_BINARY_DIR}/chapter09_serving
-        )
-    endif()
     add_executable(real_tinyllama_serving_smoke
         examples/real_tinyllama_serving_smoke.cpp
     )
     target_link_libraries(real_tinyllama_serving_smoke
-        PRIVATE cpp_llm_engine chapter09_serving
+        PRIVATE cpp_llm_engine chapter10_serving
     )
     set_target_properties(real_tinyllama_serving_smoke PROPERTIES
         BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
@@ -226,12 +266,21 @@ if(CPP_LLM_ENGINE_REAL_MODEL)
         LABELS "real_model;slow;serving"
         PASS_REGULAR_EXPRESSION "request_isolation_match: true"
     )
+    cpp_llm_set_test_contract(
+        real_tinyllama_serving_test
+        OWNER 10 LEVEL real_model STATUS active)
 
     add_executable(real_tinyllama_http_adapter_smoke
         examples/real_tinyllama_http_adapter_smoke.cpp
     )
+    if(NOT TARGET chapter10_serving)
+        add_subdirectory(
+            ${CMAKE_CURRENT_SOURCE_DIR}/../chapter10_serving
+            ${CMAKE_CURRENT_BINARY_DIR}/chapter10_serving
+        )
+    endif()
     target_link_libraries(real_tinyllama_http_adapter_smoke
-        PRIVATE cpp_llm_engine chapter09_serving
+        PRIVATE cpp_llm_engine chapter10_serving
     )
     set_target_properties(real_tinyllama_http_adapter_smoke PROPERTIES
         BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
@@ -244,13 +293,16 @@ if(CPP_LLM_ENGINE_REAL_MODEL)
         LABELS "real_model;slow;serving;http"
         PASS_REGULAR_EXPRESSION "sync_golden_match: true"
     )
+    cpp_llm_set_test_contract(
+        real_tinyllama_http_adapter_test
+        OWNER 10 LEVEL real_model STATUS active)
 
-    if(TARGET chapter09_cpp_httplib_transport)
+    if(TARGET chapter10_cpp_httplib_transport)
         add_executable(real_tinyllama_http_server
             examples/real_tinyllama_http_server.cpp
         )
         target_link_libraries(real_tinyllama_http_server
-            PRIVATE cpp_llm_engine chapter09_cpp_httplib_transport
+            PRIVATE cpp_llm_engine chapter10_cpp_httplib_transport
         )
         set_target_properties(real_tinyllama_http_server PROPERTIES
             BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
@@ -277,7 +329,7 @@ if(CPP_LLM_ENGINE_REAL_MODEL)
         examples/real_tinyllama_serving_benchmark.cpp
     )
     target_link_libraries(real_tinyllama_serving_benchmark
-        PRIVATE cpp_llm_engine chapter09_serving
+        PRIVATE cpp_llm_engine chapter10_serving
     )
     target_compile_definitions(real_tinyllama_serving_benchmark PRIVATE
         CPP_LLM_ENGINE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"

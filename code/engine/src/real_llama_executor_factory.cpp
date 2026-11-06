@@ -4,6 +4,7 @@
 #include "cpp_llm_engine/real_llama_executor_factory.h"
 
 #include "cpp_llm_engine/model/real_llama_cpu_decoder.h"
+#include "chapter07_kv_cache/paged_kv_cache.h"
 
 #include <unordered_set>
 #include <utility>
@@ -51,6 +52,74 @@ bool configure_context(
     return context->set_attention_linear_policy(attention_policy, error) &&
         context->set_ffn_linear_policy(ffn_policy, error);
 }
+
+bool paged_shape_matches(
+    const cpp_llm_engine::core::DecoderModelContract& contract,
+    const chapter07_kv_cache::CpuPagedKvCache& cache,
+    std::string* error) {
+    if (cache.layer_count() != contract.layer_count ||
+        cache.kv_heads() != contract.layer.kv_head_count ||
+        cache.head_dim() != contract.layer.head_dimension) {
+        if (error != nullptr) *error = "paged KV shape does not match real model";
+        return false;
+    }
+    return true;
+}
+
+class PagedKvDataPlane final : public chapter01::RealLlamaKvDataPlane {
+public:
+    PagedKvDataPlane(
+        std::size_t request_id,
+        chapter07_kv_cache::CpuPagedKvCache* cache)
+        : request_id_(request_id), cache_(cache) {}
+
+    std::size_t token_count() const override {
+        return cache_->block_pool().token_count(request_id_);
+    }
+
+    bool reserve(std::size_t total_tokens, std::string* error) override {
+        if (cache_->reserve(request_id_, total_tokens)) return true;
+        if (error != nullptr) *error = "paged KV data plane cannot reserve token";
+        return false;
+    }
+
+    bool write_token(
+        std::size_t layer,
+        std::size_t token_index,
+        const float* key,
+        const float* value,
+        std::size_t element_count,
+        std::string* error) override {
+        return cache_->write_token(
+            request_id_, layer, token_index, key, value, element_count, error);
+    }
+
+    const float* key_data(
+        std::size_t layer,
+        std::size_t token_index,
+        std::size_t kv_head) const override {
+        return cache_->key_data_reserved(request_id_, layer, token_index, kv_head);
+    }
+
+    const float* value_data(
+        std::size_t layer,
+        std::size_t token_index,
+        std::size_t kv_head) const override {
+        return cache_->value_data_reserved(request_id_, layer, token_index, kv_head);
+    }
+
+    bool commit(std::size_t total_tokens, std::string* error) override {
+        return cache_->commit_tokens(request_id_, total_tokens, error);
+    }
+
+    bool trim(std::size_t total_tokens) override {
+        return cache_->trim_to_tokens(request_id_, total_tokens);
+    }
+
+private:
+    std::size_t request_id_;
+    chapter07_kv_cache::CpuPagedKvCache* cache_;
+};
 
 class RealLlamaRequestExecutor final
     : public chapter06_generation::RequestModelExecutor {
@@ -108,6 +177,7 @@ private:
 
 struct RealLlamaExecutorFactory::Impl {
     std::unique_ptr<chapter01::RealLlamaCpuModel> model;
+    std::shared_ptr<chapter07_kv_cache::CpuPagedKvCache> paged_cache;
     RealLlamaExecutionMode mode = RealLlamaExecutionMode::Scalar;
 };
 
@@ -150,6 +220,81 @@ RealLlamaExecutorFactory::create_executor() const {
     return std::make_shared<RealLlamaRequestExecutor>(std::move(context));
 }
 
+bool RealLlamaExecutorFactory::configure_paged_kv_cache(
+    std::size_t total_blocks,
+    std::size_t block_size,
+    std::string* error) {
+    if (total_blocks == 0 || block_size == 0) {
+        if (error != nullptr) *error = "paged KV capacity must be positive";
+        return false;
+    }
+    const auto contract = decoder_contract();
+    impl_->paged_cache = std::make_shared<chapter07_kv_cache::CpuPagedKvCache>(
+        contract.layer_count,
+        total_blocks,
+        block_size,
+        contract.layer.kv_head_count,
+        contract.layer.head_dimension);
+    if (error != nullptr) error->clear();
+    return true;
+}
+
+std::shared_ptr<chapter07_kv_cache::KvBlockPool>
+RealLlamaExecutorFactory::paged_block_pool() const {
+    if (impl_->paged_cache == nullptr) return {};
+    return std::shared_ptr<chapter07_kv_cache::KvBlockPool>(
+        impl_->paged_cache, &impl_->paged_cache->block_pool());
+}
+
+bool RealLlamaExecutorFactory::bind_request(
+    const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+    std::size_t request_id,
+    std::string* error) const {
+    auto* real_executor = executor == nullptr ? nullptr
+        : dynamic_cast<RealLlamaRequestExecutor*>(executor->underlying_executor());
+    if (real_executor == nullptr || impl_->paged_cache == nullptr) {
+        if (error != nullptr) {
+            *error = real_executor == nullptr
+                ? "paged request binding requires a real Llama executor"
+                : "paged KV cache is not configured";
+        }
+        return false;
+    }
+    return real_executor->context()->attach_kv_data_plane(
+        std::make_shared<PagedKvDataPlane>(request_id, impl_->paged_cache.get()), error);
+}
+
+void RealLlamaExecutorFactory::release_request(std::size_t request_id) const {
+    if (impl_->paged_cache != nullptr) impl_->paged_cache->release(request_id);
+}
+
+bool RealLlamaExecutorFactory::decode_batch(
+    const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>& executors,
+    const chapter06_generation::TokenSequence& tokens,
+    const std::vector<std::size_t>& expected_positions,
+    const std::vector<std::size_t>& request_ids,
+    std::vector<chapter06_generation::Logits>* logits,
+    std::string* error) const {
+    if (request_ids.size() != executors.size()) {
+        if (error != nullptr) *error = "decode batch request IDs do not match executors";
+        return false;
+    }
+    if (impl_->paged_cache != nullptr) {
+        for (std::size_t index = 0; index < executors.size(); ++index) {
+            auto* real_executor = executors[index] == nullptr ? nullptr
+                : dynamic_cast<RealLlamaRequestExecutor*>(
+                    executors[index]->underlying_executor());
+            if (real_executor == nullptr || !real_executor->context()->uses_external_kv() ||
+                impl_->paged_cache->block_pool().token_count(request_ids[index]) !=
+                    expected_positions[index]) {
+                if (error != nullptr) *error = "paged batch request is not bound or aligned";
+                return false;
+            }
+        }
+    }
+    return decode_batch(executors, tokens, expected_positions, logits, error);
+}
+
 bool RealLlamaExecutorFactory::decode_batch(
     const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>& executors,
     const chapter06_generation::TokenSequence& tokens,
@@ -166,7 +311,9 @@ bool RealLlamaExecutorFactory::decode_batch(
     items.reserve(executors.size());
     std::unordered_set<const RealLlamaRequestExecutor*> unique_executors;
     for (std::size_t index = 0; index < executors.size(); ++index) {
-        auto* executor = dynamic_cast<RealLlamaRequestExecutor*>(executors[index].get());
+        auto* executor = executors[index] == nullptr ? nullptr
+            : dynamic_cast<RealLlamaRequestExecutor*>(
+                executors[index]->underlying_executor());
         if (executor == nullptr || !unique_executors.insert(executor).second) {
             if (error != nullptr) *error = "decode batch requires unique real Llama executors";
             return false;
@@ -182,11 +329,111 @@ bool RealLlamaExecutorFactory::decode_batch(
     return impl_->model->decode_batch(items, logits, error);
 }
 
+bool RealLlamaExecutorFactory::sync_paged_kv(
+    const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+    std::size_t request_id,
+    chapter07_kv_cache::CpuPagedKvCache* cache,
+    std::string* error) const {
+    auto* real_executor = executor == nullptr ? nullptr
+        : dynamic_cast<RealLlamaRequestExecutor*>(executor->underlying_executor());
+    if (real_executor == nullptr || cache == nullptr ||
+        !paged_shape_matches(decoder_contract(), *cache, error)) {
+        if (real_executor == nullptr && error != nullptr) {
+            *error = "paged KV sync requires a real Llama executor";
+        }
+        return false;
+    }
+    const std::size_t target_tokens = real_executor->context()->token_count();
+    const std::size_t committed_tokens = cache->block_pool().token_count(request_id);
+    if (committed_tokens > target_tokens) {
+        if (error != nullptr) *error = "paged KV is ahead of real model context";
+        return false;
+    }
+    if (committed_tokens == target_tokens) {
+        if (!real_executor->context()->uses_external_kv() &&
+            !real_executor->context()->attach_kv_data_plane(
+                std::make_shared<PagedKvDataPlane>(request_id, cache), error)) {
+            return false;
+        }
+        if (error != nullptr) error->clear();
+        return true;
+    }
+    if (!cache->reserve(request_id, target_tokens)) {
+        if (error != nullptr) *error = "paged KV capacity cannot mirror real context";
+        return false;
+    }
+
+    std::vector<float> key;
+    std::vector<float> value;
+    for (std::size_t token = committed_tokens; token < target_tokens; ++token) {
+        for (std::size_t layer = 0; layer < cache->layer_count(); ++layer) {
+            if (!real_executor->context()->copy_kv_token(
+                    layer, token, &key, &value, error) ||
+                !cache->write_token(
+                    request_id, layer, token, key.data(), value.data(), key.size(), error)) {
+                cache->trim_to_tokens(request_id, committed_tokens);
+                return false;
+            }
+        }
+    }
+    if (!cache->commit_tokens(request_id, target_tokens, error)) {
+        cache->trim_to_tokens(request_id, committed_tokens);
+        return false;
+    }
+    if (!real_executor->context()->attach_kv_data_plane(
+            std::make_shared<PagedKvDataPlane>(request_id, cache), error)) {
+        return false;
+    }
+    if (error != nullptr) error->clear();
+    return true;
+}
+
+bool RealLlamaExecutorFactory::decode_batch_paged(
+    const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>& executors,
+    const chapter06_generation::TokenSequence& tokens,
+    const std::vector<std::size_t>& expected_positions,
+    const std::vector<std::size_t>& request_ids,
+    chapter07_kv_cache::CpuPagedKvCache* cache,
+    std::vector<chapter06_generation::Logits>* logits,
+    std::string* error) const {
+    if (cache == nullptr || executors.empty() || executors.size() != request_ids.size() ||
+        executors.size() != expected_positions.size() || executors.size() != tokens.size() ||
+        !paged_shape_matches(decoder_contract(), *cache, error)) {
+        if (cache == nullptr && error != nullptr) *error = "paged KV output must not be null";
+        return false;
+    }
+    std::unordered_set<std::size_t> unique_request_ids;
+    for (std::size_t index = 0; index < executors.size(); ++index) {
+        if (!unique_request_ids.insert(request_ids[index]).second ||
+            cache->block_pool().token_count(request_ids[index]) != expected_positions[index]) {
+            if (error != nullptr) *error = "paged KV position does not match batch input";
+            return false;
+        }
+    }
+    if (!decode_batch(executors, tokens, expected_positions, logits, error)) {
+        return false;
+    }
+    for (std::size_t index = 0; index < executors.size(); ++index) {
+        auto* real_executor = executors[index] == nullptr ? nullptr
+            : dynamic_cast<RealLlamaRequestExecutor*>(
+                executors[index]->underlying_executor());
+        if (real_executor == nullptr || !real_executor->context()->uses_external_kv() ||
+            cache->block_pool().token_count(request_ids[index]) !=
+                expected_positions[index] + 1) {
+            if (error != nullptr) *error = "paged decode did not commit external KV";
+            return false;
+        }
+    }
+    if (error != nullptr) error->clear();
+    return true;
+}
+
 bool RealLlamaExecutorFactory::set_executor_profiling(
     const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
     bool enabled,
     std::string* error) const {
-    auto* real_executor = dynamic_cast<RealLlamaRequestExecutor*>(executor.get());
+    auto* real_executor = executor == nullptr ? nullptr
+        : dynamic_cast<RealLlamaRequestExecutor*>(executor->underlying_executor());
     if (real_executor == nullptr) {
         if (error != nullptr) *error = "profiling requires a real Llama executor";
         return false;
@@ -200,7 +447,8 @@ bool RealLlamaExecutorFactory::executor_profile(
     const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
     RealLlamaExecutorProfile* profile,
     std::string* error) const {
-    auto* real_executor = dynamic_cast<RealLlamaRequestExecutor*>(executor.get());
+    auto* real_executor = executor == nullptr ? nullptr
+        : dynamic_cast<RealLlamaRequestExecutor*>(executor->underlying_executor());
     if (real_executor == nullptr || profile == nullptr) {
         if (error != nullptr) *error = "profile output requires a real Llama executor";
         return false;
@@ -214,7 +462,8 @@ bool RealLlamaExecutorFactory::executor_memory(
     const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
     RealLlamaExecutorMemory* memory,
     std::string* error) const {
-    auto* real_executor = dynamic_cast<RealLlamaRequestExecutor*>(executor.get());
+    auto* real_executor = executor == nullptr ? nullptr
+        : dynamic_cast<RealLlamaRequestExecutor*>(executor->underlying_executor());
     if (real_executor == nullptr || memory == nullptr) {
         if (error != nullptr) *error = "memory output requires a real Llama executor";
         return false;
@@ -223,6 +472,13 @@ bool RealLlamaExecutorFactory::executor_memory(
     memory->kv_cache_bytes = real_executor->context()->kv_cache_bytes();
     if (error != nullptr) error->clear();
     return true;
+}
+
+bool RealLlamaExecutorFactory::executor_uses_paged_kv(
+    const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor) const {
+    auto* real_executor = executor == nullptr ? nullptr
+        : dynamic_cast<RealLlamaRequestExecutor*>(executor->underlying_executor());
+    return real_executor != nullptr && real_executor->context()->uses_external_kv();
 }
 
 std::size_t RealLlamaExecutorFactory::model_weight_payload_bytes() const {

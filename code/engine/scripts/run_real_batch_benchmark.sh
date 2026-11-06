@@ -14,7 +14,7 @@ else
     llama_build_dir="${llama_root}/build"
 fi
 build_dir="${REAL_BATCH_BENCHMARK_BUILD_DIR:-${TMPDIR:-/tmp}/cpp-llm-engine-real-batch-benchmark}"
-result_path="${REAL_BATCH_BENCHMARK_RESULT:-${repo_root}/code/chapter07_benchmark/results/tinyllama_real_batch_scalar.json}"
+result_path="${REAL_BATCH_BENCHMARK_RESULT:-${repo_root}/code/chapter09_performance/legacy/chapter07_benchmark/results/tinyllama_real_batch_scalar.json}"
 warmup="${REAL_BATCH_BENCHMARK_WARMUP:-1}"
 iterations="${REAL_BATCH_BENCHMARK_ITERATIONS:-3}"
 
