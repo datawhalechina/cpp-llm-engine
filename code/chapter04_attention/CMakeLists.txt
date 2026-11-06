@@ -84,6 +84,11 @@ add_test(
     NAME chapter02_tensor_attention_integration_test
     COMMAND chapter02_tensor_attention_integration_test
 )
-cpp_llm_set_test_labels(chapter04_attention_test unit attention decoder)
+cpp_llm_set_test_labels(chapter04_attention_test attention decoder)
+cpp_llm_set_test_contract(
+    chapter04_attention_test OWNER 04 LEVEL component STATUS active)
 cpp_llm_set_test_labels(
-    chapter02_tensor_attention_integration_test integration tensor attention)
+    chapter02_tensor_attention_integration_test tensor attention)
+cpp_llm_set_test_contract(
+    chapter02_tensor_attention_integration_test
+    OWNER 04 LEVEL integration STATUS active)

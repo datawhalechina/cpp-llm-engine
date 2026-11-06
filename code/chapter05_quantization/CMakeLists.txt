@@ -115,6 +115,11 @@ add_test(
     NAME chapter02_tensor_quantized_linear_integration_test
     COMMAND chapter02_tensor_quantized_linear_integration_test
 )
-cpp_llm_set_test_labels(chapter05_quantization_test unit quantization)
+cpp_llm_set_test_labels(chapter05_quantization_test quantization)
+cpp_llm_set_test_contract(
+    chapter05_quantization_test OWNER 05 LEVEL component STATUS active)
 cpp_llm_set_test_labels(
-    chapter02_tensor_quantized_linear_integration_test integration tensor quantization)
+    chapter02_tensor_quantized_linear_integration_test tensor quantization)
+cpp_llm_set_test_contract(
+    chapter02_tensor_quantized_linear_integration_test
+    OWNER 05 LEVEL integration STATUS active)

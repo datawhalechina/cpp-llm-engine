@@ -1,6 +1,6 @@
 # 05.6 验证量化误差与最终输出
 
-量化路径不能只证明“可以运行”，还要说明它与浮点基线相差多少、误差从哪里开始出现。验证使用相同输入比较 reference、fused backend 和真实 Decoder 输出；性能收益留给 Chapter07–08，不与正确性阈值混在一起。
+量化路径不能只证明“可以运行”，还要说明它与浮点基线相差多少、误差从哪里开始出现。验证使用相同输入比较 reference、fused backend 和真实 Decoder 输出；性能收益留给 Chapter09，不与正确性阈值混在一起。
 
 ## 局部误差与端到端输出
 
@@ -37,7 +37,7 @@ Q4_K CPU reference 使用真实 TinyLlama `token_embd.weight` 与 llama.cpp refe
 | 真实 Decoder policy | 固定 TinyLlama prompt | golden token 与 Context 隔离不变 |
 | Q8_0 多模态路径 | token-prefill 与 embedding-prefill | logits/top-1 一致 |
 
-性能 A/B 的硬件、编译器、warmup 和多轮统计集中在[实验与验证资产索引](../reference/experiment_assets.md)和 [`Chapter08 Profiling`](../chapter08_profiling/intro.md)。不能把不同机器、模型、shape 或 backend 的耗时直接相减。
+性能 A/B 的硬件、编译器、warmup 和多轮统计集中在[实验与验证资产索引](../reference/experiment_assets.md)，并由 Chapter09 统一解释。不能把不同机器、模型、shape 或 backend 的耗时直接相减。
 
 ## 验证与衔接
 
@@ -45,4 +45,4 @@ Q4_K CPU reference 使用真实 TinyLlama `token_embd.weight` 与 llama.cpp refe
 bash code/chapter05_quantization/scripts/run.sh
 ```
 
-测试应同时覆盖正确输入、非法 payload/shape、reference 与 fused 差值以及不支持 backend 的明确错误。正确性通过后先阅读 [`05.7 量化实现与成熟框架对照`](./07_tensorrt_gemma_vllm_comparison.md)，再由 [`Chapter07`](../chapter07_benchmark/intro.md) 建立可重复性能基线。
+测试应同时覆盖正确输入、非法 payload/shape、reference 与 fused 差值以及不支持 backend 的明确错误。正确性通过后先阅读 [`05.7 量化实现与成熟框架对照`](./07_tensorrt_gemma_vllm_comparison.md)，性能比较统一进入 Chapter09 的证据链。

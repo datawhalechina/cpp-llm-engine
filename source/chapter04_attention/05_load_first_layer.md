@@ -46,17 +46,24 @@ Q4_K、Q6_K 和 Q8_0 投影由 Chapter05 的量化线性计算后端执行；Cha
 
 ## 验证与衔接
 
-从仓库根目录运行真实首层检查：
+运行本章真实结构测试：
+
+```bash
+bash code/chapter04_attention/scripts/run_real_structure.sh
+```
+
+`real_tinyllama_first_layer_structure_test` 读取首层九个权重并检查 payload 契约，不执行量化 Linear。数值 forward 在完成 Chapter05 后验证。
+
+从仓库根目录运行不依赖量化计算后端的真实首层结构检查：
 
 ```bash
 cmake -S code/chapter01_tensor_loader \
   -B /tmp/cpp-llm-engine-chapter01-build \
-  -DCHAPTER05_SOURCE_DIR="$PWD/code/chapter05_quantization" \
   -DCMAKE_BUILD_TYPE=Release
 cmake --build /tmp/cpp-llm-engine-chapter01-build \
-  --target gguf_first_layer_forward -j2
-/tmp/cpp-llm-engine-chapter01-build/gguf_first_layer_forward \
+  --target gguf_first_layer_inspect -j2
+/tmp/cpp-llm-engine-chapter01-build/gguf_first_layer_inspect \
   llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
 ```
 
-`output_finite: true` 证明首层名称、形状、量化权重数据和计算顺序已经接通，但不代表完整模型数值等价。随后进入 [`运行真实 TinyLlama 解码器`](./06_real_tinyllama_decoder.md)，验证多词元 K/V、22 个解码器块、最终 RMSNorm、LM Head 和最终候选分数。
+检查结果证明首层名称、形状和量化数据类型能够映射到解码器结构，但不执行量化 Linear。随后进入 [`连接真实 TinyLlama 解码器`](./06_real_tinyllama_decoder.md) 理解 Model/Context；完整数值执行由 Chapter05 验收。

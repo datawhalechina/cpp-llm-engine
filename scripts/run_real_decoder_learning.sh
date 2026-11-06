@@ -50,8 +50,8 @@ cmake -S "${repo_root}/code/engine" -B "${build_dir}" \
 cmake --build "${build_dir}" \
     --target gguf_decoder_multilayer real_tinyllama_generation_smoke \
     real_tinyllama_batch_smoke -j2
-"${build_dir}/gguf_decoder_multilayer" "${model_path}" 22
 ctest --test-dir "${build_dir}" \
-    -R '^real_tinyllama_(generation|batch)_test$' --output-on-failure
+    -R '^(gguf_decoder_multilayer|real_tinyllama_(generation|batch)_test)$' \
+    --output-on-failure
 
 echo "[real-decoder] learning path passed"

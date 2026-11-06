@@ -32,14 +32,13 @@ Chapter06 的 `Runtime` 只调用 `RequestModelExecutor::prefill()` 和 `decode(
 - 专用 INT8 / INT4 kernel 才能进一步减少计算成本。
 - KV cache、调度或采样占主导时，端到端优化应转向对应阶段。
 
-本章先验证量化链路的正确性，再由 Chapter07 固定 workload 和延迟、吞吐结果，由 Chapter08 定位具体 backend 的耗时。真实服务实验分别记录权重 payload、请求已提交 KV 和进程峰值 RSS；三种口径的含义与当前结果见 [`08.3 定位内存与带宽瓶颈`](../chapter08_profiling/03_memory_bandwidth.md)。
+本章只验证量化链路的正确性。固定 workload、延迟、吞吐、热点归因和真实服务内存口径统一由 Chapter09 的性能证据链记录，不能反向作为 Chapter05 的完成条件。
 
 ## 验证与衔接
 
-先运行 Chapter05 默认测试确认格式、Linear policy 和 backend 数值，再运行真实 Decoder 学习入口验证 22 层生成和双请求隔离。成熟框架中的对象映射见 [`05.7 量化实现与成熟框架对照`](./07_tensorrt_gemma_vllm_comparison.md)；[`Chapter06 Generation Runtime`](../chapter06_generation/intro.md) 继续使用相同 Executor 契约组织请求生命周期。
+先运行 Chapter05 默认测试确认格式、Linear policy 和 backend 数值，再运行真实 Decoder 学习入口验证 22 层生成和双请求隔离。成熟框架中的对象映射见 [`05.7 量化实现与成熟框架对照`](./07_tensorrt_gemma_vllm_comparison.md)；[`Chapter06 Generation Runtime`](../chapter06_generation/next/intro.md) 继续使用相同 Executor 契约组织请求生命周期。
 
 | 验收层级 | 执行入口 | 通过条件 |
 | --- | --- | --- |
 | 量化 backend | `bash code/chapter05_quantization/scripts/run.sh` | reference、scalar、可用的 AVX2 与错误路径通过 |
-| 真实生成交接 | `bash scripts/run_real_decoder_learning.sh` | 22 层 Decoder 得到固定 greedy token，重复请求结果一致 |
-| 真实 batch 交接 | 同一脚本中的 `real_tinyllama_batch_test` | 顺序与 batch logits/token 一致，错误 position 不提交状态 |
+| 真实 Decoder | `bash code/chapter05_quantization/scripts/run_real_decoder.sh` | 22 层 Decoder 得到固定 logits、greedy token 和数值对照 |

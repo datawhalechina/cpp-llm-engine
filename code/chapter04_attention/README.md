@@ -20,6 +20,7 @@
 | `tests/chapter02_tensor_attention_integration_test.cpp` | Chapter02 Tensor 进入基础算子、FFN 和 Attention 的跨章测试 |
 | `examples/main_attention.cpp` | Decoder 结构演示 |
 | `scripts/run.sh` | 隔离构建、CTest 和 demo 入口 |
+| `scripts/run_real_structure.sh` | TinyLlama 首层九个权重的真实结构装配 | `real_tinyllama_first_layer_structure_test` |
 | `code/core` | 共享 backend 和 operator 契约 |
 
 ## 运行与验证
@@ -31,3 +32,11 @@ bash code/chapter04_attention/scripts/run.sh
 ```
 
 重点观察：二维激活怎样通过公共只读/可写 View 进入 Linear，3D `[T,H,Dh]` 与 4D `[B,T,H,Dh]` 输入怎样进入同一 CPU Attention backend，以及非连续 View 为什么必须先显式连续化。
+
+准备 TinyLlama 后，运行首层真实结构验收：
+
+```bash
+bash code/chapter04_attention/scripts/run_real_structure.sh
+```
+
+该入口验证九个权重的名称、shape、dtype 和 payload。量化权重进入数值 forward 后由 Chapter05 验收。

@@ -85,7 +85,7 @@ def attention_reference(query, key, value, causal, offset):
 
 Prefill 可以同时产生多个位置的 Q/K/V；decode 每次只产生一个新位置。连续缓存把新 K/V 追加到 `[S,Hkv,Dh]` 尾部，再让当前 query 读取更新后的 `S+1` 个位置。分页缓存改变存储和寻址方式，但不改变这套注意力语义。
 
-Chapter04 的 `KvCache` 用固定容量连续数组验证追加、容量和清空；真实 TinyLlama Context 为 22 层分别保存连续 K/V，并在每次 decode 后推进 position。Block 分配、逻辑位置映射和终态回收由 Chapter06 继续组织。
+Chapter04 的 `KvCache` 用固定容量连续数组验证追加、容量和清空；真实 TinyLlama Context 为 22 层分别保存连续 K/V，并在每次 decode 后推进 position。Block 分配和逻辑位置映射由 Chapter07 负责，Chapter10 在请求终态触发释放。
 
 | 观察点 | 连续 CPU 路径 | 分页路径目标 |
 | --- | --- | --- |

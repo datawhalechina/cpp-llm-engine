@@ -11,7 +11,7 @@ Chapter 04 已经固定 Decoder、Attention 和 FFN 的计算结构；本章在 
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
 | A 教学证据线 | 用小型 INT8、Q4_K/Q6_K/Q8_0 block 和 CPU reference 看清 scale、反量化与误差 | 固定反量化数值、浮点/量化输出误差和失败状态 |
-| B 真实执行线 | 读取 GGUF packed 权重，通过 fused/SIMD backend 执行 TinyLlama 22 层 Decoder | 固定 greedy token、Backend policy 和 Decoder/ServiceCore A/B 证据 |
+| B 真实执行线 | 读取 GGUF packed 权重，通过 fused/SIMD backend 接入 TinyLlama 22 层 Decoder | 固定 logits、greedy token、Backend policy 和 Decoder 数值对照 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
@@ -43,10 +43,10 @@ bash code/chapter05_quantization/scripts/run.sh
 
 ## 验证与下一步
 
-本章留下了可与浮点基线对照的量化 Linear 后端；[`Chapter 06`](../chapter06_generation/intro.md) 将把真实 Decoder 接入 `prefill -> decode -> output` 生成循环。
+本章留下了可与浮点基线对照的量化 Linear 后端；[`Chapter 06`](../chapter06_generation/next/intro.md) 将把真实 Decoder 接入 `prefill -> decode -> output` 生成循环。
 
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |
-| L1 默认 CPU | `bash code/chapter05_quantization/scripts/run.sh` | 三个 CTest 覆盖 Q4_K/Q6_K/Q8_0 backend、rank-1/2 激活 View、错误 payload 和失败保持 | 必做 |
-| L2 真实模型 | `bash scripts/run_real_decoder_learning.sh` | 真实 TinyLlama 量化权重经过 22 层后得到固定 greedy token | 有模型时必做 |
+| L1 默认 CPU | `bash code/chapter05_quantization/scripts/run.sh` | 两个 CTest 覆盖 Q4_K/Q6_K/Q8_0 backend、rank-1/2 激活 View、错误 payload 和失败保持 | 必做 |
+| L2 真实模型 | `bash code/chapter05_quantization/scripts/run_real_decoder.sh` | 真实 TinyLlama 量化权重经过 22 层后得到固定 logits 和 greedy token | 有模型时必做 |
 | L3 可选 CUDA | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备端 Q4_K/Q6_K 反量化、Float32 Workspace 和 cuBLAS 结果匹配 CPU reference | 有 NVIDIA GPU 时选做 |

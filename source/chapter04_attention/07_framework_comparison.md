@@ -24,7 +24,7 @@ Gemma 提供具体模型家族，nano-vLLM 提供紧凑算法骨架，vLLM 和 T
 | --- | --- | --- |
 | 单层前置归一化与 22 个 TinyLlama 解码器块 | 多模型架构注册和并行执行计划 | [`运行真实 TinyLlama 解码器`](./06_real_tinyllama_decoder.md) |
 | CPU 因果注意力与稳定 softmax | FlashAttention、融合注意力、GPU 工作区 | CUDA 计算后端 |
-| 位置偏移与连续 KV | 分页 KV、前缀复用和淘汰 | Chapter06、Chapter09 |
+| 位置偏移与连续 K/V | 分页 K/V、前缀复用和缓存感知调度 | Chapter07、Chapter08 |
 | 单层结构和数值测试 | 张量并行、流水线并行、跨设备通信 | 分布式扩展 |
 
 ## 继续阅读源码

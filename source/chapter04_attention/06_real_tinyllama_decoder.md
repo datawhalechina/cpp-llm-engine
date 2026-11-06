@@ -1,6 +1,6 @@
-# 04.6 运行真实 TinyLlama 解码器
+# 04.6 连接真实 TinyLlama 解码器
 
-Chapter01 已把 TinyLlama GGUF 转换为模型配置、张量映射和 Llama 权重布局。本节消费这些对象，执行 22 个解码器块、最终 RMSNorm 和 LM Head，并把候选分数（logits）与 llama.cpp 基线比较。
+Chapter01 已把 TinyLlama GGUF 转换为模型配置、张量映射和 Llama 权重布局。本节把这些对象映射到共享 Model、请求 Context、22 个解码器块、最终 RMSNorm 和 LM Head。量化 Linear 接通后的候选分数对照归 Chapter05 验收。
 
 ## 从权重布局到多层解码器
 
@@ -18,9 +18,9 @@ TinyLlama 的 `block_count=22` 对应 `blk.0` 到 `blk.21`。每个解码器块�
 
 同一个模型可以创建多个执行上下文。销毁请求只释放所属上下文，不卸载共享权重，也不影响其他请求的 K/V。
 
-## 数值对照与请求隔离
+## 完成 Chapter05 后的跨章数值证据
 
-完整连通性检查使用同一组 6 个词元分别运行自研 CPU 解码器和 llama.cpp。llama.cpp 参考路径关闭 Flash Attention，并使用 F32 K/V Cache，使双方的注意力精度设置更接近。
+以下结果使用同一组 6 个词元分别运行自研 CPU 解码器和 llama.cpp。它证明 Chapter05 量化后端接入本章结构后能够保持数值方向，不作为 Chapter04 的独立完成条件。
 
 | 指标 | 当前结果 | 验收门槛 |
 | --- | --- | --- |
@@ -35,12 +35,12 @@ TinyLlama 的 `block_count=22` 对应 `blk.0` 到 `blk.21`。每个解码器块�
 
 ## 验证与衔接
 
-默认模型路径为 `llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf`。已准备 GGUF 和 llama.cpp 源码后运行：
+完成 Chapter05 后，可运行量化 Decoder 的跨章验收：
 
 ```bash
-bash scripts/run_real_decoder_learning.sh
+bash code/chapter05_quantization/scripts/run_real_decoder.sh
 ```
 
-脚本先验证 Chapter04 教学解码器和 Chapter05 量化后端，再运行 22 层候选分数对照，最后构建引擎的真实 TinyLlama 生成连通性检查。对照程序检查余弦相似度、平均绝对误差、RMSE 和 Top-5；CTest 再确认固定贪心词元、两个执行上下文的输出一致、请求完成以及缓存状态互不污染。
+该入口只构建 22 层量化 Decoder 对照，不运行 Generation、batch 或 Serving。Chapter04 的独立验收仍是教学 Decoder 和真实结构映射。
 
-这些结果向 [`Chapter06`](../chapter06_generation/intro.md) 提供可执行的解码器上下文和候选分数；生成运行时只推进请求，不重新实现模型数学。
+这些结果向 [`Chapter06`](../chapter06_generation/next/intro.md) 提供可执行的解码器上下文和候选分数；生成运行时只推进请求，不重新实现模型数学。
