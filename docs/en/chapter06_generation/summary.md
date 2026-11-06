@@ -10,15 +10,15 @@
 
 - This chapter is a landing page and summary layer for the English route.
 - The detailed Chinese pages remain the source of truth for now.
-- The next English stop is Chapter 07.
+- The next main-line stop is the Chinese Chapter 07 K/V cache chapter.
 
 ## Next step
 
-- Go to [the next chapter](/en/chapter07_benchmark/intro)
+- Continue with the Chinese Chapter 07-10 main line
 - Or return to [the tutorial entry](/en/README)
 
 ## Related Reading
 
 - Prerequisites: this chapter depends on the Decoder from Chapter 04 and the quantized Linear path from Chapter 05.
-- Later use: Chapter 07 measures this runtime path and Chapter 09 exposes it through ServiceCore.
+- Later use: Chapters 07-10 add K/V management, scheduling, performance evidence, and ServiceCore.
 - Code index: open [the Chapter 03 intro](/en/chapter03_matmul/intro) and [the chapter code index](/code/chapter06_generation).

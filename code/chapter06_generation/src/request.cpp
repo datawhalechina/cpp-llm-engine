@@ -1,6 +1,5 @@
-// Chapter 06：实现 Request state transition 和 request-scoped KV Cache access。
-// 契约：terminal state 保持幂等，Runtime 和 Scheduler 可以安全跳过终态请求。
-// 验证：Request 和 Scheduler 测试覆盖 cancellation、timeout、rejection 和 completion。
+// Chapter 06：实现 Request 状态转换和请求级词元历史访问。
+// 契约：终态保持幂等，Runtime 和上层调度可以安全跳过终态请求。
 #include "chapter06_generation/request.h"
 
 #include <stdexcept>
@@ -40,20 +39,28 @@ bool Request::terminal() const {
            phase_ == RequestPhase::Rejected;
 }
 
-const KVCache& Request::cache() const {
-    return cache_;
+const TokenHistory& Request::history() const {
+    return history_;
 }
 
-KVCache& Request::cache() {
-    return cache_;
+TokenHistory& Request::history() {
+    return history_;
+}
+
+const TokenHistory& Request::cache() const {
+    return history_;
+}
+
+TokenHistory& Request::cache() {
+    return history_;
 }
 
 const TokenSequence& Request::token_history() const {
-    return cache_.tokens();
+    return history_.tokens();
 }
 
 std::size_t Request::token_history_size() const {
-    return cache_.size();
+    return history_.size();
 }
 
 bool Request::prefilled() const {

@@ -52,6 +52,9 @@ public:
     BatchPrefillResult prefill_batch(const std::vector<Request*>& requests);
     std::size_t decode_one(Request& request, const Sampler& sampler);
     BatchDecodeResult decode_batch_one(const std::vector<BatchDecodeItem>& items);
+    BatchDecodeResult commit_batch_logits(
+        const std::vector<BatchDecodeItem>& items,
+        const LogitsBatch& logits);
     std::size_t decode_one(Request& request, const Sampler& sampler, const LogitsProvider& logits_provider);
     std::size_t decode_one(Request& request, const Sampler& sampler, RequestModelExecutor& executor);
     PrefillChunkResult prefill_chunk(
@@ -65,15 +68,18 @@ public:
     std::size_t generate(
         Request& request,
         const Sampler& sampler,
-        const LogitsProvider& logits_provider);
+        const LogitsProvider& logits_provider,
+        const TokenCallback& on_token = {});
     std::size_t generate(
         Request& request,
         const Sampler& sampler,
-        RequestModelExecutor& executor);
+        RequestModelExecutor& executor,
+        const TokenCallback& on_token = {});
 
     std::size_t generate(
         Request& request,
-        const Sampler& sampler);
+        const Sampler& sampler,
+        const TokenCallback& on_token = {});
 
 private:
     GenerationConfig config_;

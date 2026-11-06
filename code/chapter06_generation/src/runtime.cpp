@@ -40,7 +40,7 @@ std::size_t Runtime::prefill(Request& request) {
 
     if (config_.use_kv_cache) {
         for (TokenId token : request.prompt()) {
-            request.cache().append(token);
+            request.history().append(token);
         }
     }
 
@@ -90,7 +90,7 @@ BatchPrefillResult Runtime::prefill_batch(const std::vector<Request*>& requests)
     for (Request* request : runnable) {
         if (config_.use_kv_cache) {
             for (TokenId token : request->prompt()) {
-                request->cache().append(token);
+            request->history().append(token);
             }
         }
         request->mark_prefilled();
@@ -167,6 +167,39 @@ BatchDecodeResult Runtime::decode_batch_one(const std::vector<BatchDecodeItem>& 
     return result;
 }
 
+BatchDecodeResult Runtime::commit_batch_logits(
+    const std::vector<BatchDecodeItem>& items,
+    const LogitsBatch& logits) {
+    BatchDecodeResult result;
+    if (!ready() || items.empty() || items.size() != logits.size()) return result;
+
+    std::unordered_set<Request*> unique_requests;
+    for (std::size_t index = 0; index < items.size(); ++index) {
+        const BatchDecodeItem& item = items[index];
+        if (item.request == nullptr || item.sampler == nullptr ||
+            !item.request->prefilled() || item.request->terminal() ||
+            logits[index].empty() || !unique_requests.insert(item.request).second) {
+            return {};
+        }
+    }
+
+    result.tokens.reserve(items.size());
+    for (std::size_t index = 0; index < items.size(); ++index) {
+        Request& request = *items[index].request;
+        const std::size_t step = request.generated_size();
+        request.mark_decoding();
+        const TokenId token = items[index].sampler->sample(logits[index]);
+        request.append_generated_token(token);
+        if (config_.use_kv_cache) request.history().append(token);
+        if (token == config_.eos_token_id ||
+            request.generated_size() >= config_.max_new_tokens) {
+            request.mark_finished();
+        }
+        result.tokens.push_back({index, token, step});
+    }
+    return result;
+}
+
 std::size_t Runtime::decode_one(
     Request& request,
     const Sampler& sampler,
@@ -181,7 +214,7 @@ std::size_t Runtime::decode_one(
     const TokenId token = sampler.sample(logits);
     request.append_generated_token(token);
     if (config_.use_kv_cache) {
-        request.cache().append(token);
+        request.history().append(token);
     }
     if (token == config_.eos_token_id ||
         request.generated_size() >= config_.max_new_tokens) {
@@ -226,7 +259,7 @@ std::size_t Runtime::decode_one(
     request.mark_decoding();
     const TokenId token = sampler.sample(logits);
     request.append_generated_token(token);
-    if (config_.use_kv_cache) request.cache().append(token);
+    if (config_.use_kv_cache) request.history().append(token);
     if (token == config_.eos_token_id ||
         request.generated_size() >= config_.max_new_tokens) {
         request.mark_finished();
@@ -285,7 +318,7 @@ PrefillChunkResult Runtime::prefill_chunk(
     request.advance_prefill(chunk_size);
     result.consumed_tokens = chunk_size;
     if (config_.use_kv_cache) {
-        for (TokenId token : chunk) request.cache().append(token);
+        for (TokenId token : chunk) request.history().append(token);
     }
     if (!completes_prefill) return result;
 
@@ -293,7 +326,7 @@ PrefillChunkResult Runtime::prefill_chunk(
     request.mark_decoding();
     const TokenId token = sampler.sample(logits);
     request.append_generated_token(token);
-    if (config_.use_kv_cache) request.cache().append(token);
+    if (config_.use_kv_cache) request.history().append(token);
     if (token == config_.eos_token_id ||
         request.generated_size() >= config_.max_new_tokens) {
         request.mark_finished();
@@ -333,7 +366,8 @@ std::size_t Runtime::decode(
 std::size_t Runtime::generate(
     Request& request,
     const Sampler& sampler,
-    const LogitsProvider& logits_provider) {
+    const LogitsProvider& logits_provider,
+    const TokenCallback& on_token) {
     if (!ready() || request.terminal()) {
         return 0;
     }
@@ -345,7 +379,7 @@ std::size_t Runtime::generate(
     }
     if (!request.prefilled()) {
         if (config_.use_kv_cache) {
-            for (TokenId token : request.prompt()) request.cache().append(token);
+            for (TokenId token : request.prompt()) request.history().append(token);
         }
         request.mark_prefilled();
     }
@@ -356,8 +390,9 @@ std::size_t Runtime::generate(
         const Logits logits = logits_provider(request, generated_steps);
         const TokenId token = sampler.sample(logits);
         request.append_generated_token(token);
+        if (on_token) on_token(token, generated_steps);
         if (config_.use_kv_cache) {
-            request.cache().append(token);
+            request.history().append(token);
         }
         ++generated_steps;
         if (token == config_.eos_token_id) request.mark_finished();
@@ -370,11 +405,16 @@ std::size_t Runtime::generate(
 std::size_t Runtime::generate(
     Request& request,
     const Sampler& sampler,
-    RequestModelExecutor& executor) {
+    RequestModelExecutor& executor,
+    const TokenCallback& on_token) {
     std::size_t generated_steps = 0;
     while (generated_steps < config_.max_new_tokens && !request.terminal()) {
+        const std::size_t before = request.generated_size();
         const std::size_t decoded = decode_one(request, sampler, executor);
         if (decoded == 0) break;
+        if (on_token && request.generated_size() > before) {
+            on_token(request.generated().back(), before);
+        }
         generated_steps += decoded;
     }
     return generated_steps;
@@ -382,13 +422,24 @@ std::size_t Runtime::generate(
 
 std::size_t Runtime::generate(
     Request& request,
-    const Sampler& sampler) {
+    const Sampler& sampler,
+    const TokenCallback& on_token) {
     if (transformer_ == nullptr) {
         return 0;
     }
 
     prefill(request);
-    return decode(request, sampler);
+    std::size_t generated_steps = 0;
+    while (generated_steps < config_.max_new_tokens && !request.terminal()) {
+        const std::size_t before = request.generated_size();
+        const std::size_t decoded = decode_one(request, sampler);
+        if (decoded == 0) break;
+        if (on_token && request.generated_size() > before) {
+            on_token(request.generated().back(), before);
+        }
+        generated_steps += decoded;
+    }
+    return generated_steps;
 }
 
 }  // namespace chapter06_generation

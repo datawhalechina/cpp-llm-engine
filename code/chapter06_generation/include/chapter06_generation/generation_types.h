@@ -18,6 +18,9 @@ using Logits = std::vector<float>;
 using TokenBatch = std::vector<TokenSequence>;
 using LogitsBatch = std::vector<Logits>;
 using LogitsProvider = std::function<Logits(const Request&, std::size_t)>;
+using TokenCallback = std::function<void(TokenId token, std::size_t step)>;
+using TokenStreamCallback =
+    std::function<void(std::size_t request_id, TokenId token, std::size_t step)>;
 
 struct RaggedBatch {
     Logits values;

@@ -5,7 +5,9 @@
 
 #include "chapter06_generation/generation_types.h"
 
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace chapter06_generation {
 
@@ -19,6 +21,8 @@ struct ModelExecutionState {
 class RequestModelExecutor {
 public:
     virtual ~RequestModelExecutor() = default;
+
+    virtual RequestModelExecutor* underlying_executor() { return this; }
 
     virtual bool prefill(const TokenSequence& prompt,
                          Logits* logits,
@@ -41,6 +45,28 @@ public:
                         Logits* logits,
                         std::string* error) = 0;
     virtual ModelExecutionState execution_state() const { return {}; }
+};
+
+class ExecutorBatchRunner {
+public:
+    virtual ~ExecutorBatchRunner() = default;
+
+    virtual bool bind_request(
+        const std::shared_ptr<RequestModelExecutor>&,
+        std::size_t,
+        std::string* error = nullptr) const {
+        if (error != nullptr) error->clear();
+        return true;
+    }
+    virtual void release_request(std::size_t) const {}
+
+    virtual bool decode_batch(
+        const std::vector<std::shared_ptr<RequestModelExecutor>>& executors,
+        const TokenSequence& tokens,
+        const std::vector<std::size_t>& expected_positions,
+        const std::vector<std::size_t>& request_ids,
+        std::vector<Logits>* logits,
+        std::string* error = nullptr) const = 0;
 };
 
 }  // namespace chapter06_generation

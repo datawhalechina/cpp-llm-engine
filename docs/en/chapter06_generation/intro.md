@@ -20,10 +20,10 @@ This is the English landing page for the chapter. The detailed Chinese pages rem
 
 ## Next step
 
-Continue to [summary](summary) or move to [the next chapter](/en/chapter07_benchmark/intro).
+Continue to [summary](summary). Chapters 07-10 currently use the Chinese source of truth.
 
 ## Related Reading
 
 - Prerequisites: read the Chapter 04 Decoder and Chapter 05 Quantization pages first, because this runtime consumes their executable model path.
-- Later use: `chapter07_benchmark` measures the same request and generation path.
+- Later use: Chapter 07 manages paged K/V, Chapter 08 schedules batches, Chapter 09 records performance evidence, and Chapter 10 serves requests.
 - Roadmap: if you want the full 03–06 path first, start from [the Chapter 03 intro](/en/chapter03_matmul/intro). It summarizes the reading order from operators to quantization.

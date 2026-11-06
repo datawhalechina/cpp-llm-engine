@@ -52,9 +52,9 @@ int main() {
         CPP_LLM_CHECK(suite, request.prompt() == chapter06_generation::TokenSequence({1, 2, 3}));
         CPP_LLM_CHECK(suite, request.phase() == RequestPhase::Initial);
         request.cancel();
-        request.cache().append(9);
+        request.history().append(9);
         CPP_LLM_CHECK(suite, request.cancelled());
-        CPP_LLM_CHECK(suite, request.cache().size() == 1);
+        CPP_LLM_CHECK(suite, request.history().size() == 1);
     });
 
     for (const auto& transition : terminal_transitions) {

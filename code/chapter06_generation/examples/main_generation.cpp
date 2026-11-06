@@ -25,7 +25,7 @@ int main() {
     std::cout << "[chapter06] ready: " << std::boolalpha << runtime.ready() << "\n";
     std::cout << "[chapter06] prefills: " << prefills << "\n";
     std::cout << "[chapter06] generated steps: " << generated << "\n";
-    std::cout << "[chapter06] request cache size: " << request.cache().size() << "\n";
+    std::cout << "[chapter06] token history size: " << request.history().size() << "\n";
     std::cout << "[chapter06] request prefilled: " << std::boolalpha << request.prefilled() << "\n";
     std::cout << "[chapter06] request phase: " << chapter06_generation::request_phase_name(request.phase()) << "\n";
     std::cout << "[chapter06] request finished: " << std::boolalpha << request.finished() << "\n";
