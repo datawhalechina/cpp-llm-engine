@@ -26,4 +26,4 @@
 
 ## 主线映射
 
-对应 [`chapter06 Request 生命周期`](/chapter06_generation/09_request_lifecycle)、[`端到端生成`](/chapter06_generation/07_end_to_end_generation) 和 [`服务化基础`](/reference/service_basics)。
+对应 [`Chapter06 Request 生命周期`](/chapter06_generation/next/04_request_lifecycle)、[`单请求生成循环`](/chapter06_generation/next/03_single_request_loop) 和 [`服务化基础`](/reference/service_basics)。

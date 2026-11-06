@@ -23,4 +23,4 @@
 
 ## 主线映射
 
-对应 [`foundation/06_data_structure_algorithm_basics`](/foundation/06_data_structure_algorithm_basics) 和 [`chapter06_generation/05_scheduler`](/chapter06_generation/05_scheduler)。
+对应 [`Foundation 数据结构与算法基础`](/foundation/06_data_structure_algorithm_basics) 和 [`Chapter08 调度基线`](/chapter08_scheduling/next/01_scheduler_baseline)。

@@ -2,7 +2,7 @@
 
 CMake 在本教程中负责把源码、library、app 和 test 组织成可重复构建的 target。先掌握 target 依赖，再进入 Chapter 00 和后续章节。
 
-## 主线位置与学习目标
+## Target 与依赖关系
 
 | 需要掌握 | 直接用途 |
 | --- | --- |

@@ -25,4 +25,4 @@
 
 ## 主线映射
 
-对应 [`chapter06 KV Cache`](/chapter06_generation/04_kv_cache)、[`Block KV Cache`](/chapter06_generation/12_block_kv_cache) 和 [`内存管理参考`](/reference/memory_management)。
+对应 [`Chapter07 K/V 形状`](/chapter07_kv_cache/next/01_kv_shape)、[`块表与内存池`](/chapter07_kv_cache/next/04_block_table_pool) 和 [`内存管理参考`](/reference/memory_management)。

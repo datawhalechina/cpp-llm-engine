@@ -23,4 +23,4 @@
 
 ## 主线映射
 
-对应 [`chapter06 Request 生命周期`](/chapter06_generation/09_request_lifecycle) 和 [`chapter06 Scheduler`](/chapter06_generation/05_scheduler)。
+对应 [`Chapter06 Request 生命周期`](/chapter06_generation/next/04_request_lifecycle) 和 [`Chapter08 调度基线`](/chapter08_scheduling/next/01_scheduler_baseline)。

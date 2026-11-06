@@ -24,4 +24,4 @@
 
 ## 主线映射
 
-对应 [`chapter06 Scheduler`](/chapter06_generation/05_scheduler)、[`Request 生命周期`](/chapter06_generation/09_request_lifecycle) 和 [`continuous batching`](/chapter06_generation/10_continuous_batching)。
+对应 [`Chapter08 分块与优先级`](/chapter08_scheduling/next/03_chunked_priority)、[`Chapter06 Request 生命周期`](/chapter06_generation/next/04_request_lifecycle) 和 [`Step Batching`](/chapter08_scheduling/next/02_step_batching)。

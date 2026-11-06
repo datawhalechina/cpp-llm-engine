@@ -81,7 +81,7 @@ These chapters are intentionally designed to be CPU-friendly:
 - `chapter04_attention`
 - `chapter06_generation`
 - `chapter05_quantization`
-- `chapter07_benchmark`
+- `chapter09_performance`
 
 CUDA becomes necessary when you want to compare backends or optimize the execution path.
 
