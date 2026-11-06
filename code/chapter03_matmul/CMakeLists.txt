@@ -86,3 +86,8 @@ add_test(
 cpp_llm_set_test_labels(chapter03_matmul_test unit operator)
 cpp_llm_set_test_labels(
     chapter02_tensor_matmul_integration_test integration tensor operator)
+cpp_llm_set_test_contract(
+    chapter03_matmul_test OWNER 03 LEVEL component STATUS active)
+cpp_llm_set_test_contract(
+    chapter02_tensor_matmul_integration_test
+    OWNER 03 LEVEL integration STATUS active)

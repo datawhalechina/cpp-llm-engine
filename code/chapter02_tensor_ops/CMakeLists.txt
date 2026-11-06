@@ -68,4 +68,8 @@ if(CHAPTER02_BUILD_STANDALONE_TARGETS)
     add_test(NAME chapter02_nd_tensor_test COMMAND chapter02_nd_tensor_test)
     cpp_llm_set_test_labels(chapter02_tensor_ops_test unit tensor)
     cpp_llm_set_test_labels(chapter02_nd_tensor_test contract tensor)
+    cpp_llm_set_test_contract(
+        chapter02_tensor_ops_test OWNER 02 LEVEL unit STATUS active)
+    cpp_llm_set_test_contract(
+        chapter02_nd_tensor_test OWNER 02 LEVEL contract STATUS active)
 endif()
