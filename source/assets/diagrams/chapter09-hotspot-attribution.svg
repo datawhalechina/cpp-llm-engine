@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter09 从端到端时间下钻到硬件原因</title>
+  <desc id="desc">热点分析从请求级 TTFT、ITL 和完成时间开始，依次缩小到 Runtime 阶段、Decoder 模块、算子、函数或 Kernel，最后用指令、带宽、缓存和同步指标解释原因。每一级保留同一 workload 身份和上一级证据。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#52606d"/></marker>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 27px; font-weight: 700; fill: #172033; }
+      .label { font-size: 16px; font-weight: 700; fill: #172033; }
+      .text { font-size: 13px; fill: #475569; }
+      .line { fill: none; stroke: #52606d; stroke-width: 2.4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="650" rx="24" fill="#f8fafc"/>
+  <text x="48" y="52" class="title">Chapter09 · 热点归因按层缩小，不从 Kernel 猜起</text>
+  <text x="48" y="80" class="text">每次下钻只回答更具体的问题，并保留相同 workload 与上一级测量</text>
+
+  <rect x="92" y="120" width="1016" height="76" rx="16" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="120" y="151" class="label">1 请求级结果</text><text x="310" y="151" class="text">TTFT · ITL · 完成时间 · 吞吐</text>
+  <text x="120" y="177" class="text">先判断问题主要出现在 Prefill、Decode，还是等待与服务写回。</text>
+  <path d="M600 196V224" class="line"/>
+
+  <rect x="154" y="230" width="892" height="76" rx="16" fill="#dbeafe" stroke="#60a5fa" stroke-width="2"/>
+  <text x="182" y="261" class="label">2 Runtime 阶段</text><text x="366" y="261" class="text">模型计算 · 采样 · 调度 · 输出</text>
+  <text x="182" y="287" class="text">区分模型计算成本和系统控制开销。</text>
+  <path d="M600 306V334" class="line"/>
+
+  <rect x="216" y="340" width="768" height="76" rx="16" fill="#ede9fe" stroke="#a78bfa" stroke-width="2"/>
+  <text x="244" y="371" class="label">3 Decoder 模块</text><text x="432" y="371" class="text">QKV · Attention · FFN · LM Head</text>
+  <text x="244" y="397" class="text">确认哪组模型计算占据主要阶段时间。</text>
+  <path d="M600 416V444" class="line"/>
+
+  <rect x="278" y="450" width="644" height="76" rx="16" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+  <text x="306" y="481" class="label">4 算子与实现</text><text x="472" y="481" class="text">GEMM · RoPE · Softmax · Paged Attention</text>
+  <text x="306" y="507" class="text">定位具体函数或 Kernel，并核对调用次数、自耗时和总耗时。</text>
+  <path d="M600 526V554" class="line"/>
+
+  <rect x="340" y="560" width="520" height="62" rx="16" fill="#0f766e"/>
+  <text x="600" y="586" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">5 硬件原因</text>
+  <text x="600" y="608" text-anchor="middle" font-size="13" fill="#d9fffa">指令 · 带宽 · cache miss · launch / 同步 · 占用率</text>
+
+  <rect x="910" y="560" width="242" height="62" rx="14" fill="#ecfdf5" stroke="#10b981"/>
+  <text x="1031" y="585" text-anchor="middle" class="label">形成优化假设</text><text x="1031" y="608" text-anchor="middle" class="text">进入单变量 A/B</text>
+  <path d="M860 591H905" class="line"/>
+  <text x="48" y="638" class="text">局部热点下降后仍要回到请求级指标，确认端到端结果确实改善。</text>
+</svg>
