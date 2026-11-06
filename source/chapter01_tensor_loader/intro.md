@@ -27,13 +27,13 @@ Chapter 00 已经用 llama.cpp 跑通 TinyLlama，证明模型文件、分词器
 bash code/chapter01_tensor_loader/run.sh
 ```
 
-脚本会构建并运行 `chapter01_tensor_loader_test`，检查 Tensor、教学权重格式、Loader、Tokenizer、模型配置和 GGUF fixture。真实 TinyLlama 检查需要 Chapter 00 下载的 GGUF，按 `01.5` 中的可选命令运行。
+脚本会运行 Loader、Schema、Tokenizer/Payload 三个专项 CTest，检查 Tensor、教学权重格式、Tokenizer、模型配置和 GGUF fixture。真实 TinyLlama 检查需要 Chapter 00 下载的 GGUF，按 `01.5` 中的可选命令运行。
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
-| 1 | A/B 公共 | [`01.1 Tensor Object`](./01_tensor_object.md) | <a href="../_code/chapter01_tensor_loader/src/tensor.h"><code>tensor.h</code></a> | 名称、形状、类型和底层字节组成一个 Tensor |
-| 2 | A | [`01.2 Teaching Weight Format`](./02_teaching_weight_format.md)、[`01.3 ModelLoader`](./03_model_loader_validation.md) | <a href="../_code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> | 小文件固定 Loader 正常与失败路径 |
-| 3 | A→B | [`01.4 Input Contract and Tokenizer`](./04_input_contract_and_tokenizer.md) | <a href="../_code/chapter01_tensor_loader/src/tokenizer.h"><code>tokenizer.h</code></a> | 教学接口怎样过渡到模型规定的 tokenizer |
+| 1 | A/B 公共 | [`01.1 张量对象`](./01_tensor_object.md) | <a href="../_code/chapter01_tensor_loader/src/tensor.h"><code>tensor.h</code></a> | 名称、形状、类型和底层字节组成一个 Tensor |
+| 2 | A | [`01.2 教学权重格式`](./02_teaching_weight_format.md)、[`01.3 模型加载与验证`](./03_model_loader_validation.md) | <a href="../_code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> | 小文件固定 Loader 正常与失败路径 |
+| 3 | A→B | [`01.4 输入契约与分词器`](./04_input_contract_and_tokenizer.md) | <a href="../_code/chapter01_tensor_loader/src/tokenizer.h"><code>tokenizer.h</code></a> | 教学接口怎样过渡到模型规定的 tokenizer |
 | 4 | B | [`01.5 模型元数据与 GGUF`](./05_model_metadata_and_gguf.md) | <a href="../_code/chapter01_tensor_loader/src/gguf_reader.cpp"><code>gguf_reader.cpp</code></a>、<a href="../_code/chapter01_tensor_loader/src/model_builder.cpp"><code>model_builder.cpp</code></a> | GGUF 配置和权重进入张量映射与 Llama 权重布局 |
 | 5 | B | [`Loader 框架对照`](./06_framework_loader_comparison.md) | [`llama.cpp` 项目卡](../reference/ecosystem/llama_cpp.md) | 在成熟框架中定位格式解析、权重加载和模型构建 |
 
@@ -44,5 +44,5 @@ bash code/chapter01_tensor_loader/run.sh
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |
 | L1 默认 CPU | `bash code/chapter01_tensor_loader/run.sh` | Tensor、教学 Loader、Tokenizer、模型配置、GGUF fixture 和错误路径通过 CTest | 必做 |
-| L2 真实模型 | `gguf_inspect <TinyLlama.gguf> --validate-schema` | metadata、201 个 Tensor index、22 层名称、shape、dtype 和 payload offset 可检查 | 有模型时必做 |
+| L2 真实模型 | `bash code/chapter01_tensor_loader/run_real_tokenizer.sh` | 真实 tokenizer、metadata、201 个 Tensor index、22 层名称、shape、dtype 和 payload offset 通过固定检查 | 有模型时必做 |
 | L3 可选 CUDA | 不单独设置 Loader CUDA 验收 | 文件解析和权重索引保持 Host 侧职责，设备上传由后续 backend 验证 | 不适用 |

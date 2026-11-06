@@ -13,6 +13,7 @@
 #include "../src/tensor.h"
 #include "../src/tokenizer.h"
 #include "cpp_llm_engine/testing/test.h"
+#include "support/chapter01_test_groups.h"
 
 #include <cstdint>
 #include <cstring>
@@ -566,37 +567,51 @@ void test_q8_0_payload_loader(TestSuite& suite) {
 
 }  // namespace
 
-int main() {
-    TestSuite suite("chapter01_tensor_loader");
-    suite.run("tensor roundtrip rejects invalid storage and shape", [&] {
-        test_tensor_roundtrip(suite);
-    });
-    suite.run("teaching model loader restores named tensors", [&] {
-        test_model_loader(suite);
-    });
-    suite.run("teaching model loader rejects malformed files atomically", [&] {
-        test_model_loader_rejects_malformed_files(suite);
-    });
-    suite.run("toy tokenizer preserves interface contract", [&] {
-        test_tokenizer_contract(suite);
-    });
-    suite.run("model config validates tokenizer and embedding shape", [&] {
-        test_model_config_contract(suite);
-    });
-    suite.run("model metadata becomes stable internal config", [&] {
-        test_model_metadata_boundary(suite);
-    });
-    suite.run("GGUF metadata adapter reports missing fields", [&] {
-        test_gguf_metadata_adapter(suite);
-    });
-    suite.run("GGUF reader builds tokenizer tensors and decoder schema", [&] {
-        test_gguf_reader(suite);
-    });
-    suite.run("Q8_0 loader rejects non-block-aligned shape", [&] {
-        test_q8_0_payload_loader(suite);
-    });
-    suite.run("Q4_K loader preserves quantized payload", [&] {
-        test_q4_k_payload_loader(suite);
-    });
+int run_chapter01_test_group(const std::string& group) {
+    const auto selected = [&group](const char* name) {
+        return group == "all" || group == name;
+    };
+    if (!selected("loader") && !selected("schema") && !selected("tokenizer_payload")) {
+        std::cerr << "unknown Chapter01 test group: " << group << '\n';
+        return 2;
+    }
+
+    TestSuite suite("chapter01_" + group);
+    if (selected("loader")) {
+        suite.run("tensor roundtrip rejects invalid storage and shape", [&] {
+            test_tensor_roundtrip(suite);
+        });
+        suite.run("teaching model loader restores named tensors", [&] {
+            test_model_loader(suite);
+        });
+        suite.run("teaching model loader rejects malformed files atomically", [&] {
+            test_model_loader_rejects_malformed_files(suite);
+        });
+    }
+    if (selected("schema")) {
+        suite.run("model config validates tokenizer and embedding shape", [&] {
+            test_model_config_contract(suite);
+        });
+        suite.run("model metadata becomes stable internal config", [&] {
+            test_model_metadata_boundary(suite);
+        });
+        suite.run("GGUF metadata adapter reports missing fields", [&] {
+            test_gguf_metadata_adapter(suite);
+        });
+        suite.run("GGUF reader builds tokenizer tensors and decoder schema", [&] {
+            test_gguf_reader(suite);
+        });
+    }
+    if (selected("tokenizer_payload")) {
+        suite.run("toy tokenizer preserves interface contract", [&] {
+            test_tokenizer_contract(suite);
+        });
+        suite.run("Q8_0 loader rejects non-block-aligned shape", [&] {
+            test_q8_0_payload_loader(suite);
+        });
+        suite.run("Q4_K loader preserves quantized payload", [&] {
+            test_q4_k_payload_loader(suite);
+        });
+    }
     return suite.finish();
 }

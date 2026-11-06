@@ -24,7 +24,10 @@
 | `examples/gguf_first_layer_multitoken.cpp` | 真实 TinyLlama layer-0 多 token CPU forward：RoPE、causal score、GQA、KV Cache（可选整合构建） |
 | `../model` | 消费本章模型资产的真实 Decoder 执行模块 |
 | `run_real_tokenizer.sh` | 构建并验证 TinyLlama 真实 tokenizer contract |
-| `tests/chapter01_tensor_loader_test.cpp` | fixture、loader、schema 和装配测试 |
+| `tests/chapter01_tensor_loader_test.cpp` | 四个测试入口共用的 fixture 与用例实现 |
+| `tests/chapter01_loader_test.cpp` | Tensor、CIE1 Loader 和失败原子性 |
+| `tests/chapter01_schema_test.cpp` | 模型配置、GGUF metadata 和 Decoder schema |
+| `tests/chapter01_tokenizer_payload_test.cpp` | Toy Tokenizer 与 Q4_K/Q8_0 payload |
 | `run.sh` | 隔离构建和 CTest 入口 |
 
 ## 运行与验证
@@ -34,6 +37,8 @@
 ```bash
 bash code/chapter01_tensor_loader/run.sh
 ```
+
+默认入口运行 Loader、Schema、Tokenizer/Payload 三个专项测试，失败可以直接定位到对应契约。
 
 检查真实 TinyLlama：
 

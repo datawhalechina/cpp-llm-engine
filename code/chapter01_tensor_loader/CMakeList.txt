@@ -1,3 +1,0 @@
-# Chapter 01 CMake entry point
-
-# This file will define the build targets for chapter01_tensor_loader.
