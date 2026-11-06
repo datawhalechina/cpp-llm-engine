@@ -7,6 +7,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 build_root="$(mktemp -d "${TMPDIR:-/tmp}/cpp-llm-release-contracts.XXXXXX")"
 trap 'rm -rf "${build_root}"' EXIT
 
+echo "[release-contracts] test_contracts"
+node "${repo_root}/scripts/check_test_contracts.mjs"
+
 run_suite() {
     local name="$1"
     local source_dir="$2"
@@ -21,13 +24,17 @@ run_suite() {
 
 run_suite testing "${repo_root}/code/testing"
 run_suite core "${repo_root}/code/core" -L contract
+run_suite chapter00 "${repo_root}/code/chapter00_quickstart" -R '^chapter00_'
 run_suite chapter01 "${repo_root}/code/chapter01_tensor_loader" -L loader
 run_suite chapter02 "${repo_root}/code/chapter02_tensor_ops" -L tensor
 run_suite chapter03 "${repo_root}/code/chapter03_matmul" -L operator
 run_suite chapter04 "${repo_root}/code/chapter04_attention" -L attention
 run_suite chapter05 "${repo_root}/code/chapter05_quantization" -L quantization
-run_suite chapter06 "${repo_root}/code/chapter06_generation" -L contract
-run_suite chapter09 "${repo_root}/code/chapter09_serving" -R '^chapter09_'
+run_suite chapter06 "${repo_root}/code/chapter06_generation" -R '^chapter06_'
+run_suite chapter07_kv_cache "${repo_root}/code/chapter07_kv_cache" -L cache
+run_suite chapter08_scheduling "${repo_root}/code/chapter08_scheduling" -R '^chapter08_'
+run_suite chapter09_performance "${repo_root}/code/chapter09_performance" -R '^chapter09_'
+run_suite chapter10_serving "${repo_root}/code/chapter10_serving" -R '^chapter10_'
 run_suite engine "${repo_root}/code/engine" -L engine
 run_suite multimodal "${repo_root}/code/multimodal" -L multimodal
 

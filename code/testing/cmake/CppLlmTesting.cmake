@@ -19,3 +19,20 @@ endfunction()
 function(cpp_llm_set_test_labels test_name)
     set_tests_properties(${test_name} PROPERTIES LABELS "${ARGN}")
 endfunction()
+
+# 为章节测试追加所有权、证据层级和迁移状态标签。
+function(cpp_llm_set_test_contract test_name)
+    set(one_value_args OWNER LEVEL STATUS)
+    cmake_parse_arguments(CONTRACT "" "${one_value_args}" "" ${ARGN})
+    foreach(required OWNER LEVEL STATUS)
+        if(NOT CONTRACT_${required})
+            message(FATAL_ERROR
+                "cpp_llm_set_test_contract: ${test_name} misses ${required}")
+        endif()
+    endforeach()
+    set_property(TEST ${test_name} APPEND PROPERTY LABELS
+        "owner-chapter${CONTRACT_OWNER}"
+        "level-${CONTRACT_LEVEL}"
+        "status-${CONTRACT_STATUS}"
+    )
+endfunction()

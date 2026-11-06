@@ -1,0 +1,368 @@
+{
+  "schema_version": 1,
+  "audited_modules": [
+    "chapter00_quickstart",
+    "chapter01_tensor_loader",
+    "chapter02_tensor_ops",
+    "chapter03_matmul",
+    "chapter04_attention",
+    "chapter05_quantization",
+    "chapter06_generation",
+    "chapter07_kv_cache",
+    "chapter08_scheduling",
+    "chapter09_performance",
+    "chapter10_serving"
+  ],
+  "allowed_levels": ["unit", "component", "contract", "integration", "real_model", "e2e"],
+  "tests": [
+    {
+      "target": "chapter00_quickstart_test",
+      "source": "code/chapter00_quickstart/examples/main_quick.cpp",
+      "owner": "00",
+      "level": "e2e",
+      "dependencies": ["00"],
+      "status": "active",
+      "note": "不下载模型的工具链和可执行入口 smoke check"
+    },
+    {
+      "target": "chapter01_loader_test",
+      "source": "code/chapter01_tensor_loader/tests/chapter01_loader_test.cpp",
+      "additional_sources": [
+        "code/chapter01_tensor_loader/tests/chapter01_tensor_loader_test.cpp"
+      ],
+      "owner": "01",
+      "level": "component",
+      "dependencies": ["01"],
+      "status": "active"
+    },
+    {
+      "target": "chapter01_schema_test",
+      "source": "code/chapter01_tensor_loader/tests/chapter01_schema_test.cpp",
+      "owner": "01",
+      "level": "component",
+      "dependencies": ["01"],
+      "status": "active"
+    },
+    {
+      "target": "chapter01_tokenizer_payload_test",
+      "source": "code/chapter01_tensor_loader/tests/chapter01_tokenizer_payload_test.cpp",
+      "owner": "01",
+      "level": "component",
+      "dependencies": ["01"],
+      "status": "active"
+    },
+    {
+      "target": "chapter02_tensor_ops_test",
+      "source": "code/chapter02_tensor_ops/tests/chapter02_tensor_ops_test.cpp",
+      "owner": "02",
+      "level": "unit",
+      "dependencies": ["02"],
+      "status": "active"
+    },
+    {
+      "target": "chapter02_nd_tensor_test",
+      "source": "code/chapter02_tensor_ops/tests/chapter02_nd_tensor_test.cpp",
+      "owner": "02",
+      "level": "contract",
+      "dependencies": ["02"],
+      "status": "active"
+    },
+    {
+      "target": "chapter03_matmul_test",
+      "source": "code/chapter03_matmul/tests/chapter03_matmul_test.cpp",
+      "additional_sources": [
+        "code/chapter03_matmul/tests/operator_smoke_test.cpp"
+      ],
+      "owner": "03",
+      "level": "component",
+      "dependencies": ["02", "03"],
+      "status": "active"
+    },
+    {
+      "target": "chapter02_tensor_matmul_integration_test",
+      "source": "code/chapter03_matmul/tests/chapter02_tensor_matmul_integration_test.cpp",
+      "owner": "03",
+      "level": "integration",
+      "dependencies": ["02", "03"],
+      "status": "active"
+    },
+    {
+      "target": "chapter04_attention_test",
+      "source": "code/chapter04_attention/tests/chapter04_attention_test.cpp",
+      "owner": "04",
+      "level": "component",
+      "dependencies": ["02", "03", "04"],
+      "status": "active"
+    },
+    {
+      "target": "chapter02_tensor_attention_integration_test",
+      "source": "code/chapter04_attention/tests/chapter02_tensor_attention_integration_test.cpp",
+      "owner": "04",
+      "level": "integration",
+      "dependencies": ["02", "04"],
+      "status": "active"
+    },
+    {
+      "target": "gguf_first_layer_inspect",
+      "source": "code/chapter01_tensor_loader/examples/gguf_first_layer_inspect.cpp",
+      "owner": "04",
+      "level": "real_model",
+      "dependencies": ["01", "04"],
+      "status": "active",
+      "contract_cmake": "code/chapter01_tensor_loader/CMakeLists.txt",
+      "note": "CTest 名称为 real_tinyllama_first_layer_structure_test；验证真实首层九个权重装配"
+    },
+    {
+      "target": "chapter05_quantization_test",
+      "source": "code/chapter05_quantization/tests/chapter05_quantization_test.cpp",
+      "owner": "05",
+      "level": "component",
+      "dependencies": ["03", "05"],
+      "status": "active"
+    },
+    {
+      "target": "chapter02_tensor_quantized_linear_integration_test",
+      "source": "code/chapter05_quantization/tests/chapter02_tensor_quantized_linear_integration_test.cpp",
+      "owner": "05",
+      "level": "integration",
+      "dependencies": ["02", "05"],
+      "status": "active"
+    },
+    {
+      "target": "gguf_decoder_multilayer",
+      "source": "code/model/examples/gguf_decoder_multilayer.cpp",
+      "owner": "05",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05"],
+      "status": "active",
+      "contract_cmake": "code/engine/CMakeLists.txt",
+      "note": "由 Engine 的可选真实模型构建注册为 CTest"
+    },
+    {
+      "target": "chapter06_generation_test",
+      "source": "code/chapter06_generation/tests/chapter06_generation_test.cpp",
+      "owner": "06",
+      "level": "component",
+      "dependencies": ["06"],
+      "status": "active"
+    },
+    {
+      "target": "chapter06_sampler_test",
+      "source": "code/chapter06_generation/tests/sampler_test.cpp",
+      "owner": "06",
+      "level": "unit",
+      "dependencies": ["06"],
+      "status": "active"
+    },
+    {
+      "target": "chapter06_token_history_test",
+      "source": "code/chapter06_generation/tests/token_history_test.cpp",
+      "owner": "06",
+      "level": "unit",
+      "dependencies": ["06"],
+      "status": "active",
+      "note": "只验证 Request 可观察的词元历史，不代表模型 Attention K/V"
+    },
+    {
+      "target": "chapter06_request_contract_test",
+      "source": "code/chapter06_generation/tests/request_contract_test.cpp",
+      "owner": "06",
+      "level": "contract",
+      "dependencies": ["06"],
+      "status": "active"
+    },
+    {
+      "target": "real_tinyllama_generation_smoke",
+      "source": "code/engine/examples/real_tinyllama_generation_smoke.cpp",
+      "owner": "06",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05", "06"],
+      "status": "active",
+      "note": "CTest 名称为 real_tinyllama_generation_test"
+    },
+    {
+      "target": "chapter07_block_pool_test",
+      "source": "code/chapter07_kv_cache/tests/block_pool_test.cpp",
+      "owner": "07",
+      "level": "contract",
+      "dependencies": ["07"],
+      "status": "active"
+    },
+    {
+      "target": "chapter07_paged_kv_cache_test",
+      "source": "code/chapter07_kv_cache/tests/paged_kv_cache_test.cpp",
+      "owner": "07",
+      "level": "component",
+      "dependencies": ["04", "07"],
+      "status": "active"
+    },
+    {
+      "target": "real_tinyllama_paged_kv_smoke",
+      "source": "code/engine/examples/real_tinyllama_paged_kv_smoke.cpp",
+      "owner": "07",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05", "06", "07"],
+      "status": "active",
+      "contract_cmake": "code/engine/CMakeLists.txt",
+      "note": "CTest 名称为 real_tinyllama_paged_kv_test；隔离验证分页数据面"
+    },
+    {
+      "target": "chapter08_scheduler_test",
+      "source": "code/chapter08_scheduling/tests/scheduler_test.cpp",
+      "owner": "08",
+      "level": "component",
+      "dependencies": ["06", "08"],
+      "status": "active"
+    },
+    {
+      "target": "chapter08_step_scheduler_test",
+      "source": "code/chapter08_scheduling/tests/step_scheduler_test.cpp",
+      "owner": "08",
+      "level": "component",
+      "dependencies": ["06", "07", "08"],
+      "status": "active"
+    },
+    {
+      "target": "chapter08_priority_aging_test",
+      "source": "code/chapter08_scheduling/tests/priority_aging_test.cpp",
+      "owner": "08",
+      "level": "contract",
+      "dependencies": ["06", "08"],
+      "status": "active"
+    },
+    {
+      "target": "chapter08_cache_transaction_test",
+      "source": "code/chapter08_scheduling/tests/cache_transaction_test.cpp",
+      "owner": "08",
+      "level": "integration",
+      "dependencies": ["06", "07", "08"],
+      "status": "active"
+    },
+    {
+      "target": "chapter08_tensor_batch_test",
+      "source": "code/chapter08_scheduling/tests/tensor_batch_test.cpp",
+      "owner": "08",
+      "level": "component",
+      "dependencies": ["06", "08"],
+      "status": "active"
+    },
+    {
+      "target": "real_tinyllama_batch_smoke",
+      "source": "code/engine/examples/real_tinyllama_batch_smoke.cpp",
+      "owner": "08",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05", "06", "07", "08"],
+      "status": "active",
+      "note": "CTest 名称为 real_tinyllama_batch_test，验证真实 batch 与分页 K/V 提交"
+    },
+    {
+      "target": "chapter08_overlap_scheduler_test",
+      "source": "code/chapter08_scheduling/tests/overlap_scheduler_test.cpp",
+      "owner": "08",
+      "level": "contract",
+      "dependencies": ["06", "07", "08"],
+      "status": "active"
+    },
+    {
+      "target": "chapter09_statistics_test",
+      "source": "code/chapter09_performance/tests/statistics_test.cpp",
+      "owner": "09",
+      "level": "unit",
+      "dependencies": ["09"],
+      "status": "active"
+    },
+    {
+      "target": "chapter09_evidence_contract_test",
+      "source": "code/chapter09_performance/tests/evidence_contract_test.cpp",
+      "owner": "09",
+      "level": "contract",
+      "dependencies": ["09"],
+      "status": "active"
+    },
+    {
+      "target": "chapter09_comparison_test",
+      "source": "code/chapter09_performance/tests/comparison_test.cpp",
+      "owner": "09",
+      "level": "unit",
+      "dependencies": ["09"],
+      "status": "active"
+    },
+    {
+      "target": "chapter09_real_evidence_bridge_test",
+      "source": "code/chapter09_performance/tests/real_evidence_bridge_test.mjs",
+      "owner": "09",
+      "level": "integration",
+      "dependencies": ["09"],
+      "status": "active"
+    },
+    {
+      "target": "chapter09_legacy_import_test",
+      "source": "code/chapter09_performance/tests/legacy_evidence_import_test.mjs",
+      "owner": "09",
+      "level": "contract",
+      "dependencies": ["07", "08", "09"],
+      "status": "active"
+    },
+    {
+      "target": "chapter09_versioned_evidence_test",
+      "source": "code/chapter09_performance/tests/versioned_evidence_test.mjs",
+      "owner": "09",
+      "level": "contract",
+      "dependencies": ["08", "09"],
+      "status": "active",
+      "note": "重放四组真实服务原始样本并核对版本化证据文件"
+    },
+    {
+      "target": "chapter10_service_core_test",
+      "source": "code/chapter10_serving/tests/service_core_test.cpp",
+      "owner": "10",
+      "level": "component",
+      "dependencies": ["06", "07", "08", "10"],
+      "status": "active"
+    },
+    {
+      "target": "chapter10_terminal_release_test",
+      "source": "code/chapter10_serving/tests/terminal_release_test.cpp",
+      "owner": "10",
+      "level": "contract",
+      "dependencies": ["06", "07", "08", "10"],
+      "status": "active"
+    },
+    {
+      "target": "chapter10_http_contract_test",
+      "source": "code/chapter10_serving/tests/http_contract_test.cpp",
+      "owner": "10",
+      "level": "integration",
+      "dependencies": ["06", "07", "08", "10"],
+      "status": "active"
+    },
+    {
+      "target": "chapter10_request_worker_test",
+      "source": "code/chapter10_serving/tests/request_worker_test.cpp",
+      "owner": "10",
+      "level": "integration",
+      "dependencies": ["06", "10"],
+      "status": "active"
+    },
+    {
+      "target": "real_tinyllama_serving_smoke",
+      "source": "code/engine/examples/real_tinyllama_serving_smoke.cpp",
+      "owner": "10",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05", "06", "07", "08", "10"],
+      "status": "active",
+      "contract_cmake": "code/engine/CMakeLists.txt",
+      "note": "CTest 名称为 real_tinyllama_serving_test"
+    },
+    {
+      "target": "real_tinyllama_http_adapter_smoke",
+      "source": "code/engine/examples/real_tinyllama_http_adapter_smoke.cpp",
+      "owner": "10",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05", "06", "07", "08", "10"],
+      "status": "active",
+      "contract_cmake": "code/engine/CMakeLists.txt",
+      "note": "CTest 名称为 real_tinyllama_http_adapter_test"
+    }
+  ]
+}

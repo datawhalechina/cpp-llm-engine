@@ -42,6 +42,11 @@ run_and_check \
     "Test asset check passed"
 
 run_and_check \
+    test_contracts \
+    "cd '${repo_root}' && npm run test:check-contracts" \
+    "Test contract check passed"
+
+run_and_check \
     foundation \
     "cd '${repo_root}' && bash exercises/foundation/run_all.sh"
 
@@ -72,6 +77,11 @@ run_and_check \
     "[engine] request finished: true"
 
 run_and_check \
+    chapter00 \
+    "cd '${repo_root}' && CHAPTER00_BUILD_DIR='${tmp_dir}/chapter00-build' bash code/chapter00_quickstart/run.sh" \
+    "100% tests passed"
+
+run_and_check \
     chapter01 \
     "cd '${repo_root}' && bash code/chapter01_tensor_loader/run.sh"
 
@@ -99,26 +109,23 @@ run_and_check \
 run_and_check \
     chapter06 \
     "cd '${repo_root}' && bash code/chapter06_generation/scripts/run.sh" \
-    "request_a finished: true" \
-    "request_b finished: true"
+    "request finished: true" \
+    "single-request streaming callback"
 
 run_and_check \
-    chapter07 \
-    "cd '${repo_root}' && CHAPTER07_RESULT_DIR='${tmp_dir}/chapter07-results' bash code/chapter07_benchmark/scripts/run.sh" \
-    "unit checks: true" \
-    "e2e checks: true"
+    chapter07_kv_cache \
+    "cd '${repo_root}' && CHAPTER07_BUILD_DIR='${tmp_dir}/chapter07-kv-build' bash code/chapter07_kv_cache/scripts/run.sh"
 
 run_and_check \
-    chapter08 \
-    "cd '${repo_root}' && bash code/chapter08_profiling/scripts/run.sh" \
-    "dominant_phase=" \
-    "decision=KEEP"
+    chapter08_scheduling \
+    "cd '${repo_root}' && CHAPTER08_SCHEDULING_BUILD_DIR='${tmp_dir}/chapter08-scheduling-build' bash code/chapter08_scheduling/scripts/run.sh"
 
 run_and_check \
-    chapter09 \
-    "cd '${repo_root}' && bash code/chapter09_serving/scripts/run.sh" \
-    "first_completed=2" \
-    "second_completed=1" \
-    "inflight=0"
+    chapter09_performance \
+    "cd '${repo_root}' && CHAPTER09_PERFORMANCE_BUILD_DIR='${tmp_dir}/chapter09-performance-build' bash code/chapter09_performance/scripts/run.sh"
+
+run_and_check \
+    chapter10_serving \
+    "cd '${repo_root}' && CHAPTER10_SERVING_BUILD_DIR='${tmp_dir}/chapter10-serving-build' bash code/chapter10_serving/scripts/run.sh"
 
 echo "[regression] baseline passed"
