@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 08 调度与批处理</title>
+  <desc id="desc">Chapter 08 位于 KV Cache 和 Performance、Serving 之间。调度器从运行请求和预算构造只读计划，校验状态快照后预留 K/V，执行生成运行时，成功整批提交，失败回滚。</desc>
+  <defs>
+    <style>text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }</style>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8faf7"/>
+      <stop offset="1" stop-color="#f3f1e8"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#52606d"/>
+    </marker>
+    <marker id="arrow-main" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#9a5b13"/>
+    </marker>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="132%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#39240c" flood-opacity="0.13"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="680" rx="24" fill="url(#bg)"/>
+  <text x="56" y="54" font-size="27" font-weight="700" fill="#172033">Chapter 08：在每个执行步选择请求并组织批次</text>
+  <text x="56" y="83" font-size="15" fill="#52606d">把请求状态和资源预算变成可执行计划，再连接缓存事务与模型批量输入</text>
+
+  <rect x="56" y="110" width="1088" height="116" rx="18" fill="#ffffff" stroke="#ddd9cc"/>
+  <text x="80" y="140" font-size="15" font-weight="700" fill="#52606d">在教程主线中的位置</text>
+  <g text-anchor="middle">
+    <rect x="92" y="160" width="230" height="46" rx="12" fill="#e5f2ec" stroke="#9cc7b2"/>
+    <text x="207" y="180" font-size="14" font-weight="700" fill="#27624a">Chapter 07</text>
+    <text x="207" y="198" font-size="12" fill="#557466">KV 资源与缓存事务</text>
+    <rect x="424" y="151" width="260" height="64" rx="14" fill="#9a5b13" filter="url(#shadow)"/>
+    <text x="554" y="178" font-size="16" font-weight="700" fill="#ffffff">Chapter 08</text>
+    <text x="554" y="199" font-size="13" fill="#fff2dd">Scheduling · Batching</text>
+    <rect x="786" y="160" width="310" height="46" rx="12" fill="#e8f1f6" stroke="#a9c3d2"/>
+    <text x="941" y="180" font-size="14" font-weight="700" fill="#315d72">Chapter 09–10</text>
+    <text x="941" y="198" font-size="12" fill="#526b78">性能证据 · 持续服务</text>
+  </g>
+  <path d="M322 183 H424" fill="none" stroke="#52606d" stroke-width="2.3" marker-end="url(#arrow)"/>
+  <path d="M684 183 H786" fill="none" stroke="#52606d" stroke-width="2.3" marker-end="url(#arrow)"/>
+
+  <text x="56" y="270" font-size="18" font-weight="700" fill="#172033">一次调度步怎样完成</text>
+  <g text-anchor="middle">
+    <rect x="56" y="300" width="180" height="100" rx="14" fill="#ffffff" stroke="#9ab6c4" stroke-width="2"/>
+    <text x="146" y="330" font-size="15" font-weight="700" fill="#315d72">运行请求</text>
+    <text x="146" y="354" font-size="12" fill="#52606d">阶段 · Prefill 进度</text>
+    <text x="146" y="376" font-size="12" fill="#52606d">token / request budget</text>
+
+    <rect x="278" y="292" width="190" height="116" rx="15" fill="#fff1df" stroke="#d8893b" stroke-width="2"/>
+    <text x="373" y="322" font-size="15" font-weight="700" fill="#92511b">只读计划</text>
+    <text x="373" y="347" font-size="12" fill="#715238">Decode + Prefill</text>
+    <text x="373" y="370" font-size="12" fill="#715238">候选与 token count</text>
+    <text x="373" y="393" font-size="11" fill="#8b6b50">批次编号 · 状态快照</text>
+
+    <rect x="510" y="300" width="180" height="100" rx="14" fill="#e5f2ec" stroke="#65a888" stroke-width="2"/>
+    <text x="600" y="330" font-size="15" font-weight="700" fill="#27624a">预留 K/V</text>
+    <text x="600" y="354" font-size="12" fill="#557466">Chapter07 reserve</text>
+    <text x="600" y="376" font-size="11" fill="#6d897c">容量不足则延后</text>
+
+    <rect x="732" y="292" width="190" height="116" rx="15" fill="#9a5b13" filter="url(#shadow)"/>
+    <text x="827" y="322" font-size="15" font-weight="700" fill="#ffffff">执行模型</text>
+    <text x="827" y="347" font-size="12" fill="#fff2dd">Chapter06 Runtime</text>
+    <text x="827" y="370" font-size="12" fill="#fff2dd">Prefill chunk / Decode</text>
+    <text x="827" y="393" font-size="11" fill="#f4d7ae">逐请求或 Tensor batch</text>
+
+    <path d="M972 350 L1012 314 L1052 350 L1012 386 Z" fill="#ffffff" stroke="#9ab6c4" stroke-width="2"/>
+    <text x="1012" y="355" font-size="12" fill="#315d72">前进?</text>
+  </g>
+  <path d="M236 350 H278" fill="none" stroke="#52606d" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <path d="M468 350 H510" fill="none" stroke="#9a5b13" stroke-width="2.6" marker-end="url(#arrow-main)"/>
+  <path d="M690 350 H732" fill="none" stroke="#9a5b13" stroke-width="2.6" marker-end="url(#arrow-main)"/>
+  <path d="M922 350 H972" fill="none" stroke="#52606d" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+  <rect x="184" y="466" width="342" height="82" rx="15" fill="#e5f2ec" stroke="#65a888" stroke-width="2"/>
+  <text x="208" y="496" font-size="15" font-weight="700" fill="#27624a">成功：提交本步结果</text>
+  <text x="208" y="521" font-size="13" fill="#496b5b">请求进度 · 分页 K/V 计数 · 输出事件</text>
+
+  <rect x="674" y="466" width="342" height="82" rx="15" fill="#fff1df" stroke="#d8893b" stroke-width="2"/>
+  <text x="698" y="496" font-size="15" font-weight="700" fill="#92511b">失败或未前进：回滚</text>
+  <text x="698" y="521" font-size="13" fill="#715238">裁剪到执行前计数 · 不产生词元事件</text>
+
+  <path d="M1012 386 V434 H355 V466" fill="none" stroke="#4f9474" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="670" y="426" font-size="12" text-anchor="middle" fill="#27624a">是</text>
+  <path d="M1012 386 V434 H845 V466" fill="none" stroke="#d8893b" stroke-width="2.5" marker-end="url(#arrow-main)"/>
+  <text x="930" y="426" font-size="12" text-anchor="middle" fill="#92511b">否</text>
+
+  <rect x="56" y="578" width="520" height="54" rx="13" fill="#ffffff" stroke="#ddd9cc"/>
+  <text x="316" y="601" font-size="13" font-weight="700" text-anchor="middle" fill="#52606d">A 选择与事务：预算 · 优先级老化 · 公平性 · 计划校验</text>
+  <text x="316" y="620" font-size="11" text-anchor="middle" fill="#7b8b93">验证候选顺序、状态失效与回滚</text>
+  <rect x="624" y="578" width="520" height="54" rx="13" fill="#ffffff" stroke="#ddd9cc"/>
+  <text x="884" y="601" font-size="13" font-weight="700" text-anchor="middle" fill="#52606d">B 批量执行：张量批次 · 真实模型上下文 · 分页 K/V 镜像</text>
+  <text x="884" y="620" font-size="11" text-anchor="middle" fill="#7b8b93">验证批量结果、整批提交与失败原子性</text>
+
+  <rect x="56" y="646" width="1088" height="24" rx="9" fill="#4c351a"/>
+  <text x="600" y="663" font-size="12" font-weight="700" text-anchor="middle" fill="#ffffff">本章产物：可验证的请求选择、批量执行、分页事务与计划失效契约</text>
+</svg>
