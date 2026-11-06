@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter06 词元历史与模型 K/V 的区别</title>
+  <desc id="desc">Request 的 Token History 保存 prompt 与已返回词元 ID，用于控制流观察；模型 Context 保存每层 Attention 的 K/V 向量，用于增量计算。采样得到但未再次 Decode 的最后一个词元只进入历史，不进入模型 K/V。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#52606d"/></marker>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 27px; font-weight: 700; fill: #172033; }
+      .label { font-size: 16px; font-weight: 700; fill: #172033; }
+      .text { font-size: 13px; fill: #475569; }
+      .token { font-size: 14px; font-weight: 700; fill: #172033; }
+      .line { fill: none; stroke: #52606d; stroke-width: 2.4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="650" rx="24" fill="#f8fafc"/>
+  <text x="48" y="52" class="title">Chapter06 · 两类历史随同一序列增长，但保存的不是同一数据</text>
+  <text x="48" y="80" class="text">示例：prompt 为 p0、p1、p2，随后采样得到 g0、g1，并在 g1 后结束</text>
+
+  <rect x="62" y="126" width="500" height="196" rx="18" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="88" y="160" class="label">Request Token History</text>
+  <text x="88" y="188" class="text">保存词元 ID，用于停止判断、输出观察和请求隔离</text>
+  <g text-anchor="middle">
+    <rect x="92" y="224" width="70" height="52" rx="10" fill="#fff" stroke="#60a5fa"/><text x="127" y="256" class="token">p0</text>
+    <rect x="174" y="224" width="70" height="52" rx="10" fill="#fff" stroke="#60a5fa"/><text x="209" y="256" class="token">p1</text>
+    <rect x="256" y="224" width="70" height="52" rx="10" fill="#fff" stroke="#60a5fa"/><text x="291" y="256" class="token">p2</text>
+    <rect x="338" y="224" width="70" height="52" rx="10" fill="#ecfdf5" stroke="#10b981"/><text x="373" y="256" class="token">g0</text>
+    <rect x="420" y="224" width="70" height="52" rx="10" fill="#ecfdf5" stroke="#10b981"/><text x="455" y="256" class="token">g1</text>
+  </g>
+  <text x="92" y="300" class="text">长度 5：包含已经返回给调用者的最后一个词元</text>
+
+  <rect x="638" y="126" width="500" height="196" rx="18" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+  <text x="664" y="160" class="label">Model Context K/V</text>
+  <text x="664" y="188" class="text">保存每层、每个 KV head 的向量，用于增量 Attention</text>
+  <g text-anchor="middle">
+    <rect x="678" y="224" width="82" height="52" rx="10" fill="#fff" stroke="#f59e0b"/><text x="719" y="256" class="token">K/V p0</text>
+    <rect x="772" y="224" width="82" height="52" rx="10" fill="#fff" stroke="#f59e0b"/><text x="813" y="256" class="token">K/V p1</text>
+    <rect x="866" y="224" width="82" height="52" rx="10" fill="#fff" stroke="#f59e0b"/><text x="907" y="256" class="token">K/V p2</text>
+    <rect x="960" y="224" width="82" height="52" rx="10" fill="#ecfdf5" stroke="#10b981"/><text x="1001" y="256" class="token">K/V g0</text>
+  </g>
+  <text x="678" y="300" class="text">提交位置 4：g1 未作为下一次 Decode 输入</text>
+
+  <rect x="122" y="390" width="956" height="112" rx="17" fill="#fff" stroke="#cbd5e1"/>
+  <text x="148" y="424" class="label">为什么会相差一个位置</text>
+  <text x="148" y="454" class="text">Prefill(p0,p1,p2) → logits → sample g0 → Decode(g0) → logits → sample g1 → 命中停止条件</text>
+  <text x="148" y="482" class="text">只有作为模型输入的词元才产生 K/V；采样后立即结束的 g1 不再进入 Decoder。</text>
+  <path d="M312 322V385" class="line"/><path d="M888 322V385" class="line"/>
+
+  <rect x="122" y="548" width="956" height="62" rx="15" fill="#e2e8f0" stroke="#94a3b8"/>
+  <text x="600" y="574" text-anchor="middle" class="label">Chapter07 只改变模型 K/V 的物理布局</text>
+  <text x="600" y="597" text-anchor="middle" class="text">连续 sequence_position 映射到 BlockTable 与分页 payload，Token History 的职责不变</text>
+</svg>

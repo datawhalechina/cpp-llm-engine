@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter06 单请求生成状态机</title>
+  <desc id="desc">请求从 Initial 经过 Prefilled 和 Decoding，正常进入 Finished；取消、超时、拒绝和模型失败进入对应终态。五种终态都会吸收后续推进事件，但资源释放由对象所有者完成。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#52606d"/></marker>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 27px; font-weight: 700; fill: #172033; }
+      .label { font-size: 16px; font-weight: 700; fill: #172033; }
+      .text { font-size: 13px; fill: #475569; }
+      .line { fill: none; stroke: #52606d; stroke-width: 2.4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="610" rx="24" fill="#f8fafc"/>
+  <text x="48" y="52" class="title">Chapter06 · 单请求从输入到终态</text>
+  <text x="48" y="80" class="text">前三个阶段仍可推进；进入任一终态后，旧队列和回调都不能让请求重新运行</text>
+
+  <rect x="70" y="132" width="230" height="104" rx="16" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="185" y="166" text-anchor="middle" class="label">Initial</text><text x="185" y="194" text-anchor="middle" class="text">等待或分块处理 prompt</text><text x="185" y="218" text-anchor="middle" class="text">prefill_offset 单调增加</text>
+  <rect x="486" y="132" width="230" height="104" rx="16" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="601" y="166" text-anchor="middle" class="label">Prefilled</text><text x="601" y="194" text-anchor="middle" class="text">完整 prompt 已进入模型</text><text x="601" y="218" text-anchor="middle" class="text">首个输出可以提交</text>
+  <rect x="902" y="132" width="230" height="104" rx="16" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="1017" y="166" text-anchor="middle" class="label">Decoding</text><text x="1017" y="194" text-anchor="middle" class="text">逐词元推进</text><text x="1017" y="218" text-anchor="middle" class="text">generated_size 增加</text>
+  <path d="M300 184H481" class="line"/><path d="M716 184H897" class="line"/>
+  <text x="391" y="169" text-anchor="middle" class="text">完整 Prefill</text><text x="807" y="169" text-anchor="middle" class="text">开始提交输出</text>
+
+  <rect x="438" y="314" width="324" height="88" rx="16" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+  <text x="600" y="348" text-anchor="middle" class="label">Finished</text><text x="600" y="376" text-anchor="middle" class="text">EOS 或达到输出长度上限</text>
+  <path d="M1017 236V272H600V309" class="line"/>
+  <path d="M601 236V309" class="line"/>
+
+  <rect x="70" y="472" width="1062" height="82" rx="17" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+  <text x="96" y="504" class="label" fill="#92400e">四种异常终态</text>
+  <text x="96" y="534" class="text">Cancelled：外部取消　　TimedOut：超过截止时间　　Rejected：准入失败　　Failed：模型执行失败</text>
+  <path d="M185 236V434H350V467" class="line"/><path d="M601 236V444H600V467" class="line"/><path d="M1017 236V434H850V467" class="line"/>
+  <text x="244" y="424" class="text">任意非终态发生对应事件</text>
+
+  <rect x="850" y="314" width="282" height="88" rx="16" fill="#e2e8f0" stroke="#94a3b8"/>
+  <text x="991" y="346" text-anchor="middle" class="label">终态吸收后续事件</text><text x="991" y="374" text-anchor="middle" class="text">阶段、游标和输出保持不变</text>
+  <path d="M762 358H845" class="line"/>
+  <path d="M930 472V430H991V407" class="line"/>
+  <text x="48" y="590" class="text">终态只表示“不可继续执行”；Context 和物理 K/V Block 仍由各自所有者释放。</text>
+</svg>

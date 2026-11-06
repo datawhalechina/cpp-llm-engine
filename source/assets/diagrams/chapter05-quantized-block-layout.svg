@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter05 Q8_0、Q4_K 与 Q6_K block 布局</title>
+  <desc id="desc">Q8_0 的 34 字节 block 保存 half scale 和 32 个 int8 值。Q4_K 的 144 字节 super-block 保存总 scale、minimum、分组参数和 4-bit quant。Q6_K 的 210 字节 super-block 保存低 4 bit、高 2 bit、分组 scale 和总 scale。解码后分别得到 32 或 256 个浮点参考值。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#52606d"/></marker>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 27px; font-weight: 700; fill: #172033; }
+      .label { font-size: 16px; font-weight: 700; fill: #172033; }
+      .text { font-size: 13px; fill: #475569; }
+      .small { font-size: 12px; fill: #475569; }
+      .line { fill: none; stroke: #52606d; stroke-width: 2.4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1200" height="700" rx="24" fill="#f8fafc"/>
+  <text x="48" y="52" class="title">Chapter05 · 一个量化 block 里不只有整数</text>
+  <text x="48" y="80" class="text">颜色表示字段职责，方框宽度只帮助比较组成，不作为精确字节比例尺</text>
+
+  <text x="54" y="138" class="label">Q8_0</text><text x="54" y="162" class="small">34 字节 → 32 个权重</text>
+  <rect x="210" y="112" width="140" height="72" rx="12" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="280" y="142" text-anchor="middle" class="label">d</text><text x="280" y="166" text-anchor="middle" class="small">FP16 scale · 2 B</text>
+  <rect x="350" y="112" width="520" height="72" rx="12" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+  <text x="610" y="142" text-anchor="middle" class="label">qs[32]</text><text x="610" y="166" text-anchor="middle" class="small">32 个 int8 quant · 32 B</text>
+  <path d="M870 148H1000" class="line"/>
+  <rect x="1006" y="112" width="150" height="72" rx="12" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+  <text x="1081" y="142" text-anchor="middle" class="label">32 个 float</text><text x="1081" y="166" text-anchor="middle" class="small">w = d × q</text>
+
+  <text x="54" y="288" class="label">Q4_K</text><text x="54" y="312" class="small">144 字节 → 256 个权重</text>
+  <rect x="210" y="252" width="94" height="80" rx="12" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="257" y="282" text-anchor="middle" class="label">d</text><text x="257" y="308" text-anchor="middle" class="small">2 B</text>
+  <rect x="304" y="252" width="110" height="80" rx="12" fill="#dbeafe" stroke="#60a5fa" stroke-width="2"/>
+  <text x="359" y="282" text-anchor="middle" class="label">dmin</text><text x="359" y="308" text-anchor="middle" class="small">2 B</text>
+  <rect x="414" y="252" width="196" height="80" rx="12" fill="#ede9fe" stroke="#a78bfa" stroke-width="2"/>
+  <text x="512" y="282" text-anchor="middle" class="label">scales[12]</text><text x="512" y="308" text-anchor="middle" class="small">分组 scale / min · 12 B</text>
+  <rect x="610" y="252" width="260" height="80" rx="12" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+  <text x="740" y="282" text-anchor="middle" class="label">qs[128]</text><text x="740" y="308" text-anchor="middle" class="small">两个 4-bit 值共用一字节</text>
+  <path d="M870 292H1000" class="line"/>
+  <rect x="1006" y="252" width="150" height="80" rx="12" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+  <text x="1081" y="282" text-anchor="middle" class="label">256 个 float</text><text x="1081" y="308" text-anchor="middle" class="small">d·scale·q − dmin·min</text>
+
+  <text x="54" y="438" class="label">Q6_K</text><text x="54" y="462" class="small">210 字节 → 256 个权重</text>
+  <rect x="210" y="402" width="260" height="80" rx="12" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
+  <text x="340" y="432" text-anchor="middle" class="label">ql[128]</text><text x="340" y="458" text-anchor="middle" class="small">每个值的低 4 bit</text>
+  <rect x="470" y="402" width="176" height="80" rx="12" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+  <text x="558" y="432" text-anchor="middle" class="label">qh[64]</text><text x="558" y="458" text-anchor="middle" class="small">每个值的高 2 bit</text>
+  <rect x="646" y="402" width="154" height="80" rx="12" fill="#ede9fe" stroke="#a78bfa" stroke-width="2"/>
+  <text x="723" y="432" text-anchor="middle" class="label">scales[16]</text><text x="723" y="458" text-anchor="middle" class="small">分组 scale</text>
+  <rect x="800" y="402" width="70" height="80" rx="12" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="835" y="432" text-anchor="middle" class="label">d</text><text x="835" y="458" text-anchor="middle" class="small">2 B</text>
+  <path d="M870 442H1000" class="line"/>
+  <rect x="1006" y="402" width="150" height="80" rx="12" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+  <text x="1081" y="432" text-anchor="middle" class="label">256 个 float</text><text x="1081" y="458" text-anchor="middle" class="small">d × group_scale × q6</text>
+
+  <rect x="100" y="548" width="1000" height="100" rx="17" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="126" y="582" class="label">共同解码顺序</text>
+  <text x="126" y="612" class="text">检查元素数与 payload 字节数 → 读取 block 参数 → 解包 quant bits → 应用分组 scale/min → 写入浮点参考结果</text>
+  <text x="126" y="636" class="small">fused Linear 复用同一布局规则，但解码后直接乘加，不创建完整浮点权重副本。</text>
+</svg>

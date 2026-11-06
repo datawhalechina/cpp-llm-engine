@@ -12,6 +12,10 @@
 | Q4_K | 256 | 144 字节内保存总 scale、minimum、分组参数和 4-bit quant | <a href="../_code/chapter05_quantization/src/q4k_dequantize.cpp"><code>q4k_dequantize.cpp</code></a> |
 | Q6_K | 256 | 210 字节内组合低 4 bit、高 2 bit、分组 scale 和总 scale | <a href="../_code/chapter05_quantization/src/q6k_dequantize.cpp"><code>q6k_dequantize.cpp</code></a> |
 
+下图按字段职责对齐三种 block。量化码必须与同一 block 内的 scale、minimum 或高位数据一起解释，不能把 payload 当作普通整数数组逐元素读取。
+
+![Q8_0、Q4_K 与 Q6_K block 布局](../assets/diagrams/chapter05-quantized-block-layout.svg)
+
 Q4_K 同时具有分组 scale 和 minimum，适合用来观察完整的 block 解码顺序。下面的算法镜像省略字节对齐、half 转换、边界检查和输出内存所有权；Q6_K 与 Q8_0 复用相同的“读取参数、解包 quant、应用 scale”结构，但字段布局不同。
 
 ```python

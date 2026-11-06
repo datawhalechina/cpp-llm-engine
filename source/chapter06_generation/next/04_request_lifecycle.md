@@ -4,7 +4,7 @@
 
 ## 状态怎样变化
 
-请求从 `Initial` 开始。完整 prompt 提交后进入 `Prefilled`，开始逐词元推进后进入 `Decoding`。正常停止进入 `Finished`；其余五种终态记录不同的结束来源。
+请求从 `Initial` 开始。完整 prompt 提交后进入 `Prefilled`，开始逐词元推进后进入 `Decoding`。正常停止进入 `Finished`；其余四种终态记录不同的结束来源。
 
 | 当前阶段 | 事件 | 下一阶段 | 可观察结果 |
 | --- | --- | --- | --- |
@@ -18,6 +18,10 @@
 | 任意非终态 | 模型调用失败 | `Failed` | `failure_reason` 保存原因 |
 
 状态实现位于 <a href="/_code/chapter06_generation/src/request.cpp"><code>request.cpp</code></a>。`terminal()` 将五种结束状态统一为“不可继续执行”，而 `finished()` 只表示正常完成。
+
+下图把可推进阶段、正常结束和四种异常终态放在同一状态机中。终态会阻止后续推进，但不会自动释放模型 Context 或物理缓存。
+
+![单请求生成状态机](../../assets/diagrams/chapter06-request-lifecycle.svg)
 
 ## 为什么终态必须吸收后续事件
 
