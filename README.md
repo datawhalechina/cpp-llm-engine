@@ -18,15 +18,37 @@ _A Practical Tutorial for Building a C++ LLM Inference Engine_
 
 ## Quick Start
 
-准备好 CMake、C++17 编译器、Node.js 和 npm 后，先运行无需模型文件的轻量回归：
+第一次学习建议完成三个动作：在 Chapter00 看见一条完整的模型推理路径，在 Chapter01 读取模型配置和权重，再沿 [USAGE.md](USAGE.md) 进入 Tensor、算子、Decoder、Runtime 和服务章节。
+
+先准备 CMake 3.20+、支持 C++17 的编译器和 Git。Linux 可以直接使用下面的命令；Windows 建议进入 WSL2 Ubuntu 后执行。安装方法和常见问题见 [Chapter00 环境准备](source/chapter00_quickstart/01_environment_setup.md)。
 
 ```bash
-npm install
-npm run test:regression
+cmake --version
+c++ --version
+git --version
+```
+
+先运行不需要下载模型的 Chapter00 小实验。看到 CTest 显示测试通过，说明 C++ 编译和运行环境可以继续学习：
+
+```bash
 bash code/chapter00_quickstart/run.sh
 ```
 
-随后按 [Chapter 00](source/chapter00_quickstart/intro.md) 准备 `llama.cpp` 和 TinyLlama GGUF，运行第一次真实推理。完整学习顺序与可选扩展见 [USAGE.md](USAGE.md)。
+准备好 `llama.cpp` 和 TinyLlama GGUF 后，再运行一次真实模型推理，观察 prompt 怎样变成连续输出：
+
+```bash
+bash code/chapter00_quickstart/run_real_inference.sh
+```
+
+随后进入 Chapter01，开始读取 GGUF 元数据、Tokenizer 配置和模型权重：
+
+```bash
+bash code/chapter01_tensor_loader/run.sh
+```
+
+真实推理所需的模型下载和路径设置见 [Chapter00 导读](source/chapter00_quickstart/intro.md)。暂时没有模型也可以先完成小实验和 Chapter01 的默认测试；CUDA 不是 CPU 学习路径的前置条件。
+
+如果 C++ 所有权、CMake 或 CTest 仍然陌生，可以先从 [Foundation](source/foundation/intro.md) 选择对应练习；已经掌握这些基础时直接继续 Chapter01。Chapter02–10 的阅读顺序和运行命令统一列在 [USAGE.md](USAGE.md)。
 
 ## 教程定位
 
@@ -81,7 +103,7 @@ Foundation -> Chapter00 -> Chapter01 -> Chapter02 -> Chapter03 -> Chapter04
 
 ## 验证、查阅与贡献
 
-默认 CPU 回归不依赖 GGUF、网络下载或 GPU；真实模型、transport、性能和 CUDA 使用各自入口补充证据。GitHub Actions 会在 `main` push 和 pull request 上执行文档检查与默认回归。
+默认 CPU 回归不依赖 GGUF、网络下载或 GPU；真实模型、transport、性能和 CUDA 使用各自入口补充证据。GitHub Actions 会在 `main` push 和 pull request 上执行文档检查、默认回归和 Release 契约回归。
 
 测试先检查单个对象的契约和不变量，再检查组件协作与跨章主线；真实模型和性能实验建立在正确性通过之后。图中的每一层对应不同问题，不能用一次端到端成功替代底层契约测试。
 

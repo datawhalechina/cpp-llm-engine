@@ -8,15 +8,29 @@ _A Practical Tutorial for Building a C++ LLM Inference Engine_
 
 ## Quick Start
 
-准备好 CMake、C++17 编译器、Node.js 和 npm 后，先运行无需模型文件的轻量回归：
+Quick Start 依次完成仓库检查、Chapter00 真实基线和 Chapter01 自研主线入口。Chapter02–10 的命令见[阅读指南](/guide)。
+
+CPU 路径需要 CMake 3.20+、必须支持 C++17 的编译器和 Git；全仓库回归与文档工具另需 Node.js 和 npm。Linux 可直接运行，Windows 推荐使用 WSL2 Ubuntu。先阅读 [Chapter00 环境准备](/chapter00_quickstart/01_environment_setup)；CUDA 不是主线前置，需要时再阅读 [CUDA 环境指南](/guides/setup_cuda)。
+
+如果还不熟悉 C++ 所有权、CMake 或 CTest，先按需学习 [Foundation](/foundation/intro)。Foundation 是通用能力和练习区，基础已具备时可以跳过。
 
 ```bash
+cmake --version
+c++ --version
+node --version
 npm install
 npm run test:regression
-bash code/chapter00_quickstart/run.sh
 ```
 
-随后按 [Chapter 00](/chapter00_quickstart/intro) 准备 `llama.cpp` 和 TinyLlama GGUF，运行第一次真实推理。完整学习顺序与可选扩展见[阅读指南](/guide)。
+再建立真实基线并进入自研主线：
+
+```bash
+bash code/chapter00_quickstart/run.sh
+bash code/chapter00_quickstart/run_real_inference.sh  # 准备好 llama.cpp 和 TinyLlama 后运行
+bash code/chapter01_tensor_loader/run.sh
+```
+
+真实推理脚本依赖 [Chapter 00](/chapter00_quickstart/intro) 中准备的 `llama.cpp` 和 TinyLlama GGUF。
 
 ## 学习产物
 

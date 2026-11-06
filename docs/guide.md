@@ -88,6 +88,8 @@ bash code/multimodal/scripts/run.sh
 - `CMake`、`g++` 或 `clang++`、`git`
 - `Node.js + npm`
 
+Linux 可直接使用上述配置。Windows 推荐使用 WSL2 Ubuntu，并把仓库、CMake、编译器、Git 和 Node.js 全部放在 WSL 内。当前 Bash 脚本、`/tmp` 路径、符号链接和 CI 都以 Linux 为准，Windows 原生 PowerShell/MSVC 尚未纳入发布契约。详细选择和安装入口见 [Chapter00 环境准备](/chapter00_quickstart/01_environment_setup)。
+
 ### 2. 本地带 GPU 的学习环境
 
 当前 GPU 路径可以运行 `code/cuda` 的设备资源、cuBLAS MatMul、Q4_K/Q6_K Linear、RoPE、连续 KV、GQA 和合成 Decoder；下一里程碑是真实 TinyLlama GPU Decoder。
@@ -175,21 +177,24 @@ CPU 和 GPU 的环境差异，以及它们在章节中的分叉位置：
 
 ```bash
 npm run docs:check-structure
+npm run docs:check-style
+npm run docs:check-reference
 npm run docs:check-links
 ```
 
-再跑：
+代码或公共契约改动再跑：
 
 ```bash
 npm run code:check-headers
-npm run docs:build
 npm run test:regression
+npm run test:release-contracts
 ```
 
 | 验证层级 | 当前入口 | 覆盖范围 |
 | --- | --- | --- |
 | 默认 CPU | `npm run test:regression` | Foundation、Core、Engine 和 Chapter00-10 轻量路径 |
+| 发布契约 | `npm run test:release-contracts` | 全新 Release 构建、测试登记、CTest label 和跨章契约 |
 | 真实模型 | `code/engine` 中设置 `CPP_LLM_ENGINE_REAL_MODEL` 的 CTest | TinyLlama golden、Context 隔离、HTTP adapter、profiling |
-| 真实 transport | `run_cpp_httplib_loopback.sh` | loopback HTTP、metrics、同步与 SSE |
+| 真实 transport | `bash code/chapter10_serving/scripts/run_cpp_httplib_loopback.sh` | loopback HTTP、metrics、同步与 SSE |
 | 性能实验 | Chapter09 与 Engine benchmark 脚本 | 固定 workload 的结果文件和 A/B 判定 |
 | GPU | `bash code/cuda/scripts/run.sh` | CUDA 资源、算子、KV、GQA 和合成 Decoder；不包含真实模型端到端生成 |
