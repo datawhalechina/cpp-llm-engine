@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "benchmark": "tinyllama_service_core_cpu",
+  "model": "TinyLlama-1.1B-Chat-v1.0.Q4_K_M",
+  "device": "cpu",
+  "execution_policy": "scalar",
+  "dispatch_mode": "sequential",
+  "environment": {
+    "hardware_concurrency": 32,
+    "cpu_model": "AMD Ryzen 9 9955HX 16-Core Processor",
+    "compiler": "gcc 13.1.0",
+    "build_type": "Release"
+  },
+  "warmup": 1,
+  "iterations": 3,
+  "request_count": 2,
+  "max_new_tokens_per_request": 4,
+  "prompt_tokens": [6, 1],
+  "one_time_ms": {"tokenizer_load": 27.890542, "model_load": 183.425514},
+  "metrics_ms": {
+    "prefill_compute": {"min": 3968.521748, "mean": 3971.904996, "p50": 3973.411711, "max": 3973.781529},
+    "decode_compute": {"min": 3581.726168, "mean": 3587.356116, "p50": 3584.945518, "max": 3595.396661},
+    "runtime_overhead": {"min": 0.156945, "mean": 0.159685, "p50": 0.159572, "max": 0.162538},
+    "overlapped_compute": {"min": 0, "mean": 0, "p50": 0, "max": 0},
+    "dispatch": {"min": 7550.410454, "mean": 7559.420797, "p50": 7558.886619, "max": 7568.965317},
+    "end_to_end": {"min": 7550.425593, "mean": 7559.435207, "p50": 7558.900786, "max": 7568.979243},
+    "request_a_ttft": {"min": 3370.187447, "mean": 3372.7793, "p50": 3373.586507, "max": 3374.563947},
+    "request_b_ttft": {"min": 3968.56524, "mean": 3971.94773, "p50": 3973.45377, "max": 3973.82418},
+    "request_a_completion": {"min": 6953.054968, "mean": 6962.612308, "p50": 6962.345179, "max": 6972.436776},
+    "request_b_completion": {"min": 7550.409192, "mean": 7559.419304, "p50": 7558.884976, "max": 7568.963744}
+  },
+  "memory_bytes": {
+    "model_weight_payload": 667078656,
+    "request_a_kv_committed": 405504,
+    "request_b_kv_committed": 180224,
+    "request_a_committed_tokens": 9,
+    "request_b_committed_tokens": 4,
+    "kv_committed_total": 585728,
+    "process_peak_rss": 684531712
+  },
+  "throughput_tokens_per_second": {"min": 1.056947636, "mean": 1.058283203, "p50": 1.058356925, "max": 1.059545047},
+  "correctness": {
+    "all_iterations": true,
+    "request_a_golden": "29892 306 29915 29885",
+    "request_b_golden": "839 744 29892 263",
+    "context_and_cache_isolation": true,
+    "terminal_resources_released": true
+  }
+}

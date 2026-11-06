@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="820" viewBox="0 0 1440 820" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 09 性能评估与优化主图</title>
+  <desc id="desc">展示性能章节在调度和服务之间的位置，以及从正确性闸门、固定工作负载、重复测量、热点归因、单变量对比到保留或回退决策的证据闭环。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7f3e8"/>
+      <stop offset="1" stop-color="#e7f0ec"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#173c36" flood-opacity="0.13"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#2d5a51"/>
+    </marker>
+    <marker id="arrow-warm" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#aa5a36"/>
+    </marker>
+    <style>
+      text { font-family: "Droid Sans Fallback"; }
+      .title { font-size: 32px; font-weight: 700; fill: #183d37; }
+      .subtitle { font-size: 17px; font-weight: 500; fill: #55716c; }
+      .section { font-size: 18px; font-weight: 700; fill: #183d37; letter-spacing: .5px; }
+      .chapter { font-size: 20px; font-weight: 700; fill: #fff; }
+      .chapter-sub { font-size: 14px; font-weight: 500; fill: #dcebe7; }
+      .box-title { font-size: 18px; font-weight: 700; fill: #173c36; }
+      .box-sub { font-size: 14px; font-weight: 500; fill: #58716c; }
+      .code { font-family: "DejaVu Sans Mono"; font-size: 12px; font-weight: 500; fill: #768b87; }
+      .badge { font-size: 13px; font-weight: 700; fill: #fff; }
+      .decision { font-family: "DejaVu Sans Mono"; font-size: 16px; font-weight: 700; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="820" rx="28" fill="url(#bg)"/>
+  <text x="72" y="64" class="title">Chapter 09 · 用证据判断性能变化</text>
+  <text x="72" y="94" class="subtitle">先证明结果正确，再测量、定位和决策；原始记录不随结论改变</text>
+
+  <text x="72" y="142" class="section">在推理服务主线中的位置</text>
+  <g filter="url(#shadow)">
+    <rect x="72" y="164" width="330" height="92" rx="18" fill="#426d65"/>
+    <rect x="555" y="154" width="330" height="112" rx="18" fill="#173f39"/>
+    <rect x="1038" y="164" width="330" height="92" rx="18" fill="#426d65"/>
+  </g>
+  <text x="237" y="203" text-anchor="middle" class="chapter">Chapter 08 · 调度与批处理</text>
+  <text x="237" y="230" text-anchor="middle" class="chapter-sub">提供固定的执行策略与工作负载</text>
+  <text x="720" y="198" text-anchor="middle" class="chapter">Chapter 09 · 性能评估与优化</text>
+  <text x="720" y="226" text-anchor="middle" class="chapter-sub">形成可复查的测量、归因和决策</text>
+  <text x="1203" y="203" text-anchor="middle" class="chapter">Chapter 10 · 推理服务</text>
+  <text x="1203" y="230" text-anchor="middle" class="chapter-sub">复用同一方法评估在线请求</text>
+  <path d="M 414 210 H 535" stroke="#2d5a51" stroke-width="4" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 897 210 H 1018" stroke="#2d5a51" stroke-width="4" fill="none" marker-end="url(#arrow)"/>
+
+  <text x="72" y="322" class="section">一次完整的性能证据闭环</text>
+  <g filter="url(#shadow)">
+    <rect x="72" y="352" width="232" height="130" rx="18" fill="#fffdf7" stroke="#d49b72" stroke-width="2"/>
+    <rect x="338" y="352" width="232" height="130" rx="18" fill="#ffffff" stroke="#7aa59a" stroke-width="2"/>
+    <rect x="604" y="352" width="232" height="130" rx="18" fill="#ffffff" stroke="#7aa59a" stroke-width="2"/>
+    <rect x="870" y="352" width="232" height="130" rx="18" fill="#ffffff" stroke="#7aa59a" stroke-width="2"/>
+    <rect x="1136" y="352" width="232" height="130" rx="18" fill="#fffdf7" stroke="#d49b72" stroke-width="2"/>
+  </g>
+
+  <circle cx="106" cy="383" r="18" fill="#aa5a36"/><text x="106" y="388" text-anchor="middle" class="badge">1</text>
+  <text x="132" y="389" class="box-title">正确性闸门</text>
+  <text x="92" y="423" class="box-sub">输出 · 状态 · 资源 · 批量语义</text>
+  <text x="92" y="453" class="code">correctness_pass</text>
+
+  <circle cx="372" cy="383" r="18" fill="#2d5a51"/><text x="372" y="388" text-anchor="middle" class="badge">2</text>
+  <text x="398" y="389" class="box-title">固定工作负载</text>
+  <text x="358" y="423" class="box-sub">模型 · 长度 · 请求数 · 后端</text>
+  <text x="358" y="453" class="code">workload_id + environment</text>
+
+  <circle cx="638" cy="383" r="18" fill="#2d5a51"/><text x="638" y="388" text-anchor="middle" class="badge">3</text>
+  <text x="664" y="389" class="box-title">重复测量</text>
+  <text x="624" y="423" class="box-sub">预热 · 原始样本 · 统计聚合</text>
+  <text x="624" y="453" class="code">samples + statistics</text>
+
+  <circle cx="904" cy="383" r="18" fill="#2d5a51"/><text x="904" y="388" text-anchor="middle" class="badge">4</text>
+  <text x="930" y="389" class="box-title">定位热点</text>
+  <text x="890" y="423" class="box-sub">阶段 → 函数/Kernel → 硬件原因</text>
+  <text x="890" y="453" class="code">profile ranges</text>
+
+  <circle cx="1170" cy="383" r="18" fill="#aa5a36"/><text x="1170" y="388" text-anchor="middle" class="badge">5</text>
+  <text x="1196" y="389" class="box-title">单变量 A/B</text>
+  <text x="1156" y="423" class="box-sub">同一条件 · 一个变化 · 独立记录</text>
+  <text x="1156" y="453" class="code">comparison policy</text>
+
+  <path d="M 304 417 H 323" stroke="#2d5a51" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M 570 417 H 589" stroke="#2d5a51" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M 836 417 H 855" stroke="#2d5a51" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M 1102 417 H 1121" stroke="#2d5a51" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="298" y="564" width="844" height="158" rx="22" fill="#173f39"/>
+  </g>
+  <text x="720" y="606" text-anchor="middle" class="chapter">性能决策</text>
+  <text x="720" y="636" text-anchor="middle" class="chapter-sub">先检查正确性与可比性，再应用预先声明的主指标和回退阈值</text>
+  <rect x="382" y="662" width="190" height="40" rx="20" fill="#d9eee5"/>
+  <rect x="625" y="662" width="190" height="40" rx="20" fill="#f4d8c8"/>
+  <rect x="868" y="662" width="190" height="40" rx="20" fill="#dce4e2"/>
+  <text x="477" y="688" text-anchor="middle" class="decision" fill="#1d654e">KEEP</text>
+  <text x="720" y="688" text-anchor="middle" class="decision" fill="#944425">REJECT</text>
+  <text x="963" y="688" text-anchor="middle" class="decision" fill="#526d67">NOT_COMPARABLE</text>
+  <path d="M 1252 482 V 526 Q 1252 544 1234 544 H 758 V 552" stroke="#aa5a36" stroke-width="4" fill="none" marker-end="url(#arrow-warm)"/>
+
+  <path d="M 298 642 H 184 Q 164 642 164 622 V 510" stroke="#aa5a36" stroke-width="3" stroke-dasharray="8 7" fill="none" marker-end="url(#arrow-warm)"/>
+  <text x="183" y="674" class="box-sub" fill="#8d4b2f">失败或不可比：修正条件后重跑</text>
+
+  <rect x="72" y="756" width="1296" height="38" rx="19" fill="#d8e6e1"/>
+  <text x="720" y="781" text-anchor="middle" class="box-sub">贯穿条件：同一 workload ID · 可追溯环境 · 原始样本不覆盖 · 结论引用测量记录</text>
+</svg>

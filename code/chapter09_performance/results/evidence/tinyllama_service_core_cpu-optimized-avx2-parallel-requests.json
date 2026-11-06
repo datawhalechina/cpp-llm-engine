@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "experiment_id": "tinyllama_service_core_cpu:optimized-avx2:parallel-requests",
+  "workload_id": "tinyllama_service_core_cpu:requests-2",
+  "environment": {
+    "model": "TinyLlama-1.1B-Chat-v1.0.Q4_K_M",
+    "backend": "cpp-llm-engine-cpu",
+    "device": "cpu",
+    "build_type": "Release",
+    "compiler": "gcc 13.1.0"
+  },
+  "workload": {
+    "request_count": 2,
+    "prompt_tokens_per_request": 0,
+    "prompt_tokens": [
+      6,
+      1
+    ],
+    "output_tokens_per_request": 4,
+    "warmup_iterations": 1,
+    "measurement_iterations": 3,
+    "execution_mode": "service_generation"
+  },
+  "correctness_pass": true,
+  "correctness_checks": [
+    "golden output tokens",
+    "context and cache isolation",
+    "terminal resources released",
+    "execution policy: optimized-avx2",
+    "dispatch policy: parallel-requests"
+  ],
+  "samples": [
+    {
+      "total_ms": 1069.031107,
+      "prefill_ms": 788.623362,
+      "decode_ms": 855.603336,
+      "ttft_ms": 643.823047,
+      "itl_ms": 0,
+      "tokens_per_second": 7.483651591,
+      "peak_memory_mb": 653.57421875
+    },
+    {
+      "total_ms": 1062.629974,
+      "prefill_ms": 780.621119,
+      "decode_ms": 835.758184,
+      "ttft_ms": 639.508521,
+      "itl_ms": 0,
+      "tokens_per_second": 7.528747138,
+      "peak_memory_mb": 653.57421875
+    },
+    {
+      "total_ms": 1066.173834,
+      "prefill_ms": 776.487951,
+      "decode_ms": 830.477293,
+      "ttft_ms": 641.43261,
+      "itl_ms": 0,
+      "tokens_per_second": 7.503687598,
+      "peak_memory_mb": 653.57421875
+    }
+  ]
+}
