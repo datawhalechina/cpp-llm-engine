@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="820" viewBox="0 0 1440 820" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter 10 推理服务主图</title>
+  <desc id="desc">展示 Chapter10 位于调度、性能之后，以及请求从 Transport、准入、等待、运行、调度执行、流式写回到终态释放的生命周期。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7f1e5"/>
+      <stop offset="1" stop-color="#e9f1ed"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#153d36" flood-opacity="0.14"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0 0 L12 6 L0 12 Z" fill="#315f56"/>
+    </marker>
+    <marker id="arrow-warm" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0 0 L12 6 L0 12 Z" fill="#b35a32"/>
+    </marker>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 32px; font-weight: 700; fill: #173e37; }
+      .subtitle { font-size: 17px; fill: #58736e; }
+      .section { font-size: 18px; font-weight: 700; fill: #173e37; }
+      .chapter { font-size: 19px; font-weight: 700; fill: #ffffff; }
+      .chapter-sub { font-size: 13px; fill: #deeee9; }
+      .box-title { font-size: 17px; font-weight: 700; fill: #173e37; }
+      .box-sub { font-size: 13px; fill: #5c7470; }
+      .code { font-family: "DejaVu Sans Mono", monospace; font-size: 11px; fill: #718783; }
+      .white { fill: #ffffff; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="820" rx="28" fill="url(#bg)"/>
+  <text x="70" y="62" class="title">Chapter 10 · 把推理 Runtime 变成持续服务</text>
+  <text x="70" y="92" class="subtitle">网络负责连接，服务核心负责生命周期，Scheduler 负责每一步执行选择</text>
+
+  <text x="70" y="136" class="section">在推理主线中的位置</text>
+  <g filter="url(#shadow)">
+    <rect x="70" y="158" width="300" height="88" rx="17" fill="#4c766e"/>
+    <rect x="433" y="158" width="300" height="88" rx="17" fill="#4c766e"/>
+    <rect x="796" y="148" width="350" height="108" rx="19" fill="#163f38"/>
+    <rect x="1208" y="158" width="162" height="88" rx="17" fill="#bd7048"/>
+  </g>
+  <text x="220" y="195" text-anchor="middle" class="chapter">Chapter 08</text>
+  <text x="220" y="219" text-anchor="middle" class="chapter-sub">调度与批处理</text>
+  <text x="583" y="195" text-anchor="middle" class="chapter">Chapter 09</text>
+  <text x="583" y="219" text-anchor="middle" class="chapter-sub">性能证据</text>
+  <text x="971" y="190" text-anchor="middle" class="chapter">Chapter 10 · 推理服务</text>
+  <text x="971" y="216" text-anchor="middle" class="chapter-sub">准入 · 生命周期 · Transport · 可观测性</text>
+  <text x="1289" y="195" text-anchor="middle" class="chapter">客户端</text>
+  <text x="1289" y="219" text-anchor="middle" class="chapter-sub">HTTP / SSE</text>
+  <path d="M382 202 H421" stroke="#315f56" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M745 202 H784" stroke="#315f56" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M1196 202 H1158" stroke="#b35a32" stroke-width="3" marker-end="url(#arrow-warm)"/>
+
+  <text x="70" y="308" class="section">一次请求怎样完成并释放</text>
+  <g filter="url(#shadow)">
+    <rect x="70" y="340" width="205" height="120" rx="17" fill="#ffffff" stroke="#d89570" stroke-width="2"/>
+    <rect x="310" y="340" width="205" height="120" rx="17" fill="#ffffff" stroke="#79a99e" stroke-width="2"/>
+    <rect x="550" y="340" width="205" height="120" rx="17" fill="#ffffff" stroke="#79a99e" stroke-width="2"/>
+    <rect x="790" y="330" width="260" height="140" rx="19" fill="#163f38"/>
+    <rect x="1085" y="340" width="285" height="120" rx="17" fill="#ffffff" stroke="#d89570" stroke-width="2"/>
+  </g>
+  <text x="172" y="376" text-anchor="middle" class="box-title">Transport / Adapter</text>
+  <text x="172" y="407" text-anchor="middle" class="box-sub">解析请求 · 连接事件</text>
+  <text x="172" y="434" text-anchor="middle" class="code">HTTP · SSE · Writer</text>
+
+  <text x="412" y="376" text-anchor="middle" class="box-title">准入与 waiting</text>
+  <text x="412" y="407" text-anchor="middle" class="box-sub">ID · 容量 · Deadline</text>
+  <text x="412" y="434" text-anchor="middle" class="code">admit()</text>
+
+  <text x="652" y="376" text-anchor="middle" class="box-title">running 集合</text>
+  <text x="652" y="407" text-anchor="middle" class="box-sub">请求状态 · Executor · 时间戳</text>
+  <text x="652" y="434" text-anchor="middle" class="code">ServiceCore</text>
+
+  <text x="920" y="370" text-anchor="middle" class="chapter">调度并执行一个 step</text>
+  <text x="920" y="402" text-anchor="middle" class="chapter-sub">Chapter08 Scheduler</text>
+  <text x="920" y="426" text-anchor="middle" class="chapter-sub">→ Chapter07 KV / Chapter06 Runtime</text>
+  <text x="920" y="451" text-anchor="middle" class="code white">dispatch_step()</text>
+
+  <text x="1227" y="376" text-anchor="middle" class="box-title">词元写回</text>
+  <text x="1227" y="407" text-anchor="middle" class="box-sub">同步 Completion 或 SSE event</text>
+  <text x="1227" y="434" text-anchor="middle" class="code">token · step · finish reason</text>
+
+  <path d="M275 400 H297" stroke="#315f56" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M515 400 H537" stroke="#315f56" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M755 400 H777" stroke="#315f56" stroke-width="3" marker-end="url(#arrow)"/>
+  <path d="M1050 400 H1072" stroke="#315f56" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <path d="M1227 460 V500 Q1227 520 1207 520 H674 Q654 520 654 500 V473" fill="none" stroke="#315f56" stroke-width="3" marker-end="url(#arrow)"/>
+  <text x="940" y="512" text-anchor="middle" class="box-sub">未终止：下一个 step 重新选择</text>
+
+  <rect x="70" y="570" width="410" height="108" rx="18" fill="#fff5ec" stroke="#d89570" stroke-width="2"/>
+  <text x="275" y="605" text-anchor="middle" class="box-title">异常事件进入同一终态</text>
+  <text x="275" y="635" text-anchor="middle" class="box-sub">取消 · Deadline · 客户端断开 · 背压 · Executor 失败</text>
+  <text x="275" y="659" text-anchor="middle" class="code">Cancelled · TimedOut · Failed</text>
+
+  <rect x="630" y="560" width="740" height="128" rx="20" fill="#163f38" filter="url(#shadow)"/>
+  <text x="1000" y="598" text-anchor="middle" class="chapter">统一终态释放</text>
+  <text x="1000" y="630" text-anchor="middle" class="chapter-sub">停止调度 → 回滚未提交事务 → 释放 K/V → 销毁 Context → 移除服务条目</text>
+  <text x="1000" y="658" text-anchor="middle" class="code white">release_terminal() · inflight = 0 · released_total += 1</text>
+
+  <path d="M275 460 V557" fill="none" stroke="#b35a32" stroke-width="3" marker-end="url(#arrow-warm)"/>
+  <path d="M480 624 H617" fill="none" stroke="#b35a32" stroke-width="3" marker-end="url(#arrow-warm)"/>
+  <path d="M1227 460 V540 H1140 V548" fill="none" stroke="#315f56" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <rect x="70" y="738" width="1300" height="48" rx="16" fill="#d9e7e2"/>
+  <text x="720" y="768" text-anchor="middle" class="box-sub">贯穿验证：请求状态唯一 · 词元顺序稳定 · K/V 与 Context 不泄漏 · 指标来自状态转换</text>
+</svg>
