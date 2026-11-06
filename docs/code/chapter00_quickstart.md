@@ -4,7 +4,7 @@
 
 ## 阅读顺序
 
-1. 先看 `main_quick.cpp`
+1. 先看 `examples/main_quick.cpp`
 2. 再看 `run.sh`
 3. 最后看 `CMakeLists.txt`
 
@@ -12,7 +12,7 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| <a href="/_code/chapter00_quickstart/main_quick.cpp"><code>main_quick.cpp</code></a> | 第一次本地推理入口 |
+| <a href="/_code/chapter00_quickstart/examples/main_quick.cpp"><code>examples/main_quick.cpp</code></a> | 第一次本地推理入口 |
 | <a href="/_code/chapter00_quickstart/run.sh"><code>run.sh</code></a> | 本章 smoke test 脚本 |
 | <a href="/_code/chapter00_quickstart/CMakeLists.txt"><code>CMakeLists.txt</code></a> | 本章构建配置 |
 

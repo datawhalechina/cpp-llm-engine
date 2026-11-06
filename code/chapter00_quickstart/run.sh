@@ -10,4 +10,4 @@ trap 'if [[ "${cleanup_build}" == true ]]; then rm -rf "${build_dir}"; fi' EXIT
 
 cmake -S "${script_dir}" -B "${build_dir}"
 cmake --build "${build_dir}"
-"${build_dir}/chapter00_quickstart" --check
+ctest --test-dir "${build_dir}" -R '^chapter00_quickstart_test$' --output-on-failure
