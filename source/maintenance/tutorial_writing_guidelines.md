@@ -442,7 +442,7 @@
 - `chapter04_attention` 重点是 Transformer block
 - `chapter06_generation` 重点是端到端生成
 - `chapter05_quantization` 重点是量化推理
-- `chapter07_benchmark` 重点是测试和性能评估
+- `chapter07_kv_cache` 重点是分页 KV 资源，`chapter08_scheduling` 重点是调度，`chapter09_performance` 才承担 benchmark 和 profiling
 
 如果某章开始同时讲太多内容，建议拆章。
 

@@ -39,11 +39,12 @@
 | Foundation | C++、CMake、测试、CUDA、内存和数据结构前置能力 | 完整模型和 Runtime |
 | Chapter00 | 使用成熟实现建立真实模型推理基线 | 自研引擎实现 |
 | Chapter01-04 | 输入、Tensor、Operator、Attention、FFN 和 Decoder 执行核心 | 请求调度和 HTTP 服务 |
-| Chapter06 | Request、Prefill/Decode、KV、Scheduler 和 Generation Runtime | 网络 transport 和生产集群 |
 | Chapter05 | 量化表示、解码、Quantized Linear 和 backend 选择 | 通用性能结论 |
-| Chapter07 | Correctness、workload、指标和可复现 benchmark | 无证据的优化建议 |
-| Chapter08 | Profiling、瓶颈归因和 A/B 决策 | 新模型语义 |
-| Chapter09 | ServiceCore、HTTP/SSE、metrics 和资源生命周期 | 分布式服务平台 |
+| Chapter06 | Request、Prefill/Decode、Token History、采样和单请求 Generation Runtime | 分页 KV 资源分配和多请求调度 |
+| Chapter07 | Block Pool、BlockTable、分页 K/V payload 和缓存事务 | 请求选择和服务协议 |
+| Chapter08 | 请求队列、优先级、Continuous Batching、Overlap 和 Tensor batch | 性能结论和 HTTP transport |
+| Chapter09 | Correctness、benchmark、profiling、瓶颈归因和 A/B 决策 | 无证据的优化建议 |
+| Chapter10 | ServiceCore、worker、HTTP/SSE、metrics 和资源生命周期 | 分布式服务平台 |
 | `code/core` | 跨章节、设备无关的稳定契约 | 具体 kernel |
 | `code/engine` | 真实模型和章节资产集成 | 复制章节教学实现 |
 | `code/cuda` | 单卡 CUDA backend 和设备资源契约 | 多 GPU、NCCL 和集群调度 |

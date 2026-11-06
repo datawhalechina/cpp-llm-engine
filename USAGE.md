@@ -59,7 +59,7 @@ npm run test:regression
 | --- | --- | --- |
 | CUDA | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备资源、cuBLAS、量化 Linear、RoPE、连续 KV、GQA 和合成 Decoder |
 | Engine 集成 | `bash code/engine/scripts/run.sh` | 章节组件到统一 Engine 的集成与测试 |
-| 真实 CPU 全链路验收 | `bash scripts/run_cpu_v1_acceptance.sh` | 六个 CPU 学习任务及真实模型服务闭环 |
+| 真实 CPU 全链路验收 | `bash scripts/run_cpu_v1_acceptance.sh` | 兼容验收入口；要求本地 llama.cpp 和 TinyLlama GGUF |
 | 多模态 | `bash code/multimodal/scripts/run.sh` | SmolVLM CPU 输入、Vision、Projector 和 Decoder golden |
 
 真实 TinyLlama GPU Decoder 仍在建设，不应把当前合成 Decoder 测试描述成完整 GPU 端到端推理。
@@ -71,13 +71,16 @@ npm run test:regression
 | 层级 | 命令或入口 | 证明范围 |
 | --- | --- | --- |
 | 章节测试 | 对应章节的 `run.sh` | 当前章节可以独立构建并通过测试 |
-| 默认回归 | `npm run test:regression` | 无外部模型、网络和 GPU 时，CPU 主线没有回归 |
-| 文档检查 | `npm run docs:check-structure`、`docs:check-links`、`docs:check-style`、`docs:check-reference` | 文档结构、链接、风格和参考资产一致 |
+| 默认回归 | `npm run test:regression` | 无外部模型、网络和 GPU 时，检查静态资产并运行 Foundation、Chapter00–10、Engine 和多模态默认路径 |
+| 发布契约 | `npm run test:release-contracts` | 用 Release 构建重新编译并运行已登记的关键契约，不下载模型、不运行 GPU 或 benchmark |
+| 文档检查 | `npm run docs:check-structure`、`npm run docs:check-links`、`npm run docs:check-style`、`npm run docs:check-reference` | 文档结构、链接、风格和参考资产一致；链接检查会同时构建站点 |
 | 代码头检查 | `npm run code:check-headers` | 教学代码文件具备用途、输入输出和验证说明 |
 | 真实模型 | `CPP_LLM_ENGINE_REAL_MODEL=...` 对应的 Engine CTest | TinyLlama 权重、logits 或 token golden 成立 |
 | GPU | `code/cuda/scripts/run.sh` | 当前 CUDA 资产在本机设备上构建和运行 |
 
 benchmark 只能比较指定环境和 workload 下的性能，不能替代正确性测试。实验条件与结果登记规则见[实验资产表](source/reference/experiment_assets.md)。
+
+`test:regression` 适合日常开发，它复用各章默认运行脚本。`test:release-contracts` 会在临时目录中使用 Release 配置重新构建关键 target，用于发布前确认测试登记、CTest label 和跨章契约仍然有效。
 
 ## 阅读代码的方法
 

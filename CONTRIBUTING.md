@@ -73,7 +73,9 @@ Pull request 会自动运行 `.github/workflows/ci.yml`。CI 只覆盖无模型�
 | Engine / ServiceCore | `bash code/engine/scripts/run.sh` 或相关 CTest、`npm run test:regression` |
 | CUDA | `bash code/cuda/scripts/run.sh`，并记录 GPU、驱动和 CUDA 版本 |
 | 多模态 | `bash code/multimodal/scripts/run.sh`，涉及真实模型时补对应 golden |
-| 站点构建 | 上述文档检查后运行 `npm run docs:build` |
+| 测试注册、CTest label 或跨章公共契约 | `npm run test:check-contracts`、`npm run test:release-contracts` |
+| 准备发布或大范围重构 | 文档检查、`npm run test:regression`、`npm run test:release-contracts` |
+| 站点构建 | `npm run docs:check-links` 已包含完整 VitePress 构建；需要单独查看构建输出时使用 `npm run docs:build` |
 
 文档修改的最小检查集：
 
@@ -91,6 +93,14 @@ git diff --check
 npm run code:check-headers
 npm run test:regression
 ```
+
+改动测试登记、公共契约、章节边界或发布前，再运行：
+
+```bash
+npm run test:release-contracts
+```
+
+`test:regression` 验证默认开发路径；`test:release-contracts` 使用全新 Release 构建目录按 owner、label 和 target 重新验证发布契约。两者都不替代真实 GGUF、CUDA 设备、HTTP transport 或性能实验。
 
 ## 实验与结果
 

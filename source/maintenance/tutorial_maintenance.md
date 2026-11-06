@@ -2,9 +2,9 @@
 
 本文档面向负责教程结构和长期治理的维护者，定义跨章节的稳定维护规范。学习路线和运行入口以仓库根目录的 `USAGE.md` 为准，常规修改与提交要求以 `CONTRIBUTING.md` 为准。
 
-下面的“当前交接快照”是早期历史记录，不作为当前实现状态或任务优先级的权威来源；后续维护应将稳定规则保留在本文，将阶段状态留在版本历史和项目管理工具中。
+下面的快照只用于理解旧提交，其章节名、路径、分支和任务均已过期。当前职责以 [`tutorial_positioning.md`](./tutorial_positioning.md) 为准，当前命令以 [`README.md`](./README.md) 的“维护门禁”为准。
 
-## 0. 当前交接快照
+## 0. 历史快照（已归档）
 
 更新时间：2026-08-04。
 
@@ -457,25 +457,36 @@ npm install
 npm install --registry=https://registry.npmjs.org
 ```
 
-### 8.2 本地构建
+### 8.2 文档门禁
+
+```bash
+npm run docs:check-structure
+npm run docs:check-style
+npm run docs:check-reference
+npm run docs:check-links
+```
+
+`docs:check-links` 会同时构建 VitePress 并检查生成页面。如果只需单独观察构建输出，再运行下面的命令。
+
+### 8.3 本地构建
 
 ```bash
 npm run docs:build
 ```
 
-### 8.3 本地预览
+### 8.4 本地预览
 
 ```bash
 npm run docs:preview
 ```
 
-### 8.4 本地开发
+### 8.5 本地开发
 
 ```bash
 npm run docs:dev
 ```
 
-### 8.5 构建检查点
+### 8.6 构建检查点
 
 - 首页是否能正常打开
 - 教程主入口是否能正常跳转
@@ -562,13 +573,7 @@ npm run docs:dev
 - 本地构建是否通过
 - dead link 是否清理干净
 
-如果是按优先级推进主线章节，建议直接按下面顺序落地：
-
-1. 先做 `chapter01` 到 `chapter07` 的阅读入口质量抽查
-2. 继续做 `chapter08_profiling` 的阶段计时与 profiling 样例补强
-3. 最后处理站点入口页的源码预览友好策略
-
-每完成一章，就做一次完成验收，不要攒到最后一起查。
+每完成一章，先运行该章 `run.sh`，再运行 `npm run test:regression`。如果改动章节边界、公共契约、CTest label 或测试登记，补运行 `npm run test:release-contracts`，不要把全部验收攒到发布前。
 
 ### 10.1 收口标准固定
 
@@ -596,9 +601,11 @@ npm run docs:dev
 - 先补桥，再补深度
 - 先补主线必需的增量，再补进阶分支
 - 每次新增内容都要能回答“它补的是哪一个前置缺口”
-- `chapter06` 主要承接 scheduler、continuous batching、streaming 进阶
-- `chapter07` 主要承接 memory pool、profiling、A/B benchmark 进阶
-- `chapter08` 主要承接 profiling、A/B 实验和优化闭环
+- `chapter06` 承接单请求生成、Token History、采样和 streaming
+- `chapter07` 承接 Block Pool、BlockTable、分页 KV payload 和缓存事务
+- `chapter08` 承接多请求调度、Continuous Batching、Overlap 和 Tensor batch
+- `chapter09` 承接 benchmark、profiling、结果比较和优化证据
+- `chapter10` 承接 ServiceCore、worker、HTTP/SSE、metrics 和资源释放
 
 正文模板规则固定如下：
 

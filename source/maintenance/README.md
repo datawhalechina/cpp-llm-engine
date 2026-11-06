@@ -33,3 +33,17 @@
 - 学习路线和运行入口：`USAGE.md`
 - 修改、验证和提交：`CONTRIBUTING.md`
 - 教程定位和长期治理：当前目录
+
+## 维护门禁
+
+维护文档不复制各章运行命令。只在调整章节结构、公共契约、站点映射或发布状态时使用下列全局命令。
+
+| 目的 | 命令 |
+| --- | --- |
+| 审核修改范围 | `git status --short`、`git diff --check`、`git diff --stat` |
+| 文档治理 | `npm run docs:check-structure`、`npm run docs:check-style`、`npm run docs:check-reference`、`npm run docs:check-links` |
+| 默认无外部依赖回归 | `npm run test:regression` |
+| 测试资产和 owner 审核 | `npm run test:check-assets`、`npm run test:check-contracts` |
+| 发布前契约验收 | `npm run test:release-contracts` |
+
+`docs:check-links` 会构建 VitePress 并检查生成页面；`test:regression` 使用各模块默认脚本；`test:release-contracts` 使用全新 Release 构建目录重新编译并按 CTest 契约执行。真实模型、CUDA、网络 transport 和 benchmark 仍需按修改范围单独验证。

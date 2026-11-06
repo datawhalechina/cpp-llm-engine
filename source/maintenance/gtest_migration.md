@@ -4,11 +4,11 @@
 
 ## 触发条件
 
-只有 Chapter07 明显需要共享 fixture、参数化测试、更细过滤或标准 CI 输出时，才考虑从当前轻量 harness 迁移到 Google Test。
+只有某个模块明显需要共享 fixture、参数化测试、更细过滤或标准 CI 输出时，才考虑从当前轻量 harness 迁移到 Google Test。测试数量增加本身不构成迁移理由。
 
 ## 迁移范围
 
-第一阶段只处理 `code/chapter07_benchmark/tests/`、对应 `CMakeLists.txt`、代码 README 和 Chapter07 测试说明。Chapter01-06 保持原有测试入口，`ctest` 继续作为统一执行命令。
+第一阶段只选一个有明确需求的模块，同时处理其 `tests/`、`CMakeLists.txt`、代码 README 和测试契约登记。其他模块保持原有入口，`ctest` 继续作为统一执行命令。
 
 ## 执行顺序
 
