@@ -1,6 +1,6 @@
-// Chapter 04：Attention/Decoder 综合测试
-// 职责：验证 causal mask、decode offset、KV Cache、LayerNorm、FFN 和 DecoderLayer。
-// 通过条件：Attention、Cache、组件与结构契约检查全部通过。
+// Chapter 04：Attention/Decoder 综合回归测试
+// 验证因果遮罩、decode offset、KV Cache、LayerNorm、FFN 和 DecoderLayer。
+// 同时检查 backend 生命周期约束和非法 Attention 参数。
 // 验证：bash code/chapter04_attention/scripts/run.sh。
 #include "chapter04_attention/decoder_layer.h"
 #include "chapter04_attention/attention_backend.h"
@@ -8,6 +8,8 @@
 #include "cpp_llm_engine/testing/test.h"
 
 #include <cmath>
+#include <limits>
+#include <type_traits>
 
 namespace {
 
@@ -25,6 +27,14 @@ chapter04_attention::Tensor make_input() {
 }
 
 }  // namespace
+
+static_assert(
+    !std::is_constructible_v<
+        chapter04_attention::MultiHeadAttention,
+        std::size_t,
+        std::size_t,
+        chapter04_attention::CpuReferenceAttentionBackend&&>,
+    "MultiHeadAttention must reject temporary backends");
 
 int main() {
     cpp_llm_engine::testing::TestSuite suite("chapter04_attention");
@@ -53,6 +63,34 @@ int main() {
             .compute(future_mask_request)
             .is_ok());
     CPP_LLM_CHECK(suite, std::abs(first_decode_output[0] - 2.0f) < 1e-5f);
+
+    float last_position_output[] = {-1.0F, -1.0F};
+    const cpp_llm_engine::core::AttentionRequest last_position_request{
+        query, key, value, last_position_output, 1, 1, 1, 2,
+        std::numeric_limits<std::size_t>::max(), true, 1.0F};
+    CPP_LLM_CHECK(
+        suite,
+        chapter04_attention::cpu_reference_attention_backend()
+            .compute(last_position_request)
+            .is_ok());
+    CPP_LLM_CHECK(suite, std::abs(last_position_output[0] - 2.0F) < 1e-5F);
+
+    float invalid_scale_output[] = {-3.0F, -3.0F};
+    auto invalid_scale_request = last_position_request;
+    invalid_scale_request.output = invalid_scale_output;
+    invalid_scale_request.scale = -1.0F;
+    CPP_LLM_CHECK(
+        suite,
+        !chapter04_attention::cpu_reference_attention_backend()
+             .compute(invalid_scale_request)
+             .is_ok());
+    CPP_LLM_CHECK(suite, invalid_scale_output[0] == -3.0F);
+    invalid_scale_request.scale = std::numeric_limits<float>::quiet_NaN();
+    CPP_LLM_CHECK(
+        suite,
+        !chapter04_attention::cpu_reference_attention_backend()
+             .compute(invalid_scale_request)
+             .is_ok());
 
     chapter04_attention::KvCache cache(2, 1, 2);
     CPP_LLM_CHECK(suite, cache.ready());

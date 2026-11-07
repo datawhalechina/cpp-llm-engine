@@ -1,6 +1,6 @@
-// Chapter 04：MultiHeadAttention 接口
-// 职责：构造 Q/K/V projection，调用 Attention backend 并合并输出 projection。
-// 契约：输入为 [tokens, model_dim]，model_dim 必须可整除 num_heads。
+// Chapter 04：教学 Multi-Head Attention 接口
+// 输入为 [tokens, model_dim]，依次执行 Q/K/V 投影、Attention 和输出投影。
+// 对象不拥有注入的 backend；backend 必须比当前对象存活更久。
 // 验证：chapter04_attention_test.cpp。
 #pragma once
 
@@ -17,6 +17,10 @@ public:
     MultiHeadAttention(std::size_t model_dim,
                        std::size_t num_heads,
                        const cpp_llm_engine::core::AttentionBackend& backend);
+    MultiHeadAttention(
+        std::size_t,
+        std::size_t,
+        cpp_llm_engine::core::AttentionBackend&&) = delete;
 
     Tensor forward(const Tensor& input) const;
     cpp_llm_engine::core::Status try_forward(

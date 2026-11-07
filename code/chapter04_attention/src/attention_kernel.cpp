@@ -1,6 +1,6 @@
-// Chapter 04：CPU Attention reference kernel 实现
-// 职责：执行 head 分块、causal mask、稳定 softmax 和 value aggregation。
-// 契约：保持 AttentionRequest 的 query_position_offset 和 scale 语义。
+// Chapter 04：CPU Attention 参考实现
+// 按 head 计算 QK 分数、因果遮罩、稳定 Softmax 和 Value 加权和。
+// query_position_offset 表示第一个 query token 在完整序列中的位置。
 // 验证：chapter04_attention_test.cpp。
 #include "chapter04_attention/attention_kernel.h"
 
@@ -21,6 +21,10 @@ cpp_llm_engine::core::Status cpu_reference_attention_kernel(
         request.head_dim == 0) {
         return cpp_llm_engine::core::Status::error("attention dimensions must be non-zero");
     }
+    if (!std::isfinite(request.scale) || request.scale < 0.0F) {
+        return cpp_llm_engine::core::Status::error(
+            "attention scale must be finite and non-negative");
+    }
     if (request.heads > std::numeric_limits<std::size_t>::max() / request.head_dim) {
         return cpp_llm_engine::core::Status::error("attention head width overflows host size");
     }
@@ -30,7 +34,7 @@ cpp_llm_engine::core::Status cpu_reference_attention_kernel(
         return cpp_llm_engine::core::Status::error("attention buffer size overflows host size");
     }
     if (request.query_position_offset >
-        std::numeric_limits<std::size_t>::max() - request.query_tokens) {
+        std::numeric_limits<std::size_t>::max() - (request.query_tokens - 1)) {
         return cpp_llm_engine::core::Status::error("attention query position overflows host size");
     }
 
