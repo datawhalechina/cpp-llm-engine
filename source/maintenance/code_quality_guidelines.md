@@ -93,6 +93,15 @@
 
 编译警告发现未使用对象、危险转换和遮蔽；ASan/UBSan 发现部分越界和未定义行为；CTest 证明已编写行为；默认回归检查跨模块退化；Release 契约检查 owner、label 和全新构建。它们都不能替代职责、生命周期和证据独立性的人工审核。
 
+CPU CMake 目录使用统一局部门禁；第二个参数可限制 CTest 名称，避免父章节带入的子目录测试扩大审核范围：
+
+```bash
+npm run test:cpp-quality -- code/chapter04_attention \
+  '^(chapter04_attention_test|chapter02_tensor_attention_integration_test)$'
+```
+
+该脚本适用于 GCC/Clang 的 CPU 构建，默认运行严格警告和 UBSan。确认执行环境支持 ASan 时，可增加 `CPP_LLM_ENABLE_ASAN=1`；某些 ptrace 或容器环境无法稳定运行 ASan，不能把运行器等待误记为代码通过或失败。CUDA 仍需分别记录 `nvcc` 编译、真实设备执行和 CPU 数值对照，不能用本脚本代替。
+
 代码质量通过要求：没有未处理 P0/P1；P2 有明确 owner 和验收标准；局部测试、严格警告和适用 Sanitizer 通过；默认回归与受影响发布契约通过；文档、接口、实现和证据一致；未执行的外部验证被明确记录。
 
 审核记录只需保存范围、已执行验证、未执行验证、按等级排列的发现和最终结论。单章过程记录属于本地自留；只有跨章节长期规则进入本文件。
