@@ -13,6 +13,7 @@
 #include <set>
 #include <stdexcept>
 #include <unordered_set>
+#include <utility>
 
 namespace chapter08_scheduling {
 
@@ -382,12 +383,11 @@ bool build_decode_executor_batch_input(
         if (error != nullptr) *error = "executor batch output must not be null";
         return false;
     }
-    output->tokens.clear();
     const auto fail = [&](const std::string& message) {
-        output->tokens.clear();
         if (error != nullptr) *error = message;
         return false;
     };
+    ExecutorBatchInput prepared;
     for (const BatchCandidate& candidate : plan.candidates) {
         if (candidate.prefill) continue;
         if (candidate.scheduled_index >= requests.size()) {
@@ -411,7 +411,7 @@ bool build_decode_executor_batch_input(
         if (state.committed_tokens >= block_pool.capacity_tokens(candidate.request_id)) {
             return fail("decode batch has no reserved KV write slot");
         }
-        output->tokens.push_back({
+        prepared.tokens.push_back({
             candidate.scheduled_index,
             candidate.request_id,
             scheduled.request->generated().back(),
@@ -419,7 +419,10 @@ bool build_decode_executor_batch_input(
             block_pool.locate_reserved(candidate.request_id, state.committed_tokens),
         });
     }
-    if (!output->valid()) return fail("decode batch contains duplicate request or KV slot");
+    if (!prepared.valid()) {
+        return fail("decode batch contains duplicate request or KV slot");
+    }
+    *output = std::move(prepared);
     if (error != nullptr) error->clear();
     return true;
 }

@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <utility>
 #include <vector>
 
 namespace chapter06_generation {
@@ -21,15 +22,40 @@ namespace chapter08_scheduling {
 using TokenStreamCallback = chapter06_generation::TokenStreamCallback;
 
 struct ScheduledRequest {
+    struct SchedulingMetadata {
+        int priority = 0;
+        std::size_t enqueue_sequence = 0;
+    };
+
+    ScheduledRequest(
+        std::size_t id,
+        chapter06_generation::Request* request_value,
+        const chapter06_generation::Sampler* sampler_value,
+        std::shared_ptr<chapter06_generation::RequestModelExecutor> executor_value)
+        : ScheduledRequest(
+              id,
+              request_value,
+              sampler_value,
+              std::move(executor_value),
+              SchedulingMetadata{}) {}
+
+    ScheduledRequest(
+        std::size_t id,
+        chapter06_generation::Request* request_value,
+        const chapter06_generation::Sampler* sampler_value,
+        std::shared_ptr<chapter06_generation::RequestModelExecutor> executor_value,
+        SchedulingMetadata metadata)
+        : request_id(id),
+          request(request_value),
+          sampler(sampler_value),
+          executor(std::move(executor_value)),
+          scheduling(metadata) {}
+
     std::size_t request_id = 0;
     chapter06_generation::Request* request = nullptr;
     const chapter06_generation::Sampler* sampler = nullptr;
     std::shared_ptr<chapter06_generation::RequestModelExecutor> executor;
-
-    struct SchedulingMetadata {
-        int priority = 0;
-        std::size_t enqueue_sequence = 0;
-    } scheduling;
+    SchedulingMetadata scheduling;
 };
 
 struct SchedulerStats {

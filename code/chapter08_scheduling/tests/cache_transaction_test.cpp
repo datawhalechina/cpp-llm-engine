@@ -72,5 +72,29 @@ int main() {
             suite, inspect_request_execution_state(50, request, executor.get(), &pool).consistent());
     });
 
+    suite.run("invalid decode input preserves the previous batch", [&] {
+        GenerationConfig config;
+        config.max_new_tokens = 2;
+        Runtime runtime(config);
+        GreedySampler sampler;
+        Request request({1, 2});
+        auto executor = std::make_shared<testing::ChunkedTokenExecutor>(6);
+        chapter07_kv_cache::KvBlockPool pool(2, 2);
+        const std::vector<ScheduledRequest> requests{{60, &request, &sampler, executor}};
+        const ContinuousBatchScheduler scheduler;
+        CPP_LLM_CHECK(
+            suite, scheduler.run_step(runtime, requests, 2, 0, {}, &pool).generated_tokens == 1);
+
+        const StepBatchPlan plan = StepBatchPlanner{}.build(requests, 1);
+        ExecutorBatchInput input;
+        input.tokens.push_back({99, 99, 99, 99, {1, 1}});
+        std::string error;
+        CPP_LLM_CHECK(
+            suite, !build_decode_executor_batch_input(plan, requests, pool, &input, &error));
+        CPP_LLM_REQUIRE(suite, input.tokens.size() == 1);
+        CPP_LLM_CHECK(suite, input.tokens.front().request_id == 99);
+        CPP_LLM_CHECK(suite, error == "decode batch has no reserved KV write slot");
+    });
+
     return suite.finish();
 }
