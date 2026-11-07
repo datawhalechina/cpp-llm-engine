@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+} from 'node:fs'
 import { dirname, extname, join, resolve } from 'node:path'
 
 const distDir = 'docs/.vitepress/dist'
@@ -62,7 +69,7 @@ for (const file of sourceMarkdownFiles) {
     const image = match[1]
     if (/^(https?:|data:)/.test(image)) continue
 
-    const target = resolve(dirname(file), image)
+    const target = resolve(dirname(realpathSync(file)), image)
     if (!existsSync(target)) {
       sourceMissing.push(`${file}: image ${image} -> ${target}`)
     }

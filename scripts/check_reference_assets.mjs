@@ -139,7 +139,7 @@ for (const slug of chapterSlugs) {
 
   const codeReadme = `code/${slug}/README.md`
   const codeReadmeText = fs.readFileSync(codeReadme, 'utf8')
-  if (!/^## (?:本章)?资产总览$/m.test(codeReadmeText)) {
+  if (!/^## (?:(?:本章)?资产总览|阅读顺序与资产)$/m.test(codeReadmeText)) {
     findings.push(`${codeReadme}: missing asset overview heading`)
   }
 }
