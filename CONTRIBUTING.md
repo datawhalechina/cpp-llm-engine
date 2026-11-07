@@ -43,6 +43,8 @@
 
 ## 代码要求
 
+实现要求、审核顺序和问题等级见[代码质量与审核规则](source/maintenance/code_quality_guidelines.md)。
+
 - 默认使用 C++17，遵循现有 CMake target 和命名方式。
 - CPU 默认路径不得依赖 GGUF 模型、网络下载、Python、CUDA 或外部 BLAS。
 - 优化实现必须保留可比较的 reference 或 golden，不能让实现本身同时充当验收答案。
