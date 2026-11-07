@@ -1,17 +1,29 @@
-# Chapter 02：Tensor Ops Tensor 视图与共享存储
+# Chapter 02：Tensor 视图与共享存储
 
-本目录实现 CPU Float32 的 1-4 维 Tensor、共享 Storage View、轴切片与轴交换，以及将非连续 View 显式物化的 `contiguous()`。完整学习说明见 [`source/chapter02_tensor_ops`](../../source/chapter02_tensor_ops/intro.md)。
+本目录实现 CPU Float32 的 1–4 维 Tensor。`reshape()`、`slice()` 和 `transpose()` 只改变 shape、stride 或 offset，并继续共享原 Storage；`contiguous()` 在布局不连续时复制数据。原理和图解见 [Chapter02 导读](../../source/chapter02_tensor_ops/intro.md)。
 
-## 本章资产总览
+## 代码架构
+
+```text
+Tensor：shared_ptr<vector<float>> + shape + strides + offset
+  ├─ reshape / slice / transpose ──> 共享 Storage 的 Tensor View
+  ├─ contiguous ───────────────────> 独立、连续的 Tensor
+  └─ view_ref / mutable_view_ref ──> Core 非拥有引用 ──> Chapter03–05 算子
+```
+
+`Tensor` 负责 Storage 生命周期，所以由它产生的另一个 `Tensor` View 可以在原对象销毁后继续使用。`TensorViewRef` 只借用地址，不增加引用计数，调用方必须保证对应 `Tensor` 仍然存活。
+
+## 阅读顺序与资产
 
 | 资产 | 作用 |
 | --- | --- |
-| `CMakeLists.txt` | library、demo 和 test target |
-| `src/tensor.cpp` | reshape、slice、transpose、连续化和只读/可写 `TensorViewRef` 导出 |
-| `examples/main_tensor_ops.cpp` | 最小 view 操作演示 |
-| `tests/chapter02_tensor_ops_test.cpp` | shape、offset、别名、连续化和边界测试 |
-| `tests/chapter02_nd_tensor_test.cpp` | 1D、3D、4D 索引与 View 测试 |
-| `scripts/run.sh` | 隔离构建、CTest 和 demo 入口 |
+| `include/chapter02_tensor_ops/tensor.h` | 先看公开操作和返回方式 |
+| `src/tensor.cpp` | 再看地址计算、View 变换和连续化 |
+| `examples/main_tensor_ops.cpp` | 观察 shape、stride、offset 和共享写入 |
+| `tests/chapter02_tensor_ops_test.cpp` | 核对二维 View、生命周期和失败行为 |
+| `tests/chapter02_nd_tensor_test.cpp` | 核对 1D、3D、4D 索引与轴变换 |
+
+阅读实现时先看 `checked_storage_index()` 如何把 N 维索引转换为 Storage 位置，再看三个 `try_*` View 操作，最后看 `try_contiguous()` 如何按逻辑索引复制非连续数据。
 
 ## 运行与验证
 
@@ -21,4 +33,8 @@
 bash code/chapter02_tensor_ops/scripts/run.sh
 ```
 
-重点观察：N 维索引是否按 shape/stride 落到正确元素，轴交换是否共享 Storage，非连续 View 调用 `contiguous()` 后是否获得独立的连续 Storage。
+脚本会先运行 CTest，再输出一个二维示例。重点核对 N 维索引是否按 shape、stride 和 offset 找到元素，View 修改是否反映到原 Tensor，以及连续化后写入是否相互隔离。
+
+## 扩展入口
+
+Chapter03–05 通过 Core `TensorViewRef` 接收本章数据，不需要依赖 `Tensor` 类。后续增加设备内存或新 dtype 时，应实现新的拥有对象并继续导出 Core 引用，而不是在本章 CPU Float32 教学类中加入设备分支。

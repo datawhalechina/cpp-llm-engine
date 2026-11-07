@@ -1,6 +1,6 @@
-// Chapter 02：N 维 Tensor 命名契约测试。
-// 职责：验证 1-4 维索引、stride、轴切片、轴交换和连续化。
-// 验证入口：Chapter02 CTest 或带 contract、tensor 标签的 CTest。
+// Chapter 02：N 维 Tensor 回归测试
+// 验证 1–4 维索引、stride、轴切片、轴交换和连续化。
+// 入口：Chapter02 CTest 或带 contract、tensor 标签的 CTest。
 #include "chapter02_tensor_ops/tensor.h"
 
 #include "cpp_llm_engine/testing/test.h"

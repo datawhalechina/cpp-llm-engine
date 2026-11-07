@@ -1,6 +1,6 @@
-// Chapter 02：Tensor view 接口
-// 职责：声明共享 storage 的 view 操作和显式连续化接口。
-// 契约：view 操作不复制；try_* 支持原地输出且失败时保留源对象。
+// Chapter 02：CPU Float32 Tensor 及其 View 操作
+// Tensor View 共享 Storage；contiguous() 在需要时创建独立连续副本。
+// try_* 允许 output 与当前对象相同，操作失败时原对象保持不变。
 // 验证：chapter02_tensor_ops_test.cpp 和 chapter02_nd_tensor_test.cpp。
 #pragma once
 

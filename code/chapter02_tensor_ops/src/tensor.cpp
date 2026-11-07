@@ -1,6 +1,6 @@
-// Chapter 02：Tensor view 实现
-// 职责：实现 1-4 维 shape/stride、共享 storage、view 变换和连续化。
-// 契约：地址计算检查溢出；try_* 原地失败不修改源对象。
+// Chapter 02：CPU Float32 Tensor 及其 View 实现
+// shape、stride 和 offset 决定逻辑索引对应的 Storage 位置。
+// 地址计算检查溢出；try_* 原地失败不修改源对象。
 // 验证：code/chapter02_tensor_ops/scripts/run.sh。
 #include "chapter02_tensor_ops/tensor.h"
 

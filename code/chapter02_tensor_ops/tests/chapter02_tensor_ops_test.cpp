@@ -1,6 +1,6 @@
-// Chapter 02：二维 Tensor View 命名契约测试。
-// 职责：验证 reshape、slice、transpose、连续化、失败路径和生命周期。
-// 验证入口：Chapter02 CTest 或带 unit、tensor 标签的 CTest。
+// Chapter 02：二维 Tensor View 回归测试
+// 验证 reshape、slice、transpose、连续化、失败路径和 Storage 生命周期。
+// 入口：Chapter02 CTest 或带 unit、tensor 标签的 CTest。
 #include "chapter02_tensor_ops/tensor.h"
 
 #include "cpp_llm_engine/testing/test.h"
@@ -163,6 +163,7 @@ int main() {
 
         const Tensor offset_view = tensor.slice(1, 1, 0, 3);
         CPP_LLM_CHECK(suite, offset_view.is_contiguous());
+        CPP_LLM_CHECK(suite, offset_view.data() == tensor.data() + 3);
         const auto reused = offset_view.contiguous();
         CPP_LLM_CHECK(suite, reused.shares_storage_with(offset_view));
         CPP_LLM_CHECK(suite, reused.offset() == 3);
@@ -206,6 +207,14 @@ int main() {
         CPP_LLM_CHECK(suite, !bad_slice.is_ok());
         CPP_LLM_CHECK(suite, bad_slice.message() == "slice range exceeds tensor shape");
         CPP_LLM_CHECK(suite, !tensor.try_slice(0, 1, 0, 1, nullptr).is_ok());
+
+        Tensor in_place = tensor;
+        const auto preserved_shape = in_place.shape();
+        const auto preserved_offset = in_place.offset();
+        CPP_LLM_CHECK(suite, !in_place.try_slice(0, 3, 0, 1, &in_place).is_ok());
+        CPP_LLM_CHECK(suite, in_place.shape() == preserved_shape);
+        CPP_LLM_CHECK(suite, in_place.offset() == preserved_offset);
+        CPP_LLM_CHECK(suite, in_place.at(1, 2) == 6.0F);
         expect_out_of_range(suite, [&] { tensor.at(2, 0); });
         expect_out_of_range(suite, [&] { tensor.at(0, 3); });
     });
