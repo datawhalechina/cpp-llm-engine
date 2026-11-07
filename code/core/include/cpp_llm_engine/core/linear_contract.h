@@ -1,7 +1,8 @@
-// Core：Linear backend 请求契约
-// 职责：固定 row-major weights[rows, cols] * input[cols] 的输入输出布局。
-// 契约：weight_format 标识 Float32、Q4K、Q6K 或 Q8_0，backend 写入 output。
-// 验证：Chapter 05 quantized backend 测试。
+// Core：线性层后端的公共请求格式
+// 输入按行主序排列，权重格式可以是 Float32、Q4_K、Q6_K 或 Q8_0。
+// weights、input 和 output 缓冲区不得重叠；具体后端负责计算。
+// 默认批处理实现逐行调用单样本接口。
+// 验证：code/core/tests/core_contract_test.cpp 与 Chapter05 量化测试。
 #pragma once
 
 #include "backend.h"
@@ -21,7 +22,7 @@ enum class WeightFormat : std::uint8_t {
     Q8_0,
 };
 
-// Row-major contract: weights[rows, cols] * input[cols] = output[rows].
+// 行主序：weights[rows, cols] * input[cols] = output[rows]。
 struct LinearRequest final {
     const void* weights = nullptr;
     std::size_t weight_bytes = 0;
@@ -34,8 +35,8 @@ struct LinearRequest final {
     WeightFormat weight_format = WeightFormat::Unknown;
 };
 
-// Row-major contract: input[batch, cols] * weights[rows, cols]^T
-//                   = output[batch, rows].
+// 行主序：input[batch, cols] * weights[rows, cols]^T
+//       = output[batch, rows]。
 struct LinearBatchRequest final {
     const void* weights = nullptr;
     std::size_t weight_bytes = 0;
@@ -54,7 +55,9 @@ public:
     ~LinearBackend() override = default;
     virtual Status compute(const LinearRequest& request) const = 0;
     virtual Status compute_batch(const LinearBatchRequest& request) const {
-        if (request.batch_size == 0 || request.cols == 0 || request.rows == 0 ||
+        if (request.weights == nullptr || request.input == nullptr ||
+            request.output == nullptr || request.batch_size == 0 ||
+            request.cols == 0 || request.rows == 0 ||
             request.batch_size > std::numeric_limits<std::size_t>::max() / request.cols ||
             request.batch_size > std::numeric_limits<std::size_t>::max() / request.rows ||
             request.input_size != request.batch_size * request.cols ||

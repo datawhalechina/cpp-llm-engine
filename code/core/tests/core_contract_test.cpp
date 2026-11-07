@@ -1,10 +1,12 @@
-// Core：公共契约测试
-// 职责：验证 Backend、Operator、Tensor、Decoder 元数据和错误状态的最小行为。
-// 通过条件：五组命名契约全部成立，失败时报告用例、表达式和源码位置。
-// 验证：由 Core CTest、默认回归和 Release 契约回归执行。
+// Core：公共接口的独立回归测试
+// 覆盖 Tensor 布局、量化字节数、Decoder 结构和默认批处理失败路径。
+// 失败时输出用例、表达式和源码位置。
+// 验证：Core CTest、默认回归和 Release 契约回归。
 #include "cpp_llm_engine/core/backend.h"
 #include "cpp_llm_engine/core/decoder_contract.h"
+#include "cpp_llm_engine/core/decoder_elementwise_contract.h"
 #include "cpp_llm_engine/core/gqa_attention_contract.h"
+#include "cpp_llm_engine/core/linear_contract.h"
 #include "cpp_llm_engine/core/operator.h"
 #include "cpp_llm_engine/core/quantization_contract.h"
 #include "cpp_llm_engine/core/rope_contract.h"
@@ -28,6 +30,27 @@ public:
 class MatmulOperator final : public cpp_llm_engine::core::Operator {
 public:
     std::string_view name() const override { return "matmul"; }
+};
+
+class CopyLinearBackend final : public cpp_llm_engine::core::LinearBackend {
+public:
+    cpp_llm_engine::core::BackendKind kind() const override {
+        return cpp_llm_engine::core::BackendKind::CPU;
+    }
+    std::string_view name() const override { return "copy-linear"; }
+
+    cpp_llm_engine::core::Status compute(
+        const cpp_llm_engine::core::LinearRequest& request) const override {
+        if (request.input == nullptr || request.output == nullptr ||
+            request.input_size != request.cols || request.output_size < request.rows ||
+            request.rows != request.cols) {
+            return cpp_llm_engine::core::Status::error("invalid copy Linear request");
+        }
+        for (std::size_t index = 0; index < request.rows; ++index) {
+            request.output[index] = request.input[index];
+        }
+        return cpp_llm_engine::core::Status::ok();
+    }
 };
 
 }  // namespace
@@ -144,7 +167,7 @@ int main() {
         invalid_heads.kv_head_count = 3;
         CPP_LLM_CHECK(suite, !invalid_heads.validate().is_ok());
         auto invalid_rope = decoder_layer;
-        invalid_rope.position_dimension = 65;
+        invalid_rope.position_dimension = 63;
         CPP_LLM_CHECK(suite, !invalid_rope.validate().is_ok());
 
         float rope_values[16]{};
@@ -173,6 +196,45 @@ int main() {
         auto invalid_gqa_scale = gqa_request;
         invalid_gqa_scale.scale = -1.0F;
         CPP_LLM_CHECK(suite, !invalid_gqa_scale.validate().is_ok());
+
+        float norm_input[4]{1.0F, 2.0F, 3.0F, 4.0F};
+        float norm_weight[4]{1.0F, 1.0F, 1.0F, 1.0F};
+        float elementwise_output[4]{};
+        const RmsNormRequest rms_norm{
+            norm_input, norm_weight, elementwise_output, 4, 1.0e-5F};
+        CPP_LLM_CHECK(suite, rms_norm.validate().is_ok());
+        auto invalid_epsilon = rms_norm;
+        invalid_epsilon.epsilon = 0.0F;
+        CPP_LLM_CHECK(suite, !invalid_epsilon.validate().is_ok());
+
+        const SwiGluRequest swiglu{
+            norm_input, norm_weight, elementwise_output, 4};
+        CPP_LLM_CHECK(suite, swiglu.validate().is_ok());
+        auto missing_gate = swiglu;
+        missing_gate.gate = nullptr;
+        CPP_LLM_CHECK(suite, !missing_gate.validate().is_ok());
+    });
+
+    suite.run("linear batch fallback validates before pointer arithmetic", [&] {
+        CopyLinearBackend backend;
+        float weights[4]{};
+        float input[4]{1.0F, 2.0F, 3.0F, 4.0F};
+        float output[4]{};
+        const LinearBatchRequest request{
+            weights, sizeof(weights), input, 4, output, 4, 2, 2, 2,
+            WeightFormat::Float32};
+        CPP_LLM_CHECK(suite, backend.compute_batch(request).is_ok());
+        CPP_LLM_CHECK(suite, output[0] == 1.0F && output[3] == 4.0F);
+
+        auto null_input = request;
+        null_input.input = nullptr;
+        CPP_LLM_CHECK(suite, !backend.compute_batch(null_input).is_ok());
+        auto null_output = request;
+        null_output.output = nullptr;
+        CPP_LLM_CHECK(suite, !backend.compute_batch(null_output).is_ok());
+        auto overflow = request;
+        overflow.batch_size = std::numeric_limits<std::size_t>::max();
+        CPP_LLM_CHECK(suite, !backend.compute_batch(overflow).is_ok());
     });
 
     suite.run("backend and operator identity", [&] {

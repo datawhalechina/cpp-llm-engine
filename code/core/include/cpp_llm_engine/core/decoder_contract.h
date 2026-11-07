@@ -1,6 +1,7 @@
-// Core：Decoder 结构与 token 执行公共契约。
-// 职责：区分单层数学结构和完整模型 prefill/decode，不规定 Tensor 或权重实现。
-// 验证：Core、Chapter04 与真实 TinyLlama Engine 测试共同检查结构和状态语义。
+// Core：Decoder 结构与 token 执行接口
+// 结构对象记录模型维度；执行上下文保存单个请求的 prefill/decode 状态。
+// Tensor、权重和具体数学实现由 Chapter04、CPU 模型或 CUDA 后端提供。
+// 验证：Core、Chapter04 与真实 TinyLlama Engine 测试。
 #pragma once
 
 #include "status.h"
@@ -53,8 +54,10 @@ struct DecoderLayerContract final {
             return Status::error("decoder query heads must be divisible by KV heads");
         }
         if (position_encoding == DecoderPositionEncodingKind::Rotary &&
-            (position_dimension == 0 || position_dimension > head_dimension)) {
-            return Status::error("decoder rotary dimension must fit inside one head");
+            (position_dimension == 0 || position_dimension > head_dimension ||
+             position_dimension % 2 != 0)) {
+            return Status::error(
+                "decoder rotary dimension must be even and fit inside one head");
         }
         return Status::ok();
     }
