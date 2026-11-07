@@ -11,7 +11,11 @@ run_and_check() {
     shift 2
 
     echo "[regression] ${name}"
-    bash -c "${command}" >"${tmp_dir}/${name}.log" 2>&1
+    if ! bash -c "${command}" >"${tmp_dir}/${name}.log" 2>&1; then
+        echo "[regression] ${name} failed" >&2
+        cat "${tmp_dir}/${name}.log" >&2
+        return 1
+    fi
     for expected in "$@"; do
         if ! grep -Fq "${expected}" "${tmp_dir}/${name}.log"; then
             echo "[regression] missing '${expected}' in ${name}" >&2

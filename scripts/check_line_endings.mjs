@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 
 const shellExtensions = new Set([".sh", ".bash"]);
@@ -22,8 +22,11 @@ function shellScriptsUnder(target) {
   return files;
 }
 
-const roots = process.argv.slice(2);
-const targets = (roots.length > 0 ? roots : defaultRoots)
+const requestedRoots = process.argv.slice(2);
+const roots = requestedRoots.length > 0
+  ? requestedRoots
+  : defaultRoots.filter(existsSync);
+const targets = roots
   .flatMap(shellScriptsUnder)
   .sort();
 const invalid = targets.filter((file) => readFileSync(file).includes(0x0d));
