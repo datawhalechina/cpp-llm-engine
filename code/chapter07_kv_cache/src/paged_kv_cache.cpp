@@ -262,20 +262,23 @@ bool CpuPagedKvCache::attention(
     std::vector<float>* output,
     std::string* error) const {
     const auto fail = [&](const char* message) {
-        if (output != nullptr) output->clear();
         if (error != nullptr) *error = message;
         return false;
     };
     if (output == nullptr) return fail("paged attention output must not be null");
     if (layer >= layer_count_) return fail("paged attention layer is out of range");
+    if (query_heads > std::numeric_limits<std::size_t>::max() / head_dim_) {
+        return fail("paged attention query shape overflows host size");
+    }
+    const std::size_t query_width = query_heads * head_dim_;
     if (query_heads == 0 || query_heads % kv_heads_ != 0 ||
-        query.size() != query_heads * head_dim_) {
+        query.size() != query_width) {
         return fail("paged attention query shape does not match GQA layout");
     }
     const std::size_t token_count = block_pool_.token_count(request_id);
     if (token_count == 0) return fail("paged attention requires committed K/V tokens");
 
-    output->assign(query_heads * head_dim_, 0.0f);
+    std::vector<float> result(query_width, 0.0f);
     const std::size_t queries_per_kv_head = query_heads / kv_heads_;
     const float scale = 1.0f / std::sqrt(static_cast<float>(head_dim_));
     std::vector<float> scores(token_count, 0.0f);
@@ -295,7 +298,7 @@ bool CpuPagedKvCache::attention(
         if (!std::isfinite(denominator) || denominator <= 0.0f) {
             return fail("paged attention softmax denominator is invalid");
         }
-        float* output_row = output->data() + query_head * head_dim_;
+        float* output_row = result.data() + query_head * head_dim_;
         for (std::size_t token = 0; token < token_count; ++token) {
             const float probability = scores[token] / denominator;
             const float* value = value_data(request_id, layer, token, kv_head);
@@ -304,6 +307,7 @@ bool CpuPagedKvCache::attention(
             }
         }
     }
+    *output = std::move(result);
     if (error != nullptr) error->clear();
     return true;
 }

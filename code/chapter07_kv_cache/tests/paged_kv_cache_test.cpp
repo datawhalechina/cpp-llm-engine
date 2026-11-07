@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -156,6 +157,32 @@ int main() {
         CPP_LLM_CHECK(suite, cache.commit_batch({{20, 1}, {21, 1}}, &error));
         CPP_LLM_CHECK(suite, cache.block_pool().token_count(20) == 1);
         CPP_LLM_CHECK(suite, cache.block_pool().token_count(21) == 1);
+    });
+
+    suite.run("attention failure preserves caller output", [&] {
+        CpuPagedKvCache cache(1, 2, 2, 1, 2);
+        constexpr std::size_t request_id = 30;
+        const float key[] = {1.0f, 0.0f};
+        const float value[] = {10.0f, 1.0f};
+        CPP_LLM_CHECK(suite, cache.reserve(request_id, 1));
+        write_all_layers(suite, cache, request_id, 0, key, value);
+        CPP_LLM_CHECK(suite, cache.commit_tokens(request_id, 1));
+
+        std::vector<float> output{42.0f};
+        std::string error;
+        const float nan = std::numeric_limits<float>::quiet_NaN();
+        CPP_LLM_CHECK(
+            suite, !cache.attention(request_id, 0, {nan, 0.0f}, 1, &output, &error));
+        CPP_LLM_CHECK(suite, error.find("denominator") != std::string::npos);
+        CPP_LLM_CHECK(suite, output == std::vector<float>{42.0f});
+
+        const std::size_t overflowing_heads =
+            std::numeric_limits<std::size_t>::max() / cache.head_dim() + 1;
+        CPP_LLM_CHECK(
+            suite,
+            !cache.attention(request_id, 0, {}, overflowing_heads, &output, &error));
+        CPP_LLM_CHECK(suite, error.find("overflows") != std::string::npos);
+        CPP_LLM_CHECK(suite, output == std::vector<float>{42.0f});
     });
 
     suite.run("release clears payload before reuse", [&] {
