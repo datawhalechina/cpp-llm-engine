@@ -24,13 +24,34 @@ npm run test:regression
 
 ## 选择学习路线
 
-| 目标 | 建议顺序 | 完成标志 |
+三条完整路线共享同一套模型、执行和服务契约：CPU 建立完整基线，GPU 替换算子和设备内存实现，多模态增加图片到视觉向量的输入链路。章节导读中的 A/B 表示章内学习递进，G/M 表示在稳定契约上接入横向扩展。
+
+### 章节中的路线标记
+
+A 通常先建立可观察的教学基线，B 再进入真实结构或系统闭环；G 和 M 不排在 B 之后成为必修步骤，而是按学习目标选做：
+
+```text
+A 教学基线 → B 真实主线
+                  ├→ G GPU 执行扩展
+                  └→ M 多模态输入扩展
+```
+
+| 标记 | 所属维度 | 含义 |
 | --- | --- | --- |
-| 完整 CPU 主线 | Foundation（按需）→ Chapter00 → Chapter01-10 | 默认回归通过，能解释从权重到服务的完整链路 |
-| 引擎执行核心 | Chapter00 → Chapter01-06 | 能连接 Tensor、Operator、Decoder、Runtime 和量化表示 |
-| Runtime 与服务 | Chapter06 → Chapter07-10 | 能运行分页缓存、调度、性能证据和服务闭环 |
-| GPU 扩展 | 先完成 CPU 执行核心 → `code/cuda` | CPU/CUDA 数值对照和设备测试通过 |
-| 多模态扩展 | 先完成 CPU Decoder → `code/multimodal` | 图像输入可以转换并接入已有 LLM Runtime |
+| A | 章内学习线 | 可观察的教学基线或第一阶段 |
+| B | 章内学习线 | 真实结构、进阶实现或系统闭环 |
+| G | 横向扩展线 | 在稳定契约上接入 GPU 执行 |
+| M | 横向扩展线 | 在稳定主线上接入多模态输入 |
+
+### 完整路线
+
+只学习引擎执行核心时可以先完成 Chapter00–06；关注缓存、调度和服务时再继续 Chapter07–10。
+
+| 路线 | 改变什么 | 复用什么 | 建议起点 | 完成标志 |
+| --- | --- | --- | --- | --- |
+| CPU 主线 | 从模型输入到推理服务建立完整实现 | 作为其他路线的数值与接口基线 | Foundation（按需）→ Chapter00 → Chapter01–10 | 默认回归通过，能解释从权重到服务的完整链路 |
+| GPU 扩展 | 将算子、工作区和 K/V 存储迁移到 CUDA 设备 | Decoder、请求、调度和服务语义 | 完成 Chapter00–06 后进入 [`code/cuda`](code/cuda/README.md) | CPU/CUDA 数值对照和真实设备测试通过 |
+| 多模态扩展 | 增加图片预处理、Vision Encoder 和 Projector | LLM Decoder、Runtime、K/V、调度和服务 | 完成 Chapter04–06 后进入 [`code/multimodal`](code/multimodal/README.md) | 图片形成统一 embedding 序列并进入现有 LLM Runtime |
 
 ## 章节与运行入口
 
@@ -57,10 +78,10 @@ npm run test:regression
 
 | 扩展 | 命令 | 当前范围 |
 | --- | --- | --- |
-| CUDA | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备资源、cuBLAS、量化 Linear、RoPE、连续 KV、GQA 和合成 Decoder |
+| CUDA | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | [CPU/GPU 架构](source/reference/cpu_gpu_architecture.md)：设备资源、cuBLAS、量化 Linear、RoPE、连续 KV、GQA 和合成 Decoder |
 | Engine 集成 | `bash code/engine/scripts/run.sh` | 章节组件到统一 Engine 的集成与测试 |
 | 真实 CPU 全链路验收 | `bash scripts/run_cpu_v1_acceptance.sh` | 兼容验收入口；要求本地 llama.cpp 和 TinyLlama GGUF |
-| 多模态 | `bash code/multimodal/scripts/run.sh` | SmolVLM CPU 输入、Vision、Projector 和 Decoder golden |
+| 多模态 | `bash code/multimodal/scripts/run.sh` | [多模态输入链路](source/reference/multimodal_inference.md)：SmolVLM CPU 输入、Vision、Projector 和 Decoder golden |
 
 真实 TinyLlama GPU Decoder 仍在建设，不应把当前合成 Decoder 测试描述成完整 GPU 端到端推理。
 

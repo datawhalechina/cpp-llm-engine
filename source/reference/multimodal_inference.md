@@ -4,6 +4,8 @@
 
 SmolVLM 500M 的 IDEFICS3 图片路径用于说明图片进入模型前发生的变化。可运行代码和验证命令位于 `code/multimodal`。
 
+多模态路线只扩展输入；CPU 与 GPU 如何在统一算子和 Decoder 契约下切换执行后端，见 [CPU 主线与 GPU 扩展架构](./cpu_gpu_architecture.md)。当前多模态闭环使用 CPU，后续 GPU 化不改变图片到统一 embedding 序列的交接点。
+
 ![IDEFICS3 动态切图与视觉输入链路](../assets/diagrams/idefics3-image-tiling.svg)
 
 ## 为什么选择 SmolVLM 和固定图片

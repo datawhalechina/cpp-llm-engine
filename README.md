@@ -8,7 +8,7 @@ _A Practical Tutorial for Building a C++ LLM Inference Engine_
 
 [![CPU and docs CI](https://github.com/datawhalechina/cpp-llm-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/datawhalechina/cpp-llm-engine/actions/workflows/ci.yml)
 
-这是一套中文优先、以 C++ 为实现主线的推理引擎工程教程。教程以 TinyLlama 作为默认语言模型基线，连接模型加载、张量、算子、解码器、生成运行时、缓存、调度和服务；每章通过测试、参考结果或性能实验验证实现，并与 llama.cpp、vLLM、SGLang 和 TensorRT-LLM 的工程策略对照。CPU 是完整学习主线，单卡 CUDA 和 SmolVLM 多模态输入作为可选扩展，最终目标是构建一个可 DIY 的单机推理服务框架。
+这是一套中文优先、以 C++ 为实现主线的推理引擎工程教程。教程以 TinyLlama 作为默认语言模型基线，连接模型加载、张量、算子、解码器、生成运行时、缓存、调度和服务；每章通过测试、参考结果或性能实验验证实现，并与 llama.cpp、vLLM、SGLang 和 TensorRT-LLM 的工程策略对照。CPU 建立完整推理服务主线，单卡 CUDA 在保持上层语义不变的前提下替换执行后端，SmolVLM 多模态在解码器前扩展视觉输入并复用后续运行时，最终目标是构建一个可 DIY 的单机推理服务框架。
 
 ![cpp-llm-engine 教程主图](source/assets/diagrams/tutorial-concept-map.svg)
 

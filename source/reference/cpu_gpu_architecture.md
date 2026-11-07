@@ -2,6 +2,8 @@
 
 教程先用 CPU 固定正确性和接口，再在同一套公共契约上接入 GPU。GPU 不是另一条 Runtime，而是替换 Backend、Kernel 和内存执行路径。
 
+多模态不是第三种计算后端：它在 Decoder 前增加图片、Vision Encoder 和 Projector，再把统一 embedding 序列交给现有 CPU 或 GPU 执行路径。图片怎样进入 Runtime 见[多模态推理输入链路](./multimodal_inference.md)。
+
 ![推理引擎 CPU 主线与 GPU 扩展架构](../assets/diagrams/inference-engine-cpu-gpu-architecture.svg)
 
 ## 读图顺序
