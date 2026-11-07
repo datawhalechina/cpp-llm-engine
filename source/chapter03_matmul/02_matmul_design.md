@@ -1,35 +1,56 @@
-# 03.2 矩阵乘法算子设计
+# 03.2 矩阵乘法请求怎样执行
 
-矩阵乘法的数学公式、内存位置和执行实现必须分开描述。`MatMulOp` 固定主机输入上的 `A[M,K] × B[K,N] = C[M,N]`；独立 CUDA 目标复用相同形状语义，但接收设备指针和 CUDA 流。
+两个矩阵能够相乘，需要满足 `lhs.cols == rhs.rows`。代码还要知道数据地址、行优先步长和输出位置，才能把数学公式变成一次安全的内存访问。
 
-## 输入输出与布局契约
+## 先固定输入和输出形状
 
-Chapter03 当前接受连续行优先 `Matrix`：
+本章使用连续行优先布局：
 
 ```text
-lhs [M,K] stride [K,1]
-rhs [K,N] stride [N,1]
-out [M,N] stride [N,1]
+左输入 [M,K]，步长 [K,1]
+右输入 [K,N]，步长 [N,1]
+输出   [M,N]，步长 [N,1]
 ```
 
-`try_compute(lhs, rhs, &output)` 检查对象是否有效、`lhs.cols == rhs.rows` 和输出元素数量，再创建公共 `MatmulRequest`。教学入口 `compute()` 复用同一逻辑，并在失败时抛出异常。
+二维视图中第 `row` 行、第 `col` 列的元素地址为：
 
-工程入口 <a href="../_code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> 接收两个只读 `TensorViewRef` 和一个可写 `MutableTensorViewRef`，依次检查存储范围、维数、Float32、CPU、连续行优先布局和输入输出形状。连续性由公共 `TensorContract` 判断，Chapter03 不再另写一套布局规则。验证通过后，适配器把存储基址加上偏移，生成指向视图首元素的 `MatmulRequest`。非连续切片或转置返回 `matmul requires contiguous row-major input`；调用者可先显式执行 Chapter02 的 `contiguous()`，再提交新的视图。
+```text
+storage[offset + row * stride[0] + col * stride[1]]
+```
 
-`try_compute_tensor_views_into()` 先在临时连续结果中计算，后端成功后才写入调用方的输出视图。这个提交步骤用于保证形状、存储或后端执行失败时已有输出保持不变。`try_compute_tensor_views()` 继续返回 `Matrix`，但它只是兼容教学入口，不再是跨章输出类型。
+连续行优先矩阵的步长是 `[cols,1]`，地址可以简化为 `offset + row * cols + col`。CPU 内核正是按这个公式读取元素，因此转置或跨步切片要先整理成连续副本。
 
-## 算子、计算后端与内核
+每个输出元素由左输入的一行和右输入的一列计算。`try_compute(lhs, rhs, &output)` 先检查矩阵对象和形状，再把地址与 `M、N、K` 写入 `MatmulRequest`；`compute()` 使用同一流程，在失败时抛出异常。
 
-<a href="../_code/chapter03_matmul/src/matmul_op.cpp"><code>matmul_op.cpp</code></a> 将计算拆成三层：
+## 从张量视图到输出写回
 
-| 层 | 决定什么 | 当前对象 |
+<a href="../_code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> 按下面的顺序处理 Chapter02 视图：
+
+| 步骤 | 代码检查或操作 | 目的 |
 | --- | --- | --- |
-| 算子 | 输入输出和数学语义 | `MatMulOp` |
-| 计算后端 | 当前主机请求使用哪个实现 | `CpuReferenceMatmulBackend` |
-| 内核/计算库 | 怎样完成循环或设备库调用 | CPU 三重循环；独立 CUDA 目标使用 `cublasSgemm` |
+| 1 | 检查存储范围、二维形状、Float32 和 CPU 设备 | 确认地址和元素解释有效 |
+| 2 | 检查连续行优先步长 | 让内核可以使用 `row * cols + col` 寻址 |
+| 3 | 基址加 offset，创建 `MatmulRequest` | 指向视图中的第一个参与计算元素 |
+| 4 | 在临时连续结果中运行 CPU Backend | 失败时保留调用者原来的输出 |
+| 5 | 计算成功后复制到 `MutableTensorViewRef` | 一次提交完整结果 |
 
-CPU 与 CUDA 都保持 `A × B` 的数学语义，但指针所在内存不同。行优先到 cuBLAS 列优先的转换、设备内存分配、CUDA 流和句柄生命周期位于 `code/cuda`，不能把 `Matrix::data` 的主机指针直接传给 cuBLAS。
+切片或转置产生的非连续视图会返回 `matmul requires contiguous row-major input`。调用 `contiguous()` 得到连续副本后，可以重新提交计算。
 
-## 验证与衔接
+## 一次调用经过哪些代码
 
-运行 `bash code/chapter03_matmul/scripts/run.sh`，确认合法矩阵、Chapter02 连续视图和显式物化结果都得到正确输出；形状不匹配、空引用、错误数据类型/设备、越界存储和未物化的非连续布局返回明确错误，并且不覆盖已有输出。[`CPU 参考实现`](./03_cpu_reference.md) 将建立可读的数值基线。
+| 位置 | 当前实现 | 阅读重点 |
+| --- | --- | --- |
+| 算子入口 | `MatMulOp` | 接收输入并创建请求 |
+| CPU Backend | `CpuReferenceMatmulBackend` | 检查请求并选择 CPU 内核 |
+| CPU 内核 | `cpu_kernel.cpp` | 用三重循环计算每个输出元素 |
+| GPU 选读 | `CublasMatmulBackend` | 用设备内存和 `cublasSgemm` 完成同一形状的计算 |
+
+CPU 和 CUDA 的输入地址位于不同设备。行优先数据交给 cuBLAS 时还要处理列优先解释，具体步骤放在 [`03.4`](./04_cublas_implement.md)。
+
+## 动手验证
+
+```bash
+bash code/chapter03_matmul/scripts/run.sh
+```
+
+测试覆盖合法矩阵、非零偏移视图、显式连续化，以及空引用、错误类型、越界、非连续布局和形状不匹配。所有输入检查通过后，再进入 [`03.3`](./03_cpu_reference.md) 阅读实际计算循环。

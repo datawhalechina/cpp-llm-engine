@@ -1,35 +1,34 @@
-# 03.7 从矩阵乘法到真实推理后端
+# 03.7 在成熟框架中寻找矩阵乘法路径
 
-本章用“算子 → 计算后端 → 内核”分开计算语义和执行方式。成熟框架仍保留这三类职责，但会加入设备选择、算子融合、工作区和多精度内核。
+Chapter03 的调用路径已经可以顺着源码追踪：输入视图生成请求，Backend 选择实现，CPU 循环或 cuBLAS 完成计算。阅读成熟框架时也沿着这条路径查找，不必先理解整个项目。
 
 ![算子、计算后端与内核分层](../assets/diagrams/chapter03-operator-backend-kernel.svg)
 
 ## 对象映射
 
-| 教程对象 | 成熟框架中的对应物 | 阅读重点 |
+| 要找的对象 | 教程入口 | 阅读问题 |
 | --- | --- | --- |
-| `MatMulOp` | 线性层、QKV 投影、FFN 的算子语义 | 输入布局、形状和输出是否稳定 |
-| `MatmulBackend` | ggml 后端、TensorRT-LLM 运行时/内核分派 | 谁选择 CPU、GPU 或高性能库 |
-| CPU 参考内核 | 标量参考实现 | 优化路径用什么结果做数值基线 |
-| `code/cuda` cuBLAS 后端 | GEMM 计算库、策略或插件 | 库调用前后怎样处理布局、CUDA 流和工作区 |
-| PyTorch 对照 | 后端正确性测试 | 替换后端后允许多大误差 |
+| 输入和输出形状 | `MatmulRequest` | `M、N、K` 从哪里产生 |
+| CPU 实现选择 | `CpuReferenceMatmulBackend` | 请求在哪里交给 CPU 内核 |
+| 实际循环 | `cpu_kernel.cpp` | 行、列和累加维怎样映射到地址 |
+| CUDA 库调用 | `CublasMatmulBackend` | 行优先数据怎样映射到 SGEMM 参数 |
+| 正确性基线 | Chapter03 CPU 测试 | 替换实现后与什么结果比较 |
 
 ## 教学实现与生产实现
 
-| 本章可验证对象 | 成熟系统继续增加 | 后续入口 |
+| 生产项目入口 | 先寻找什么 | 与本章对照什么 |
 | --- | --- | --- |
-| 行优先矩阵乘法契约 | 转置、批量 GEMM、动态布局 | 扩展算子契约 |
-| CPU 标量参考实现、独立 cuBLAS 后端 | SIMD、批量 GEMM 和自定义融合内核 | CPU/GPU 计算后端 |
-| 后端注入与可观察名称 | 策略搜索、工作区规划器 | 性能优化阶段 |
-| 形状、缓冲区、数值回归与显式 CUDA 流 | 多流重叠、跨设备执行 | GPU 执行主线 |
+| [llama.cpp CPU Backend](../reference/ecosystem/llama_cpp.md) | 图算子如何分派到 CPU 矩阵乘法或点积内核 | `MatMulOp → CpuReferenceMatmulBackend → kernel` |
+| [llama.cpp CUDA Backend](../reference/ecosystem/llama_cpp.md) | 同一个图算子如何选择 CUDA Kernel 或计算库 | G 路线的设备指针、Stream 和结果对照 |
+| [TensorRT-LLM Runtime 与 Kernel](../reference/ecosystem/tensorrt_llm.md) | Buffer、执行上下文、GEMM 与 Workspace 怎样连接 | 请求、Backend 和设备资源的分工 |
 
 ## 继续阅读源码
 
-1. 模型代码在哪里停止描述语义，计算后端从哪里开始选择实现？
-2. 布局转换发生在算子、计算后端还是内核内部，成本是否可见？
-3. 融合内核上线后，哪条参考实现路径继续承担正确性基线？
+打开项目卡中的官方源码入口，按下面的顺序记录：
 
-| 项目卡 | 在本章中的用途 |
-| --- | --- |
-| [llama.cpp](../reference/ecosystem/llama_cpp.md) | ggml 算子、CPU/CUDA 后端和量化内核 |
-| [TensorRT-LLM](../reference/ecosystem/tensorrt_llm.md) | GPU 运行时、内核和执行器分层 |
+1. 输入布局和矩阵形状由哪个对象决定；
+2. CPU 与 GPU 在哪个位置分派；
+3. 临时 Workspace、Stream 和设备 Buffer 由谁持有；
+4. 优化实现使用哪一份 CPU 或独立结果做回归。
+
+能够回答这四个问题，就已经把 Chapter03 的小型调用路径映射到了成熟框架，不需要先通读整个仓库。

@@ -1,12 +1,10 @@
 # 03.4 接入 cuBLAS 计算后端
 
-本节用已验证的 `cublasSgemm` 计算后端说明行优先与列优先布局的适配。CPU 参考实现和 CUDA 后端复用 `MatmulRequest` 的形状与数学语义；CUDA 请求中的三个指针必须指向设备内存，并与显式 CUDA 流一起通过独立 GPU 目标执行。
-
-项目的矩阵乘法语义不随计算后端改变。实现和测试入口分别位于 <a href="../_code/cuda/src/cublas_matmul_backend.cpp"><code>cublas_matmul_backend.cpp</code></a> 与 <a href="../_code/cuda/tests/cuda_cublas_matmul_test.cu"><code>cuda_cublas_matmul_test.cu</code></a>。
+CPU 内核按行优先读取矩阵，cuBLAS 默认按列优先解释内存。本节跟踪 `CublasMatmulBackend` 怎样交换输入矩阵和维度参数，在不复制数据的情况下得到相同输出。实现和测试分别位于 <a href="../_code/cuda/src/cublas_matmul_backend.cpp"><code>cublas_matmul_backend.cpp</code></a> 与 <a href="../_code/cuda/tests/cuda_cublas_matmul_test.cu"><code>cuda_cublas_matmul_test.cu</code></a>。
 
 ## 行优先布局映射
 
-核心层固定的数学语义是：
+需要计算的矩阵乘法是：
 
 ```text
 C[M,N] = A[M,K] * B[K,N]
@@ -26,13 +24,13 @@ C^T[N,M] = B^T[N,K] * A^T[K,M]
 | `m/n/k` | `N / M / K` | 输出按 `C^T[N,M]` 计算 |
 | `lda/ldb/ldc` | `N / K / N` | 对应三个列优先矩阵的行数 |
 
-## 资源与错误边界
+## Stream、Handle 与错误状态
 
-`CublasMatmulBackend` 独占只能移动的 `cublasHandle_t`，不使用进程全局句柄。每次 `compute()` 显式接收 `CudaStream` 并调用 `cublasSetStream`，因此句柄与执行上下文可以在下一阶段一起管理。
+`CublasMatmulBackend` 持有一个可以移动的 `cublasHandle_t`。每次 `compute()` 接收 `CudaStream` 并调用 `cublasSetStream`，本次 SGEMM 因而进入指定 Stream。
 
 `CublasStatus` 保留原始 `cublasStatus_t`、操作名和可读错误，并能转换为核心层的 `Status`。计算后端在调用库函数前拒绝空句柄、无效 CUDA 流、空指针、零维和超出 cuBLAS `int` 范围的维度。
 
-## 验证与衔接
+## 运行 GPU 对照
 
 从仓库根目录运行：
 

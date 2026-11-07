@@ -1,10 +1,10 @@
-# 03.5 用 PyTorch 独立复算
+# 03.5 用 PyTorch 复算同一组矩阵
 
-独立数值参考可以帮助判断错误来自数学定义还是计算后端映射。PyTorch 适合生成小矩阵基准结果，但不进入本教程默认 CMake 和 CTest 依赖。
+手算可以检查很小的例子，PyTorch 则提供另一份现成实现。把同一组输入交给 C++ 和 PyTorch，可以先确认期望结果，再排查 CPU 循环或 CUDA 参数。
 
-## 用固定输入复算结果
+## 复算固定输入
 
-下面的输入与 Chapter03 C++ 测试一致，可以直接复算 `58/64/139/154`：
+下面的输入与 Chapter03 C++ 示例一致：
 
 ```python
 import torch
@@ -18,14 +18,21 @@ torch.testing.assert_close(actual, expected)
 print(actual)
 ```
 
-这段代码是学习时可选的独立复算，不属于默认回归。需要把对照扩展成固定测试数据时，再记录输入、输出、数据类型和误差容限；C++ 测试只读取结果，不在默认回归中现场安装或调用 PyTorch。
+输出应为：
 
-## 当前仓库怎样完成对照
+```text
+tensor([[ 58.,  64.],
+        [139., 154.]])
+```
 
-当前 Chapter03 CTest 使用固定小矩阵和手算结果验证 CPU 参考实现；CUDA 的 cuBLAS 测试使用相同形状的 CPU 三重循环生成基准结果。仓库尚未提交独立 PyTorch 测试数据，因此不能把 PyTorch 对照写成已执行的默认测试。
+PyTorch 是选做工具，CPU 主线不要求安装它。默认 CTest 已把同一组输入和期望结果写入 C++ 测试。
 
-判断顺序是：CPU 参考实现先通过固定结果，其他计算后端再与 CPU 基准结果比较。两者都偏离独立测试数据时，才回到数学定义、输入布局或测试数据本身排查。
+## 根据差异定位问题
 
-## 验证与衔接
+| 对照结果 | 优先检查 |
+| --- | --- |
+| PyTorch 正确，CPU 结果错误 | 三重循环索引、`M/N/K` 和行优先地址 |
+| CPU 正确，cuBLAS 结果错误 | A/B 交换、`m/n/k`、leading dimension 和设备指针 |
+| 三者结果一致 | 当前形状的数学计算和布局映射成立 |
 
-运行 `bash code/chapter03_matmul/scripts/run.sh` 验证 CPU 结果；具备 CUDA 环境时运行 `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` 验证 cuBLAS 与 CPU 基准结果。需要增加 PyTorch 测试数据时，应固定随机种子、形状、数据类型和容差，并保持默认 CTest 不依赖 Python 环境。
+先运行 `bash code/chapter03_matmul/scripts/run.sh` 检查 CPU；有 NVIDIA GPU 时，再运行 `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh`。CPU 与 CUDA 测试通过后，继续阅读 [`03.6`](./06_complexity_intuition.md)，比较相同算法工作量下的实际执行成本。
