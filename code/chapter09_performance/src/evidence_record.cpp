@@ -43,11 +43,28 @@ bool prompt_shape_valid(const WorkloadDefinition& workload) {
 }
 
 std::string escape_json(const std::string& value) {
+    constexpr char hex[] = "0123456789abcdef";
     std::string escaped;
     escaped.reserve(value.size());
-    for (char character : value) {
-        if (character == '"' || character == '\\') escaped.push_back('\\');
-        escaped.push_back(character);
+    for (const unsigned char character : value) {
+        switch (character) {
+            case '"': escaped += "\\\""; break;
+            case '\\': escaped += "\\\\"; break;
+            case '\b': escaped += "\\b"; break;
+            case '\f': escaped += "\\f"; break;
+            case '\n': escaped += "\\n"; break;
+            case '\r': escaped += "\\r"; break;
+            case '\t': escaped += "\\t"; break;
+            default:
+                if (character < 0x20) {
+                    escaped += "\\u00";
+                    escaped.push_back(hex[character >> 4]);
+                    escaped.push_back(hex[character & 0x0f]);
+                } else {
+                    escaped.push_back(static_cast<char>(character));
+                }
+                break;
+        }
     }
     return escaped;
 }

@@ -61,5 +61,12 @@ int main() {
                                  std::string::npos);
     });
 
+    suite.run("json escapes identity control characters", [&] {
+        auto record = chapter09_performance::testing::sample_record("EXP-ESCAPE");
+        record.experiment_id = std::string("EXP\n\"\\") + static_cast<char>(1);
+        const std::string json = chapter09_performance::render_evidence_json(record);
+        CPP_LLM_CHECK(suite, json.find("EXP\\n\\\"\\\\\\u0001") != std::string::npos);
+    });
+
     return suite.finish();
 }

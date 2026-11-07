@@ -4,8 +4,6 @@
 #include "chapter09_performance/statistics.h"
 
 #include <algorithm>
-#include <numeric>
-
 namespace chapter09_performance {
 
 SampleStatistics summarize(const std::vector<double>& samples) {
@@ -17,11 +15,12 @@ SampleStatistics summarize(const std::vector<double>& samples) {
     result.count = ordered.size();
     result.minimum = ordered.front();
     result.maximum = ordered.back();
-    result.mean = std::accumulate(ordered.begin(), ordered.end(), 0.0) /
-                  static_cast<double>(ordered.size());
+    long double sum = 0.0L;
+    for (const double sample : ordered) sum += static_cast<long double>(sample);
+    result.mean = static_cast<double>(sum / static_cast<long double>(ordered.size()));
     const std::size_t middle = ordered.size() / 2;
     result.median = ordered.size() % 2 == 0
-                        ? (ordered[middle - 1] + ordered[middle]) / 2.0
+                        ? ordered[middle - 1] / 2.0 + ordered[middle] / 2.0
                         : ordered[middle];
     return result;
 }

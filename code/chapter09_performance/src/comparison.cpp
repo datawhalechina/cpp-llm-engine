@@ -4,13 +4,27 @@
 #include "chapter09_performance/comparison.h"
 
 #include <cmath>
+#include <limits>
 
 namespace chapter09_performance {
 
 namespace {
 
 double delta_percent(double baseline, double experiment) {
-    return baseline > 0.0 ? (experiment - baseline) * 100.0 / baseline : 0.0;
+    if (baseline > 0.0) return (experiment - baseline) * 100.0 / baseline;
+    return experiment > 0.0 ? std::numeric_limits<double>::infinity() : 0.0;
+}
+
+bool valid_policy(const ComparisonPolicy& policy) {
+    const double thresholds[] = {
+        policy.max_latency_regression_percent,
+        policy.max_throughput_regression_percent,
+        policy.max_memory_regression_percent,
+    };
+    for (const double threshold : thresholds) {
+        if (!std::isfinite(threshold) || threshold < 0.0) return false;
+    }
+    return true;
 }
 
 bool same_environment(const EnvironmentIdentity& left, const EnvironmentIdentity& right) {
@@ -36,6 +50,10 @@ ComparisonResult compare(const EvidenceRecord& baseline,
                          ComparisonPolicy policy) {
     ComparisonResult result;
     std::string error;
+    if (!valid_policy(policy)) {
+        result.reason = "comparison policy thresholds must be finite and non-negative";
+        return result;
+    }
     if (!baseline.valid(&error)) {
         result.reason = "invalid baseline: " + error;
         return result;

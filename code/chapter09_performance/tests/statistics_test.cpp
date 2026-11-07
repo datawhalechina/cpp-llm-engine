@@ -6,6 +6,7 @@
 #include "cpp_llm_engine/testing/test.h"
 
 #include <cmath>
+#include <limits>
 
 int main() {
     cpp_llm_engine::testing::TestSuite suite("chapter09_statistics");
@@ -28,6 +29,15 @@ int main() {
     suite.run("even samples average middle values", [&] {
         const auto result = chapter09_performance::summarize({8.0, 2.0, 4.0, 6.0});
         CPP_LLM_CHECK(suite, std::abs(result.median - 5.0) < 1e-9);
+    });
+
+    suite.run("large samples do not overflow mean or median", [&] {
+        const double maximum = std::numeric_limits<double>::max();
+        const auto result = chapter09_performance::summarize({maximum, maximum});
+        CPP_LLM_CHECK(suite, std::isfinite(result.mean));
+        CPP_LLM_CHECK(suite, std::isfinite(result.median));
+        CPP_LLM_CHECK(suite, result.mean == maximum);
+        CPP_LLM_CHECK(suite, result.median == maximum);
     });
 
     return suite.finish();

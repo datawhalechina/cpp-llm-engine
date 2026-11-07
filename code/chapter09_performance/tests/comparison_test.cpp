@@ -6,6 +6,9 @@
 #include "cpp_llm_engine/testing/test.h"
 #include "support/sample_records.h"
 
+#include <cmath>
+#include <limits>
+
 int main() {
     using chapter09_performance::Decision;
     cpp_llm_engine::testing::TestSuite suite("chapter09_comparison");
@@ -95,6 +98,36 @@ int main() {
         experiment.correctness_pass = false;
         const auto result = chapter09_performance::compare(baseline, experiment);
         CPP_LLM_CHECK(suite, result.decision == Decision::invalid);
+    });
+
+    suite.run("memory growth from a zero baseline is rejected", [&] {
+        auto baseline = chapter09_performance::testing::sample_record("EXP-ZERO-MEMORY");
+        auto experiment = chapter09_performance::testing::sample_record("EXP-MEMORY");
+        for (auto& sample : baseline.samples) sample.peak_memory_mb = 0.0;
+        for (auto& sample : experiment.samples) {
+            sample.total_ms *= 0.9;
+            sample.tokens_per_second *= 1.1;
+        }
+        const auto result = chapter09_performance::compare(baseline, experiment);
+        CPP_LLM_CHECK(suite, result.decision == Decision::reject);
+        CPP_LLM_CHECK(suite, std::isinf(result.memory_delta_percent));
+    });
+
+    suite.run("invalid comparison policy is rejected", [&] {
+        const auto baseline = chapter09_performance::testing::sample_record("EXP-A");
+        const auto experiment = chapter09_performance::testing::sample_record("EXP-B");
+        chapter09_performance::ComparisonPolicy policy;
+        policy.max_latency_regression_percent = -1.0;
+        CPP_LLM_CHECK(
+            suite,
+            chapter09_performance::compare(baseline, experiment, policy).decision ==
+                Decision::invalid);
+        policy.max_latency_regression_percent =
+            std::numeric_limits<double>::quiet_NaN();
+        CPP_LLM_CHECK(
+            suite,
+            chapter09_performance::compare(baseline, experiment, policy).decision ==
+                Decision::invalid);
     });
 
     return suite.finish();
