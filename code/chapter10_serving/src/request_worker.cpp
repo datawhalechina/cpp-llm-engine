@@ -11,6 +11,7 @@
 #include <atomic>
 #include <stdexcept>
 #include <thread>
+#include <unordered_set>
 
 namespace chapter10_serving {
 
@@ -21,9 +22,18 @@ std::vector<WorkerResult> RequestWorkerPool::run(
     if (worker_count == 0) {
         throw std::invalid_argument("request worker count must be positive");
     }
+    std::unordered_set<std::size_t> request_ids;
+    std::unordered_set<const chapter06_generation::Request*> request_objects;
+    std::unordered_set<const chapter06_generation::RequestModelExecutor*> executors;
     for (const WorkerRequest& item : requests) {
         if (item.request == nullptr || item.sampler == nullptr || item.executor == nullptr) {
             throw std::invalid_argument("request worker requires request, sampler and executor");
+        }
+        if (!request_ids.insert(item.request_id).second ||
+            !request_objects.insert(item.request).second ||
+            !executors.insert(item.executor.get()).second) {
+            throw std::invalid_argument(
+                "request workers require unique IDs, requests and executors");
         }
     }
 

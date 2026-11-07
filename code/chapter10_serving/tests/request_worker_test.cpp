@@ -4,6 +4,7 @@
 #include "chapter06_generation/request.h"
 #include "chapter06_generation/runtime.h"
 #include "chapter06_generation/sampler.h"
+#include "chapter10_serving/request_worker.h"
 #include "chapter10_serving/service_core.h"
 #include "cpp_llm_engine/testing/test.h"
 
@@ -89,6 +90,35 @@ int main() {
         CPP_LLM_CHECK(suite, request_a.generated() == TokenSequence({3}));
         CPP_LLM_CHECK(suite, request_b.generated() == TokenSequence({4}));
         CPP_LLM_CHECK_EQ(suite, service.release_terminal(), 2U);
+    });
+
+    suite.run("workers reject shared mutable request state", [&] {
+        GenerationConfig config;
+        Runtime runtime(config);
+        GreedySampler sampler;
+        Request request({1});
+        auto gate = std::make_shared<ParallelGate>();
+        auto executor = std::make_shared<CoordinatedExecutor>(gate, 3);
+        const chapter10_serving::RequestWorkerPool workers;
+        CPP_LLM_CHECK_THROWS(
+            suite,
+            std::invalid_argument,
+            workers.run(
+                runtime,
+                {{40, &request, &sampler, executor},
+                 {41, &request, &sampler,
+                  std::make_shared<CoordinatedExecutor>(gate, 4)}},
+                2));
+
+        Request second({2});
+        CPP_LLM_CHECK_THROWS(
+            suite,
+            std::invalid_argument,
+            workers.run(
+                runtime,
+                {{42, &request, &sampler, executor},
+                 {43, &second, &sampler, executor}},
+                2));
     });
 
     return suite.finish();

@@ -11,10 +11,11 @@
 #include "cpp_llm_engine/testing/test.h"
 
 #include <string>
+#include <stdexcept>
 
 namespace {
 
-class RecordingWriter final : public chapter10_serving::ResponseWriter {
+class RecordingWriter : public chapter10_serving::ResponseWriter {
 public:
     bool write_headers(const chapter10_serving::ResponseHead& value) override {
         head = value;
@@ -37,6 +38,13 @@ public:
     bool blocked = false;
     bool headers_written = false;
     bool finished = false;
+};
+
+class ThrowingWriter final : public RecordingWriter {
+public:
+    chapter10_serving::WriteResult write_event(std::string_view) override {
+        throw std::runtime_error("writer failure");
+    }
 };
 
 }  // namespace
@@ -144,6 +152,16 @@ int main() {
             suite,
             adapter.handle({"GET", "/missing", {}}).status_code,
             404);
+    });
+
+    suite.run("writer exception fails and releases the request", [&] {
+        ThrowingWriter writer;
+        const auto response = adapter.handle_stream({
+            "POST", "/v1/completions",
+            "{\"request_id\":7,\"prompt_tokens\":[7]}"}, writer);
+        CPP_LLM_CHECK_EQ(suite, response.status_code, 500);
+        CPP_LLM_CHECK(suite, writer.finished);
+        CPP_LLM_CHECK_EQ(suite, service.inflight_size(), 0U);
     });
 
     return suite.finish();

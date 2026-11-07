@@ -144,21 +144,27 @@ HttpResponse HttpAdapter::handle_completion(const HttpRequest& request) {
     requests_.emplace(request_id, std::move(owned_request));
     if (!request.client_connected) service_.cancel(request_id);
 
-    while (!request_ptr->terminal()) {
-        const DispatchStats stats = service_.dispatch_step(
-            runtime_, 1024,
-            [&](std::size_t callback_id, chapter06_generation::TokenId, std::size_t) {
-                if (callback_id != request_id) return;
-                if (request.disconnect_after_tokens > 0 &&
-                    request_ptr->generated_size() >= request.disconnect_after_tokens) {
-                    service_.cancel(request_id);
-                } else if (request.timeout_after_tokens > 0 &&
-                           request_ptr->generated_size() >= request.timeout_after_tokens) {
-                    service_.timeout(request_id);
-                }
-            });
-        if (stats.scheduled_requests == 0 && !request_ptr->terminal()) {
-            request_ptr->mark_failed("service dispatch made no progress");
+    try {
+        while (!request_ptr->terminal()) {
+            const DispatchStats stats = service_.dispatch_step(
+                runtime_, 1024,
+                [&](std::size_t callback_id, chapter06_generation::TokenId, std::size_t) {
+                    if (callback_id != request_id) return;
+                    if (request.disconnect_after_tokens > 0 &&
+                        request_ptr->generated_size() >= request.disconnect_after_tokens) {
+                        service_.cancel(request_id);
+                    } else if (request.timeout_after_tokens > 0 &&
+                               request_ptr->generated_size() >= request.timeout_after_tokens) {
+                        service_.timeout(request_id);
+                    }
+                });
+            if (stats.scheduled_requests == 0 && !request_ptr->terminal()) {
+                request_ptr->mark_failed("service dispatch made no progress");
+            }
+        }
+    } catch (...) {
+        if (!request_ptr->terminal()) {
+            request_ptr->mark_failed("service dispatch threw an exception");
         }
     }
 
@@ -210,38 +216,65 @@ HttpResponse HttpAdapter::handle_stream(
     chapter06_generation::Request* request_ptr = owned_request.get();
     requests_.emplace(request_id, std::move(owned_request));
     WriteResult write_result = WriteResult::ok;
-    if (!request.client_connected) {
-        write_result = WriteResult::client_closed;
-        service_.cancel(request_id);
-    } else if (!writer.write_headers({200, "text/event-stream"})) {
-        write_result = writer.client_connected()
-                           ? WriteResult::backpressure
-                           : WriteResult::client_closed;
-        service_.cancel(request_id);
-    }
+    bool adapter_exception = false;
+    try {
+        if (!request.client_connected) {
+            write_result = WriteResult::client_closed;
+            service_.cancel(request_id);
+        } else if (!writer.write_headers({200, "text/event-stream"})) {
+            write_result = writer.client_connected()
+                               ? WriteResult::backpressure
+                               : WriteResult::client_closed;
+            service_.cancel(request_id);
+        }
 
-    while (!request_ptr->terminal()) {
-        const DispatchStats stats = service_.dispatch_step(
-            runtime_, 1024,
-            [&](std::size_t callback_id,
-                chapter06_generation::TokenId token,
-                std::size_t step) {
-                if (callback_id != request_id || write_result != WriteResult::ok) return;
-                std::ostringstream event;
-                event << "data: {\"token\":" << token << ",\"step\":" << step << "}\n\n";
-                write_result = writer.write_event(event.str());
-                if (write_result != WriteResult::ok) {
-                    service_.cancel(request_id);
-                } else if (request.disconnect_after_tokens > 0 &&
-                           request_ptr->generated_size() >= request.disconnect_after_tokens) {
-                    service_.cancel(request_id);
-                } else if (request.timeout_after_tokens > 0 &&
-                           request_ptr->generated_size() >= request.timeout_after_tokens) {
-                    service_.timeout(request_id);
-                }
-            });
-        if (stats.scheduled_requests == 0 && !request_ptr->terminal()) {
-            request_ptr->mark_failed("service stream dispatch made no progress");
+        while (!request_ptr->terminal()) {
+            const DispatchStats stats = service_.dispatch_step(
+                runtime_, 1024,
+                [&](std::size_t callback_id,
+                    chapter06_generation::TokenId token,
+                    std::size_t step) {
+                    if (callback_id != request_id || write_result != WriteResult::ok) return;
+                    std::ostringstream event;
+                    event << "data: {\"token\":" << token << ",\"step\":" << step
+                          << "}\n\n";
+                    write_result = writer.write_event(event.str());
+                    if (write_result != WriteResult::ok) {
+                        service_.cancel(request_id);
+                    } else if (request.disconnect_after_tokens > 0 &&
+                               request_ptr->generated_size() >=
+                                   request.disconnect_after_tokens) {
+                        service_.cancel(request_id);
+                    } else if (request.timeout_after_tokens > 0 &&
+                               request_ptr->generated_size() >=
+                                   request.timeout_after_tokens) {
+                        service_.timeout(request_id);
+                    }
+                });
+            if (stats.scheduled_requests == 0 && !request_ptr->terminal()) {
+                request_ptr->mark_failed("service stream dispatch made no progress");
+            }
+        }
+
+        if (write_result == WriteResult::ok && writer.client_connected()) {
+            const char* finish_event = request_ptr->timed_out()
+                ? "data: {\"finish_reason\":\"timeout\"}\n\n"
+                : request_ptr->cancelled()
+                    ? "data: {\"finish_reason\":\"client_disconnect\"}\n\n"
+                    : request_ptr->finished()
+                        ? "data: {\"finish_reason\":\"stop\"}\n\n"
+                        : "data: {\"finish_reason\":\"runtime_error\"}\n\n";
+            write_result = writer.write_event(finish_event);
+        }
+        writer.finish();
+    } catch (...) {
+        adapter_exception = true;
+        if (!request_ptr->terminal()) {
+            request_ptr->mark_failed("service response writer threw an exception");
+        }
+        try {
+            writer.finish();
+        } catch (...) {
         }
     }
 
@@ -249,23 +282,12 @@ HttpResponse HttpAdapter::handle_stream(
     const bool cancelled = request_ptr->cancelled();
     const bool timed_out = request_ptr->timed_out();
     int status = 200;
-    if (write_result == WriteResult::backpressure) status = 503;
+    if (adapter_exception) status = 500;
+    else if (write_result == WriteResult::backpressure) status = 503;
     else if (write_result == WriteResult::client_closed || cancelled) status = 499;
     else if (timed_out) status = 408;
     else if (!finished) status = 500;
 
-    if (write_result == WriteResult::ok && writer.client_connected()) {
-        if (timed_out) {
-            writer.write_event("data: {\"finish_reason\":\"timeout\"}\n\n");
-        } else if (cancelled) {
-            writer.write_event("data: {\"finish_reason\":\"client_disconnect\"}\n\n");
-        } else if (finished) {
-            writer.write_event("data: {\"finish_reason\":\"stop\"}\n\n");
-        } else {
-            writer.write_event("data: {\"finish_reason\":\"runtime_error\"}\n\n");
-        }
-    }
-    writer.finish();
     service_.release_terminal();
     requests_.erase(request_id);
     return {status, "text/event-stream", {}};
