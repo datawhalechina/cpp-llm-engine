@@ -2,12 +2,17 @@
 
 ## 本章导读
 
-Chapter 02 已经能导出只读输入视图和可写输出视图；本章将连续 CPU Float32 视图适配为矩阵乘法（MatMul）请求。CPU 参考实现先给出正确结果，可选 CUDA 目标再用相同数学语义验证设备内存上的 cuBLAS 执行。Chapter 04 会沿用矩阵乘法的形状与布局语义组装线性层、注意力和前馈网络。
+Chapter 02 已经能导出只读输入视图和可写输出视图；本章将连续 CPU Float32 视图适配为矩阵乘法（MatMul）请求。CPU 参考实现先给出正确结果，可选 CUDA 目标再用相同数学语义验证设备内存上的 cuBLAS 执行。多模态的 Vision Linear 和 Projector 也复用同一算子语义，具体权重和形状由多模态输入链路负责。Chapter 04 会沿用矩阵乘法的形状与布局语义组装线性层、注意力和前馈网络。
 
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
 | A 教学闭环 | 用固定小矩阵和 CPU 三重循环理解 `A[M,K] × B[K,N]` | `58/64/139/154` 固定结果与失败状态 |
-| B 真实执行闭环 | 将 Chapter02 张量视图适配到 CPU 矩阵乘法，并用独立 CUDA 目标对照同一数学语义 | 跨章矩阵乘法、主机/设备执行契约和可选 cuBLAS 对照 |
+| B 真实执行闭环 | 将 Chapter02 张量视图适配到稳定的矩阵乘法请求，并交给 CPU Backend 执行 | 跨章输入输出、连续性、失败传播和结果提交契约 |
+
+| 扩展线 | 本章交接点 | 当前验证 |
+| --- | --- | --- |
+| G GPU 执行扩展 | 使用相同 MatMul 形状语义，把主机存储替换为设备内存和 cuBLAS | `cpp_llm_engine_cuda_cublas_matmul_test` 与 CPU reference 对照 |
+| M 多模态输入扩展 | Vision Encoder 和 Projector 复用 Linear/MatMul 语义，不改变本章算子接口 | `code/multimodal` 的 Vision 与 Projector 测试负责真实形状验证 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
@@ -32,8 +37,9 @@ bash code/chapter03_matmul/scripts/run.sh
 | --- | --- | --- | --- | --- |
 | 1 | A/B 公共 | [`03.1 算子基类`](./01_operator_base.md)、[`03.2 矩阵乘法算子设计`](./02_matmul_design.md) | <a href="../_code/chapter03_matmul/src/matmul_op.cpp"><code>matmul_op.cpp</code></a> | 算子接口固定输入、输出、形状和布局 |
 | 2 | A | [`03.3 参考实现（CPU）`](./03_cpu_reference.md)、[`03.6 建立复杂度直觉`](./06_complexity_intuition.md) | <a href="../_code/chapter03_matmul/src/cpu_backend.cpp"><code>cpu_backend.cpp</code></a> | 三重循环产生可复查数值和 `O(MNK)` 成本 |
-| 3 | B | [`03.4 接入 cuBLAS 计算后端`](./04_cublas_implement.md)、[`03.7 真实推理后端`](./07_runtime_backend_bridge.md) | <a href="../_code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> | 区分 CPU 主机视图与 CUDA 设备指针的执行入口 |
-| 4 | A/B 验证 | [`03.5 用 PyTorch 独立复算`](./05_test_with_pytorch.md) | <a href="../_code/chapter03_matmul/tests/chapter02_tensor_matmul_integration_test.cpp"><code>chapter02_tensor_matmul_integration_test.cpp</code></a> | 手算、CPU reference、可选 PyTorch/CUDA 结果怎样形成独立对照 |
+| 3 | B | [`03.7 真实推理后端`](./07_runtime_backend_bridge.md) | <a href="../_code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> | Chapter02 视图怎样进入稳定请求并由 CPU Backend 提交结果 |
+| 4 | G | [`03.4 接入 cuBLAS 计算后端`](./04_cublas_implement.md) | <a href="../_code/cuda/src/cublas_matmul_backend.cpp"><code>cublas_matmul_backend.cpp</code></a> | 同一形状语义怎样迁移到设备内存和 cuBLAS |
+| 5 | A/B/G 验证 | [`03.5 用 PyTorch 独立复算`](./05_test_with_pytorch.md) | <a href="../_code/chapter03_matmul/tests/chapter02_tensor_matmul_integration_test.cpp"><code>chapter02_tensor_matmul_integration_test.cpp</code></a> | 手算、CPU reference、可选 PyTorch/CUDA 结果怎样形成独立对照 |
 
 ## 验证与下一步
 
