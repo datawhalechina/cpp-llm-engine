@@ -23,7 +23,7 @@ int main() {
     using namespace chapter05_quantization;
 
     cpp_llm_engine::testing::TestSuite suite("chapter05_quantization");
-    suite.run("量化格式、后端策略与数值参考保持一致", [&] {
+    suite.run("INT8 teaching path matches Float32 reference", [&] {
     const Tensor quantized = Tensor::from_int8(2, 2, {1, 2, 3, 4}, 0.1f);
     CPP_LLM_REQUIRE(suite, quantized.ready());
     CPP_LLM_CHECK(suite, quantized.is_int8());
@@ -50,6 +50,10 @@ int main() {
     CPP_LLM_CHECK(suite, reference_output.cols() == quantized_output.cols());
     CPP_LLM_CHECK(suite, std::abs(reference_output.at(0, 0) - quantized_output.at(0, 0)) < 1e-5f);
     CPP_LLM_CHECK(suite, std::abs(reference_output.at(1, 1) - quantized_output.at(1, 1)) < 1e-5f);
+
+    });
+
+    suite.run("Q8_0 dequantization fused Linear and policy agree", [&] {
 
     std::vector<std::uint8_t> q8_0(kQ8_0BlockBytes, 0);
     q8_0[0] = 0x00;
@@ -109,6 +113,11 @@ int main() {
         q8_0_matrix.data(), q8_0_matrix.size() - 1, 2, 32,
         q8_0_input, &q8_0_fused, &error));
     CPP_LLM_CHECK(suite, error == "Q8_0 Linear byte count does not match shape");
+
+    });
+
+    suite.run("Q4_K reference fused SIMD and failure paths agree", [&] {
+    std::string error;
 
     std::vector<std::uint8_t> q4k(144, 0);
     q4k[0] = 0x00;
@@ -227,6 +236,29 @@ int main() {
     CPP_LLM_CHECK(suite, !dequantize_q4_k(q4k.data(), q4k.size() - 1, 256, &q4k_output, &error));
     CPP_LLM_CHECK(suite, error == "Q4_K byte count does not match block count");
 
+    const cpp_llm_engine::core::LinearRequest wrong_format_request{
+        q4k.data(), q4k.size(), linear_input.data(), linear_input.size(),
+        contract_output.data(), contract_output.size(), 1, 256,
+        cpp_llm_engine::core::WeightFormat::Float32};
+    CPP_LLM_CHECK(suite, !q4k_fused_backend().compute(wrong_format_request).is_ok());
+    const auto unsupported_policy_status = compute_quantized_linear(
+        wrong_format_request, scalar_policy);
+    CPP_LLM_CHECK(suite, !unsupported_policy_status.is_ok());
+    CPP_LLM_CHECK(suite, unsupported_policy_status.message() ==
+           "quantized Linear policy only supports Q4_K, Q6_K, and Q8_0");
+
+    std::vector<float> rejected_output;
+    CPP_LLM_CHECK(suite, !Q4KLinearFused::forward(
+        q4k.data(), q4k.size(), std::numeric_limits<std::size_t>::max(), 256,
+        linear_input, &rejected_output, &error));
+    CPP_LLM_CHECK(suite, error == "Q4_K Linear payload is too large");
+
+    });
+
+    suite.run("Q6_K reference fused SIMD and policy agree", [&] {
+    std::string error;
+    const QuantizedLinearPolicy scalar_policy;
+
     std::vector<std::uint8_t> q6k(210, 0);
     q6k[0] = 0x21;   // q1=1, q3=2 before upper two bits are added.
     q6k[32] = 0x43;  // q2=3, q4=4 before upper two bits are added.
@@ -289,23 +321,6 @@ int main() {
         CPP_LLM_CHECK(suite, std::abs(q6k_backend_output[0] - q6k_linear_reference[0]) < 1e-3f);
     }
 #endif
-
-    const cpp_llm_engine::core::LinearRequest wrong_format_request{
-        q4k.data(), q4k.size(), linear_input.data(), linear_input.size(),
-        contract_output.data(), contract_output.size(), 1, 256,
-        cpp_llm_engine::core::WeightFormat::Float32};
-    CPP_LLM_CHECK(suite, !q4k_fused_backend().compute(wrong_format_request).is_ok());
-    const auto unsupported_policy_status = compute_quantized_linear(
-        wrong_format_request, scalar_policy);
-    CPP_LLM_CHECK(suite, !unsupported_policy_status.is_ok());
-    CPP_LLM_CHECK(suite, unsupported_policy_status.message() ==
-           "quantized Linear policy only supports Q4_K, Q6_K, and Q8_0");
-
-    std::vector<float> rejected_output;
-    CPP_LLM_CHECK(suite, !Q4KLinearFused::forward(
-        q4k.data(), q4k.size(), std::numeric_limits<std::size_t>::max(), 256,
-        linear_input, &rejected_output, &error));
-    CPP_LLM_CHECK(suite, error == "Q4_K Linear payload is too large");
 
     });
     return suite.finish();
