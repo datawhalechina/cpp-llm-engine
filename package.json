@@ -9,6 +9,7 @@
     "docs:check-style": "node scripts/check_docs_style.mjs",
     "docs:check-reference": "node scripts/check_reference_assets.mjs",
     "code:check-headers": "node scripts/check_code_headers.mjs code",
+    "code:check-line-endings": "node scripts/check_line_endings.mjs",
     "test:check-assets": "node scripts/check_test_assets.mjs",
     "test:check-contracts": "node scripts/check_test_contracts.mjs",
     "docs:build": "vitepress build docs",

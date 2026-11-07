@@ -22,6 +22,11 @@ run_and_check() {
 }
 
 run_and_check \
+    line_endings \
+    "cd '${repo_root}' && npm run code:check-line-endings" \
+    "Shell script line ending check passed"
+
+run_and_check \
     code_headers \
     "cd '${repo_root}' && npm run code:check-headers" \
     "Code header check passed: code"

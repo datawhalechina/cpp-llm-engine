@@ -1,0 +1,7 @@
+* text=auto
+
+# Unix entrypoints must keep LF when checked out by Windows Git.
+*.sh text eol=lf
+*.bash text eol=lf
+*.mjs text eol=lf
+*.py text eol=lf
