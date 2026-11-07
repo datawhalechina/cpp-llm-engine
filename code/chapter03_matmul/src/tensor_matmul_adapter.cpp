@@ -1,7 +1,7 @@
-// Chapter 03：Tensor View 到 MatMul 请求的适配实现
-// 职责：将公共布局契约收窄为连续 row-major MatmulRequest。
-// 契约：拒绝非 CPU、非 Float32、非二维或非连续 View，不执行隐式复制。
-// 验证：chapter02_tensor_matmul_integration_test.cpp。
+// Chapter 03：Tensor View 到矩阵乘请求的适配实现
+// 流程：校验二维 View 的设备、类型和布局，再构造连续行主序 MatmulRequest。
+// 提交：先写入临时结果，计算成功后再复制到输出；输入不会被隐式连续化。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #include "chapter03_matmul/tensor_matmul_adapter.h"
 
 #include "cpp_llm_engine/core/backend.h"

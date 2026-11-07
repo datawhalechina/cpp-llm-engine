@@ -1,7 +1,7 @@
-// Chapter 03：MatMul 算子实现
-// 职责：校验 Matrix shape、创建输出并把请求交给注入的 backend。
-// 契约：上层使用稳定的 compute 接口，CPU reference 是默认 backend。
-// 验证：chapter03_matmul_test.cpp 和 main_matmul.cpp。
+// Chapter 03：矩阵乘算子实现
+// 流程：校验两个 Matrix 的形状，创建临时输出，再调用注入的计算后端。
+// 提交：后端成功后才替换调用方输出；默认使用 CPU 参考后端。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #include "chapter03_matmul/matmul_op.h"
 #include "chapter03_matmul/cpu_backend.h"
 
@@ -11,14 +11,7 @@
 namespace chapter03_matmul {
 
 Matrix cpu_reference_matmul(const Matrix& lhs, const Matrix& rhs) {
-    if (!lhs.ready() || !rhs.ready()) {
-        throw std::invalid_argument("matrix is not ready");
-    }
-    if (lhs.cols != rhs.rows) {
-        throw std::invalid_argument("shape mismatch");
-    }
-
-    return MatMulOp(cpu_reference_backend()).compute(lhs, rhs);
+    return MatMulOp().compute(lhs, rhs);
 }
 
 MatMulOp::MatMulOp() : backend_(&cpu_reference_backend()) {}

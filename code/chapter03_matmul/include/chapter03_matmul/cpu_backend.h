@@ -1,7 +1,7 @@
-// Chapter 03：CPU MatMul backend 接口
-// 职责：声明 CPU backend 的设备身份、名称和 MatmulRequest 执行入口。
-// 契约：backend 负责适配公共请求，不改变 row-major MatMul 语义。
-// 验证：chapter03_matmul_test.cpp 和 core CTest。
+// Chapter 03：CPU 矩阵乘后端接口
+// 输入输出：compute 接收行主序 MatmulRequest，并将结果写入其 output。
+// 行为：报告 CPU 设备类型，把实际计算交给可读的参考内核。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #pragma once
 
 #include "cpp_llm_engine/core/matmul_contract.h"

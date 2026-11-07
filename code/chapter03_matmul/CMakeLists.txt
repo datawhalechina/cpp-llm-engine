@@ -1,5 +1,5 @@
-# Chapter 03：MatMul CPU 构建入口
-# 构建：生成 core、MatMul library、demo 和联合 CTest。
+# Chapter 03：CPU 矩阵乘构建入口
+# 构建：生成公共 core、矩阵乘库、运行示例和跨章测试。
 cmake_minimum_required(VERSION 3.20)
 project(chapter03_matmul LANGUAGES CXX)
 

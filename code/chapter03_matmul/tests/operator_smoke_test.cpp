@@ -1,7 +1,7 @@
-// Chapter 03：Operator/backend smoke test
-// 职责：验证 MatMulOp 名称、CPU backend 身份和最小 1x1 计算。
-// 通过条件：公共 Operator 入口返回 2*3=6。
-// 验证：chapter03_matmul_test 目标。
+// Chapter 03：算子接口冒烟测试
+// 场景：通过 Operator 引用调用 MatMulOp，并检查 CPU 后端身份。
+// 通过条件：最小 1x1 矩阵乘返回 2*3=6。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #include "chapter03_matmul/matmul_op.h"
 #include "chapter03_matmul/cpu_backend.h"
 #include "cpp_llm_engine/testing/test.h"

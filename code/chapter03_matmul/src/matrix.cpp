@@ -1,7 +1,7 @@
 // Chapter 03：教学 Matrix 实现
-// 职责：实现 row-major storage、shape 校验和安全 at() 索引。
-// 契约：构造和访问路径拒绝 size_t 乘法溢出与越界索引。
-// 验证：chapter03_matmul_test.cpp。
+// 数据：分配行主序元素存储，并把二维坐标转换为一维索引。
+// 校验：构造时检查元素数溢出，访问时拒绝越界坐标。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #include "chapter03_matmul/matrix.h"
 
 #include <limits>

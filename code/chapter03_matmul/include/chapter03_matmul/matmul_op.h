@@ -1,7 +1,7 @@
-// Chapter 03：MatMul 算子接口
-// 职责：把 Matrix 输入转换为公共 MatmulRequest，并注入可替换 backend。
-// 契约：try_compute 成功后提交输出、失败时保留输出；compute 失败时抛出明确错误。
-// 验证：chapter03_matmul_test.cpp 和 operator_smoke_test.cpp。
+// Chapter 03：矩阵乘算子接口
+// 输入输出：把两个 Matrix 转换为 MatmulRequest，成功后提交新的输出 Matrix。
+// 生命周期：算子不拥有注入的计算后端，后端必须比算子存活更久；失败时保留原输出。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #pragma once
 
 #include "chapter03_matmul/operator.h"
@@ -13,6 +13,7 @@ class MatMulOp final : public Operator {
 public:
     MatMulOp();
     explicit MatMulOp(const cpp_llm_engine::core::MatmulBackend& backend);
+    MatMulOp(cpp_llm_engine::core::MatmulBackend&& backend) = delete;
 
     std::string_view name() const override;
     cpp_llm_engine::core::BackendKind backend_kind() const;

@@ -1,7 +1,7 @@
-// Chapter 03：CPU MatMul backend 实现
-// 职责：提供 CPU backend 身份，并将公共 MatmulRequest 分派给 reference kernel。
-// 契约：不重复实现循环，错误由 kernel 以 Status 返回。
-// 验证：chapter03_matmul/scripts/run.sh。
+// Chapter 03：CPU 矩阵乘后端实现
+// 行为：提供 CPU 后端身份，并把 MatmulRequest 交给参考内核执行。
+// 错误：本文件不重复校验和计算，直接传回参考内核的 Status。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #include "chapter03_matmul/cpu_backend.h"
 #include "chapter03_matmul/cpu_kernel.h"
 

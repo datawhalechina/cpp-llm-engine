@@ -1,7 +1,7 @@
-// Chapter 03：Tensor View 到 MatMul 请求的适配接口
-// 职责：校验 CPU Float32 连续二维 View，并交给指定 MatMul backend。
-// 契约：不拥有 Storage；只接受 CPU Float32 连续二维 View 和 CPU backend；失败保留输出。
-// 验证：chapter02_tensor_matmul_integration_test.cpp。
+// Chapter 03：Tensor View 到矩阵乘请求的适配接口
+// 输入：CPU 上连续、行主序、Float32 的二维 View，以及 CPU 计算后端。
+// 输出：成功后提交 Matrix 或写入输出 View；失败时保留原输出，不隐式复制输入。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #pragma once
 
 #include "chapter03_matmul/matrix.h"

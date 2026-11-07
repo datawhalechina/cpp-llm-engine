@@ -1,7 +1,7 @@
 // Chapter 03：教学 Matrix 对象
-// 职责：保存 row-major float 矩阵，提供安全索引和 ready 检查。
-// 契约：data.size() 必须等于 rows * cols，shape/index 溢出或越界会失败。
-// 验证：chapter03_matmul_test.cpp。
+// 数据：data 按行主序保存 Float32 元素，rows 和 cols 描述二维形状。
+// 限制：元素数必须等于 rows * cols；尺寸溢出或索引越界时失败。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #pragma once
 
 #include "cpp_llm_engine/core/tensor_contract.h"

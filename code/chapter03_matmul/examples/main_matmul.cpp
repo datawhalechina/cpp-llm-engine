@@ -1,7 +1,7 @@
-// Chapter 03：MatMul CPU 示例
-// 职责：构造两个 row-major Matrix，执行 MatMulOp 并打印结果。
-// 运行：bash code/chapter03_matmul/scripts/run.sh。
-// 验证：输出 shape=2x2、value(0,0)=58、value(1,1)=154。
+// Chapter 03：CPU 矩阵乘示例
+// 场景：构造两个行主序 Matrix，通过 MatMulOp 计算二维输出。
+// 观察：输出形状为 2x2，左上角为 58，右下角为 154。
+// 运行：bash code/chapter03_matmul/scripts/run.sh
 #include "chapter03_matmul/matmul_op.h"
 
 #include <iostream>

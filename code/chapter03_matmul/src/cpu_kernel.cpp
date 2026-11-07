@@ -1,7 +1,7 @@
-// Chapter 03：CPU MatMul reference kernel 实现
-// 职责：执行 row-major 三重循环并校验 buffer、shape 和尺寸溢出。
-// 契约：保持公共 MatmulRequest 语义，作为 SIMD/cuBLAS 的数值基线。
-// 验证：chapter03_matmul_test.cpp。
+// Chapter 03：CPU 矩阵乘参考内核实现
+// 计算：使用三重循环计算行主序 [M,K] * [K,N]。
+// 校验：拒绝空缓冲区、零维和尺寸溢出；结果作为 SIMD 与 cuBLAS 的数值基线。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #include "chapter03_matmul/cpu_kernel.h"
 
 #include <limits>

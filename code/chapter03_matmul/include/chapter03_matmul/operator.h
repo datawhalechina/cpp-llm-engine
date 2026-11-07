@@ -1,7 +1,7 @@
-// Chapter 03：章节 Operator 接口
-// 职责：为 MatMul 等教学算子提供统一 Matrix compute 入口。
-// 契约：上层只依赖输入输出语义，backend 选择由具体算子保存。
-// 验证：operator_smoke_test.cpp。
+// Chapter 03：教学算子接口
+// 输入输出：compute 接收左右两个 Matrix，返回新 Matrix。
+// 设计：基类固定调用形式，具体算子选择计算后端并实现计算过程。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #pragma once
 
 #include "chapter03_matmul/matrix.h"

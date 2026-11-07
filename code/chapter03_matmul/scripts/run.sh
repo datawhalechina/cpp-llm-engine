@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Chapter 03：MatMul CPU 验证脚本
-# 执行：隔离配置、构建 demo，并运行 MatMul 与 core CTest。
-# 参数：CHAPTER03_BUILD_DIR 可指定持久 build 目录。
+# 执行：在隔离目录构建示例与测试，然后运行示例和全部 CTest。
+# 参数：CHAPTER03_BUILD_DIR 可指定需要保留的构建目录。
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

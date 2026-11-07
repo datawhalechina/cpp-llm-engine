@@ -1,13 +1,14 @@
-// Chapter 03：MatMul 数值与边界测试
-// 职责：验证矩阵结果、shape mismatch、空请求、越界访问和超大 shape。
-// 通过条件：命名数值、边界和失败原子性检查全部通过。
-// 验证：bash code/chapter03_matmul/scripts/run.sh。
+// Chapter 03：矩阵乘数值与边界测试
+// 场景：覆盖固定数值、形状不匹配、空请求、越界访问和尺寸溢出。
+// 通过条件：结果与固定值一致，计算失败后原输出保持不变。
+// 验证：bash code/chapter03_matmul/scripts/run.sh
 #include "chapter03_matmul/matmul_op.h"
 #include "chapter03_matmul/cpu_kernel.h"
 #include "cpp_llm_engine/testing/test.h"
 
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 
 void chapter03_matmul_run_operator_smoke_test(
     cpp_llm_engine::testing::TestSuite& suite);
@@ -27,6 +28,10 @@ public:
         return cpp_llm_engine::core::Status::error("injected backend failure");
     }
 };
+
+static_assert(
+    !std::is_constructible_v<chapter03_matmul::MatMulOp, FailingCpuBackend&&>,
+    "MatMulOp must not borrow a temporary backend");
 
 }  // namespace
 
