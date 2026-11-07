@@ -1,6 +1,6 @@
-// Chapter 06：Generation Core 的命名端到端测试。
-// 职责：验证 Prefill/Decode、上下文准入、EOS 和 Cache 增长。
-// 验证入口：带 unit、generation 标签的 Chapter06 CTest。
+// Chapter 06：Generation Core 回归测试
+// 验证 Prefill/Decode、上下文准入、EOS、取消和空 logits 失败路径。
+// 入口：带 unit、generation 标签的 Chapter06 CTest。
 #include "chapter06_generation/model_executor.h"
 #include "chapter06_generation/runtime.h"
 #include "chapter06_generation/sampler.h"
@@ -9,6 +9,7 @@
 #include "cpp_llm_engine/testing/test.h"
 
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -55,6 +56,13 @@ public:
 };
 
 }  // namespace
+
+static_assert(
+    !std::is_constructible_v<
+        chapter06_generation::Runtime,
+        chapter06_generation::GenerationConfig,
+        chapter06_generation::Transformer&&>,
+    "Runtime must reject temporary Transformer objects");
 
 int main() {
     using namespace chapter06_generation;
@@ -139,6 +147,88 @@ int main() {
         CPP_LLM_CHECK(suite, observed_output_sizes == std::vector<std::size_t>({1}));
         CPP_LLM_CHECK(suite, request.history().size() == 3);
         CPP_LLM_CHECK(suite, request.finished());
+    });
+
+    suite.run("provider failure and callback cancellation stop generation", [&] {
+        GenerationConfig config;
+        config.max_new_tokens = 4;
+        Runtime runtime(config);
+        GreedySampler sampler;
+
+        Request empty_logits_request({1});
+        const LogitsProvider empty_provider = [](const Request&, std::size_t) {
+            return Logits{};
+        };
+        CPP_LLM_CHECK(
+            suite,
+            runtime.generate(empty_logits_request, sampler, empty_provider) == 0);
+        CPP_LLM_CHECK(suite, empty_logits_request.failed());
+        CPP_LLM_CHECK(suite, empty_logits_request.generated().empty());
+
+        Request cancelled_request({1});
+        const LogitsProvider token_provider = [](const Request&, std::size_t) {
+            return Logits{0.0F, 1.0F};
+        };
+        std::size_t callback_count = 0;
+        CPP_LLM_CHECK(
+            suite,
+            runtime.generate(
+                cancelled_request,
+                sampler,
+                token_provider,
+                [&](TokenId, std::size_t) {
+                    ++callback_count;
+                    cancelled_request.cancel();
+                }) == 1);
+        CPP_LLM_CHECK(suite, cancelled_request.cancelled());
+        CPP_LLM_CHECK(suite, cancelled_request.generated() == TokenSequence({1}));
+        CPP_LLM_CHECK(suite, callback_count == 1);
+
+        Request one_step_request({1});
+        one_step_request.mark_prefilled();
+        CPP_LLM_CHECK(
+            suite,
+            runtime.decode_one(one_step_request, sampler, token_provider) == 1);
+        CPP_LLM_CHECK(suite, one_step_request.generated() == TokenSequence({1}));
+    });
+
+    suite.run("batch logits validate every row before committing tokens", [&] {
+        GenerationConfig config;
+        config.max_new_tokens = 2;
+        Runtime runtime(config);
+        GreedySampler sampler;
+        Request request_a({1});
+        Request request_b({2});
+        request_a.mark_prefilled();
+        request_b.mark_prefilled();
+        const std::vector<BatchDecodeItem> items{
+            {&request_a, &sampler}, {&request_b, &sampler}};
+
+        const auto committed = runtime.commit_batch_logits(
+            items, LogitsBatch{{0.0F, 2.0F}, {3.0F, 0.0F}});
+        CPP_LLM_CHECK(suite, committed.tokens.size() == 2);
+        CPP_LLM_CHECK(suite, request_a.generated() == TokenSequence({1}));
+        CPP_LLM_CHECK(suite, request_b.generated() == TokenSequence({0}));
+
+        Request invalid_a({1});
+        Request invalid_b({2});
+        invalid_a.mark_prefilled();
+        invalid_b.mark_prefilled();
+        const std::vector<BatchDecodeItem> invalid_items{
+            {&invalid_a, &sampler}, {&invalid_b, &sampler}};
+        const auto rejected = runtime.commit_batch_logits(
+            invalid_items, LogitsBatch{{0.0F, 1.0F}, {}});
+        CPP_LLM_CHECK(suite, rejected.tokens.empty());
+        CPP_LLM_CHECK(suite, invalid_a.generated().empty());
+        CPP_LLM_CHECK(suite, invalid_b.generated().empty());
+
+        const std::vector<BatchDecodeItem> duplicate_items{
+            {&invalid_a, &sampler}, {&invalid_a, &sampler}};
+        CPP_LLM_CHECK(
+            suite,
+            runtime.commit_batch_logits(
+                duplicate_items, LogitsBatch{{1.0F}, {1.0F}}).tokens.empty());
+        CPP_LLM_CHECK(suite, invalid_a.generated().empty());
     });
 
     suite.run("model prefill failure terminates request without output", [&] {

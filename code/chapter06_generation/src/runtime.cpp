@@ -1,6 +1,6 @@
-// Chapter 06：实现单个 Request 的 CPU prefill、decode 和 generation orchestration。
-// 职责：在委托 model 与 sampling work 前执行 admission 和 terminal-state 规则。
-// 验证：Runtime smoke、generation 和 streaming 测试检查可观察生命周期。
+// Chapter 06：单请求 CPU 生成编排
+// 在模型执行和采样前检查上下文限制与终态，成功后提交 token 和历史。
+// 验证：Runtime smoke、generation 和 streaming 测试。
 #include "chapter06_generation/runtime.h"
 #include "chapter06_generation/transformer.h"
 
@@ -126,8 +126,10 @@ BatchDecodeResult Runtime::decode_batch_one(const std::vector<BatchDecodeItem>& 
     }
 
     std::vector<std::size_t> item_indices;
+    std::vector<BatchDecodeItem> runnable_items;
     std::vector<const Request*> model_inputs;
     item_indices.reserve(items.size());
+    runnable_items.reserve(items.size());
     model_inputs.reserve(items.size());
     for (std::size_t index = 0; index < items.size(); ++index) {
         const BatchDecodeItem& item = items[index];
@@ -136,6 +138,7 @@ BatchDecodeResult Runtime::decode_batch_one(const std::vector<BatchDecodeItem>& 
             continue;
         }
         item_indices.push_back(index);
+        runnable_items.push_back(item);
         model_inputs.push_back(item.request);
     }
     if (model_inputs.empty()) {
@@ -147,22 +150,11 @@ BatchDecodeResult Runtime::decode_batch_one(const std::vector<BatchDecodeItem>& 
         return result;
     }
     result.model_calls = 1;
-    result.tokens.reserve(model_inputs.size());
-    for (std::size_t row = 0; row < model_inputs.size(); ++row) {
-        const std::size_t item_index = item_indices[row];
-        Request& request = *items[item_index].request;
-        const std::size_t step = request.generated_size();
-        request.mark_decoding();
-        const TokenId token = items[item_index].sampler->sample(logits[row]);
-        request.append_generated_token(token);
-        if (config_.use_kv_cache) {
-            request.cache().append(token);
-        }
-        if (token == config_.eos_token_id ||
-            request.generated_size() >= config_.max_new_tokens) {
-            request.mark_finished();
-        }
-        result.tokens.push_back({item_index, token, step});
+    auto committed = commit_batch_logits(runnable_items, logits);
+    result.tokens.reserve(committed.tokens.size());
+    for (auto token : committed.tokens) {
+        token.batch_index = item_indices[token.batch_index];
+        result.tokens.push_back(token);
     }
     return result;
 }
@@ -204,13 +196,17 @@ std::size_t Runtime::decode_one(
     Request& request,
     const Sampler& sampler,
     const LogitsProvider& logits_provider) {
-    if (!ready() || transformer_ == nullptr || !request.prefilled() || request.terminal()) {
+    if (!ready() || !request.prefilled() || request.terminal()) {
         return 0;
     }
 
     request.mark_decoding();
     const std::size_t step = request.generated_size();
     const Logits logits = logits_provider(request, step);
+    if (logits.empty()) {
+        request.mark_failed("logits provider returned empty logits");
+        return 0;
+    }
     const TokenId token = sampler.sample(logits);
     request.append_generated_token(token);
     if (config_.use_kv_cache) {
@@ -351,13 +347,15 @@ std::size_t Runtime::decode(
     Request& request,
     const Sampler& sampler,
     const LogitsProvider& logits_provider) {
-    if (!ready() || transformer_ == nullptr || !request.prefilled() || request.terminal()) {
+    if (!ready() || !request.prefilled() || request.terminal()) {
         return 0;
     }
 
     std::size_t generated_steps = 0;
-    while (generated_steps < config_.max_new_tokens && !request.finished()) {
-        generated_steps += decode_one(request, sampler, logits_provider);
+    while (generated_steps < config_.max_new_tokens && !request.terminal()) {
+        const std::size_t decoded = decode_one(request, sampler, logits_provider);
+        if (decoded == 0) break;
+        generated_steps += decoded;
     }
 
     return generated_steps;
@@ -385,9 +383,13 @@ std::size_t Runtime::generate(
     }
 
     std::size_t generated_steps = 0;
-    while (generated_steps < config_.max_new_tokens && !request.finished()) {
+    while (generated_steps < config_.max_new_tokens && !request.terminal()) {
         request.mark_decoding();
         const Logits logits = logits_provider(request, generated_steps);
+        if (logits.empty()) {
+            request.mark_failed("logits provider returned empty logits");
+            break;
+        }
         const TokenId token = sampler.sample(logits);
         request.append_generated_token(token);
         if (on_token) on_token(token, generated_steps);
@@ -398,7 +400,7 @@ std::size_t Runtime::generate(
         if (token == config_.eos_token_id) request.mark_finished();
     }
 
-    if (!request.finished()) request.mark_finished();
+    if (!request.terminal()) request.mark_finished();
     return generated_steps;
 }
 

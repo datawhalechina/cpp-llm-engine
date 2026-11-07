@@ -1,6 +1,7 @@
-// Chapter 06：声明负责 prefill、decode 和 token generation 的 CPU Generation Runtime。
-// 职责：推进 Request state、写入 request cache，并把 token choice 交给 Sampler。
-// 验证：Runtime smoke 和 generation 测试检查 admission、terminal handling 和 output count。
+// Chapter 06：单请求 prefill、decode 和 token generation 编排器
+// Runtime 推进 Request 状态并把 logits 交给 Sampler，不拥有模型执行状态。
+// 注入的教学 Transformer 必须比 Runtime 存活更久。
+// 验证：Runtime smoke 和 generation 测试。
 #pragma once
 
 #include "chapter06_generation/generation_types.h"
@@ -45,6 +46,7 @@ class Runtime {
 public:
     explicit Runtime(GenerationConfig config = {});
     Runtime(GenerationConfig config, const Transformer& transformer);
+    Runtime(GenerationConfig, Transformer&&) = delete;
 
     const GenerationConfig& config() const;
     bool ready() const;
