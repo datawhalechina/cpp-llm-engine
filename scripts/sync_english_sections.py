@@ -53,7 +53,7 @@ PAIRS: tuple[DocPair, ...] = (
             (r"\]\(chapter00_quickstart/intro\)", r"](/en/chapter00_quickstart/intro)"),
             (r"\]\(guides/README\)", r"](/en/guides/README)"),
             (r"\]\(reference/README\)", r"](/en/reference/README)"),
-            (r"\]\(maintenance/tutorial_maintenance\.md\)", r"](/en/maintenance/tutorial_maintenance)"),
+            (r"\]\(maintenance/tutorial_positioning\.md\)", r"](/en/maintenance/tutorial_positioning)"),
             (r"\]\(maintenance/tutorial_writing_guidelines\.md\)", r"](/en/maintenance/tutorial_writing_guidelines)"),
         ),
     ),
