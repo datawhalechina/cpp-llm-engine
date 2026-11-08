@@ -8,6 +8,8 @@ Chapter04 已经固定 Decoder 的计算顺序，Chapter05 让真实量化权重
 | --- | --- | --- |
 | A 教学闭环 | 用小词表、确定性 logits 和 Greedy 跟踪请求状态 | 固定 token、阶段、停止条件和回调顺序 |
 | B 真实执行闭环 | 接入 TinyLlama Tokenizer、22 层 Decoder 和请求专属 Context | 固定生成 token、文本结果和 Context 隔离 |
+| G GPU 扩展坐标 | 保持 Request 和停止语义不变，将模型执行器替换为设备后端 | 当前只有 CUDA Decoder 证据，尚无完整 GPU Generation Core 入口 |
+| M 多模态扩展坐标 | 视觉 embedding 进入模型后复用 Decode、采样和终态语义 | 当前接口坐标，不作为本章可运行输入路径 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
@@ -20,13 +22,7 @@ Chapter04 已经固定 Decoder 的计算顺序，Chapter05 让真实量化权重
 
 ## 开始学习
 
-先运行 Generation Core 的独立入口：
-
-```bash
-bash code/chapter06_generation/scripts/run_generation_core.sh
-```
-
-脚本构建普通生成和逐词元回调示例，运行 Generation、Sampler、TokenHistory 和 Request 契约测试，再打印 Prefill 数量、生成步数、词元历史长度和最终阶段。
+先沿单请求的状态推进理解 Generation Core：请求保存可观察状态，模型执行器持有模型 Context，Runtime 组织 Prefill、Decode、采样、停止和回调。随后再用真实 TinyLlama 替换教学执行器，观察控制流保持不变。
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |

@@ -13,6 +13,8 @@ token  = argmax(logits) = 1
 
 Greedy 不需要随机数，同一组 logits 始终产生同一个词元，适合作为 Runtime、KV Cache 和批处理重构时的正确性基线。
 
+空 logits 没有可选择的词元。`GreedySampler` 会抛出 `std::invalid_argument`；Runtime 在调用采样器前先把模型返回的空 logits 转换为请求 `Failed`，因此不会把合法词元 `0` 当作错误占位值。
+
 | 对象 | 决定什么 | 不决定什么 |
 | --- | --- | --- |
 | 模型执行器 | 返回候选 logits | 不选择词元，不结束请求 |
@@ -48,4 +50,4 @@ ctest --test-dir /tmp/cpp-llm-chapter06-sampling \
   -R 'chapter06_(sampler|generation)_test' --output-on-failure
 ```
 
-Sampler 测试固定 `[0.1, 0.9, 0.2] -> 1`；Generation 测试把 token `7` 配置为 EOS，确认只生成一个词元就进入 `Finished`。下一篇区分停止判断所见的词元历史与模型真正保存的 K/V。
+Sampler 测试固定 `[0.1, 0.9, 0.2] -> 1` 并检查空输入抛出异常；Generation 测试把 token `7` 配置为 EOS，确认只生成一个词元就进入 `Finished`。下一篇区分停止判断所见的词元历史与模型真正保存的 K/V。

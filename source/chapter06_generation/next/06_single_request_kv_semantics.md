@@ -1,15 +1,15 @@
 # 06.6 区分词元历史与模型 K/V
 
-逐词元生成需要回看历史，但代码中有两类不同数据。请求的教学缓存保存词元 ID，便于观察控制流；真实模型 Context 保存每层 Attention 的 K/V，避免 Decode 时重新计算全部历史。它们随序列一起增长，却不能互相替代。
+逐词元生成需要回看历史，但代码中有两类不同数据。请求的词元历史保存词元 ID，便于观察控制流；真实模型 Context 保存每层 Attention 的 K/V，避免 Decode 时重新计算全部历史。它们随序列一起增长，却不能互相替代。
 
 ## 两类历史数据
 
 | 对象 | 保存内容 | 主要用途 | 当前所有者 |
 | --- | --- | --- | --- |
-| `Request::cache()` | prompt 和已生成词元 ID | 检查历史长度与请求隔离 | `Request` |
+| `Request::history()` | prompt 和已生成词元 ID | 检查历史长度与请求隔离 | `Request` |
 | `RequestModelExecutor` Context | 每层、每个 KV head 的向量 | 增量 Attention | 请求专属执行器 |
 
-教学缓存实现位于 <a href="/_code/chapter06_generation/include/chapter06_generation/kv_cache.h"><code>kv_cache.h</code></a>。真实执行器通过 `execution_state()` 暴露已提交词元数、K/V 层数以及是否保存实际 K/V 值，但 Chapter06 不规定物理存储布局。
+词元历史实现位于 <a href="/_code/chapter06_generation/include/chapter06_generation/token_history.h"><code>token_history.h</code></a>。真实执行器通过 `execution_state()` 暴露已提交词元数、K/V 层数以及是否保存实际 K/V 值；物理存储布局从 Chapter07 开始引入。
 
 ## Decode 时长度怎样增长
 

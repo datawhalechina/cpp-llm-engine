@@ -7,10 +7,10 @@
 `Runtime::generate()` 每次成功采样后按固定顺序执行：
 
 1. 把词元追加到 `Request::generated()`；
-2. 调用 `TokenCallback(token, step)`；
-3. 更新教学词元历史并检查停止条件。
+2. 更新教学词元历史并检查停止条件；
+3. 调用 `TokenCallback(token, step)`。
 
-回调触发时，调用者已经能从 Request 读到该词元。`step` 从 0 开始，只表示当前请求的输出位置，不包含服务请求 ID，也不表示批次中的行号。
+回调触发时，调用者已经能从 Request 读到词元、更新后的历史和当前阶段；EOS 回调会观察到 `Finished`。`step` 从 0 开始，只表示当前请求的输出位置，不包含服务请求 ID，也不表示批次中的行号。回调是同步观察接口；异常会在请求完成本步提交后继续向调用者传播。
 
 | 回调参数 | 含义 | 不包含 |
 | --- | --- | --- |
@@ -43,4 +43,4 @@ ctest --test-dir /tmp/cpp-llm-chapter06-stream \
   -R '^chapter06_generation_test$' --output-on-failure
 ```
 
-Generation 测试固定 EOS 词元 `7`，检查回调收到 `(7, 0)`，且回调读取到的输出长度已经是 1。多请求回调归属和 step 顺序由 Chapter08 的 Scheduler 测试验证。
+Generation 测试固定 EOS 词元 `7`，检查回调收到 `(7, 0)`，并观察到输出长度 `1`、历史长度 `3` 和 `Finished`。多请求回调归属和 step 顺序由 Chapter08 的 Scheduler 测试验证。

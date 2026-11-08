@@ -54,7 +54,7 @@ cmake --build /tmp/cpp-llm-chapter06-loop \
 /tmp/cpp-llm-chapter06-loop/chapter06_generation_demo
 ```
 
-输出应包含 `prefills: 3`、`generated steps: 2`、`request cache size: 5` 和 `request phase: finished`。随后执行：
+输出应包含 `prefills: 3`、`generated steps: 2`、`token history size: 5` 和 `request phase: finished`。随后执行：
 
 ```bash
 ctest --test-dir /tmp/cpp-llm-chapter06-loop \

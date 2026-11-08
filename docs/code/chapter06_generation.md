@@ -35,7 +35,7 @@
 | <a href="/_code/chapter06_generation/examples/main_generation.cpp"><code>main_generation.cpp</code></a> | 单请求生成示例 |
 | <a href="/_code/chapter06_generation/examples/main_streaming.cpp"><code>main_streaming.cpp</code></a> | 单请求逐词元回调示例 |
 | <a href="/_code/chapter06_generation/tests/request_contract_test.cpp"><code>request_contract_test.cpp</code></a> | Request 状态机契约 |
-| <a href="/_code/chapter06_generation/tests/chapter06_generation_test.cpp"><code>chapter06_generation_test.cpp</code></a> | Generation Core 端到端测试 |
+| <a href="/_code/chapter06_generation/tests/chapter06_generation_test.cpp"><code>chapter06_generation_test.cpp</code></a> | Generation Core 组件测试 |
 | <a href="/_code/chapter06_generation/tests/token_history_test.cpp"><code>token_history_test.cpp</code></a> | TokenHistory 顺序和清空测试 |
 | <a href="/_code/chapter06_generation/scripts/run_generation_core.sh"><code>run_generation_core.sh</code></a> | 默认 CPU 入口 |
 | <a href="/_code/chapter06_generation/scripts/run_real_generation.sh"><code>run_real_generation.sh</code></a> | 真实 TinyLlama 单请求入口 |

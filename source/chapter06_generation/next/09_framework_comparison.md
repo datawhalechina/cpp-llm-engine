@@ -32,3 +32,11 @@ Chapter06 只比较单请求生成核心：输入怎样进入模型、Prefill/De
 - [vLLM 生态卡](/reference/ecosystem/vllm)：先看 EngineCore 与 model runner，KV manager 和 Scheduler 留到后续章节。
 - [TensorRT-LLM 生态卡](/reference/ecosystem/tensorrt_llm)：观察 C++ Runtime、执行上下文和 Executor 的关系。
 - [SGLang 生态卡](/reference/ecosystem/sglang)：本章只看 Runtime 请求推进，Radix Cache 与 LPM 分别放到 Chapter07/08。
+
+## 验证与衔接
+
+```bash
+bash code/chapter06_generation/scripts/run_generation_core.sh
+```
+
+Request 契约测试验证终态，Generation component 验证 Prefill、Decode、停止和回调顺序；这些结果对应成熟框架在调度与缓存之外仍需保持的单请求语义。[`Chapter07`](../../chapter07_kv_cache/next/intro.md) 将在不改变这些语义的前提下，把模型 K/V 放入分页物理块。

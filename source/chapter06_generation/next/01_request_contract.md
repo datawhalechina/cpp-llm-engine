@@ -13,7 +13,7 @@
 | 已生成词元 | `generated()` | 采样结果成功后追加 |
 | 当前阶段 | `phase()` | Prefill、Decode 或结束事件发生时改变 |
 | 失败原因 | `failure_reason()` | 模型执行失败时写入 |
-| 教学词元历史 | `cache()` | prompt 或生成词元提交后追加 |
+| 教学词元历史 | `history()` | prompt 或生成词元提交后追加 |
 
 `Initial`、`Prefilled` 和 `Decoding` 表示请求仍可推进。`Finished`、`Cancelled`、`TimedOut`、`Rejected` 和 `Failed` 都是终态；终态请求不会再增加 Prefill 游标或生成词元。
 
@@ -30,7 +30,7 @@
 | `decode(token)` | 上一步已生成词元 | 下一组 logits | 追加该词元对应的模型 K/V |
 | `execution_state()` | 无 | 已提交词元数和 K/V 层数 | 只读观察，不推进模型 |
 
-请求归 Generation Core 管理可观察状态；执行器持有真实模型 Context。教学 `cache()` 当前保存词元 ID，不能代替真实模型的分层 K/V，也不承担物理 Block 分配。
+请求归 Generation Core 管理可观察状态；执行器持有真实模型 Context。`history()` 保存词元 ID，用于观察请求推进；真实模型的分层 K/V 由执行器持有，物理 Block 分配在 Chapter07 引入。
 
 ## 验证请求状态
 
@@ -45,4 +45,4 @@ ctest --test-dir /tmp/cpp-llm-chapter06-contract \
   -R '^chapter06_request_contract_test$' --output-on-failure
 ```
 
-通过时可以观察到 prompt 与缓存互不混淆、Prefill 游标单调递增且不越界、五种终态都拒绝后续状态变化。下一篇使用这组契约区分 Prefill 与 Decode。
+通过时可以观察到 prompt 与词元历史分别保存、Prefill 游标单调递增且不越界、五种终态都拒绝后续状态变化。下一篇使用这组契约区分 Prefill 与 Decode。
