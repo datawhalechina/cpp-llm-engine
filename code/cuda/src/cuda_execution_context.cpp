@@ -336,6 +336,15 @@ core::Status CudaExecutionContext::append_kv(
     return cache->append(key, value, stream_);
 }
 
+core::Status CudaExecutionContext::download_kv(
+    const CudaKvCache& cache,
+    float* key,
+    float* value,
+    std::size_t token_count) const {
+    if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
+    return cache.copy_to_host_async(key, value, token_count, stream_);
+}
+
 core::Status CudaExecutionContext::reserve_workspace(std::size_t bytes) {
     if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
     return workspace_.reserve(bytes).to_core_status();

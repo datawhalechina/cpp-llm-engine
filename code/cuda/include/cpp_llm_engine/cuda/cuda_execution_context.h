@@ -76,6 +76,11 @@ public:
         CudaKvCache* cache,
         const CudaTensor& key,
         const CudaTensor& value) const;
+    core::Status download_kv(
+        const CudaKvCache& cache,
+        float* key,
+        float* value,
+        std::size_t token_count) const;
     core::Status gqa_attention(
         const CudaTensor& query,
         const CudaKvCache& cache,

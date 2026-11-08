@@ -1,0 +1,242 @@
+// Engine CUDA：验证真实 TinyLlama layer-0 的单 token 前向。
+// 职责：用 Chapter05 CPU fused 路径生成独立参考，再核对 CUDA hidden 与 K/V。
+// 通过条件：真实权重上传、首层执行、缓存增长和 CPU/CUDA 数值误差均符合契约。
+#include "cpp_llm_engine/cuda_llama_layer_weights.h"
+
+#include "chapter05_quantization/q4k_dequantize.h"
+#include "chapter05_quantization/q4k_linear.h"
+#include "chapter05_quantization/q6k_linear.h"
+#include "cpp_llm_engine/cuda/cuda_decoder_layer.h"
+#include "cpp_llm_engine/cuda/cuda_execution_context.h"
+#include "cpp_llm_engine/cuda/cuda_kv_cache.h"
+#include "gguf_reader.h"
+#include "gguf_tensor_loader.h"
+#include "model_metadata_adapter.h"
+#include "model_schema.h"
+#include "real_layer_weights.h"
+
+#include <cuda_runtime_api.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <iostream>
+#include <string>
+#include <vector>
+
+#define CHECK(c) do { if (!(c)) { std::cerr << "check failed line " << __LINE__ << '\n'; return 1; } } while (false)
+
+namespace {
+
+const chapter01::GgufTensorInfo* find_tensor(
+    const chapter01::GgufModelIndex& index, const std::string& name) {
+    for (const auto& tensor : index.tensors) {
+        if (tensor.name == name) return &tensor;
+    }
+    return nullptr;
+}
+
+bool load_named(
+    const std::string& path,
+    const chapter01::GgufModelIndex& index,
+    const std::string& name,
+    chapter01::Tensor* output,
+    std::string* error) {
+    const auto* info = find_tensor(index, name);
+    if (info == nullptr) {
+        *error = "missing tensor: " + name;
+        return false;
+    }
+    return chapter01::GgufTensorLoader::load_tensor(path, index, *info, output, error);
+}
+
+bool linear(
+    const chapter01::Tensor& weight,
+    const std::vector<float>& input,
+    std::vector<float>* output,
+    std::string* error) {
+    if (weight.shape().size() != 2) {
+        *error = "Linear weight is not rank 2: " + weight.name();
+        return false;
+    }
+    const auto rows = static_cast<std::size_t>(weight.shape()[1]);
+    const auto cols = static_cast<std::size_t>(weight.shape()[0]);
+    const auto* payload = reinterpret_cast<const std::uint8_t*>(weight.raw_data());
+    if (weight.dtype() == chapter01::DType::Q4_K) {
+        return chapter05_quantization::Q4KLinearFused::forward(
+            payload, weight.bytes(), rows, cols, input, output, error);
+    }
+    if (weight.dtype() == chapter01::DType::Q6_K) {
+        return chapter05_quantization::Q6KLinearFused::forward(
+            payload, weight.bytes(), rows, cols, input, output, error);
+    }
+    *error = "Linear weight is not Q4_K/Q6_K: " + weight.name();
+    return false;
+}
+
+std::vector<float> rms_norm(
+    const std::vector<float>& input,
+    const std::vector<float>& weight,
+    float epsilon) {
+    float square_sum = 0.0F;
+    for (float value : input) square_sum += value * value;
+    const float inverse = 1.0F /
+        std::sqrt(square_sum / static_cast<float>(input.size()) + epsilon);
+    std::vector<float> output(input.size());
+    for (std::size_t i = 0; i < input.size(); ++i) {
+        output[i] = input[i] * inverse * weight[i];
+    }
+    return output;
+}
+
+bool close(
+    const std::vector<float>& actual,
+    const std::vector<float>& expected,
+    float* max_error) {
+    if (actual.size() != expected.size()) return false;
+    float maximum = 0.0F;
+    for (std::size_t i = 0; i < actual.size(); ++i) {
+        const float error = std::fabs(actual[i] - expected[i]);
+        maximum = std::max(maximum, error);
+        if (!std::isfinite(actual[i]) ||
+            error > 3.0e-2F + 5.0e-3F * std::fabs(expected[i])) {
+            if (max_error != nullptr) *max_error = maximum;
+            return false;
+        }
+    }
+    if (max_error != nullptr) *max_error = maximum;
+    return true;
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+    if (argc != 2) {
+        std::cerr << "usage: real_tinyllama_cuda_first_layer_test <model.gguf>\n";
+        return 2;
+    }
+    int devices = 0;
+    CHECK(cudaGetDeviceCount(&devices) == cudaSuccess && devices > 0);
+
+    const std::string model_path = argv[1];
+    std::string error;
+    chapter01::GgufModelIndex index;
+    CHECK(chapter01::GgufReader::read_index(model_path, &index, &error));
+    chapter01::ModelMetadata metadata;
+    CHECK(chapter01::ModelMetadataAdapter::from_gguf(index.metadata, &metadata, &error));
+    chapter01::LlamaTensorLayout layout;
+    CHECK(chapter01::ModelSchema::validate_gguf(metadata, index, &layout, &error));
+
+    chapter01::Tensor embedding;
+    CHECK(load_named(model_path, index, layout.embedding, &embedding, &error));
+    chapter01::RealLlamaLayerWeights host_weights;
+    CHECK(chapter01::RealLlamaLayerLoader::load(
+        model_path, index, layout, 0, &host_weights, &error));
+
+    constexpr std::size_t kTokenId = 15043;
+    constexpr std::size_t kQ4BlockElements = 256;
+    constexpr std::size_t kQ4BlockBytes = 144;
+    CHECK(embedding.dtype() == chapter01::DType::Q4_K);
+    const std::size_t embedding_row_bytes =
+        metadata.hidden_size / kQ4BlockElements * kQ4BlockBytes;
+    const std::size_t embedding_offset = kTokenId * embedding_row_bytes;
+    CHECK(embedding_offset + embedding_row_bytes <= embedding.bytes());
+    std::vector<float> initial_hidden;
+    CHECK(chapter05_quantization::dequantize_q4_k(
+        reinterpret_cast<const std::uint8_t*>(embedding.raw_data()) + embedding_offset,
+        embedding_row_bytes, metadata.hidden_size, &initial_hidden, &error));
+
+    const auto attention_norm = host_weights.attn_norm.to_vector<float>();
+    const auto ffn_norm = host_weights.ffn_norm.to_vector<float>();
+    const auto normalized = rms_norm(
+        initial_hidden, attention_norm, metadata.rms_norm_epsilon);
+    std::vector<float> query;
+    std::vector<float> key;
+    std::vector<float> value;
+    CHECK(linear(host_weights.attn_q, normalized, &query, &error));
+    CHECK(linear(host_weights.attn_k, normalized, &key, &error));
+    CHECK(linear(host_weights.attn_v, normalized, &value, &error));
+
+    const std::size_t query_heads = metadata.attention_head_count;
+    const std::size_t kv_heads = metadata.attention_head_count_kv;
+    CHECK(query_heads > 0 && kv_heads > 0 && query_heads % kv_heads == 0);
+    const std::size_t head_dimension = metadata.hidden_size / query_heads;
+    std::vector<float> attention(metadata.hidden_size, 0.0F);
+    for (std::size_t query_head = 0; query_head < query_heads; ++query_head) {
+        const std::size_t kv_head = query_head / (query_heads / kv_heads);
+        std::copy_n(
+            value.begin() + kv_head * head_dimension,
+            head_dimension,
+            attention.begin() + query_head * head_dimension);
+    }
+    std::vector<float> attention_projection;
+    CHECK(linear(
+        host_weights.attn_output, attention, &attention_projection, &error));
+    std::vector<float> expected = initial_hidden;
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        expected[i] += attention_projection[i];
+    }
+    const auto ffn_input = rms_norm(expected, ffn_norm, metadata.rms_norm_epsilon);
+    std::vector<float> gate;
+    std::vector<float> up;
+    CHECK(linear(host_weights.ffn_gate, ffn_input, &gate, &error));
+    CHECK(linear(host_weights.ffn_up, ffn_input, &up, &error));
+    for (std::size_t i = 0; i < gate.size(); ++i) {
+        gate[i] = gate[i] / (1.0F + std::exp(-gate[i])) * up[i];
+    }
+    std::vector<float> ffn_projection;
+    CHECK(linear(host_weights.ffn_down, gate, &ffn_projection, &error));
+    for (std::size_t i = 0; i < expected.size(); ++i) expected[i] += ffn_projection[i];
+
+    cpp_llm_engine::cuda::CudaExecutionContext context;
+    CHECK(cpp_llm_engine::cuda::CudaExecutionContext::create(&context).is_ok());
+    cpp_llm_engine::CudaLlamaLayerWeights device_weights;
+    CHECK(cpp_llm_engine::CudaLlamaLayerWeights::upload(
+        &context, host_weights, &device_weights).is_ok());
+    const std::size_t ffn_size = static_cast<std::size_t>(host_weights.ffn_gate.shape()[1]);
+    const std::size_t rope_dimension = metadata.rope_dimension_count == 0
+        ? head_dimension : metadata.rope_dimension_count;
+    const cpp_llm_engine::cuda::CudaDecoderLayerConfig config{
+        metadata.hidden_size, ffn_size, query_heads, kv_heads, head_dimension,
+        rope_dimension, metadata.rms_norm_epsilon, metadata.rope_freq_base};
+    cpp_llm_engine::cuda::CudaDecoderLayer layer;
+    cpp_llm_engine::cuda::CudaKvCache cache;
+    CHECK(cpp_llm_engine::cuda::CudaDecoderLayer::create(config, &layer).is_ok());
+    CHECK(cpp_llm_engine::cuda::CudaKvCache::create(
+        1, kv_heads, head_dimension, &cache).is_ok());
+    cpp_llm_engine::cuda::CudaTensor hidden;
+    CHECK(cpp_llm_engine::cuda::CudaTensor::create_contiguous(
+        {metadata.hidden_size}, cpp_llm_engine::core::DType::Float32, &hidden).is_ok());
+    CHECK(context.upload(
+        &hidden, initial_hidden.data(), initial_hidden.size() * sizeof(float)).is_ok());
+    CHECK(layer.forward(
+        &context, device_weights.decoder_weights(), &cache, &hidden, 0).is_ok());
+
+    std::vector<float> actual(metadata.hidden_size);
+    std::vector<float> actual_key(key.size());
+    std::vector<float> actual_value(value.size());
+    CHECK(context.download(
+        hidden, actual.data(), actual.size() * sizeof(float)).is_ok());
+    CHECK(context.download_kv(
+        cache, actual_key.data(), actual_value.data(), 1).is_ok());
+    CHECK(context.synchronize().is_ok());
+    float hidden_error = 0.0F;
+    float key_error = 0.0F;
+    float value_error = 0.0F;
+    CHECK(close(actual, expected, &hidden_error));
+    CHECK(close(actual_key, key, &key_error));
+    CHECK(close(actual_value, value, &value_error));
+    CHECK(cache.size_tokens() == 1);
+    cpp_llm_engine::cuda::CudaExecutionContext invalid_context;
+    CHECK(!invalid_context.download_kv(
+        cache, actual_key.data(), actual_value.data(), 1).is_ok());
+    CHECK(!context.download_kv(cache, nullptr, actual_value.data(), 1).is_ok());
+    std::cout << "cuda_first_layer_match: true\n"
+              << "hidden_max_error: " << hidden_error << '\n'
+              << "key_max_error: " << key_error << '\n'
+              << "value_max_error: " << value_error << '\n';
+    return 0;
+}
+
+#undef CHECK

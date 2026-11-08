@@ -11,6 +11,8 @@ option(CHAPTER01_ENABLE_LLAMA_CPP "Build the real llama.cpp tokenizer backend" O
 option(CPP_LLM_ENGINE_ENABLE_CUDA "Build optional CUDA model adapters" OFF)
 set(LLAMA_CPP_ROOT "" CACHE PATH "llama.cpp checkout containing include/ and build/bin/")
 set(CPP_LLM_ENGINE_REAL_MODEL "" CACHE FILEPATH "Optional GGUF used by real-model CTest")
+set(CPP_LLM_ENGINE_CUDA_REAL_MODEL "" CACHE FILEPATH
+    "Optional GGUF used by the real CUDA layer CTest")
 set(CHAPTER05_SOURCE_DIR "" CACHE PATH "Optional Chapter 05 source directory for real-model execution")
 
 add_subdirectory(
@@ -64,6 +66,14 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
     )
     target_link_libraries(cuda_llama_layer_weights_test PRIVATE cpp_llm_engine)
     cpp_llm_prepare_test(cuda_llama_layer_weights_test)
+    if(TARGET chapter05_quantization)
+        add_executable(real_tinyllama_cuda_first_layer_test
+            tests/real_tinyllama_cuda_first_layer_test.cpp
+        )
+        target_link_libraries(real_tinyllama_cuda_first_layer_test
+            PRIVATE cpp_llm_engine chapter05_quantization)
+        cpp_llm_prepare_test(real_tinyllama_cuda_first_layer_test)
+    endif()
 endif()
 
 target_include_directories(cpp_llm_engine
@@ -156,6 +166,26 @@ cpp_llm_set_test_labels(embedding_request_service_test integration engine servin
 if(CPP_LLM_ENGINE_ENABLE_CUDA)
     add_test(NAME cuda_llama_layer_weights_test COMMAND cuda_llama_layer_weights_test)
     cpp_llm_set_test_labels(cuda_llama_layer_weights_test cuda integration)
+    if(CPP_LLM_ENGINE_CUDA_REAL_MODEL)
+        if(NOT EXISTS "${CPP_LLM_ENGINE_CUDA_REAL_MODEL}")
+            message(FATAL_ERROR "CPP_LLM_ENGINE_CUDA_REAL_MODEL does not exist")
+        endif()
+        if(NOT TARGET real_tinyllama_cuda_first_layer_test)
+            message(FATAL_ERROR
+                "CPP_LLM_ENGINE_CUDA_REAL_MODEL requires CHAPTER05_SOURCE_DIR")
+        endif()
+        add_test(
+            NAME real_tinyllama_cuda_first_layer_test
+            COMMAND real_tinyllama_cuda_first_layer_test
+                "${CPP_LLM_ENGINE_CUDA_REAL_MODEL}"
+        )
+        cpp_llm_set_test_labels(
+            real_tinyllama_cuda_first_layer_test
+            real_model slow cuda decoder integration)
+        cpp_llm_set_test_contract(
+            real_tinyllama_cuda_first_layer_test
+            OWNER 04 LEVEL real_model STATUS active)
+    endif()
 endif()
 
 if(CPP_LLM_ENGINE_REAL_MODEL)
