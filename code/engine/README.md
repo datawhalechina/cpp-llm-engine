@@ -6,8 +6,8 @@
 
 | 资产 | 作用 |
 | --- | --- |
-| `include/` | toy Engine、真实 TinyLlama Engine、Tokenizer 和每请求执行器工厂接口 |
-| `src/` | prompt、Tokenizer backend、教学 decoder 与真实 Model/Context 的运行时适配 |
+| `include/` | toy Engine、真实 TinyLlama Engine、Tokenizer、执行器工厂和可选 CUDA 权重对象接口 |
+| `src/` | prompt、Tokenizer backend、教学 decoder、真实 Model/Context 适配与 CUDA 单层权重上传 |
 | `tests/` | core contract、engine、embedding Runtime 与 ServiceCore 集成测试 |
 | `EmbeddingRequestExecutor` | 预计算 text/visual embedding -> Chapter06 每请求执行器 |
 | `examples/` | First Success、真实生成/服务/HTTP smoke 和真实服务 benchmark |
@@ -16,7 +16,7 @@
 | `scripts/run_real_batch_benchmark.sh` | 可选 TinyLlama sequential/scalar Linear batch 配对 benchmark，并输出 Chapter08 可消费的分段计时 |
 | `scripts/run_real_decoder_profile.sh` | 可选 TinyLlama Decoder 子阶段计时与结果归档 |
 | `scripts/run_real_http_server.sh` | 启动真实 TinyLlama HTTP server，或以 `--check` 执行 curl 闭环 |
-| `CMakeLists.txt` | CPU-only 集成构建 |
+| `CMakeLists.txt` | CPU 集成构建，以及显式启用的 CUDA 权重适配测试 |
 
 ## 运行与验证
 
@@ -28,6 +28,8 @@ ctest --test-dir code/engine/build --output-on-failure
 ```
 
 默认构建使用 toy config、toy tokenizer 和教学 decoder，适合快速回归接口与状态机。可选真实路径读取 TinyLlama GGUF，执行真实 tokenizer、22 层 CPU Decoder、greedy sampling 和 detokenize；真实服务 smoke 使用 3-token step budget 验证 append-prefill、双请求隔离和 Block KV 回收，但不代表生产并发性能。
+
+启用 `CPP_LLM_ENGINE_ENABLE_CUDA=ON` 后，Engine 还会构建 `CudaLlamaLayerWeights`。该对象把 Chapter01 的单层 host 权重转换为 Decoder 使用的 GPU 只读权重视图；当前验证止于上传契约，尚未把真实 TinyLlama 首层接入 CUDA Decoder forward。
 
 `EmbeddingRequestExecutor` 接收 Core `DecoderEmbeddingSequence` 和每请求 `DecoderExecutionContext`，把预计算 embedding 适配为 Chapter06 `RequestModelExecutor`。Request 中的 prompt position 只承担序列长度和调度计数，真实 hidden values 由 Context 消费；prefill 成功后适配器立即释放 embedding storage，decode 继续使用同一 Context 和既有 KV 生命周期。默认测试用合成 Context 验证 Runtime 生成、长度校验、错误传播与释放，不要求多模态模型文件。
 

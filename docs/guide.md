@@ -92,7 +92,7 @@ Linux 可直接使用上述配置。Windows 推荐使用 WSL2 Ubuntu，并把仓
 
 ### 2. 本地带 GPU 的学习环境
 
-当前 GPU 路径可以运行 `code/cuda` 的设备资源、cuBLAS MatMul、Q4_K/Q6_K Linear、RoPE、连续 KV、GQA 和合成 Decoder；下一里程碑是真实 TinyLlama GPU Decoder。
+当前 GPU 路径可以运行 `code/cuda` 的设备资源、cuBLAS MatMul、Q4_K/Q6_K Linear、RoPE、连续 KV、GQA 和合成 Decoder；`code/engine` 已能把 Chapter01 的单层 Float32 norm 与 Q4_K/Q6_K Linear 上传为 GPU 权重对象。下一里程碑是让真实 TinyLlama 首层在 CUDA Decoder 中执行并与 CPU 结果对照。
 
 建议配置：
 

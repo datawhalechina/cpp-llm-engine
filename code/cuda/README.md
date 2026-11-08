@@ -111,9 +111,15 @@ Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续�
 
 `CudaDecoderLayer` 按 `RMSNorm -> QKV Linear -> RoPE -> KV append -> GQA -> O Linear -> Residual -> RMSNorm -> gate/up -> SwiGLU -> down -> Residual` 编排已有 backend。权重由 Model 侧只读 Tensor 提供，KV Cache 仍由请求持有，层对象只持有可复用中间 Tensor。
 
-首个测试使用 `D=8、Hq/Hkv=4/2、Dh=2、FFN=12` 的可读合成权重，逐项检查 Attention Norm、GQA context、FFN Norm、SwiGLU 和最终 hidden。它证明整层执行顺序和所有权已闭合，不代表真实 TinyLlama 量化首层已经接入。
+首个测试使用 `D=8、Hq/Hkv=4/2、Dh=2、FFN=12` 的可读合成权重，逐项检查 Attention Norm、GQA context、FFN Norm、SwiGLU 和最终 hidden。它固定整层执行顺序和请求状态语义。
 
 真实权重接入使用 `CudaLinearWeight` 隔离格式差异：Float32 权重按 `[input, output]` Tensor 解释，Q4_K/Q6_K 按 `rows=output、cols=input` 的 packed Matrix 解释。量化 Linear 依据连续输入/输出的元素数校验 shape，因此 Q/K/V 可以直接写入 rank-3 Tensor；workspace 中的反量化矩阵只在计算期间复用，不成为永久模型副本。
+
+## 真实层权重上传
+
+`code/engine` 中的 `CudaLlamaLayerWeights` 接收 Chapter01 读取的单层权重，把两个 Float32 norm 和七个 Q4_K/Q6_K Linear 上传到显存。对象拥有上传后的 device storage；Chapter01 的 host Tensor 可以在同步完成后释放。上传先写入临时对象，九个权重全部成功后才替换原对象，因此格式错误不会破坏已有 GPU 权重。
+
+`cuda_llama_layer_weights_test` 检查九个权重的输入/输出方向、packed payload 字节数、norm 内容、移动语义、host 生命周期和失败原子性。该适配器完成了真实首层的权重准备；真实 TinyLlama hidden 输入、首层 CUDA forward 和 CPU 数值对照仍是下一步。
 
 ## 运行与验证
 

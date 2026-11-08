@@ -8,7 +8,7 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | --- | --- | --- |
 | A 教学闭环 | 用小尺寸 MHA、LayerNorm、FFN 和双残差组装一个 `DecoderLayer`，再用请求 Context 连接预填充与逐词元解码 | 单层输出、因果掩码、连续 KV 追加、请求隔离和失败原子性测试 |
 | B 真实 CPU | 先用 3D/4D Q/K/V 适配器核对通用多头注意力布局，再沿真实模型路径学习 TinyLlama 的 RMSNorm、RoPE、GQA、SwiGLU 和 22 层拓扑 | 批次隔离、首层权重映射、22 层结构与跨章数值证据 |
-| G GPU 扩展 | 保持解码器顺序和请求状态语义不变，把 Linear、RoPE、GQA、归一化和 FFN 换成 CUDA 后端 | 合成单层 CUDA Decoder 与 CPU 参考结果一致 |
+| G GPU 扩展 | 保持解码器顺序和请求状态语义不变，把 Linear、RoPE、GQA、归一化和 FFN 换成 CUDA 后端 | 合成单层 Decoder 已与 CPU 参考对齐；真实单层权重已可上传，真实首层 forward 待接入 |
 | M 多模态扩展 | 视觉编码器复用归一化、Attention、FFN 和双残差结构；视觉向量进入语言 Decoder 后复用请求 Context | SigLIP Block、视觉投影和统一 embedding 序列测试 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
