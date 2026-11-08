@@ -6,6 +6,26 @@
 bash code/chapter08_scheduling/scripts/run.sh
 ```
 
+## 代码架构
+
+调用方拥有 `Request`、`Sampler` 和请求专属 Executor；Chapter08 只保存策略状态或本步临时计划。同步执行按以下顺序连接 Chapter06 与 Chapter07：
+
+```text
+ScheduledRequest[]
+       │
+       ▼
+StepBatchPlanner ── PriorityAgingPolicy
+       │ StepBatchPlan（只读候选）
+       ▼
+ContinuousBatchScheduler
+       ├── KvCacheTransaction：reserve / commit / trim
+       ├── ExecutorBatchInput：token / position / request ID / K/V slot
+       ├── ExecutorBatchRunner：真实 Decode batch
+       └── Runtime：提交 logits、采样并更新 Request
+```
+
+Planner 不修改请求和缓存；Scheduler 在执行前预留资源，模型失败时裁剪到原计数，成功后才提交 K/V 与请求结果。Runner 必须自行回滚模型 Context，因为 Scheduler 只拥有请求与外部缓存事务。`OverlapScheduler` 只保存计划和状态快照，不拥有 Request、Executor 或物理块。
+
 ## 资产总览
 
 | 模块 | 学习内容 | 验证 |
@@ -15,17 +35,18 @@ bash code/chapter08_scheduling/scripts/run.sh
 | `PriorityAgingPolicy` | 优先级、等待老化和稳定的平局顺序 | `chapter08_priority_aging_test` |
 | `OverlapScheduler` | 预计算下一批，并在请求状态变化后拒绝旧计划 | `chapter08_overlap_scheduler_test` |
 | 缓存事务与批输入 | 预留 KV 槽位、执行、提交或回滚 | `chapter08_cache_transaction_test` |
-| Ragged Tensor Batch | 组织不同长度输入并批量执行 | `chapter08_tensor_batch_test` |
+| Ragged Tensor Batch | Chapter06 教学 Transformer 的批量 Prefill 前置能力 | `chapter08_tensor_batch_test`（integration） |
+| `ExecutorBatchInput`、`ExecutorBatchRunner` | 把 Decode 候选交给真实模型批量执行 | `chapter08_cache_transaction_test`、真实模型测试 |
 
 ## 阅读顺序
 
 1. 从 `scheduler.cpp` 对比 Round-robin 和 Tensor Batch，理解“选择请求”与“合并执行”的区别。
 2. 阅读 `StepBatchPlanner::build()`，观察请求数预算、词元预算和 Chunked Prefill 如何共同决定批次。
-3. 阅读 `ContinuousBatchScheduler::run_step()`，跟踪缓存预留、模型执行、请求推进和缓存提交。
+3. 阅读 `ExecutorBatchInput` 和 `ContinuousBatchScheduler::run_step()`，跟踪缓存预留、批输入、模型执行、请求推进和缓存提交。
 4. 阅读 `PriorityAgingPolicy`，确认高优先级与长时间等待如何平衡。
 5. 最后阅读 `OverlapScheduler`，理解预计算计划为什么必须绑定请求、模型和页表快照。
 
-一次调度步遵循“计划、预留、执行、提交”顺序。计划不修改请求；容量不足时请求留到下一轮；执行失败时释放本轮新增块；只有模型与请求都推进后才提交新的缓存长度。
+一次调度步遵循“计划、预留、执行、提交”顺序。计划不修改请求；容量不足时请求留到下一轮；执行失败时缓存裁剪到执行前词元数；只有模型与请求都推进后才提交新的缓存长度。
 
 ## 验证
 
@@ -35,7 +56,7 @@ bash code/chapter08_scheduling/scripts/run.sh
 bash code/chapter08_scheduling/scripts/run.sh
 ```
 
-有 TinyLlama GGUF 和已构建的 llama.cpp 时，再验证真实批量执行：
+有 TinyLlama GGUF 和已构建的 llama.cpp 时，再验证真实 Decode batch：
 
 ```bash
 bash code/chapter08_scheduling/scripts/run_real_batch.sh
@@ -43,4 +64,4 @@ bash code/chapter08_scheduling/scripts/run_real_batch.sh
 
 ## 扩展位置
 
-当前实现包含同步 CPU 调度、优先级老化和 overlap 计划校验。后续可以增加 Deadline、抢占和设备事件重叠；网络准入由 Chapter10 负责，前缀缓存复用建立在 Chapter07 的块管理之上。
+当前实现包含同步 CPU 调度、优先级老化、真实 Decode batch 和 overlap 计划校验。真实多请求 Prefill Tensor batch、Deadline、抢占和设备事件重叠仍待扩展；网络准入由 Chapter10 负责，前缀缓存复用建立在 Chapter07 的块管理之上。

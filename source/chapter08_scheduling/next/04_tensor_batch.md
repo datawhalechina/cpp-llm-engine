@@ -1,4 +1,4 @@
-# 08.4 把调度计划交给真实批量执行
+# 08.4 把调度计划交给真实 Decode Batch
 
 Step batch 回答本步选择谁，Executor batch 补齐 token、position 和 K/V 写入位置，Tensor batch 再把多行激活交给共享模型算子。循环调用多个单请求 Executor 不属于真正的模型批量计算。
 
@@ -10,25 +10,28 @@ Step batch 回答本步选择谁，Executor batch 补齐 token、position 和 K/
 | Executor batch | token、position、K/V 写入槽 | 可校验的模型输入行 |
 | Tensor batch | 多行激活、行边界或 batch 维度 | 一次算子或 Decoder 调用的多行输出 |
 
-## 当前真实 Decoder 合并了哪些计算
+## 当前真实 Decode 合并了哪些计算
 
-`RealLlamaCpuModel::decode_batch()` 让多个请求共享只读 TinyLlama 权重，每个请求保留独立 Context。Q/K/V、输出投影、FFN 和 LM Head 使用批量 Linear；不同历史长度的 Attention 按请求 ID 和 BlockTable 读取各自分页 K/V。
+`RealLlamaCpuModel::decode_batch()` 让多个请求共享只读 TinyLlama 权重，每个请求保留独立 Context。Decode 阶段的 Q/K/V、输出投影、FFN 和 LM Head 使用多行 Linear；不同历史长度的 Attention 仍按请求 ID 和 BlockTable 分别读取分页 K/V。真实多请求 Prefill 目前逐请求执行，不属于该批量路径。
 
 | 执行部分 | 当前方式 | 还需要什么 |
 | --- | --- | --- |
 | 量化 Linear | 多行激活共同遍历权重 | AVX2 专用批量内核和更少打包开销 |
 | Attention | 每个请求直接读取自己的分页 K/V | 融合的 Ragged/Paged Attention 批量内核 |
-| Prefill | Runtime 支持分块 | 真实多请求 Prefill Tensor batch |
+| Prefill | Runtime 支持分块，但真实模型仍逐请求执行 | 真实多请求 Prefill Tensor batch |
 | Decode | 真实多 Context 批量调用 | 减少打包开销并接入 GPU backend |
 
 ## 分页 K/V 怎样提交
 
-ServiceCore 在 admission 时把请求 ID 绑定到真实 Executor 的分页数据面。Prefill 和 Decode 都先预留槽位，Decoder 逐层写入 K/V，Attention 通过页表读取历史和当前行；所有层完成后提交，任一步失败都裁剪到执行前的位置。
+ServiceCore 在 admission 时把请求 ID 绑定到真实 Executor 的分页数据面。进入批量 Decode 前，Scheduler 为每个候选预留一个槽位并构造 token、position、request ID 和 K/V 写入位置；K/V 位置用于批输入校验，真实 Runner 再通过 request ID 找到已绑定的数据面。Decoder 逐层写入 K/V，Attention 通过页表读取历史和当前行。
+
+成功时 Runner 必须让每个模型 Context 恰好推进一个位置，并返回同顺序 logits；失败时 Runner 负责恢复模型 Context。Scheduler 随后负责提交或回滚 Request 与 Chapter07 资源，因为它无法直接修改模型内部状态。
 
 ```text
 admission bind request ID
-  -> prefill writes paged payload
+  -> per-request prefill writes paged payload
   -> reserve one slot per request
+  -> build ExecutorBatchInput
   -> real decode_batch
   -> every layer reads/writes paged K/V
   -> commit the complete batch
@@ -54,5 +57,5 @@ bash code/chapter08_scheduling/scripts/run_real_batch.sh
 
 | 环境 | 必须通过 |
 | --- | --- |
-| 无模型文件 | Ragged batch、重复请求拒绝、缓存事务和结果等价 |
+| 无模型文件 | Ragged batch、重复请求或槽位拒绝、缓存事务和结果等价 |
 | 本地 TinyLlama | 真实 batch golden、批量 Linear、失败回滚和分页计数一致 |
