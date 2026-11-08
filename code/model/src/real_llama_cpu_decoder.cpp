@@ -395,7 +395,7 @@ struct RealLlamaCpuContext::Impl {
             if (!decode_token_embedding(*model, token, &hidden, error)) return false;
         }
 
-        return forward_hidden(std::move(hidden), logits, error);
+        return forward_hidden(std::move(hidden), logits, nullptr, error);
     }
 
     bool forward_embedding(const float* embedding,
@@ -408,7 +408,8 @@ struct RealLlamaCpuContext::Impl {
             return false;
         }
         return forward_hidden(
-            std::vector<float>(embedding, embedding + hidden_size), logits, error);
+            std::vector<float>(embedding, embedding + hidden_size),
+            logits, nullptr, error);
     }
 
     bool forward_layer(
@@ -573,6 +574,7 @@ struct RealLlamaCpuContext::Impl {
 
     bool forward_hidden(std::vector<float> hidden,
                         std::vector<float>* logits,
+                        std::vector<float>* decoder_hidden,
                         std::string* error) {
         const std::size_t initial_position = position;
         if (external_kv != nullptr &&
@@ -585,10 +587,13 @@ struct RealLlamaCpuContext::Impl {
                 return false;
             }
         }
+        std::vector<float> hidden_result;
+        if (decoder_hidden != nullptr) hidden_result = hidden;
         if (!finish_hidden(std::move(hidden), logits, error)) {
             if (external_kv != nullptr) external_kv->trim(initial_position);
             return false;
         }
+        if (decoder_hidden != nullptr) *decoder_hidden = std::move(hidden_result);
         return true;
     }
 };
@@ -1086,6 +1091,17 @@ bool RealLlamaCpuContext::decode(TokenId token,
         return false;
     }
     return impl_->forward_token(token, logits, error);
+}
+
+bool RealLlamaCpuContext::forward_hidden_state(
+    const std::vector<float>& input,
+    std::vector<float>* output,
+    std::string* error) {
+    if (output == nullptr || input.size() != impl_->model->metadata.hidden_size) {
+        if (error != nullptr) *error = "CPU hidden input or output is invalid";
+        return false;
+    }
+    return impl_->forward_hidden(input, nullptr, output, error);
 }
 
 cpp_llm_engine::core::Status RealLlamaCpuContext::prefill_tokens(

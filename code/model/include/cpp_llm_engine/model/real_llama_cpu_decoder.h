@@ -134,6 +134,10 @@ public:
     bool decode(TokenId token,
                 std::vector<float>* logits,
                 std::string* error = nullptr);
+    bool forward_hidden_state(
+        const std::vector<float>& input,
+        std::vector<float>* output,
+        std::string* error = nullptr);
     cpp_llm_engine::core::Status prefill_tokens(
         const cpp_llm_engine::core::DecoderTokenSequence& tokens,
         cpp_llm_engine::core::DecoderLogits* logits) override;

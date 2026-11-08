@@ -1,4 +1,4 @@
-// Engine CUDA：声明 Chapter01 host layer 到 CUDA model weight 的上传适配器。
+// Llama CUDA Model：声明 Chapter01 host layer 到 device weight 的上传适配器。
 // 职责：保存两个 F32 norm 与七个 packed Linear，并生成 Decoder 只读权重视图。
 // 契约：Model 拥有该对象；上传完成后不再依赖 Chapter01 Tensor 生命周期。
 // 验证：可选真实 GPU 测试覆盖格式、方向、payload bytes、移动和失败路径。
@@ -11,7 +11,7 @@
 
 namespace chapter01 { struct RealLlamaLayerWeights; }
 
-namespace cpp_llm_engine {
+namespace cpp_llm_engine::model {
 
 class CudaLlamaLayerWeights final {
 public:
@@ -37,4 +37,4 @@ private:
     cuda::CudaQuantizedMatrix down_;
 };
 
-}  // namespace cpp_llm_engine
+}  // namespace cpp_llm_engine::model

@@ -1,13 +1,25 @@
 # Repository Engine First Success 首个纵向切片
 
-`code/engine` 把本教程自己的 CPU-only 纵向路径串成一个可运行切片，不替代 Chapter 00 的 llama.cpp 真实模型 baseline，也不是完整推理服务。
+`code/engine` 把本教程的 CPU 主线和可选 CUDA 后端串成可运行纵向切片，不替代 Chapter 00 的 llama.cpp 真实模型基线，也不是生产级推理服务。
+
+## 对象与所有权
+
+| 概念 | 代码角色 | 生命周期与所有权 |
+| --- | --- | --- |
+| 模型（Model） | 真实 CPU/CUDA Model | 长期复用，保存配置和共享只读权重 |
+| 执行器工厂（Factory） | `RealLlamaExecutorFactory`、`RealLlamaCudaExecutorFactory` | 长期复用，共享 Model、块池或批量工作区，并创建请求执行器 |
+| 请求执行器（Executor） | `RequestModelExecutor` 实现 | 每个请求独立，把 Prefill/Decode 转交给 Model 和 Context |
+| 模型执行上下文（Context） | CPU/CUDA Context | 每个请求独立，保存或绑定位置、分层 K/V 和后端状态 |
+| 批量工作区（Batch Workspace） | CUDA batch workspace | Factory 共享，只保存可复用临时张量，不保存请求历史 |
+
+Factory 的名称表示它负责按统一规则创建和装配 Executor，而不是执行调度。Context 在这里特指请求运行状态对象，不等同于模型的上下文窗口容量。
 
 ## 资产总览
 
 | 资产 | 作用 |
 | --- | --- |
-| `include/` | toy Engine、真实 TinyLlama Engine、Tokenizer、执行器工厂和可选 CUDA 权重对象接口 |
-| `src/` | prompt、Tokenizer backend、教学 decoder、真实 Model/Context 适配与 CUDA 单层权重上传 |
+| `include/` | toy Engine、真实 TinyLlama Engine、Tokenizer 和执行器工厂接口 |
+| `src/` | prompt、Tokenizer backend、教学 decoder 与真实 CPU Model/Context 适配 |
 | `tests/` | core contract、engine、embedding Runtime 与 ServiceCore 集成测试 |
 | `EmbeddingRequestExecutor` | 预计算 text/visual embedding -> Chapter06 每请求执行器 |
 | `examples/` | First Success、真实生成/服务/HTTP smoke 和真实服务 benchmark |
@@ -29,13 +41,43 @@ ctest --test-dir code/engine/build --output-on-failure
 
 默认构建使用 toy config、toy tokenizer 和教学 decoder，适合快速回归接口与状态机。可选真实路径读取 TinyLlama GGUF，执行真实 tokenizer、22 层 CPU Decoder、greedy sampling 和 detokenize；真实服务 smoke 使用 3-token step budget 验证 append-prefill、双请求隔离和 Block KV 回收，但不代表生产并发性能。
 
-启用 CUDA 后，Engine 会用 `CudaLlamaLayerWeights` 把 Chapter01 的单层 host 权重转换为 Decoder 使用的 GPU 只读权重视图。默认模型和 CUDA Toolkit 位于教程推荐路径时，只需运行：
+启用 CUDA 后，`code/model` 会把 Chapter01 的 host 权重上传为 Model 共享的 GPU 只读权重，并为请求创建独立 Context。默认模型和 CUDA Toolkit 位于教程推荐路径时，只需运行：
 
 ```bash
 bash code/engine/scripts/run_real_cuda_first_layer.sh
 ```
 
-模型或 Toolkit 位于其他位置时，通过 `CPP_LLM_ENGINE_MODEL_PATH` 和 `CUDA_HOME` 覆盖；需要保留构建目录排查问题时设置 `CUDA_REAL_LAYER_BUILD_DIR`。该入口需要真实 NVIDIA 设备，当前只执行单 token、单层；22 层 CUDA Model/Context 和 Generation Runtime 尚未接入。
+模型或 Toolkit 位于其他位置时，通过 `CPP_LLM_ENGINE_MODEL_PATH` 和 `CUDA_HOME` 覆盖；需要保留构建目录排查问题时设置 `CUDA_REAL_LAYER_BUILD_DIR`。该入口快速验收单 token、单层。继续运行下面的命令，会用同一 embedding 核对 CPU/CUDA 的 2 层与完整 22 层 hidden 和分层 K/V：
+
+```bash
+bash code/engine/scripts/run_real_cuda_decoder.sh
+```
+
+完整 Decoder 对照用于定位 hidden 与分层 K/V。继续运行 Runtime 入口，会从固定 token prompt 开始执行 CUDA embedding、22 层 Decoder、final norm、LM Head 和 greedy decode：
+
+```bash
+bash code/engine/scripts/run_real_cuda_runtime.sh
+```
+
+继续运行真实文本入口，会使用与 CPU Engine 相同的 llama.cpp tokenizer，并核对四个生成 token：
+
+```bash
+bash code/engine/scripts/run_real_cuda_generation.sh
+```
+
+最后把同一个执行器工厂注入 Chapter10，验证同步 Completion、SSE、取消、超时和终态资源释放：
+
+```bash
+bash code/engine/scripts/run_real_cuda_serving.sh
+```
+
+当前 CUDA 执行器工厂已实现 Chapter08 `ExecutorBatchRunner`。Decode batch 把多个请求上下文的 hidden 打包为批量 Tensor，共享 RMSNorm、QKV/输出投影、FFN 和 LM Head；RoPE 使用每请求位置，Attention 根据 Context 访问连续 K/V 或各自页表映射的分页 payload。整批失败会恢复所有 Context，错误 position、请求绑定或未预留槽位在执行前拒绝。
+
+连续 CUDA Executor 的完整 prompt 使用 `RealLlamaCudaContext::prefill_tokens()`，在请求级持久 Prefill workspace 中执行批量 embedding、多层 Tensor Prefill 和最终 logits；后续生成仍逐 token Decode。绑定分页数据面的请求暂时保留逐 token Prefill，因为分页多-query Attention 尚未实现。
+
+`RealLlamaCudaExecutorFactory::set_attention_mode()` 可在创建请求执行器前选择三阶段或融合在线 Attention。默认值保持三阶段；Chapter09 的 EXP-GPU-04 表明融合实现已通过端到端正确性，但两轮真实 Prefill/Decode 中位数没有稳定收益，因此该开关用于教学 A/B 和继续调优，不代表生产默认策略。
+
+执行器工厂按精确 batch size 缓存 `RealLlamaCudaBatchWorkspace`，复用 stream、cuBLAS handle、embedding rows、批量 hidden/logits 和 Decoder 中间 Tensor。同一工厂的批量调用由互斥锁串行保护；请求级位置和页表仍归各模型执行上下文所有，不进入 workspace。真实 Runtime 与 Service 测试覆盖双请求分页 batch、预留/提交分离、失败不推进和终态释放。融合 PagedAttention、跨 batch size 容量复用、并发 batch 和真实 socket server 尚未接入。
 
 `EmbeddingRequestExecutor` 接收 Core `DecoderEmbeddingSequence` 和每请求 `DecoderExecutionContext`，把预计算 embedding 适配为 Chapter06 `RequestModelExecutor`。Request 中的 prompt position 只承担序列长度和调度计数，真实 hidden values 由 Context 消费；prefill 成功后适配器立即释放 embedding storage，decode 继续使用同一 Context 和既有 KV 生命周期。默认测试用合成 Context 验证 Runtime 生成、长度校验、错误传播与释放，不要求多模态模型文件。
 

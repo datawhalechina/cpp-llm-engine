@@ -1,14 +1,11 @@
 // Engine CUDA：验证真实 TinyLlama layer-0 的单 token 前向。
 // 职责：用 Chapter05 CPU fused 路径生成独立参考，再核对 CUDA hidden 与 K/V。
 // 通过条件：真实权重上传、首层执行、缓存增长和 CPU/CUDA 数值误差均符合契约。
-#include "cpp_llm_engine/cuda_llama_layer_weights.h"
+#include "cpp_llm_engine/model/real_llama_cuda_model.h"
 
 #include "chapter05_quantization/q4k_dequantize.h"
 #include "chapter05_quantization/q4k_linear.h"
 #include "chapter05_quantization/q6k_linear.h"
-#include "cpp_llm_engine/cuda/cuda_decoder_layer.h"
-#include "cpp_llm_engine/cuda/cuda_execution_context.h"
-#include "cpp_llm_engine/cuda/cuda_kv_cache.h"
 #include "gguf_reader.h"
 #include "gguf_tensor_loader.h"
 #include "model_metadata_adapter.h"
@@ -189,53 +186,43 @@ int main(int argc, char** argv) {
     CHECK(linear(host_weights.ffn_down, gate, &ffn_projection, &error));
     for (std::size_t i = 0; i < expected.size(); ++i) expected[i] += ffn_projection[i];
 
-    cpp_llm_engine::cuda::CudaExecutionContext context;
-    CHECK(cpp_llm_engine::cuda::CudaExecutionContext::create(&context).is_ok());
-    cpp_llm_engine::CudaLlamaLayerWeights device_weights;
-    CHECK(cpp_llm_engine::CudaLlamaLayerWeights::upload(
-        &context, host_weights, &device_weights).is_ok());
-    const std::size_t ffn_size = static_cast<std::size_t>(host_weights.ffn_gate.shape()[1]);
-    const std::size_t rope_dimension = metadata.rope_dimension_count == 0
-        ? head_dimension : metadata.rope_dimension_count;
-    const cpp_llm_engine::cuda::CudaDecoderLayerConfig config{
-        metadata.hidden_size, ffn_size, query_heads, kv_heads, head_dimension,
-        rope_dimension, metadata.rms_norm_epsilon, metadata.rope_freq_base};
-    cpp_llm_engine::cuda::CudaDecoderLayer layer;
-    cpp_llm_engine::cuda::CudaKvCache cache;
-    CHECK(cpp_llm_engine::cuda::CudaDecoderLayer::create(config, &layer).is_ok());
-    CHECK(cpp_llm_engine::cuda::CudaKvCache::create(
-        1, kv_heads, head_dimension, &cache).is_ok());
-    cpp_llm_engine::cuda::CudaTensor hidden;
-    CHECK(cpp_llm_engine::cuda::CudaTensor::create_contiguous(
-        {metadata.hidden_size}, cpp_llm_engine::core::DType::Float32, &hidden).is_ok());
-    CHECK(context.upload(
-        &hidden, initial_hidden.data(), initial_hidden.size() * sizeof(float)).is_ok());
-    CHECK(layer.forward(
-        &context, device_weights.decoder_weights(), &cache, &hidden, 0).is_ok());
-
-    std::vector<float> actual(metadata.hidden_size);
-    std::vector<float> actual_key(key.size());
-    std::vector<float> actual_value(value.size());
-    CHECK(context.download(
-        hidden, actual.data(), actual.size() * sizeof(float)).is_ok());
-    CHECK(context.download_kv(
-        cache, actual_key.data(), actual_value.data(), 1).is_ok());
-    CHECK(context.synchronize().is_ok());
+    auto model = cpp_llm_engine::model::RealLlamaCudaModel::load(
+        model_path, 1, &error);
+    CHECK(model != nullptr);
+    CHECK(model->layer_count() == 1);
+    CHECK(model->model_layer_count() == metadata.layer_count);
+    CHECK(model->hidden_size() == metadata.hidden_size);
+    auto context = model->create_context(1, &error);
+    CHECK(context != nullptr);
+    std::vector<float> actual;
+    CHECK(context->forward_hidden(initial_hidden, &actual).is_ok());
+    CHECK(context->position() == 1);
+    std::vector<float> actual_key;
+    std::vector<float> actual_value;
+    CHECK(context->copy_layer_kv(0, &actual_key, &actual_value).is_ok());
     float hidden_error = 0.0F;
     float key_error = 0.0F;
     float value_error = 0.0F;
     CHECK(close(actual, expected, &hidden_error));
     CHECK(close(actual_key, key, &key_error));
     CHECK(close(actual_value, value, &value_error));
-    CHECK(cache.size_tokens() == 1);
-    cpp_llm_engine::cuda::CudaExecutionContext invalid_context;
-    CHECK(!invalid_context.download_kv(
-        cache, actual_key.data(), actual_value.data(), 1).is_ok());
-    CHECK(!context.download_kv(cache, nullptr, actual_value.data(), 1).is_ok());
+    CHECK(!context->forward_hidden(initial_hidden, &actual).is_ok());
+    CHECK(context->position() == 1);
+    context->reset();
+    CHECK(context->position() == 0);
+    std::vector<float> repeated;
+    CHECK(context->forward_hidden(initial_hidden, &repeated).is_ok());
+    CHECK(close(repeated, expected, nullptr));
+    auto isolated = model->create_context(1, &error);
+    CHECK(isolated != nullptr && isolated->position() == 0);
+    std::vector<float> isolated_output;
+    CHECK(isolated->forward_hidden(initial_hidden, &isolated_output).is_ok());
+    CHECK(close(isolated_output, expected, nullptr));
     std::cout << "cuda_first_layer_match: true\n"
               << "hidden_max_error: " << hidden_error << '\n'
               << "key_max_error: " << key_error << '\n'
-              << "value_max_error: " << value_error << '\n';
+              << "value_max_error: " << value_error << '\n'
+              << "request_context_isolation: true\n";
     return 0;
 }
 

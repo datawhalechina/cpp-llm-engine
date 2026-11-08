@@ -25,6 +25,13 @@ add_subdirectory(
     ${CMAKE_CURRENT_BINARY_DIR}/chapter01_tensor_loader
 )
 
+if(CPP_LLM_ENGINE_ENABLE_CUDA)
+    add_subdirectory(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../cuda
+        ${CMAKE_CURRENT_BINARY_DIR}/cuda
+    )
+endif()
+
 if(CHAPTER05_SOURCE_DIR)
     if(NOT EXISTS "${CHAPTER05_SOURCE_DIR}/CMakeLists.txt")
         message(FATAL_ERROR "CHAPTER05_SOURCE_DIR must point to Chapter 05")
@@ -33,6 +40,9 @@ if(CHAPTER05_SOURCE_DIR)
         ${CHAPTER05_SOURCE_DIR}
         ${CMAKE_CURRENT_BINARY_DIR}/chapter05_quantization
     )
+endif()
+
+if(CPP_LLM_ENGINE_ENABLE_CUDA OR TARGET chapter05_quantization)
     add_subdirectory(
         ${CMAKE_CURRENT_SOURCE_DIR}/../model
         ${CMAKE_CURRENT_BINARY_DIR}/model
@@ -55,24 +65,46 @@ add_library(cpp_llm_engine
 )
 
 if(CPP_LLM_ENGINE_ENABLE_CUDA)
-    add_subdirectory(
-        ${CMAKE_CURRENT_SOURCE_DIR}/../cuda
-        ${CMAKE_CURRENT_BINARY_DIR}/cuda
+    add_library(cpp_llm_engine_cuda_runtime
+        src/real_llama_cuda_executor_factory.cpp
     )
-    target_sources(cpp_llm_engine PRIVATE src/cuda_llama_layer_weights.cpp)
-    target_link_libraries(cpp_llm_engine PUBLIC cpp_llm_engine_cuda)
+    target_include_directories(cpp_llm_engine_cuda_runtime
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_link_libraries(cpp_llm_engine_cuda_runtime
+        PUBLIC cpp_llm_engine_model_cuda chapter06_generation chapter07_kv_cache
+    )
+    target_compile_features(cpp_llm_engine_cuda_runtime PUBLIC cxx_std_17)
     add_executable(cuda_llama_layer_weights_test
         tests/cuda_llama_layer_weights_test.cpp
     )
-    target_link_libraries(cuda_llama_layer_weights_test PRIVATE cpp_llm_engine)
+    target_link_libraries(cuda_llama_layer_weights_test
+        PRIVATE cpp_llm_engine_model_cuda)
     cpp_llm_prepare_test(cuda_llama_layer_weights_test)
     if(TARGET chapter05_quantization)
         add_executable(real_tinyllama_cuda_first_layer_test
             tests/real_tinyllama_cuda_first_layer_test.cpp
         )
+        add_executable(real_tinyllama_cuda_multilayer_test
+            tests/real_tinyllama_cuda_multilayer_test.cpp
+        )
+        add_executable(real_tinyllama_cuda_runtime_test
+            tests/real_tinyllama_cuda_runtime_test.cpp
+        )
+        add_executable(real_tinyllama_cuda_attention_benchmark
+            examples/real_tinyllama_cuda_attention_benchmark.cpp
+        )
         target_link_libraries(real_tinyllama_cuda_first_layer_test
-            PRIVATE cpp_llm_engine chapter05_quantization)
+            PRIVATE cpp_llm_engine_model_cuda chapter05_quantization)
+        target_link_libraries(real_tinyllama_cuda_multilayer_test
+            PRIVATE cpp_llm_engine_model cpp_llm_engine_model_cuda)
+        target_link_libraries(real_tinyllama_cuda_runtime_test
+            PRIVATE cpp_llm_engine_cuda_runtime)
+        target_link_libraries(real_tinyllama_cuda_attention_benchmark
+            PRIVATE cpp_llm_engine_cuda_runtime)
         cpp_llm_prepare_test(real_tinyllama_cuda_first_layer_test)
+        cpp_llm_prepare_test(real_tinyllama_cuda_multilayer_test)
+        cpp_llm_prepare_test(real_tinyllama_cuda_runtime_test)
     endif()
 endif()
 
@@ -93,8 +125,17 @@ if(CHAPTER01_ENABLE_LLAMA_CPP)
     if(NOT TARGET chapter01_real_tokenizer)
         message(FATAL_ERROR "CHAPTER01_ENABLE_LLAMA_CPP requires chapter01_real_tokenizer")
     endif()
-    target_sources(cpp_llm_engine PRIVATE src/real_tokenizer_backend.cpp)
-    target_link_libraries(cpp_llm_engine PUBLIC chapter01_real_tokenizer)
+    add_library(cpp_llm_engine_real_tokenizer
+        src/real_tokenizer_backend.cpp
+    )
+    target_include_directories(cpp_llm_engine_real_tokenizer
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_link_libraries(cpp_llm_engine_real_tokenizer
+        PUBLIC chapter01_real_tokenizer
+    )
+    target_compile_features(cpp_llm_engine_real_tokenizer PUBLIC cxx_std_17)
+    target_link_libraries(cpp_llm_engine PUBLIC cpp_llm_engine_real_tokenizer)
     add_executable(real_tokenizer_engine_smoke
         examples/real_tokenizer_engine_smoke.cpp
     )
@@ -102,6 +143,34 @@ if(CHAPTER01_ENABLE_LLAMA_CPP)
     set_target_properties(real_tokenizer_engine_smoke PROPERTIES
         BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
     )
+    if(TARGET cpp_llm_engine_cuda_runtime)
+        target_sources(cpp_llm_engine_cuda_runtime PRIVATE
+            src/real_llama_cuda_engine.cpp
+        )
+        target_link_libraries(cpp_llm_engine_cuda_runtime
+            PUBLIC cpp_llm_engine_real_tokenizer
+        )
+        add_executable(real_tinyllama_cuda_generation_smoke
+            examples/real_tinyllama_cuda_generation_smoke.cpp
+        )
+        add_executable(real_tinyllama_cuda_serving_smoke
+            examples/real_tinyllama_cuda_serving_smoke.cpp
+        )
+        target_link_libraries(real_tinyllama_cuda_generation_smoke
+            PRIVATE cpp_llm_engine_cuda_runtime
+        )
+        target_link_libraries(real_tinyllama_cuda_serving_smoke
+            PRIVATE cpp_llm_engine_cuda_runtime chapter10_serving
+        )
+        cpp_llm_prepare_test(real_tinyllama_cuda_generation_smoke)
+        cpp_llm_prepare_test(real_tinyllama_cuda_serving_smoke)
+        set_target_properties(real_tinyllama_cuda_generation_smoke PROPERTIES
+            BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
+        )
+        set_target_properties(real_tinyllama_cuda_serving_smoke PROPERTIES
+            BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
+        )
+    endif()
     if(TARGET cpp_llm_engine_model)
         target_sources(cpp_llm_engine PRIVATE
             src/real_llama_engine.cpp
@@ -179,12 +248,72 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
             COMMAND real_tinyllama_cuda_first_layer_test
                 "${CPP_LLM_ENGINE_CUDA_REAL_MODEL}"
         )
+        add_test(
+            NAME real_tinyllama_cuda_multilayer_test
+            COMMAND real_tinyllama_cuda_multilayer_test
+                "${CPP_LLM_ENGINE_CUDA_REAL_MODEL}" 2
+        )
+        add_test(
+            NAME real_tinyllama_cuda_full_decoder_test
+            COMMAND real_tinyllama_cuda_multilayer_test
+                "${CPP_LLM_ENGINE_CUDA_REAL_MODEL}" 22
+        )
+        add_test(
+            NAME real_tinyllama_cuda_runtime_test
+            COMMAND real_tinyllama_cuda_runtime_test
+                "${CPP_LLM_ENGINE_CUDA_REAL_MODEL}"
+        )
         cpp_llm_set_test_labels(
             real_tinyllama_cuda_first_layer_test
             real_model slow cuda decoder integration)
         cpp_llm_set_test_contract(
             real_tinyllama_cuda_first_layer_test
             OWNER 04 LEVEL real_model STATUS active)
+        cpp_llm_set_test_labels(
+            real_tinyllama_cuda_multilayer_test
+            real_model slow cuda decoder integration)
+        cpp_llm_set_test_contract(
+            real_tinyllama_cuda_multilayer_test
+            OWNER 04 LEVEL real_model STATUS active)
+        cpp_llm_set_test_labels(
+            real_tinyllama_cuda_full_decoder_test
+            real_model slow cuda decoder integration)
+        cpp_llm_set_test_contract(
+            real_tinyllama_cuda_full_decoder_test
+            OWNER 04 LEVEL real_model STATUS active)
+        cpp_llm_set_test_labels(
+            real_tinyllama_cuda_runtime_test
+            real_model slow cuda generation integration)
+        cpp_llm_set_test_contract(
+            real_tinyllama_cuda_runtime_test
+            OWNER 06 LEVEL real_model STATUS active)
+        if(TARGET real_tinyllama_cuda_generation_smoke)
+            add_test(
+                NAME real_tinyllama_cuda_generation_smoke
+                COMMAND real_tinyllama_cuda_generation_smoke
+                    "${CPP_LLM_ENGINE_CUDA_REAL_MODEL}"
+                    4
+                    "Hello TinyLlama"
+                    "29892,306,29915,29885"
+            )
+            cpp_llm_set_test_labels(
+                real_tinyllama_cuda_generation_smoke
+                real_model slow cuda generation integration tokenizer)
+            cpp_llm_set_test_contract(
+                real_tinyllama_cuda_generation_smoke
+                OWNER 06 LEVEL real_model STATUS active)
+            add_test(
+                NAME real_tinyllama_cuda_serving_smoke
+                COMMAND real_tinyllama_cuda_serving_smoke
+                    "${CPP_LLM_ENGINE_CUDA_REAL_MODEL}"
+            )
+            cpp_llm_set_test_labels(
+                real_tinyllama_cuda_serving_smoke
+                real_model slow cuda serving http streaming integration)
+            cpp_llm_set_test_contract(
+                real_tinyllama_cuda_serving_smoke
+                OWNER 10 LEVEL real_model STATUS active)
+        endif()
     endif()
 endif()
 

@@ -1,7 +1,7 @@
 // Engine CUDA：验证 Chapter01 layer 权重到 CUDA Model 权重的上传边界。
 // 职责：检查 F32 norm、Q4_K/Q6_K 格式、矩阵方向、payload bytes 和失败路径。
 // 通过条件：九个权重上传后视图有效，host 销毁不影响 device 所有权。
-#include "cpp_llm_engine/cuda_llama_layer_weights.h"
+#include "cpp_llm_engine/model/cuda_llama_layer_weights.h"
 
 #include "cpp_llm_engine/cuda/cuda_execution_context.h"
 #include "real_layer_weights.h"
@@ -74,8 +74,8 @@ int main() {
     cpp_llm_engine::cuda::CudaExecutionContext context;
     CHECK(cpp_llm_engine::cuda::CudaExecutionContext::create(&context).is_ok());
     chapter01::RealLlamaLayerWeights host = make_layer();
-    cpp_llm_engine::CudaLlamaLayerWeights device;
-    CHECK(cpp_llm_engine::CudaLlamaLayerWeights::upload(
+    cpp_llm_engine::model::CudaLlamaLayerWeights device;
+    CHECK(cpp_llm_engine::model::CudaLlamaLayerWeights::upload(
         &context, host, &device).is_ok());
     CHECK(device.valid());
     const auto weights = device.decoder_weights();
@@ -114,24 +114,24 @@ int main() {
     CHECK(device.valid());
     CHECK(device.decoder_weights().key.valid());
 
-    cpp_llm_engine::CudaLlamaLayerWeights moved = std::move(device);
+    cpp_llm_engine::model::CudaLlamaLayerWeights moved = std::move(device);
     CHECK(moved.valid());
     CHECK(!device.valid());
 
     chapter01::RealLlamaLayerWeights invalid = make_layer();
     invalid.attn_norm.set_dtype(chapter01::DType::Float16);
-    cpp_llm_engine::CudaLlamaLayerWeights rejected;
-    CHECK(!cpp_llm_engine::CudaLlamaLayerWeights::upload(
+    cpp_llm_engine::model::CudaLlamaLayerWeights rejected;
+    CHECK(!cpp_llm_engine::model::CudaLlamaLayerWeights::upload(
         &context, invalid, &rejected).is_ok());
     CHECK(!rejected.valid());
-    CHECK(!cpp_llm_engine::CudaLlamaLayerWeights::upload(
+    CHECK(!cpp_llm_engine::model::CudaLlamaLayerWeights::upload(
         nullptr, invalid, &rejected).is_ok());
-    CHECK(!cpp_llm_engine::CudaLlamaLayerWeights::upload(
+    CHECK(!cpp_llm_engine::model::CudaLlamaLayerWeights::upload(
         &context, make_layer(), nullptr).is_ok());
 
     invalid = make_layer();
     invalid.ffn_up.set_dtype(chapter01::DType::Float32);
-    CHECK(!cpp_llm_engine::CudaLlamaLayerWeights::upload(
+    CHECK(!cpp_llm_engine::model::CudaLlamaLayerWeights::upload(
         &context, invalid, &moved).is_ok());
     CHECK(moved.valid());
     CHECK(moved.down().cols() == 512);

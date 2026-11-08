@@ -1,8 +1,8 @@
-// Engine CUDA：实现真实 Llama layer 权重的格式校验与显存上传。
+// Llama CUDA Model：实现真实 layer 权重的格式校验与显存上传。
 // 职责：把 GGUF `[input,output]` shape 转换为 CUDA rows=output、cols=input。
 // 契约：仅接受 F32 norm 与 Q4_K/Q6_K Linear，不做永久 Float32 反量化。
 // 验证：cuda_llama_layer_weights_test 在真实 GPU 上执行。
-#include "cpp_llm_engine/cuda_llama_layer_weights.h"
+#include "cpp_llm_engine/model/cuda_llama_layer_weights.h"
 
 #include "cpp_llm_engine/cuda/cuda_execution_context.h"
 #include "real_layer_weights.h"
@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-namespace cpp_llm_engine {
+namespace cpp_llm_engine::model {
 namespace {
 
 core::Status upload_norm(
@@ -97,4 +97,4 @@ bool CudaLlamaLayerWeights::valid() const {
 const cuda::CudaQuantizedMatrix& CudaLlamaLayerWeights::query() const { return query_; }
 const cuda::CudaQuantizedMatrix& CudaLlamaLayerWeights::down() const { return down_; }
 
-}  // namespace cpp_llm_engine
+}  // namespace cpp_llm_engine::model
