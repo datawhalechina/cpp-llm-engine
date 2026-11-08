@@ -35,6 +35,31 @@ int main() {
         CPP_LLM_CHECK(suite, request_a.generated().empty());
     });
 
+    suite.run("cached prefix breaks equal priority prefill ties", [&] {
+        Request cold({1, 2});
+        Request cached({1, 2});
+        GreedySampler sampler;
+        const std::vector<ScheduledRequest> requests{
+            {10,
+             &cold,
+             &sampler,
+             std::make_shared<testing::FixedTokenExecutor>(5),
+             {0, 0, 0}},
+            {11,
+             &cached,
+             &sampler,
+             std::make_shared<testing::FixedTokenExecutor>(6),
+             {0, 1, 2}},
+        };
+
+        const auto plan = StepBatchPlanner{}.build(requests, 2);
+        CPP_LLM_REQUIRE(suite, plan.candidates.size() == 1);
+        CPP_LLM_CHECK(suite, plan.candidates.front().request_id == 11);
+        CPP_LLM_CHECK(suite, plan.candidates.front().token_count == 2);
+        CPP_LLM_CHECK(suite, cold.prefill_offset() == 0);
+        CPP_LLM_CHECK(suite, cached.prefill_offset() == 0);
+    });
+
     suite.run("successive steps mix decode and prefill", [&] {
         GenerationConfig config;
         config.max_new_tokens = 2;

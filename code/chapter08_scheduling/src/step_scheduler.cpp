@@ -125,6 +125,12 @@ StepBatchPlan StepBatchPlanner::build(
                 if (left_wait != right_wait) return left_wait > right_wait;
 
                 if (prefill) {
+                    const std::size_t left_cached =
+                        left_scheduled.scheduling.cached_prefix_tokens;
+                    const std::size_t right_cached =
+                        right_scheduled.scheduling.cached_prefix_tokens;
+                    if (left_cached != right_cached) return left_cached > right_cached;
+
                     const auto* left_request = left_scheduled.request;
                     const auto* right_request = right_scheduled.request;
                     const std::size_t left_progress = left_request == nullptr

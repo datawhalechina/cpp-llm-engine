@@ -25,6 +25,7 @@ struct ScheduledRequest {
     struct SchedulingMetadata {
         int priority = 0;
         std::size_t enqueue_sequence = 0;
+        std::size_t cached_prefix_tokens = 0;
     };
 
     ScheduledRequest(
