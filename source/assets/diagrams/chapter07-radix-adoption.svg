@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+  <title id="title">Radix 前缀命中进入真实模型 Context</title>
+  <desc id="desc">源请求发布完整 K/V 块。新请求命中后同步块表、请求预填充进度和模型位置，再只计算私有后缀。失败时释放目标请求引用并保持请求未推进。</desc>
+  <defs>
+    <style>text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }</style>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7faf8"/>
+      <stop offset="1" stop-color="#eef5f1"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#52606d"/>
+    </marker>
+    <marker id="arrow-main" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#087f5b"/>
+    </marker>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="132%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#102a24" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="520" rx="24" fill="url(#bg)"/>
+  <text x="56" y="54" font-size="27" font-weight="700" fill="#172033">Radix 命中后，三份位置必须一起推进</text>
+  <text x="56" y="83" font-size="15" fill="#52606d">共享的是已提交 K/V 块；请求只计算未命中的私有后缀</text>
+
+  <rect x="56" y="112" width="240" height="118" rx="16" fill="#ffffff" stroke="#9ab6c4" stroke-width="2"/>
+  <text x="176" y="144" text-anchor="middle" font-size="16" font-weight="700" fill="#315d72">源请求完成 Prefill</text>
+  <text x="176" y="174" text-anchor="middle" font-size="13" fill="#52606d">完整块已经提交</text>
+  <text x="176" y="199" text-anchor="middle" font-size="12" fill="#7b8b93">请求释放前发布索引</text>
+
+  <rect x="366" y="112" width="240" height="118" rx="16" fill="#087f5b" filter="url(#shadow)"/>
+  <text x="486" y="144" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">最长块对齐命中</text>
+  <text x="486" y="174" text-anchor="middle" font-size="13" fill="#d9fff1">词元路径 → 物理块</text>
+  <text x="486" y="199" text-anchor="middle" font-size="12" fill="#bcebd9">索引保留一份块引用</text>
+
+  <rect x="676" y="112" width="468" height="118" rx="16" fill="#ffffff" stroke="#87c9ad" stroke-width="2"/>
+  <text x="910" y="142" text-anchor="middle" font-size="16" font-weight="700" fill="#076449">新请求采用命中</text>
+  <g text-anchor="middle">
+    <rect x="700" y="164" width="128" height="42" rx="10" fill="#fff1df" stroke="#efc38e"/>
+    <text x="764" y="181" font-size="12" font-weight="700" fill="#92511b">块表</text>
+    <text x="764" y="197" font-size="10" fill="#7b5b3f">挂接共享块</text>
+    <rect x="846" y="164" width="128" height="42" rx="10" fill="#e8f1f6" stroke="#a9c3d2"/>
+    <text x="910" y="181" font-size="12" font-weight="700" fill="#315d72">请求进度</text>
+    <text x="910" y="197" font-size="10" fill="#526b78">跳过已算词元</text>
+    <rect x="992" y="164" width="128" height="42" rx="10" fill="#def4eb" stroke="#87c9ad"/>
+    <text x="1056" y="181" font-size="12" font-weight="700" fill="#076449">模型位置</text>
+    <text x="1056" y="197" font-size="10" fill="#456f60">从命中点续写</text>
+  </g>
+
+  <path d="M296 171 H366" fill="none" stroke="#52606d" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <path d="M606 171 H676" fill="none" stroke="#087f5b" stroke-width="2.6" marker-end="url(#arrow-main)"/>
+
+  <rect x="56" y="286" width="1088" height="142" rx="18" fill="#ffffff" stroke="#d6e0dc"/>
+  <text x="80" y="318" font-size="15" font-weight="700" fill="#52606d">采用成功后的执行</text>
+  <g text-anchor="middle">
+    <rect x="104" y="344" width="222" height="58" rx="12" fill="#def4eb" stroke="#87c9ad"/>
+    <text x="215" y="368" font-size="14" font-weight="700" fill="#076449">只读共享前缀</text>
+    <text x="215" y="389" font-size="11" fill="#456f60">不重复计算、不重复保存</text>
+    <rect x="414" y="344" width="222" height="58" rx="12" fill="#fff1df" stroke="#efc38e"/>
+    <text x="525" y="368" font-size="14" font-weight="700" fill="#92511b">计算私有后缀</text>
+    <text x="525" y="389" font-size="11" fill="#7b5b3f">至少保留一个词元产生 logits</text>
+    <rect x="724" y="344" width="174" height="58" rx="12" fill="#e8f1f6" stroke="#a9c3d2"/>
+    <text x="811" y="368" font-size="14" font-weight="700" fill="#315d72">继续 Decode</text>
+    <text x="811" y="389" font-size="11" fill="#526b78">写入私有尾块</text>
+    <rect x="986" y="344" width="110" height="58" rx="12" fill="#173f35"/>
+    <text x="1041" y="368" font-size="14" font-weight="700" fill="#ffffff">结果</text>
+    <text x="1041" y="389" font-size="11" fill="#d9fff1">与冷启动一致</text>
+  </g>
+  <path d="M326 373 H414" fill="none" stroke="#087f5b" stroke-width="2.4" marker-end="url(#arrow-main)"/>
+  <path d="M636 373 H724" fill="none" stroke="#52606d" stroke-width="2.4" marker-end="url(#arrow)"/>
+  <path d="M898 373 H986" fill="none" stroke="#52606d" stroke-width="2.4" marker-end="url(#arrow)"/>
+
+  <rect x="56" y="454" width="520" height="40" rx="11" fill="#def4eb" stroke="#87c9ad"/>
+  <text x="316" y="479" text-anchor="middle" font-size="13" font-weight="700" fill="#076449">容量不足：淘汰索引独占的最久未使用叶端块</text>
+  <rect x="600" y="454" width="544" height="40" rx="11" fill="#fff1df" stroke="#efc38e"/>
+  <text x="872" y="479" text-anchor="middle" font-size="13" font-weight="700" fill="#92511b">采用失败：释放目标引用，请求和模型位置保持未推进</text>
+</svg>

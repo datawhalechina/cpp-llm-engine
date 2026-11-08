@@ -25,7 +25,7 @@ ContinuousBatchScheduler
        └── Runtime：提交 logits、采样并更新 Request
 ```
 
-Planner 不修改请求和缓存；同优先级、同等待时间的 Prefill 请求优先选择 `cached_prefix_tokens` 更长者。该字段只提供排序证据，不会自动推进 Request 或模型 Context。Scheduler 在执行前预留资源，模型失败时裁剪到原计数，成功后才提交 K/V 与请求结果。Runner 必须自行回滚模型 Context，因为 Scheduler 只拥有请求与外部缓存事务。`OverlapScheduler` 只保存计划和状态快照，不拥有 Request、Executor 或物理块。
+Planner 不修改请求和缓存；同优先级、同等待时间的 Prefill 请求优先选择 `cached_prefix_tokens` 更长者。waiting 阶段的数值是 CPU/CUDA Factory 给出的无副作用估算，只决定哪个请求先获得运行槽；ServiceCore 提升请求时重新查询并采用真实前缀，再把实际长度交给 Planner。Scheduler 在执行前预留资源，模型失败时裁剪到原计数，成功后才提交 K/V 与请求结果。Runner 必须自行回滚模型 Context，因为 Scheduler 只拥有请求与外部缓存事务。`OverlapScheduler` 只保存计划和状态快照，不拥有 Request、Executor 或物理块。
 
 ## 阅读顺序与资产
 
@@ -63,4 +63,4 @@ bash code/chapter08_scheduling/scripts/run_real_batch.sh
 
 ## 扩展入口
 
-当前实现包含同步 CPU 调度、优先级老化、缓存命中排序、真实 Decode batch 和 overlap 计划校验。Chapter07 负责产生最长前缀命中并挂接共享块；模型 Context 采用命中、真实多请求 Prefill Tensor batch、Deadline、抢占和设备事件重叠仍待扩展。网络准入由 Chapter10 负责。
+当前实现包含同步 CPU 调度、优先级老化、真实 Radix 命中排序、真实 Decode batch 和 overlap 计划校验。Chapter10 用估算长度排列 waiting 请求，提升运行时再让 Chapter07 与 Engine 把真实 CPU/CUDA 命中同步到共享块、Request 和模型 Context；真实多请求 Prefill Tensor batch、Deadline、抢占和设备事件重叠仍待扩展。

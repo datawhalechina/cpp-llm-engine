@@ -9,13 +9,15 @@
 | 数据 | 代码表示 | 变化时机 |
 | --- | --- | --- |
 | 输入词元 | `prompt()` | 构造请求时固定 |
-| Prefill 进度 | `prefill_offset()` | 一段 prompt 成功提交后增加 |
+| Prefill 进度 | `prefill_offset()` | 一段 prompt 成功提交，或采用已验证的缓存前缀后增加 |
 | 已生成词元 | `generated()` | 采样结果成功后追加 |
 | 当前阶段 | `phase()` | Prefill、Decode 或结束事件发生时改变 |
 | 失败原因 | `failure_reason()` | 模型执行失败时写入 |
 | 教学词元历史 | `history()` | prompt 或生成词元提交后追加 |
 
 `Initial`、`Prefilled` 和 `Decoding` 表示请求仍可推进。`Finished`、`Cancelled`、`TimedOut`、`Rejected` 和 `Failed` 都是终态；终态请求不会再增加 Prefill 游标或生成词元。
+
+Chapter07 命中共享 K/V 前缀时，`adopt_prefilled_prefix()` 会把同一段 prompt 写入词元历史并推进 Prefill 游标。它只接受尚未执行的请求和严格短于完整 prompt 的前缀，防止 Request、模型 Context 与 K/V 块表从不同位置继续执行。
 
 ## 配置与模型执行器
 
@@ -57,4 +59,4 @@ ctest --test-dir /tmp/cpp-llm-chapter06-contract \
   -R '^chapter06_request_contract_test$' --output-on-failure
 ```
 
-通过时可以观察到 prompt 与词元历史分别保存、Prefill 游标单调递增且不越界、五种终态都拒绝后续状态变化。下一篇使用这组契约区分 Prefill 与 Decode。
+通过时可以观察到 prompt 与词元历史分别保存、缓存前缀同步推进两者、Prefill 游标单调递增且不越界、五种终态都拒绝后续状态变化。下一篇使用这组契约区分 Prefill 与 Decode。

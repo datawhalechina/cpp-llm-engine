@@ -6,13 +6,15 @@
 
 `CppHttplibServer` 只处理 socket 和 chunked write，并在进入当前单线程 `HttpAdapter` 前串行化调用。Adapter 解析 Completion 参数、持有请求对象并映射 HTTP/SSE 结果；`ServiceCore` 管理 waiting/running、准入、指标和终态释放，再把每个执行步交给 Chapter08。模型状态由请求专属 Executor/Context 持有，分页 K/V 通过 Chapter07 事务释放。
 
+配置批执行器后，准入顺序是“绑定请求数据面 → 估算缓存前缀 → 进入 waiting”。估算不增加块引用，同优先级请求只用它决定提升顺序；获得运行槽时再重新查询并采用真实前缀，同步块表、Request 和模型 Context，实际长度随后传给 Chapter08 Planner。终态释放顺序是“发布完整缓存块 → 释放请求块引用 → 清理历史与服务条目”。ServiceCore 只调用生命周期钩子，不解析 Radix 树或修改 K/V payload。
+
 | 调用阶段 | 主要对象 | 所有权与失败处理 |
 | --- | --- | --- |
 | 网络接入 | `CppHttplibServer`、`ResponseWriter` | Transport 拥有连接；断连或写回失败转换为取消 |
 | 协议映射 | `HttpAdapter` | Adapter 持有 Request，终态释放后才销毁 |
-| 生命周期 | `ServiceCore` | 保存 waiting/running 引用，统一统计并释放请求资源 |
+| 生命周期 | `ServiceCore` | 准入时绑定和估算，提升时采用缓存前缀，统一统计并释放资源 |
 | 调度执行 | Chapter08 Scheduler、Executor | 每步提交候选；失败写入 Request 终态 |
-| 缓存回收 | Chapter07 cache transaction | 完成、取消、超时和失败共用释放入口 |
+| 缓存发布与回收 | Chapter07 cache transaction、Engine Factory | 终态先发布可复用块，再释放请求引用 |
 
 当前互斥入口保证 Transport 不会并发修改 `ServiceCore`，但也使真实 HTTP Completion/SSE 串行执行。`RequestWorkerPool` 是独立 Context 的 CPU 重叠实验；Chapter08 Tensor Batch 是一次模型调用处理多请求，两者不属于当前 HTTP Transport 的并发能力。
 
@@ -20,7 +22,7 @@
 
 | 模块 | 学习内容 | 验证 |
 | --- | --- | --- |
-| `ServiceCore` | 准入、等待/运行队列、调度交接、指标和统一释放 | `chapter10_service_core_test` |
+| `ServiceCore` | 准入、缓存采用、等待/运行队列、调度交接、指标和统一释放 | `chapter10_service_core_test` |
 | `RequestWorkerPool` | 用独立 Request 与 Executor 并行执行 CPU 请求 | `chapter10_request_worker_test` |
 | `ResponseWriter` | 表达响应头、SSE 事件、断连和背压 | `chapter10_http_contract_test` |
 | `HttpAdapter` | 把 health、metrics 和 Completion 路由映射到 ServiceCore | `chapter10_http_contract_test` |

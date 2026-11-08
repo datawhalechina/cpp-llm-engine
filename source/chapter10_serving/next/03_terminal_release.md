@@ -13,14 +13,14 @@
 
 ## 当前统一释放顺序
 
-释放前先把请求标记为终态，避免它再次进入 StepBatchPlan。`release_terminal()` 清理 Request 的词元历史，释放 Chapter07 BlockTable，再移除服务条目；条目移除后，请求专属 Executor 引用随之释放。
+释放前先把请求标记为终态，避免它再次进入 StepBatchPlan。`release_terminal()` 先让执行器工厂发布可复用的完整 K/V 块，再释放请求持有的 Chapter07 BlockTable；随后清理词元历史并移除服务条目。Radix 索引拥有独立块引用，因此请求释放后仍可供后续请求命中。
 
 | 顺序 | 操作 | 验证事实 |
 | --- | --- | --- |
 | 1 | 写入唯一终态 | 请求不再可调度 |
 | 2 | 当前调度步完成提交或回滚 | Chapter08 测试固定事务结果 |
-| 3 | 清理 Request 缓存并释放 BlockTable | block pool 恢复容量 |
-| 4 | 移除服务条目和 Executor 引用 | inflight 归零 |
+| 3 | 发布完整 K/V 块，再释放请求 BlockTable | 可复用块由 Radix 索引继续持有 |
+| 4 | 清理 Request 历史，移除条目和 Executor 引用 | inflight 归零 |
 | 5 | 记录终态与 released 指标 | 重复调用不重复计数 |
 
 当前测试覆盖 waiting 取消、running 完成、显式超时、Executor 失败、重复释放，以及分页资源随请求终态归还。模型执行中的抢占式取消需要异步 Executor 支持，属于后续并发执行扩展。

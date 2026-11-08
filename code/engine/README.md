@@ -118,7 +118,9 @@ ctest --test-dir /tmp/cpp-llm-engine-real-generation \
 
 `RealLlamaExecutorFactory` 长期持有只读 `RealLlamaCpuModel`，每次 `create_executor()` 创建一个独立 `RealLlamaCpuContext`。Context 独占 position 和 22 层连续 K/V。`decode_batch()` 校验 position 后，在每层合并多个 Context 的 Q/K/V、输出投影、FFN 和 LM Head Linear；scalar Q4_K/Q6_K/Q8_0 backend 一次遍历权重并累加多个输入行。真实 batch CTest 证明不同长度 prompt 的 logits 和固定输出与顺序执行一致，错误 position 或 token 不会提交状态。AVX2 batch 仍使用逐行兼容路径，KV 也未写入分页 payload，因此尚不宣称批量吞吐收益。
 
-真实服务 smoke 用同一 Factory 为 `Hello TinyLlama` 和 `Hi` 创建两个 Executor；长 prompt 分块追加到同一 Context，中间 chunk 不产生 logits，固定输出仍分别为 `29892 306 29915 29885` 与 `839 744 29892 263`。terminal release 后，两个 Executor/Context 和 block table 均被释放。服务调度仍是单线程 step 正确性路径，不宣称线程安全。
+启用分页 K/V 后，CPU 和 CUDA Factory 都持有 `RadixPrefixCache`。请求结束时，完整物理块在释放请求页表前发布到前缀索引；新请求准入只估算可复用长度，获得运行槽时才重新查询并同步共享 `BlockTable`、Request 的 Prefill 进度和 CPU/CUDA Context 位置。`PrefixBlockStore` 让索引共用匹配和淘汰算法，同时保留两种 payload 的清理时序。容量不足时，数据面先回收最久未使用的索引独占叶端块，再重试预留；真实 CPU 和 CUDA 测试都使用相同四词元前缀比较冷启动与缓存命中路径，验证 logits 或首个生成词元一致。
+
+真实服务 smoke 用同一 Factory 为 `Hello TinyLlama` 和 `Hi` 创建两个 Executor；长 prompt 分块追加到同一 Context，中间 chunk 不产生 logits，固定输出仍分别为 `29892 306 29915 29885` 与 `839 744 29892 263`。测试还会先发布一组真实 K/V 前缀，再让冷请求与命中请求依次入队，检查后者先执行。terminal release 后 Executor/Context 和请求 block table 被释放，Radix 索引可继续持有可复用物理块。`real_serving_match: true` 是该测试的唯一总通过标记。
 
 `real_tinyllama_http_adapter_smoke` 把同一 Factory 注入 Chapter10 `HttpAdapter`，验证同步 JSON 返回第一组 token、SSE 按顺序返回第二组 token，并核对两个请求的 accepted/completed/released/generated metrics。需要继续验证真实 socket 时运行 `bash code/engine/scripts/run_real_http_server.sh --check`；去掉 `--check` 会保留服务供手工 curl。transport 只处理 HTTP/SSE，并用互斥锁串行调用当前单线程 ServiceCore。
 

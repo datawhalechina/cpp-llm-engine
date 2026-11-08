@@ -34,7 +34,7 @@ effective_priority = base_priority
 | Prefill 进度 | 较少者优先 | 让多个长输入轮换推进 |
 | 入队序号 | 较小者优先 | 固定平局结果 |
 
-`cached_prefix_tokens` 来自 Chapter07 的最长前缀匹配。Planner 只用它排序，不据此修改 `prefill_offset`，也不直接读取共享 K/V。只有模型 Context 和请求页表都采用命中后，执行层才能真正跳过对应 Prefill；当前实现尚未完成这一步。
+`cached_prefix_tokens` 在两个阶段有不同含义。准入时，ServiceCore 保存 Chapter07 给出的无副作用估算，只用它排列 waiting 请求，不增加块引用，也不推进 Request。请求获得运行槽时，Factory 重新查询并采用仍然有效的前缀，同时推进 `BlockTable`、`Request::prefill_offset()` 和模型 Context；随后交给 Planner 的才是实际采用长度。估算过期只会改变候选顺序，不能直接改变执行状态。
 
 ## 当前公平性保证到哪里
 
@@ -46,7 +46,7 @@ effective_priority = base_priority
 | 多个长输入按进度轮换 | step 边界协作式抢占 |
 | 小优先级差可由有界老化追平 | 缓存压力和持续 admission 下的长期公平性 |
 | 同优先级结果可复现 | 配额与多租户策略 |
-| 同级 Prefill 优先选择较长缓存命中 | 模型 Context 采用命中后的 Prefill 跳过 |
+| 同级 Prefill 按估算命中长度选择，运行前重新采用 | 缓存压力与命中收益联合评分 |
 
 ## 验证分块和老化
 
@@ -66,3 +66,5 @@ ctest --test-dir /tmp/cpp-llm-chapter08-policy \
 | 高优先级先执行，普通请求等待后获得机会 | 有效优先级 |
 | 老化不超过配置上限 | `max_aging_boost` |
 | 同级请求中缓存命中较长者先进入计划 | `cached_prefix_tokens` |
+
+真实纵向验收由 `real_tinyllama_serving_test` 完成：冷请求先入队，共享四词元 K/V 前缀的请求后入队，同优先级下命中请求先产生输出。

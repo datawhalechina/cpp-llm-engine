@@ -99,7 +99,7 @@ RoPE 请求使用连续 `[tokens, heads, head_dim]` 布局，在原 Tensor 上�
 
 `CudaKvCache` 分别独占 `[capacity_tokens, kv_heads, head_dim]` 的 K/V 连续显存。新 K/V 使用相同布局的 `CudaTensor` 输入，并在调用方 stream 上追加到当前 token 尾部；成功后才推进逻辑长度。`clear()` 只把长度归零以复用 allocation，`reset()` 才释放显存。
 
-首版保持连续布局，用于固定 prefill/decode 的数据语义和请求所有权。每个请求、每层应持有独立缓存；分页 block、回收池和 prefix sharing 属于后续 Runtime/服务优化，不能混入 P1-3 的数值基线。
+连续布局用于固定 prefill/decode 的数据语义和请求所有权，每个请求、每层持有独立缓存。分页 block、回收池和 prefix sharing 位于后文的分页路径，它们不改变这条数值基线。
 
 ## Causal GQA Attention
 
@@ -122,6 +122,8 @@ EXP-GPU-04 进一步比较 32-token Tensor Prefill 和一次 Decode。两轮端�
 `CudaPagedKvCache` 只拥有 `[layer, physical_block, slot, kv_head, head_dim]` 的共享设备 payload；请求 ID、逻辑块顺序和提交状态仍由 Chapter07 `KvBlockPool` 管理。写入接口接收 BlockTable 定位出的物理 block/slot，释放前可按物理块清零。
 
 `paged_gqa_attention()` 把请求的物理块列表上传到可复用 workspace。score 和 value kernel 将逻辑 token 拆为 `logical_block + slot`，经页表取得 physical block 后直接读取 payload，不先拼回连续 K/V。真实 GPU 测试构造 `{1, 0, 3}` 的非连续映射，对照双层 CPU GQA，并覆盖越界和清块。`RealLlamaCudaContext` 已接入 reserve、逐层写入、commit、trim 和 release；真实双请求 Decode batch 进一步验证不同页表共享批量 Linear，并由 Chapter08 统一提交或回滚。
+
+Engine 的 CUDA Factory 用 `PrefixBlockStore` 把同一 `RadixPrefixCache` 算法接到 `KvBlockPool` 和设备 payload。源请求释放时，索引持有的块不会被清空；只有最后一个引用将要释放时，Factory 才在专用 stream 上清理设备块。`RealLlamaCudaContext` 命中后同步推进 position，Executor 通过继续 Prefill 只计算私有后缀。真实 Runtime 测试将该路径与完整冷启动的首个生成词元对照。
 
 ## Decoder 逐元素算子
 

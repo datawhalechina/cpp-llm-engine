@@ -6,6 +6,8 @@
 
 调用方拥有 `Request`、`Sampler` 和请求专属 `RequestModelExecutor`，这些对象必须覆盖一次生成调用。`Runtime` 只保存配置和可选教学 `Transformer` 的非拥有指针；模型执行器持有位置与模型 K/V，`TokenHistory` 始终记录已经提交给请求的 token ID。模型失败先进入 Request 终态，batch logits 则先校验所有行再统一提交。
 
+`ExecutorBatchRunner` 还提供请求绑定、缓存前缀采用、缓存前缀发布和批量 Decode 交接点。Chapter06 只定义这些生命周期契约；Chapter07 保存共享 K/V，Engine Factory 同步真实模型 Context，Chapter10 决定准入与释放时机。
+
 ```text
 Request(prompt + phase + generated + token history)
    │
@@ -24,8 +26,8 @@ Request(prompt + phase + generated + token history)
 
 | 顺序 | 文件 | 阅读重点 | 对应验证 |
 | --- | --- | --- | --- |
-| 1 | `request.h`、`src/request.cpp` | Prefill 游标、生成结果和五种吸收终态 | `chapter06_request_contract_test` |
-| 2 | `model_executor.h` | 请求专属模型 Context、Prefill/Decode 和失败返回 | Generation component 的模型失败用例 |
+| 1 | `request.h`、`src/request.cpp` | Prefill 游标、缓存前缀采用、生成结果和五种吸收终态 | `chapter06_request_contract_test` |
+| 2 | `model_executor.h` | 请求专属 Context、Prefill/Decode、缓存生命周期钩子和失败返回 | Generation 与 ServiceCore 契约测试 |
 | 3 | `src/sampler.cpp`、`src/token_history.cpp` | Greedy 选择与可观察 token 历史 | sampler、token history unit 测试 |
 | 4 | `src/runtime.cpp` | 模型调用、提交、停止与回调顺序 | `chapter06_generation_test` |
 | 5 | `embedding.cpp`、`position_encoding.cpp`、`decoder_layer.cpp`、`transformer.cpp` | 无模型文件的确定性教学执行器 | `chapter06_generation_demo` |

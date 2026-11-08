@@ -1,6 +1,6 @@
 # 07.6 前缀复用与生产扩展
 
-相同提示词（prompt）不需要为每个请求重复保存完整 K/V。CPU 最小实现用 `RadixPrefixCache` 按词元路径索引已提交的完整物理块，新请求命中后共享这些只读块，只为后续词元分配私有块。
+相同提示词（prompt）不需要为每个请求重复保存完整 K/V。`RadixPrefixCache` 按词元路径索引已提交的完整物理块，CPU 和 CUDA 请求命中后共享这些只读块，只为后续词元分配私有块。
 
 ## 前缀复用增加什么
 
@@ -8,28 +8,25 @@
 
 索引沿词元逐个匹配，只在块边界记录可共享结果。假设块大小为 4，命中 6 个词元时只能复用前 4 个；剩余 2 个仍需计算。这样不会让两个请求共享一个仍可能继续写入的半满块。
 
-`KvBlockPool` 为每个物理块维护引用计数。Radix 索引持有一份引用，每个挂接的请求再持有一份；只有引用归零时，`CpuPagedKvCache` 才清空 payload 和写入标记。请求释放不会破坏其他请求正在读取的共享前缀。
+`KvBlockPool` 为每个物理块维护引用计数。Radix 索引持有一份引用，每个挂接的请求再持有一份。`PrefixBlockStore` 隔离索引与 payload：CPU 在最后一个引用释放后清理主机 K/V，CUDA 在降低最后一个引用前异步清理设备物理块。请求释放不会破坏索引或其他请求正在读取的共享前缀。
 
-```text
-tokens:  A B C D E F
-Radix:   └── A ─ B ─ C ─ D ─ E ─ F
-                         │       │
-block boundary:       block 0  block 1
-                         │
-new request:         share block 0 -> private suffix
-```
+命中后必须同时推进三份状态：`BlockTable` 挂接共享物理块，`Request` 跳过已完成的 Prefill 词元，模型 `Context` 从同一位置继续写 K/V。只修改其中一份会造成位置错位，后续 Attention 会读取错误历史或重复计算前缀。
 
-当前闭环没有容量淘汰和并发锁。Chapter08 已能按调用方提供的命中长度排序，但模型 Context 尚未自动采用 Radix 命中结果；调度器只消费“命中多少词元”和“还需多少块”，不接管 K/V payload。
+当前 CPU 与 CUDA Factory 都提供估算和采用两个入口。准入只遍历 Radix 路径，既不增加块引用，也不更新命中统计；请求获得运行槽时重新查询并采用真实前缀，在请求释放前发布可共享完整块。首版会保留至少一个未缓存的提示词词元：K/V payload 不保存最后一次前向传播产生的 logits，计算这个私有后缀才能得到首个生成词元。块池容量不足时，索引按最近使用时间从叶端后缀开始淘汰；仍被运行请求引用的块不会成为候选，较短的可达前缀也因此得以保留。Chapter08 只消费“命中多少词元”和“还需多少块”，不接管 K/V payload。
+
+![Radix 命中怎样进入请求与模型 Context](../../assets/diagrams/chapter07-radix-adoption.svg)
 
 | 对象 | 当前状态 | 解决的问题 |
 | --- | --- | --- |
 | Radix 前缀索引 | 已实现 | 新请求与哪些完整 K/V 块匹配 |
 | 共享引用计数 | 已实现 | 请求结束后物理块是否仍需保留 |
 | 命中长度 | 已实现 | 新请求可从哪个块边界继续计算 |
-| 执行锁 | 未实现 | 并发执行期间哪些块不能淘汰 |
-| 容量淘汰 | 未实现 | 块不足时先回收哪些缓存前缀 |
+| 活跃块保护 | CPU/CUDA 已实现 | 请求引用计数大于一时不参与索引淘汰 |
+| 容量淘汰 | CPU/CUDA 已实现 | 容量不足时后缀优先回收最久未使用的叶端块 |
+| 命中统计 | CPU/CUDA 已实现 | 记录查询、命中、未命中、匹配词元和淘汰块数 |
 | 缓存感知排序 | 已实现 | 同优先级请求中优先选择更长命中 |
-| 模型 Context 自动采用命中 | 未实现 | 跳过已缓存前缀并从私有后缀继续 |
+| 模型 Context 自动采用命中 | CPU/CUDA 已实现 | 同步块表、请求进度和模型位置，只计算私有后缀 |
+| 两阶段估算与采用 | CPU/CUDA 已实现 | waiting 不固定共享块，提升运行时重新确认命中 |
 
 ## K/V Cache 量化改变什么
 
@@ -57,7 +54,7 @@ scale 可以按 Tensor、层、head、token 或 block 保存。粒度越细越�
 | `KvBlockPool` | Cache manager / block allocator | 显存容量、抢占、交换、并发安全 |
 | `CpuPagedKvCache` | Cache engine / Paged Attention 数据面 | GPU kernel、布局优化、多数据类型 |
 | 连续与分页对照 | Reference / optimized backend | 数值误差、吞吐、回退策略 |
-| `RadixPrefixCache` | Prefix / Radix Cache | 并发锁、命中统计、容量淘汰 |
+| `RadixPrefixCache` | Prefix / Radix Cache | 并发锁、批量更新和分层淘汰策略 |
 
 ## 继续阅读框架源码
 
