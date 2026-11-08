@@ -92,6 +92,7 @@ chapter09_performance::EvidenceRecord read_record(const std::string& path) {
     record.experiment_id = text("experiment_id");
     record.workload_id = text("workload_id");
     record.environment = {text("model"), text("backend"), text("device"),
+                          text("hardware"), size_value(fields, "hardware_concurrency"),
                           text("build_type"), text("compiler")};
     record.workload.request_count = size_value(fields, "request_count");
     record.workload.prompt_tokens_per_request = size_value(fields, "prompt_tokens_per_request");
@@ -110,6 +111,16 @@ chapter09_performance::EvidenceRecord read_record(const std::string& path) {
     return record;
 }
 
+std::string json_escape(const std::string& value) {
+    std::string escaped;
+    escaped.reserve(value.size());
+    for (const char character : value) {
+        if (character == '"' || character == '\\') escaped.push_back('\\');
+        escaped.push_back(character);
+    }
+    return escaped;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -118,14 +129,30 @@ int main(int argc, char** argv) {
         return 2;
     }
     try {
-        const auto result = chapter09_performance::compare(
-            read_record(argv[1]), read_record(argv[2]));
+        const auto baseline = read_record(argv[1]);
+        const auto experiment = read_record(argv[2]);
+        const chapter09_performance::ComparisonPolicy policy;
+        const auto result = chapter09_performance::compare(baseline, experiment, policy);
         std::cout << std::fixed << std::setprecision(4)
-                  << "{\"decision\":\"" << chapter09_performance::decision_name(result.decision)
+                  << "{\"schema_version\":1"
+                  << ",\"baseline_experiment_id\":\""
+                  << json_escape(baseline.experiment_id) << "\""
+                  << ",\"experiment_experiment_id\":\""
+                  << json_escape(experiment.experiment_id) << "\""
+                  << ",\"workload_id\":\"" << json_escape(baseline.workload_id) << "\""
+                  << ",\"policy\":{\"primary_metric\":\"throughput\""
+                  << ",\"max_latency_regression_percent\":"
+                  << policy.max_latency_regression_percent
+                  << ",\"max_throughput_regression_percent\":"
+                  << policy.max_throughput_regression_percent
+                  << ",\"max_memory_regression_percent\":"
+                  << policy.max_memory_regression_percent << "}"
+                  << ",\"decision\":\""
+                  << chapter09_performance::decision_name(result.decision)
                   << "\",\"latency_delta_percent\":" << result.latency_delta_percent
                   << ",\"throughput_delta_percent\":" << result.throughput_delta_percent
                   << ",\"memory_delta_percent\":" << result.memory_delta_percent
-                  << ",\"reason\":\"" << result.reason << "\"}\n";
+                  << ",\"reason\":\"" << json_escape(result.reason) << "\"}\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "comparison input failed: " << error.what() << '\n';

@@ -313,6 +313,9 @@ if(CPP_LLM_ENGINE_REAL_MODEL)
         examples/real_tinyllama_decoder_profile.cpp
     )
     target_link_libraries(real_tinyllama_decoder_profile PRIVATE cpp_llm_engine)
+    target_compile_definitions(real_tinyllama_decoder_profile PRIVATE
+        CPP_LLM_ENGINE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
+    )
     set_target_properties(real_tinyllama_decoder_profile PROPERTIES
         BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
     )
@@ -322,7 +325,7 @@ if(CPP_LLM_ENGINE_REAL_MODEL)
     )
     set_tests_properties(real_tinyllama_decoder_profile_test PROPERTIES
         LABELS "real_model;slow;profiling"
-        PASS_REGULAR_EXPRESSION "ffn_profile_complete=PASS"
+        PASS_REGULAR_EXPRESSION "workload_id=WL-CPU-TINYLLAMA-DECODER-PHASE-V1"
     )
 
     add_executable(real_tinyllama_serving_benchmark

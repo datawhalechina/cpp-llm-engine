@@ -42,4 +42,42 @@ for (const [policy, dispatch] of cases) {
     sample.total_ms > 0 && sample.tokens_per_second > 0));
 }
 
+const profileText = fs.readFileSync(
+  path.join(resultsDir, "profile", "tinyllama-decoder-scalar.txt"),
+  "utf8",
+);
+const profile = Object.fromEntries(profileText.trim().split("\n").map((line) => {
+  const separator = line.indexOf("=");
+  return [line.slice(0, separator), line.slice(separator + 1)];
+}));
+assert.equal(profile.experiment_id, "EXP-CPU-04");
+assert.equal(profile.workload_id, "WL-CPU-TINYLLAMA-DECODER-PHASE-V1");
+assert.equal(profile.model, "TinyLlama-1.1B-Chat-v1.0.Q4_K_M");
+assert.ok(profile.cpu_model.length > 0);
+assert.equal(profile.build_type, "Release");
+assert.equal(profile.correctness, "PASS");
+assert.equal(profile.profile_complete, "PASS");
+assert.equal(profile.iterations, "3");
+
+const baseline = JSON.parse(fs.readFileSync(path.join(
+  resultsDir,
+  "evidence",
+  "tinyllama_service_core_cpu-optimized-avx2-sequential.json",
+), "utf8"));
+const experiment = JSON.parse(fs.readFileSync(path.join(
+  resultsDir,
+  "evidence",
+  "tinyllama_service_core_cpu-optimized-avx2-parallel-requests.json",
+), "utf8"));
+const decision = JSON.parse(fs.readFileSync(path.join(
+  resultsDir,
+  "evidence",
+  "tinyllama_service_core_cpu-avx2-dispatch-decision.json",
+), "utf8"));
+assert.equal(decision.baseline_experiment_id, baseline.experiment_id);
+assert.equal(decision.experiment_experiment_id, experiment.experiment_id);
+assert.equal(decision.workload_id, baseline.workload_id);
+assert.equal(decision.policy.primary_metric, "throughput");
+assert.equal(decision.decision, "KEEP");
+
 process.stdout.write("versioned performance evidence tests passed\n");

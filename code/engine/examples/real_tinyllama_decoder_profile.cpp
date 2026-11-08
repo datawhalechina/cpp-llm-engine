@@ -1,5 +1,5 @@
-// Engine/Chapter 08：真实 TinyLlama CPU Decoder 子阶段 profiling。
-// 职责：显式开启 Context 计时，汇总量化投影、attention、FFN 和 LM Head 耗时。
+// Engine/Chapter 09：真实 TinyLlama CPU Decoder 子阶段 profiling。
+// 输出：实验与 workload 身份、构建环境、正确性和各 Decoder 阶段平均耗时。
 // 运行：real_tinyllama_decoder_profile <model.gguf> [iterations] [backend]。
 #include "cpp_llm_engine/real_tokenizer_backend.h"
 #include "cpp_llm_engine/model/real_llama_cpu_decoder.h"
@@ -7,12 +7,43 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
 
+#ifndef CPP_LLM_ENGINE_BUILD_TYPE
+#define CPP_LLM_ENGINE_BUILD_TYPE "unknown"
+#endif
+
 namespace {
+
+std::string cpu_model_name() {
+#if defined(__linux__)
+    std::ifstream cpuinfo("/proc/cpuinfo");
+    std::string line;
+    while (std::getline(cpuinfo, line)) {
+        const std::string key = "model name";
+        if (line.compare(0, key.size(), key) != 0) continue;
+        const std::size_t separator = line.find(':');
+        const std::size_t first = line.find_first_not_of(" \t", separator + 1);
+        return first == std::string::npos ? "unknown" : line.substr(first);
+    }
+#endif
+    return "unknown";
+}
+
+std::string compiler_name() {
+#if defined(__clang__)
+    return std::string("clang ") + __clang_version__;
+#elif defined(__GNUC__)
+    return std::string("gcc ") + __VERSION__;
+#else
+    return "unknown";
+#endif
+}
 
 void add_profile(
     chapter01::RealLlamaDecoderProfile* total,
@@ -120,7 +151,16 @@ int main(int argc, char** argv) {
         total.ffn_ms > 0.0 && ffn_measured > 0.0 &&
         ffn_measured <= total.ffn_ms * 1.01;
     std::cout << std::fixed << std::setprecision(4)
+              << "profile_schema_version=1\n"
+              << "experiment_id=EXP-CPU-04\n"
+              << "workload_id=WL-CPU-TINYLLAMA-DECODER-PHASE-V1\n"
               << "decoder_profile=tinyllama_cpu_subphases\n"
+              << "model=TinyLlama-1.1B-Chat-v1.0.Q4_K_M\n"
+              << "device=cpu\n"
+              << "cpu_model=" << cpu_model_name() << '\n'
+              << "hardware_concurrency=" << std::thread::hardware_concurrency() << '\n'
+              << "compiler=" << compiler_name() << '\n'
+              << "build_type=" << CPP_LLM_ENGINE_BUILD_TYPE << '\n'
               << "correctness=" << (correctness ? "PASS" : "FAIL") << '\n'
               << "profile_complete=" << (profile_complete ? "PASS" : "FAIL") << '\n'
               << "ffn_profile_complete="
@@ -137,6 +177,8 @@ int main(int argc, char** argv) {
               << '\n'
               << "lm_head_backend=scalar\n"
               << "iterations=" << iterations << '\n'
+              << "prompt_tokens_per_iteration=" << prompt.size() << '\n'
+              << "generated_tokens_per_iteration=" << expected.size() << '\n'
               << "forward_tokens_per_iteration="
               << total.forward_tokens / iterations << '\n'
               << "total_ms=" << total.total_ms / divisor << '\n'

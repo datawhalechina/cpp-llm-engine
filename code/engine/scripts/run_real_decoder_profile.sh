@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Engine/Chapter 08：构建并运行真实 TinyLlama CPU Decoder 子阶段 profiling。
-# 验证 golden token 后，归档 embedding、projection、attention、FFN 和 LM Head 耗时。
+# Engine/Chapter 09：构建并运行真实 TinyLlama CPU Decoder 子阶段 profiling。
+# 验证 workload 身份和 golden token 后，归档各 Decoder 阶段耗时。
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,5 +37,9 @@ profile_output=$("${build_dir}/real_tinyllama_decoder_profile" \
 printf '%s\n' "${profile_output}"
 printf '%s\n' "${profile_output}" > "${result_file}"
 grep -Fq "correctness=PASS" <<<"${profile_output}"
+grep -Fq "experiment_id=EXP-CPU-04" <<<"${profile_output}"
+grep -Fq "workload_id=WL-CPU-TINYLLAMA-DECODER-PHASE-V1" <<<"${profile_output}"
+grep -Fq "cpu_model=" <<<"${profile_output}"
+grep -Fq "build_type=Release" <<<"${profile_output}"
 grep -Fq "profile_complete=PASS" <<<"${profile_output}"
 grep -Fq "ffn_profile_complete=PASS" <<<"${profile_output}"

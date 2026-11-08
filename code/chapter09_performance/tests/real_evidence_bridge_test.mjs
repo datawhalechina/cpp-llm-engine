@@ -11,10 +11,10 @@ const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "chapter09-bridge-test-"
 
 function record(id) {
   return {
-    schema_version: 1,
+    schema_version: 2,
     experiment_id: id,
     workload_id: "WL-REAL-SERVICE",
-    environment: { model: "TinyLlama", backend: "cpu", device: "x86_64", build_type: "Release", compiler: "gcc-13" },
+    environment: { model: "TinyLlama", backend: "cpu", device: "x86_64", hardware: "test CPU", hardware_concurrency: 8, build_type: "Release", compiler: "gcc-13" },
     workload: { request_count: 2, prompt_tokens_per_request: 0, prompt_tokens: [6, 1], output_tokens_per_request: 4, warmup_iterations: 1, measurement_iterations: 2, execution_mode: "service_generation" },
     correctness_pass: true,
     correctness_checks: ["golden tokens"],
@@ -44,7 +44,13 @@ try {
     sample.total_ms *= 0.9;
     sample.tokens_per_second *= 1.1;
   });
-  assert.equal(compare(baseline, faster, "keep").decision, "KEEP");
+  const keep = compare(baseline, faster, "keep");
+  assert.equal(keep.decision, "KEEP");
+  assert.equal(keep.baseline_experiment_id, "baseline");
+  assert.equal(keep.experiment_experiment_id, "faster");
+  assert.equal(keep.workload_id, "WL-REAL-SERVICE");
+  assert.equal(keep.policy.primary_metric, "throughput");
+  assert.equal(keep.policy.max_latency_regression_percent, 5);
 
   const otherWorkload = record("other-workload");
   otherWorkload.workload.prompt_tokens = [6, 2];
