@@ -41,12 +41,12 @@
 
     <rect x="774" y="132" width="200" height="104" rx="16" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
     <text x="874" y="164" font-size="15" font-weight="700" fill="#172033">4 检查所有层</text>
-    <text x="874" y="190" font-size="13" fill="#52606d">all layers written?</text>
+    <text x="874" y="190" font-size="13" fill="#52606d">所有层已写完？</text>
     <text x="874" y="213" font-size="12" fill="#64748b">不完整位置不可提交</text>
 
     <rect x="1014" y="132" width="132" height="104" rx="16" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
     <text x="1080" y="164" font-size="15" font-weight="700" fill="#172033">5 分支</text>
-    <text x="1080" y="190" font-size="13" fill="#52606d">success?</text>
+    <text x="1080" y="190" font-size="13" fill="#52606d">执行成功？</text>
     <text x="1080" y="213" font-size="12" fill="#64748b">提交或恢复</text>
   </g>
 
@@ -74,7 +74,7 @@
 
   <rect x="208" y="466" width="784" height="54" rx="14" fill="#173f3c"/>
   <text x="600" y="489" font-size="14" font-weight="700" text-anchor="middle" fill="#ffffff">请求进入任一终态后：release(request_id)</text>
-  <text x="600" y="509" font-size="12" text-anchor="middle" fill="#d9fffa">删除 BlockTable · 清理 K/V 与 written 标记 · 归还全部物理块</text>
+  <text x="600" y="509" font-size="12" text-anchor="middle" fill="#d9fffa">清理 K/V 与 written 标记 · 删除 BlockTable · 归还全部物理块</text>
   <path d="M385 426 V466" fill="none" stroke="#0f766e" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#arrow-good)"/>
   <path d="M815 426 V466" fill="none" stroke="#b45309" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#arrow-bad)"/>
 </svg>

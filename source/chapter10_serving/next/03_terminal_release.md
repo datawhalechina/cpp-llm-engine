@@ -13,7 +13,7 @@
 
 ## 当前统一释放顺序
 
-释放前先把请求标记为终态，避免它再次进入 StepBatchPlan。`release_terminal()` 清理 Request 的教学缓存，释放 Chapter07 BlockTable，再移除服务条目；条目移除后，请求专属 Executor 引用随之释放。
+释放前先把请求标记为终态，避免它再次进入 StepBatchPlan。`release_terminal()` 清理 Request 的词元历史，释放 Chapter07 BlockTable，再移除服务条目；条目移除后，请求专属 Executor 引用随之释放。
 
 | 顺序 | 操作 | 验证事实 |
 | --- | --- | --- |

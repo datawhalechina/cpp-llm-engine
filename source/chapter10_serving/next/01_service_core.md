@@ -7,7 +7,7 @@
 | 对象 | 主要所有者 | ServiceCore 怎样使用 |
 | --- | --- | --- |
 | `Request`、`Runtime`、`Executor` | Chapter06 | 保存引用并推进生成 |
-| `KvBlockPool`、K/V payload | Chapter07 | 请求终态时触发释放 |
+| `KvCacheTransaction`、K/V payload | Chapter07 | 请求终态时触发释放 |
 | `StepBatchPlan`、Scheduler | Chapter08 | 提交当前 running 集合和预算 |
 | 性能证据 | Chapter09 | 输出固定 workload 所需指标 |
 | HTTP 连接与 Writer | Chapter10 Transport | 接收事件，不进入模型对象 |

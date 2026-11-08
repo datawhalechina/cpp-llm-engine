@@ -35,7 +35,7 @@
 | Chapter04 | 04.1-04.5 Attention、Norm/FFN、Decoder、首层接线 | 04.6 成熟框架对照 |
 | Chapter05 | 05.1、05.4-05.6 原理、反量化、Linear、精度 | 05.2-05.3 dtype/loader 深入；05.7-05.8 框架与 serving 对照 |
 | Chapter06 | 06.1-06.8 请求、Prefill/Decode、生成循环和真实单请求 | 06.9 框架生成核心对照 |
-| Chapter07 | 07.1-07.7 K/V 形状、连续基线、分页存储和事务 | 07.8-07.10 前缀复用、真实迁移和框架对照 |
+| Chapter07 | 07.1-07.5 连续基线、分页映射、事务、Attention 和真实模型迁移 | 07.6 前缀复用与成熟框架扩展 |
 | Chapter08 | 08.1-08.4 调度契约、连续批处理、chunked prefill 和真实批量执行 | 08.5-08.6 重叠调度与框架对照 |
 | Chapter09 | 09.1-09.4 correctness、workload、样本与统计 | 09.5-09.9 工具、热点、A/B 和框架对照 |
 | Chapter10 | 10.1-10.5 生命周期、准入、释放和同步 Completion | 10.6-10.10 SSE、并发、指标、真实模型和框架对照 |

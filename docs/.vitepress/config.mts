@@ -237,16 +237,12 @@ function createSidebar() {
         collapsed: false,
         items: [
           chapterGroup('07', '第 07 章 K/V Cache 与内存管理', '/chapter07_kv_cache/next', [
-            { text: 'K/V 形状', file: '01_kv_shape.md' },
-            { text: '连续缓存', file: '02_contiguous_kv.md' },
-            { text: 'Block 与槽位', file: '03_block_page_layout.md' },
-            { text: '块表与内存池', file: '04_block_table_pool.md' },
-            { text: '分页 K/V payload', file: '05_paged_payload.md' },
-            { text: '缓存事务', file: '06_cache_transaction.md' },
-            { text: '分页 Attention', file: '07_paged_attention.md' },
-            { text: '前缀复用', file: '08_prefix_cache.md' },
-            { text: '真实模型迁移', file: '09_real_model_migration.md' },
-            { text: '框架对照', file: '10_framework_comparison.md' },
+            { text: 'K/V 形状与连续缓存', file: '01_kv_baseline.md' },
+            { text: '块表与物理内存', file: '02_block_mapping.md' },
+            { text: '分页 K/V 事务', file: '03_paged_transaction.md' },
+            { text: '分页 Attention', file: '04_paged_attention.md' },
+            { text: '真实模型迁移', file: '05_real_model_migration.md' },
+            { text: '生产扩展', file: '06_production_extensions.md' },
           ]),
           chapterGroup('08', '第 08 章 调度与批处理', '/chapter08_scheduling/next', [
             { text: '调度基线', file: '01_scheduler_baseline.md' },
