@@ -30,7 +30,7 @@ vLLM V1 使用统一的待计算词元差值覆盖 Prefill、Decode、前缀命�
 
 | 项目卡 | 追踪问题 |
 | --- | --- |
-| [vLLM](/reference/ecosystem/vllm) | Scheduler 输出怎样连接 KV manager 和 model runner |
-| [nano-vLLM](/reference/ecosystem/nano_vllm) | 最小代码怎样表达 token budget 和分页位置 |
-| [Mini-SGLang](/reference/ecosystem/mini_sglang) | normal loop 与 overlap loop 的事件顺序 |
-| [SGLang](/reference/ecosystem/sglang) | LPM 怎样利用前缀命中并受缓存预算约束 |
+| [vLLM](/reference/ecosystem/production_frameworks#vllm) | Scheduler 输出怎样连接 KV manager 和 model runner |
+| [nano-vLLM](/reference/ecosystem/teaching_projects#nano-vllm) | 最小代码怎样表达 token budget 和分页位置 |
+| [Mini-SGLang](/reference/ecosystem/teaching_projects#mini-sglang) | normal loop 与 overlap loop 的事件顺序 |
+| [SGLang](/reference/ecosystem/production_frameworks#sglang) | LPM 怎样利用前缀命中并受缓存预算约束 |

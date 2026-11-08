@@ -10,6 +10,8 @@
 
 `KvBlockPool` 为每个物理块维护引用计数。Radix 索引持有一份引用，每个挂接的请求再持有一份。`PrefixBlockStore` 隔离索引与 payload：CPU 在最后一个引用释放后清理主机 K/V，CUDA 在降低最后一个引用前异步清理设备物理块。请求释放不会破坏索引或其他请求正在读取的共享前缀。
 
+因此请求结束后仍有物理块占用不一定是泄漏：先检查请求引用是否已归还，再检查 Radix 索引是否为了后续复用持有独立引用。只有没有任何所有者却仍无法回收，才属于资源释放错误。
+
 命中后必须同时推进三份状态：`BlockTable` 挂接共享物理块，`Request` 跳过已完成的 Prefill 词元，模型 `Context` 从同一位置继续写 K/V。只修改其中一份会造成位置错位，后续 Attention 会读取错误历史或重复计算前缀。
 
 当前 CPU 与 CUDA Factory 都提供估算和采用两个入口。准入只遍历 Radix 路径，既不增加块引用，也不更新命中统计；请求获得运行槽时重新查询并采用真实前缀，在请求释放前发布可共享完整块。首版会保留至少一个未缓存的提示词词元：K/V payload 不保存最后一次前向传播产生的 logits，计算这个私有后缀才能得到首个生成词元。块池容量不足时，索引按最近使用时间从叶端后缀开始淘汰；仍被运行请求引用的块不会成为候选，较短的可达前缀也因此得以保留。Chapter08 只消费“命中多少词元”和“还需多少块”，不接管 K/V payload。
@@ -62,9 +64,9 @@ llama.cpp 适合观察单机 Context 与真实模型 K/V；vLLM 适合追踪缓�
 
 | 项目卡 | 重点追踪 |
 | --- | --- |
-| [llama.cpp](/reference/ecosystem/llama_cpp) | Context 怎样拥有并增长真实模型 K/V |
-| [vLLM](/reference/ecosystem/vllm) | Cache manager、块表与 Attention metadata |
-| [nano-vLLM](/reference/ecosystem/nano_vllm) | 紧凑代码中的页表与缓存分配骨架 |
-| [Mini-SGLang](/reference/ecosystem/mini_sglang) | Radix Cache 的匹配、引用和释放 |
-| [SGLang](/reference/ecosystem/sglang) | 前缀缓存、多级缓存与调度扩展 |
-| [TensorRT-LLM](/reference/ecosystem/tensorrt_llm) | GPU K/V 与 Attention kernel 的工程入口 |
+| [llama.cpp](/reference/ecosystem/local_and_delivery#llama-cpp) | Context 怎样拥有并增长真实模型 K/V |
+| [vLLM](/reference/ecosystem/production_frameworks#vllm) | Cache manager、块表与 Attention metadata |
+| [nano-vLLM](/reference/ecosystem/teaching_projects#nano-vllm) | 紧凑代码中的页表与缓存分配骨架 |
+| [Mini-SGLang](/reference/ecosystem/teaching_projects#mini-sglang) | Radix Cache 的匹配、引用和释放 |
+| [SGLang](/reference/ecosystem/production_frameworks#sglang) | 前缀缓存、多级缓存与调度扩展 |
+| [TensorRT-LLM](/reference/ecosystem/production_frameworks#tensorrt-llm) | GPU K/V 与 Attention kernel 的工程入口 |

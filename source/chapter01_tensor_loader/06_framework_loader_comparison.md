@@ -22,6 +22,8 @@ Chapter01 把外部模型文件转换为稳定的配置、分词器、张量映�
 
 模型权重如何被 Decoder 执行、哪些状态按请求隔离，进入 [`Chapter04 真实 TinyLlama Decoder`](../chapter04_attention/06_real_tinyllama_decoder.md) 继续学习。
 
+模型家族变化首先在 Loader 暴露：架构标识、metadata key、Tensor 名称、词表和量化类型都可能不同。Gemma、Qwen 或 DeepSeek 模型即使使用同一种文件容器，也必须先转换为各自的内部 schema，不能只替换 GGUF 路径。跨模型接入状态统一查[模型支持表](../reference/model_support.md)。
+
 ## 继续阅读源码
 
 阅读成熟项目时，可以沿以下问题定位代码：
@@ -32,5 +34,5 @@ Chapter01 把外部模型文件转换为稳定的配置、分词器、张量映�
 
 | 项目卡 | 阅读方向 |
 | --- | --- |
-| [llama.cpp](../reference/ecosystem/llama_cpp.md) | GGUF 读取器、模型参数和 mmap 加载 |
-| [vLLM](../reference/ecosystem/vllm.md) | 多格式检查点加载器、设备放置和并行权重映射 |
+| [llama.cpp](../reference/ecosystem/local_and_delivery.md#llama-cpp) | GGUF 读取器、模型参数和 mmap 加载 |
+| [vLLM](../reference/ecosystem/production_frameworks.md#vllm) | 多格式检查点加载器、设备放置和并行权重映射 |

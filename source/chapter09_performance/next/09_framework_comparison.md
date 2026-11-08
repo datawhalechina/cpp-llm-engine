@@ -1,6 +1,6 @@
 # 09.9 把教学证据链映射到成熟框架
 
-本章不复制成熟框架的完整 Benchmark 工具，而是建立可以继续阅读其实现的共同坐标：工作负载、指标、阶段范围、原始结果和决策彼此分离。容易随版本变化的命令和源码路径集中放在 `reference/ecosystem`，章节只保留稳定的观察问题。
+成熟框架的性能工具都需要明确工作负载、指标、阶段范围、原始结果和决策。本章先用统一证据结构完成可重复实验，再通过 `reference/ecosystem` 查找容易随版本变化的命令和源码入口。
 
 ## 对象映射
 
@@ -27,7 +27,7 @@
 
 | 项目卡 | 本章使用它回答什么 |
 | --- | --- |
-| [llama.cpp](../../reference/ecosystem/llama_cpp.md) | 单机 CPU/GPU 如何固定模型、线程和量化条件 |
-| [vLLM](../../reference/ecosystem/vllm.md) | 离线吞吐与在线 TTFT/ITL 如何区分 workload |
-| [SGLang](../../reference/ecosystem/sglang.md) | 前缀缓存和调度变化如何进入服务 Benchmark |
-| [TensorRT-LLM](../../reference/ecosystem/tensorrt_llm.md) | GPU 构建身份、Nsight 证据与端到端结果如何分层 |
+| [llama.cpp](../../reference/ecosystem/local_and_delivery.md#llama-cpp) | 单机 CPU/GPU 如何固定模型、线程和量化条件 |
+| [vLLM](../../reference/ecosystem/production_frameworks.md#vllm) | 离线吞吐与在线 TTFT/ITL 如何区分 workload |
+| [SGLang](../../reference/ecosystem/production_frameworks.md#sglang) | 前缀缓存和调度变化如何进入服务 Benchmark |
+| [TensorRT-LLM](../../reference/ecosystem/production_frameworks.md#tensorrt-llm) | GPU 构建身份、Nsight 证据与端到端结果如何分层 |

@@ -33,5 +33,5 @@
 
 | 项目卡 | 在本章中的用途 |
 | --- | --- |
-| [llama.cpp](../reference/ecosystem/llama_cpp.md) | ggml 张量、视图与后端缓冲区 |
-| [vLLM](../reference/ecosystem/vllm.md) | 张量语义在分页 KV Cache 中的应用 |
+| [llama.cpp](../reference/ecosystem/local_and_delivery.md#llama-cpp) | ggml 张量、视图与后端缓冲区 |
+| [vLLM](../reference/ecosystem/production_frameworks.md#vllm) | 张量语义在分页 KV Cache 中的应用 |

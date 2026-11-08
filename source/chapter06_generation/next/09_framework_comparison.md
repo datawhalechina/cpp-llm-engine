@@ -28,10 +28,10 @@ Chapter06 只比较单请求生成核心：输入怎样进入模型、Prefill/De
 
 ## 继续阅读源码
 
-- [llama.cpp 生态卡](/reference/ecosystem/llama_cpp)：从模型 Context 和本地 decode loop 观察最小运行时。
-- [vLLM 生态卡](/reference/ecosystem/vllm)：先看 EngineCore 与 model runner，KV manager 和 Scheduler 留到后续章节。
-- [TensorRT-LLM 生态卡](/reference/ecosystem/tensorrt_llm)：观察 C++ Runtime、执行上下文和 Executor 的关系。
-- [SGLang 生态卡](/reference/ecosystem/sglang)：本章只看 Runtime 请求推进，Radix Cache 与 LPM 分别放到 Chapter07/08。
+- [llama.cpp 生态卡](/reference/ecosystem/local_and_delivery#llama-cpp)：从模型 Context 和本地 decode loop 观察最小运行时。
+- [vLLM 生态卡](/reference/ecosystem/production_frameworks#vllm)：先看 EngineCore 与 model runner，KV manager 和 Scheduler 留到后续章节。
+- [TensorRT-LLM 生态卡](/reference/ecosystem/production_frameworks#tensorrt-llm)：观察 C++ Runtime、执行上下文和 Executor 的关系。
+- [SGLang 生态卡](/reference/ecosystem/production_frameworks#sglang)：本章只看 Runtime 请求推进，Radix Cache 与 LPM 分别放到 Chapter07/08。
 
 ## 验证与衔接
 

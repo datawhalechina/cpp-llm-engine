@@ -29,7 +29,7 @@
 
 | 项目卡 | 本章使用它回答什么 |
 | --- | --- |
-| [llama.cpp](../../reference/ecosystem/llama_cpp.md) | 单机 server 如何组织 slot、Context 和流式输出 |
-| [vLLM](../../reference/ecosystem/vllm.md) | API server、EngineCore 和 model runner 怎样分工 |
-| [SGLang](../../reference/ecosystem/sglang.md) | tokenizer manager、Scheduler 和 radix cache 怎样交接 |
-| [TensorRT-LLM](../../reference/ecosystem/tensorrt_llm.md) | Executor、Worker 和多 GPU 执行怎样扩展故障域 |
+| [llama.cpp](../../reference/ecosystem/local_and_delivery.md#llama-cpp) | 单机 server 如何组织 slot、Context 和流式输出 |
+| [vLLM](../../reference/ecosystem/production_frameworks.md#vllm) | API server、EngineCore 和 model runner 怎样分工 |
+| [SGLang](../../reference/ecosystem/production_frameworks.md#sglang) | tokenizer manager、Scheduler 和 radix cache 怎样交接 |
+| [TensorRT-LLM](../../reference/ecosystem/production_frameworks.md#tensorrt-llm) | Executor、Worker 和多 GPU 执行怎样扩展故障域 |

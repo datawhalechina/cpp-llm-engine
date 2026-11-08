@@ -6,7 +6,7 @@ Foundation 准备了构建和测试能力；本章使用 `llama.cpp` 加载 Tiny
 
 | 教学范围 | 成熟实现提供 | 深入入口 |
 | --- | --- | --- |
-| 构建本地基线、准备模型、运行一次 CPU 推理 | GGUF 加载器、分词器、模型执行和采样循环 | [`llama.cpp` 项目卡](../reference/ecosystem/llama_cpp.md) |
+| 构建本地基线、准备模型、运行一次 CPU 推理 | GGUF 加载器、分词器、模型执行和采样循环 | [`llama.cpp` 项目卡](../reference/ecosystem/local_and_delivery.md#llama-cpp) |
 
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |

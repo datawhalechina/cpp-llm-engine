@@ -30,9 +30,9 @@
 
 | 项目卡 | 在本章中的用途 |
 | --- | --- |
-| [llama.cpp](../reference/ecosystem/llama_cpp.md) | Q4_K/Q6_K/Q8_0 block 与 CPU 量化 kernel |
-| [vLLM](../reference/ecosystem/vllm.md) | quant method 与模型 Linear 的绑定 |
-| [TensorRT-LLM](../reference/ecosystem/tensorrt_llm.md) | GPU 量化 kernel、workspace 和执行策略 |
+| [llama.cpp](../reference/ecosystem/local_and_delivery.md#llama-cpp) | Q4_K/Q6_K/Q8_0 block 与 CPU 量化 kernel |
+| [vLLM](../reference/ecosystem/production_frameworks.md#vllm) | quant method 与模型 Linear 的绑定 |
+| [TensorRT-LLM](../reference/ecosystem/production_frameworks.md#tensorrt-llm) | GPU 量化 kernel、workspace 和执行策略 |
 
 ## 验证与衔接
 

@@ -4,7 +4,7 @@
 
 ## 对象映射
 
-TinyLlama/Llama 决定本章真实模型的数学结构，llama.cpp 提供同模型 CPU 数值基线。nano-vLLM 适合阅读紧凑前向控制流，vLLM 和 TensorRT-LLM 展示生产执行路径；Gemma 用于比较另一种模型家族怎样调整解码器块。
+TinyLlama/Llama 决定本章真实模型的数学结构，llama.cpp 提供同模型 CPU 数值基线。nano-vLLM 适合阅读紧凑前向控制流，vLLM 和 TensorRT-LLM 展示生产执行路径。Gemma、Qwen 等模型家族用于检查归一化、位置编码、Attention 和 FFN 变化是否真正由配置与模型注册表达，而不是写死在 Llama 路径中。
 
 | 教程对象 | 成熟项目中的对应物 | 阅读重点 |
 | --- | --- | --- |
@@ -38,8 +38,8 @@ TinyLlama/Llama 决定本章真实模型的数学结构，llama.cpp 提供同模
 
 | 项目卡 | 在本章中的用途 |
 | --- | --- |
-| [llama.cpp](../reference/ecosystem/llama_cpp.md) | 核对 TinyLlama/Llama 的 CPU 模型执行和数值结果 |
-| [nano-vLLM](../reference/ecosystem/nano_vllm.md) | 先阅读紧凑的模型与前向控制流 |
-| [vLLM](../reference/ecosystem/vllm.md) | 观察模型层、注意力后端和缓存元数据 |
-| [TensorRT-LLM](../reference/ecosystem/tensorrt_llm.md) | 观察 GPU 运行时、注意力和融合内核 |
-| [Gemma](../reference/ecosystem/gemma.md) | 比较模型家族变化怎样影响归一化、位置编码和 FFN |
+| [llama.cpp](../reference/ecosystem/local_and_delivery.md#llama-cpp) | 核对 TinyLlama/Llama 的 CPU 模型执行和数值结果 |
+| [nano-vLLM](../reference/ecosystem/teaching_projects.md#nano-vllm) | 先阅读紧凑的模型与前向控制流 |
+| [vLLM](../reference/ecosystem/production_frameworks.md#vllm) | 观察模型层、注意力后端和缓存元数据 |
+| [TensorRT-LLM](../reference/ecosystem/production_frameworks.md#tensorrt-llm) | 观察 GPU 运行时、注意力和融合内核 |
+| [模型支持表](../reference/model_support.md) | 比较模型家族变化怎样影响 Loader、归一化、位置编码和 FFN |
