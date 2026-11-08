@@ -8,6 +8,7 @@
 #include <array>
 #include <fstream>
 #include <limits>
+#include <unordered_set>
 
 namespace chapter01 {
 namespace {
@@ -17,6 +18,9 @@ constexpr std::uint32_t kGgufVersionMax = 3;
 constexpr std::uint64_t kDefaultAlignment = 32;
 constexpr std::uint64_t kMaxStringBytes = 64 * 1024 * 1024;
 constexpr std::uint64_t kMaxArrayElements = 16 * 1024 * 1024;
+constexpr std::uint64_t kMaxMetadataCount = 1U << 20U;
+constexpr std::uint64_t kMaxTensorCount = 1U << 20U;
+constexpr std::uint32_t kMaxTensorRank = 8;
 
 enum class GgufType : std::uint32_t {
     UInt8 = 0,
@@ -90,6 +94,10 @@ bool skip_array(std::istream& input, std::string* error) {
         return false;
     }
     const auto element_type = static_cast<GgufType>(element_type_raw);
+    if (count > kMaxArrayElements) {
+        set_error(error, "GGUF metadata array is too large");
+        return false;
+    }
     if (element_type == GgufType::Array) {
         set_error(error, "nested GGUF arrays are not supported");
         return false;
@@ -297,6 +305,7 @@ bool GgufReader::read_index(const std::string& path,
         set_error(error, "GGUF index output must not be null");
         return false;
     }
+    if (error != nullptr) error->clear();
 
     std::ifstream input(path, std::ios::binary);
     if (!input) {
@@ -323,8 +332,14 @@ bool GgufReader::read_index(const std::string& path,
         set_error(error, "unsupported GGUF version");
         return false;
     }
+    if (metadata_count > kMaxMetadataCount || tensor_count > kMaxTensorCount) {
+        set_error(error, "GGUF header count exceeds teaching reader limit");
+        return false;
+    }
 
     std::uint64_t alignment = kDefaultAlignment;
+    std::unordered_set<std::string> metadata_keys;
+    metadata_keys.reserve(static_cast<std::size_t>(metadata_count));
     for (std::uint64_t i = 0; i < metadata_count; ++i) {
         std::string key;
         std::uint32_t type_raw = 0;
@@ -340,8 +355,16 @@ bool GgufReader::read_index(const std::string& path,
             }
             return false;
         }
+        if (key.empty()) {
+            set_error(error, "GGUF metadata key must not be empty");
+            return false;
+        }
+        if (!metadata_keys.emplace(key).second) {
+            set_error(error, "duplicate GGUF metadata key: " + key);
+            return false;
+        }
         if (supported) {
-            parsed.metadata[key] = value;
+            parsed.metadata.emplace(key, value);
             if (key == "general.alignment") {
                 if (const auto* number = std::get_if<std::uint64_t>(&value)) {
                     alignment = *number;
@@ -351,6 +374,8 @@ bool GgufReader::read_index(const std::string& path,
     }
 
     parsed.tensors.reserve(static_cast<std::size_t>(tensor_count));
+    std::unordered_set<std::string> tensor_names;
+    tensor_names.reserve(static_cast<std::size_t>(tensor_count));
     for (std::uint64_t i = 0; i < tensor_count; ++i) {
         GgufTensorInfo tensor;
         std::uint32_t dimension_count = 0;
@@ -359,10 +384,26 @@ bool GgufReader::read_index(const std::string& path,
             set_error(error, "truncated GGUF tensor descriptor");
             return false;
         }
+        if (tensor.name.empty()) {
+            set_error(error, "GGUF tensor name must not be empty");
+            return false;
+        }
+        if (!tensor_names.emplace(tensor.name).second) {
+            set_error(error, "duplicate GGUF tensor name: " + tensor.name);
+            return false;
+        }
+        if (dimension_count == 0 || dimension_count > kMaxTensorRank) {
+            set_error(error, "GGUF tensor rank exceeds teaching reader limit");
+            return false;
+        }
         tensor.dimensions.resize(dimension_count);
         for (auto& dimension : tensor.dimensions) {
             if (!read_pod(input, &dimension)) {
                 set_error(error, "truncated GGUF tensor dimensions");
+                return false;
+            }
+            if (dimension == 0) {
+                set_error(error, "GGUF tensor dimensions must be positive");
                 return false;
             }
         }

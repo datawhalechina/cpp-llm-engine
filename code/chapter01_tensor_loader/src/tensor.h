@@ -7,7 +7,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -81,7 +83,20 @@ public:
 
     template <typename T>
     std::vector<T> to_vector() const {
-        std::vector<T> values(numel());
+        const auto expected_dtype = deduce_dtype<T>();
+        if (expected_dtype == DType::Unknown || dtype_ != expected_dtype) {
+            throw std::invalid_argument("tensor dtype does not match requested vector type");
+        }
+        const auto element_count = numel();
+        if (element_count > std::numeric_limits<std::size_t>::max() / sizeof(T)) {
+            throw std::overflow_error("tensor vector byte size overflows host size");
+        }
+        const auto required_bytes = element_count * sizeof(T);
+        if (!storage_ || offset_bytes_ > storage_->size() ||
+            required_bytes > storage_->size() - offset_bytes_) {
+            throw std::out_of_range("tensor storage is shorter than requested vector");
+        }
+        std::vector<T> values(element_count);
         if (values.empty()) {
             return values;
         }
@@ -92,7 +107,14 @@ public:
 
     template <typename T>
     void set_vector(const std::vector<T>& values) {
-        set_dtype(deduce_dtype<T>());
+        const auto vector_dtype = deduce_dtype<T>();
+        if (vector_dtype == DType::Unknown) {
+            throw std::invalid_argument("tensor vector type is not supported");
+        }
+        if (numel() != values.size()) {
+            throw std::invalid_argument("tensor vector size does not match shape");
+        }
+        set_dtype(vector_dtype);
         auto storage_bytes = values.size() * sizeof(T);
         auto storage = std::make_shared<Storage>(storage_bytes);
         if (storage_bytes > 0) {
@@ -118,8 +140,10 @@ template <typename T>
 constexpr DType Tensor::deduce_dtype() {
     if constexpr (std::is_same_v<T, float>) {
         return DType::Float32;
-    } else if constexpr (std::is_same_v<T, std::int8_t> || std::is_same_v<T, std::uint8_t>) {
+    } else if constexpr (std::is_same_v<T, std::int8_t>) {
         return DType::Int8;
+    } else if constexpr (std::is_same_v<T, std::uint8_t>) {
+        return DType::UInt8;
     } else {
         return DType::Unknown;
     }

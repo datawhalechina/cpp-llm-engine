@@ -19,7 +19,7 @@
 
 ## 从输入数据构造 Tensor
 
-接口和实现分别位于 <a href="../_code/chapter01_tensor_loader/src/tensor.h"><code>tensor.h</code></a> 与 <a href="../_code/chapter01_tensor_loader/src/tensor.cpp"><code>tensor.cpp</code></a>。`from_vector<T>()` 适合测试和普通数值，`from_raw_bytes()` 保留 GGUF 量化权重的原始字节。复制张量时共享底层存储；移动张量时转移对象状态，资源释放由 RAII 完成。
+接口和实现分别位于 <a href="../_code/chapter01_tensor_loader/src/tensor.h"><code>tensor.h</code></a> 与 <a href="../_code/chapter01_tensor_loader/src/tensor.cpp"><code>tensor.cpp</code></a>。`from_vector<T>()` 适合测试和普通数值，写入前会核对形状与元素数量；`to_vector<T>()` 读取前会核对数据类型和剩余存储长度。`from_raw_bytes()` 保留 GGUF 量化权重的原始字节，由格式 Loader 负责验证 payload。复制张量时共享底层存储；移动张量时转移对象状态，资源释放由 RAII 完成。
 
 ## 验证与衔接
 
@@ -34,8 +34,8 @@ bash code/chapter01_tensor_loader/run.sh
 1. `numel()` 与形状一致。
 2. `bytes()` 和原始权重数据大小一致。
 3. `raw_data()` 已包含 `offset_bytes`。
-4. 复制和移动后数据仍可访问。
-5. 非法形状、数据类型或越界偏移会明确失败。
+4. 类型不匹配或存储长度不足时，类型化读取会失败。
+5. 非法形状、元素数量或越界偏移会明确失败。
 
 这些字段固定了加载结果的模型语义。Chapter02 不直接扩展这个权重 Tensor，而是通过独立教学类型建立 View 语义；后续算子再通过公共 `TensorContract` 连接两类对象。
 

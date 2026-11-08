@@ -16,6 +16,9 @@ namespace {
 
 constexpr char kMagic[4] = {'C', 'I', 'E', '1'};
 constexpr std::uint32_t kVersion = 1;
+constexpr std::uint32_t kMaxTensorCount = 1U << 20U;
+constexpr std::uint32_t kMaxTensorNameBytes = 1U << 20U;
+constexpr std::uint32_t kMaxTensorRank = 8;
 
 template <typename T>
 bool read_pod(std::istream& in, T* value) {
@@ -23,17 +26,12 @@ bool read_pod(std::istream& in, T* value) {
     return static_cast<bool>(in);
 }
 
-template <typename T>
-bool write_pod(std::ostream& out, const T& value) {
-    out.write(reinterpret_cast<const char*>(&value), sizeof(T));
-    return static_cast<bool>(out);
-}
-
 bool read_string(std::istream& in, std::string* value) {
     std::uint32_t size = 0;
     if (!read_pod(in, &size)) {
         return false;
     }
+    if (size == 0 || size > kMaxTensorNameBytes) return false;
     value->resize(size);
     if (size == 0) {
         return true;
@@ -47,6 +45,7 @@ bool read_shape(std::istream& in, std::vector<std::int64_t>* shape) {
     if (!read_pod(in, &ndim)) {
         return false;
     }
+    if (ndim == 0 || ndim > kMaxTensorRank) return false;
     shape->resize(ndim);
     for (std::uint32_t i = 0; i < ndim; ++i) {
         if (!read_pod(in, &(*shape)[i])) {
@@ -60,10 +59,24 @@ std::string make_error(const std::string& message) {
     return message;
 }
 
+bool checked_element_count(const std::vector<std::int64_t>& shape,
+                           std::size_t* count) {
+    std::size_t result = 1;
+    for (const auto dimension : shape) {
+        if (dimension <= 0) return false;
+        const auto converted = static_cast<std::size_t>(dimension);
+        if (result > std::numeric_limits<std::size_t>::max() / converted) return false;
+        result *= converted;
+    }
+    *count = result;
+    return true;
+}
+
 }  // namespace
 
 bool ModelLoader::load(const std::filesystem::path& path, std::string* error) {
     tensors_.clear();
+    if (error != nullptr) error->clear();
     std::unordered_map<std::string, Tensor> loaded_tensors;
 
     std::ifstream input(path, std::ios::binary);
@@ -98,6 +111,10 @@ bool ModelLoader::load(const std::filesystem::path& path, std::string* error) {
         }
         return false;
     }
+    if (tensor_count > kMaxTensorCount) {
+        if (error) *error = make_error("tensor count exceeds teaching format limit");
+        return false;
+    }
 
     for (std::uint32_t i = 0; i < tensor_count; ++i) {
         std::string name;
@@ -116,6 +133,17 @@ bool ModelLoader::load(const std::filesystem::path& path, std::string* error) {
             }
             return false;
         }
+        const auto dtype = static_cast<DType>(dtype_u8);
+        const auto device = static_cast<Device>(device_u8);
+        const auto element_bytes = dtype_size(dtype);
+        if (element_bytes == 0) {
+            if (error) *error = make_error("unsupported teaching tensor dtype");
+            return false;
+        }
+        if (device != Device::CPU) {
+            if (error) *error = make_error("unsupported teaching tensor device");
+            return false;
+        }
 
         std::vector<std::int64_t> shape;
         if (!read_shape(input, &shape)) {
@@ -124,6 +152,13 @@ bool ModelLoader::load(const std::filesystem::path& path, std::string* error) {
             }
             return false;
         }
+        std::size_t element_count = 0;
+        if (!checked_element_count(shape, &element_count) ||
+            element_count > std::numeric_limits<std::size_t>::max() / element_bytes) {
+            if (error) *error = make_error("invalid teaching tensor shape");
+            return false;
+        }
+        const auto expected_bytes = element_count * element_bytes;
 
         std::uint64_t data_bytes_u64 = 0;
         if (!read_pod(input, &data_bytes_u64)) {
@@ -136,6 +171,15 @@ bool ModelLoader::load(const std::filesystem::path& path, std::string* error) {
             if (error) {
                 *error = make_error("tensor is too large");
             }
+            return false;
+        }
+        if (data_bytes_u64 != expected_bytes) {
+            if (error) *error = make_error("teaching tensor payload size does not match shape and dtype");
+            return false;
+        }
+        if (data_bytes_u64 > static_cast<std::uint64_t>(
+                                 std::numeric_limits<std::streamsize>::max())) {
+            if (error) *error = make_error("tensor payload is not readable by this host");
             return false;
         }
 
@@ -153,13 +197,17 @@ bool ModelLoader::load(const std::filesystem::path& path, std::string* error) {
 
         Tensor tensor = Tensor::from_raw_bytes(name,
                                                std::move(shape),
-                                               static_cast<DType>(dtype_u8),
+                                               dtype,
                                                std::move(bytes),
-                                               static_cast<Device>(device_u8));
-        loaded_tensors.emplace(tensor.name(), std::move(tensor));
+                                               device);
+        if (!loaded_tensors.emplace(tensor.name(), std::move(tensor)).second) {
+            if (error) *error = make_error("duplicate teaching tensor name");
+            return false;
+        }
     }
 
     tensors_ = std::move(loaded_tensors);
+    if (error != nullptr) error->clear();
     return true;
 }
 

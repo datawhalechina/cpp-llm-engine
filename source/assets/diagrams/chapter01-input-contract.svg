@@ -35,12 +35,12 @@
     <text x="147" y="232" class="node-sub">Hello TinyLlama</text>
 
     <rect x="266" y="165" width="180" height="100" rx="14" fill="#dbeafe" stroke="#60a5fa"/>
-    <text x="356" y="197" class="node-title" fill="#1d4ed8">Tokenizer</text>
+    <text x="356" y="197" class="node-title" fill="#1d4ed8">分词器（Tokenizer）</text>
     <text x="356" y="222" class="node-sub">A：固定字母映射</text>
     <text x="356" y="244" class="node-sub">B：GGUF + llama.cpp</text>
 
     <rect x="494" y="177" width="174" height="76" rx="13" fill="#eff6ff" stroke="#7aa6d8"/>
-    <text x="581" y="208" class="node-title" fill="#1d4ed8">TokenSequence</text>
+    <text x="581" y="208" class="node-title" fill="#1d4ed8">词元序列</text>
     <text x="581" y="232" class="node-sub">词元编号 · 输入长度</text>
 
     <rect x="716" y="165" width="190" height="100" rx="14" fill="#f8fafc" stroke="#94a3b8"/>
@@ -49,7 +49,7 @@
     <text x="811" y="244" class="node-sub">长度与停止条件</text>
 
     <rect x="954" y="177" width="166" height="76" rx="13" fill="#e7f6f3" stroke="#4a9d93"/>
-    <text x="1037" y="208" class="node-title" fill="#0f5f59">Request 输入</text>
+    <text x="1037" y="208" class="node-title" fill="#0f5f59">请求输入</text>
     <text x="1037" y="232" class="node-sub">Chapter06</text>
   </g>
   <path d="M218 215H266M446 215H494M668 215H716M906 215H954" class="blue-arrow"/>
@@ -67,12 +67,12 @@
     <text x="356" y="474" class="node-sub">分词器元数据</text>
 
     <rect x="494" y="395" width="174" height="100" rx="14" fill="#fff7ed" stroke="#e8a765"/>
-    <text x="581" y="427" class="node-title" fill="#9a4d13">ModelConfig</text>
+    <text x="581" y="427" class="node-title" fill="#9a4d13">模型配置</text>
     <text x="581" y="452" class="node-sub">vocab · hidden · layers</text>
     <text x="581" y="474" class="node-sub">context length</text>
 
     <rect x="716" y="395" width="190" height="100" rx="14" fill="#fff7ed" stroke="#e8a765"/>
-    <text x="811" y="427" class="node-title" fill="#9a4d13">权重 Tensor</text>
+    <text x="811" y="427" class="node-title" fill="#9a4d13">权重张量</text>
     <text x="811" y="452" class="node-sub">词元嵌入 · 解码器</text>
     <text x="811" y="474" class="node-sub">LM Head</text>
 
@@ -87,7 +87,7 @@
   <path d="M1037 483V520H1074" class="orange-arrow"/>
   <rect x="730" y="565" width="274" height="74" rx="15" fill="#0f766e" filter="url(#shadow)"/>
   <text x="867" y="595" text-anchor="middle" class="node-title" fill="#ffffff">解码器 / 生成运行时</text>
-  <text x="867" y="620" text-anchor="middle" font-size="13" fill="#d9fffa">已加载模型（词元编号）→ 候选分数</text>
+  <text x="867" y="620" text-anchor="middle" font-size="13" fill="#d9fffa">模型权重 + 词元编号 → 候选分数</text>
   <path d="M1082 528V602H1004" class="arrow"/>
 
   <rect x="52" y="565" width="620" height="74" rx="15" fill="#f8fafc" stroke="#d8e2e8"/>

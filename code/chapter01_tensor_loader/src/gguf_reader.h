@@ -28,7 +28,7 @@ struct GgufModelIndex {
 
 class GgufReader {
 public:
-    // Reads the header, scalar metadata, and tensor index without loading weights.
+    // 只读取文件头、元数据和张量索引，不加载权重 payload。
     static bool read_index(const std::string& path,
                            GgufModelIndex* index,
                            std::string* error = nullptr);

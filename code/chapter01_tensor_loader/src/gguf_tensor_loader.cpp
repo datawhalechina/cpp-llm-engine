@@ -24,7 +24,7 @@ bool set_error(std::string* error, const std::string& message) {
 }
 
 bool map_dtype(std::uint32_t gguf_type, GgufDType* dtype, std::string* error) {
-    // GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_Q8_0, GGML_TYPE_I8.
+    // GGUF 类型编号沿用 ggml 定义，内部只暴露教程使用的 DType。
     switch (gguf_type) {
     case 0:
         *dtype = {DType::Float32, sizeof(float)};
@@ -33,18 +33,18 @@ bool map_dtype(std::uint32_t gguf_type, GgufDType* dtype, std::string* error) {
         *dtype = {DType::Float16, sizeof(std::uint16_t)};
         return true;
     case 8:
-        // GGML_TYPE_Q8_0: 32 values per 34-byte block (FP16 scale + 32 int8 values).
+        // Q8_0 每个 34 字节块保存一个 FP16 scale 和 32 个 int8 值。
         *dtype = {DType::Q8_0, 0, 32, 34};
         return true;
     case 24:
         *dtype = {DType::Int8, sizeof(std::int8_t)};
         return true;
     case 12:
-        // GGML_TYPE_Q4_K: 256 values per 144-byte super-block.
+        // Q4_K 每个 144 字节 super-block 表示 256 个值。
         *dtype = {DType::Q4_K, 0, 256, 144};
         return true;
     case 14:
-        // GGML_TYPE_Q6_K: 256 values per 210-byte super-block.
+        // Q6_K 每个 210 字节 super-block 表示 256 个值。
         *dtype = {DType::Q6_K, 0, 256, 210};
         return true;
     default:
@@ -56,16 +56,19 @@ bool map_dtype(std::uint32_t gguf_type, GgufDType* dtype, std::string* error) {
 bool checked_product(const std::vector<std::uint64_t>& dimensions,
                      std::size_t* elements,
                      std::string* error) {
+    if (dimensions.empty()) {
+        return set_error(error, "GGUF tensor shape must not be empty");
+    }
     std::size_t result = 1;
     for (const auto dimension : dimensions) {
-        if (dimension > std::numeric_limits<std::size_t>::max() ||
+        if (dimension == 0 || dimension > std::numeric_limits<std::size_t>::max() ||
             result > std::numeric_limits<std::size_t>::max() /
                          static_cast<std::size_t>(dimension)) {
-            return set_error(error, "GGUF tensor shape is too large");
+            return set_error(error, "GGUF tensor shape is invalid or too large");
         }
         result *= static_cast<std::size_t>(dimension);
     }
-    *elements = dimensions.empty() ? 0 : result;
+    *elements = result;
     return true;
 }
 
@@ -104,6 +107,10 @@ bool GgufTensorLoader::load_tensor(const std::filesystem::path& path,
         byte_count_host = (elements / dtype.block_elements) * dtype.block_bytes;
     }
     const auto byte_count = static_cast<std::uint64_t>(byte_count_host);
+    if (byte_count > static_cast<std::uint64_t>(
+                         std::numeric_limits<std::streamsize>::max())) {
+        return set_error(error, "GGUF tensor payload is not readable by this host");
+    }
     std::uint64_t payload_offset = 0;
     if (!checked_add(index.data_offset, info.offset, &payload_offset)) {
         return set_error(error, "GGUF tensor offset overflows");
@@ -147,14 +154,16 @@ bool GgufTensorLoader::load_all(const std::filesystem::path& path,
                                 std::unordered_map<std::string, Tensor>* tensors,
                                 std::string* error) {
     if (tensors == nullptr) return set_error(error, "tensor map output must not be null");
-    tensors->clear();
+    std::unordered_map<std::string, Tensor> loaded;
+    loaded.reserve(index.tensors.size());
     for (const auto& info : index.tensors) {
         Tensor tensor;
         if (!load_tensor(path, index, info, &tensor, error)) return false;
-        if (!tensors->emplace(info.name, std::move(tensor)).second) {
+        if (!loaded.emplace(info.name, std::move(tensor)).second) {
             return set_error(error, "duplicate GGUF tensor name: " + info.name);
         }
     }
+    *tensors = std::move(loaded);
     if (error != nullptr) error->clear();
     return true;
 }

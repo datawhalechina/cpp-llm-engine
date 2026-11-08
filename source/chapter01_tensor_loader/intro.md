@@ -23,13 +23,7 @@ Chapter 00 已经用 llama.cpp 跑通 TinyLlama，证明模型文件、分词器
 
 ## 开始学习
 
-先运行不依赖真实模型文件的默认测试：
-
-```bash
-bash code/chapter01_tensor_loader/run.sh
-```
-
-脚本会运行 Loader、Schema、Tokenizer/Payload 三个专项 CTest，检查 Tensor、教学权重格式、Tokenizer、模型配置和 GGUF fixture。真实 TinyLlama 检查需要 Chapter 00 下载的 GGUF，按 `01.5` 中的可选命令运行。
+先从张量对象认识加载结果，再用 CIE1 小文件观察一条完整且容易排错的加载链。理解名称、形状、数据类型和权重字节怎样被校验后，再进入真实分词器、GGUF 元数据、张量目录和 Llama 权重布局。这样阅读真实模型时，文件格式细节不会遮住 Loader 的基本职责。
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
@@ -46,5 +40,5 @@ bash code/chapter01_tensor_loader/run.sh
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |
 | L1 默认 CPU | `bash code/chapter01_tensor_loader/run.sh` | Tensor、教学 Loader、Tokenizer、模型配置、GGUF fixture 和错误路径通过 CTest | 必做 |
-| L2 真实模型 | `bash code/chapter01_tensor_loader/run_real_tokenizer.sh` | 真实 tokenizer、metadata、201 个 Tensor index、22 层名称、shape、dtype 和 payload offset 通过固定检查 | 有模型时必做 |
+| L2 真实模型 | `bash code/chapter01_tensor_loader/run_real_tokenizer.sh` | 固定文本得到预期 token IDs；metadata、201 个张量索引、22 层布局、数据区偏移和 Decoder 输入映射通过检查 | 有模型时必做 |
 | L3 可选 CUDA | 不单独设置 Loader CUDA 验收 | 文件解析和权重索引保持 Host 侧职责，设备上传由后续 backend 验证 | 不适用 |

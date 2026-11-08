@@ -24,7 +24,7 @@ using MetadataValue = std::variant<std::string,
                                    std::vector<float>>;
 using MetadataMap = std::unordered_map<std::string, MetadataValue>;
 
-// Converts parsed GGUF key/value metadata into the format-independent model contract.
+// 把已解析的 GGUF 键值转换为与文件格式无关的模型契约。
 class ModelMetadataAdapter {
 public:
     static bool from_gguf(const MetadataMap& values,

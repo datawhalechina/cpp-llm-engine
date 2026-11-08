@@ -180,6 +180,28 @@ void write_tensor_record(std::ostream& out,
     out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
 }
 
+struct TeachingTensorRecord {
+    std::string name;
+    DType dtype;
+    Device device;
+    std::vector<std::int64_t> shape;
+    std::vector<std::byte> bytes;
+};
+
+void create_teaching_model(const std::filesystem::path& path,
+                           const std::vector<TeachingTensorRecord>& records) {
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out) throw std::runtime_error("failed to create teaching model: " + path.string());
+    out.write(kMagic, sizeof(kMagic));
+    write_pod(out, kVersion);
+    const auto tensor_count = static_cast<std::uint32_t>(records.size());
+    write_pod(out, tensor_count);
+    for (const auto& record : records) {
+        write_tensor_record(
+            out, record.name, record.dtype, record.device, record.shape, record.bytes);
+    }
+}
+
 std::filesystem::path make_temp_model_path() {
     auto path = std::filesystem::temp_directory_path() / "chapter01_tensor_loader_mock.bin";
     std::filesystem::remove(path);
@@ -227,6 +249,32 @@ void test_tensor_roundtrip(TestSuite& suite) {
     CPP_LLM_CHECK(suite, values[0] == 1.f);
     CPP_LLM_CHECK(suite, values[3] == 4.f);
 
+    bool rejected_type = false;
+    try {
+        (void)tensor.to_vector<std::int8_t>();
+    } catch (const std::invalid_argument&) {
+        rejected_type = true;
+    }
+    CPP_LLM_CHECK(suite, rejected_type);
+
+    bool rejected_vector_size = false;
+    try {
+        (void)Tensor::from_vector<float>("bad-size", {2}, {1.0f});
+    } catch (const std::invalid_argument&) {
+        rejected_vector_size = true;
+    }
+    CPP_LLM_CHECK(suite, rejected_vector_size);
+
+    Tensor short_storage("short", {2}, DType::Float32);
+    short_storage.set_storage(std::make_shared<Tensor::Storage>(sizeof(float)));
+    bool rejected_short_storage = false;
+    try {
+        (void)short_storage.to_vector<float>();
+    } catch (const std::out_of_range&) {
+        rejected_short_storage = true;
+    }
+    CPP_LLM_CHECK(suite, rejected_short_storage);
+
     Tensor offset_tensor("offset", {1}, DType::Float32);
     bool rejected_offset = false;
     try {
@@ -235,6 +283,16 @@ void test_tensor_roundtrip(TestSuite& suite) {
         rejected_offset = true;
     }
     CPP_LLM_CHECK(suite, rejected_offset);
+
+    Tensor incomplete_offset = Tensor::from_vector<float>(
+        "incomplete-offset", {1}, {1.0f});
+    bool rejected_incomplete_offset = false;
+    try {
+        incomplete_offset.set_offset_bytes(1);
+    } catch (const std::invalid_argument&) {
+        rejected_incomplete_offset = true;
+    }
+    CPP_LLM_CHECK(suite, rejected_incomplete_offset);
 
     Tensor oversized("oversized", {std::numeric_limits<std::int64_t>::max(), 3}, DType::Float32);
     bool rejected_shape = false;
@@ -308,6 +366,42 @@ void test_model_loader_rejects_malformed_files(TestSuite& suite) {
     std::filesystem::resize_file(path, complete_size - 1);
     CPP_LLM_CHECK(suite, !loader.load(path, &error));
     CPP_LLM_CHECK(suite, error == "failed to read tensor payload");
+    CPP_LLM_CHECK(suite, loader.tensors().empty());
+
+    create_teaching_model(
+        path,
+        {{"unknown", static_cast<DType>(255), Device::CPU, {1}, {std::byte{0}}}});
+    CPP_LLM_CHECK(suite, !loader.load(path, &error));
+    CPP_LLM_CHECK(suite, error == "unsupported teaching tensor dtype");
+    CPP_LLM_CHECK(suite, loader.tensors().empty());
+
+    create_teaching_model(
+        path,
+        {{"device", DType::Float32, static_cast<Device>(1), {1}, to_bytes(std::vector<float>{1.0f})}});
+    CPP_LLM_CHECK(suite, !loader.load(path, &error));
+    CPP_LLM_CHECK(suite, error == "unsupported teaching tensor device");
+    CPP_LLM_CHECK(suite, loader.tensors().empty());
+
+    create_teaching_model(
+        path,
+        {{"shape", DType::Float32, Device::CPU, {-1}, to_bytes(std::vector<float>{1.0f})}});
+    CPP_LLM_CHECK(suite, !loader.load(path, &error));
+    CPP_LLM_CHECK(suite, error == "invalid teaching tensor shape");
+    CPP_LLM_CHECK(suite, loader.tensors().empty());
+
+    create_teaching_model(
+        path,
+        {{"payload", DType::Float32, Device::CPU, {2}, to_bytes(std::vector<float>{1.0f})}});
+    CPP_LLM_CHECK(suite, !loader.load(path, &error));
+    CPP_LLM_CHECK(
+        suite, error == "teaching tensor payload size does not match shape and dtype");
+    CPP_LLM_CHECK(suite, loader.tensors().empty());
+
+    const TeachingTensorRecord duplicate{
+        "duplicate", DType::Float32, Device::CPU, {1}, to_bytes(std::vector<float>{1.0f})};
+    create_teaching_model(path, {duplicate, duplicate});
+    CPP_LLM_CHECK(suite, !loader.load(path, &error));
+    CPP_LLM_CHECK(suite, error == "duplicate teaching tensor name");
     CPP_LLM_CHECK(suite, loader.tensors().empty());
     std::filesystem::remove(path);
 }
@@ -480,10 +574,23 @@ void test_gguf_reader(TestSuite& suite) {
     }
 
     LoadedModel model;
+    model.config.architecture = "preserved";
     std::unordered_map<std::string, Tensor> incomplete_tensors = tensors;
     incomplete_tensors.erase("output.weight");
     CPP_LLM_CHECK(suite, !ModelBuilder::build(metadata, tokenizer_metadata, std::move(incomplete_tensors), &model, &error));
     CPP_LLM_CHECK(suite, error.find("missing Llama tensor") != std::string::npos);
+    CPP_LLM_CHECK(suite, model.config.architecture == "preserved");
+
+    std::unordered_map<std::string, Tensor> wrong_shape_tensors = tensors;
+    wrong_shape_tensors["output_norm.weight"] = Tensor::from_vector<float>(
+        "output_norm.weight", {15}, std::vector<float>(15, 1.0f));
+    CPP_LLM_CHECK(
+        suite,
+        !ModelBuilder::build(
+            metadata, tokenizer_metadata, std::move(wrong_shape_tensors), &model, &error));
+    CPP_LLM_CHECK(suite, error == "shape mismatch for output_norm.weight");
+    CPP_LLM_CHECK(suite, model.config.architecture == "preserved");
+
     CPP_LLM_REQUIRE(
         suite,
         ModelBuilder::build(
@@ -500,6 +607,85 @@ void test_gguf_reader(TestSuite& suite) {
     CPP_LLM_CHECK(suite, model.decoder.layers[0].attn_q == "blk.0.attn_q.weight");
     CPP_LLM_CHECK(suite, model.decoder.layers[1].ffn_down == "blk.1.ffn_down.weight");
     CPP_LLM_CHECK(suite, model.tensors.size() == 21);
+    std::filesystem::remove(path);
+
+    GgufModelIndex preserved;
+    preserved.version = 77;
+    {
+        std::ofstream out(path, std::ios::binary);
+        CPP_LLM_REQUIRE(suite, out);
+        out.write("GGUF", 4);
+        const std::uint32_t version = 3;
+        const std::uint64_t tensor_count = (1U << 20U) + 1U;
+        const std::uint64_t metadata_count = 0;
+        write_pod(out, version);
+        write_pod(out, tensor_count);
+        write_pod(out, metadata_count);
+    }
+    CPP_LLM_CHECK(suite, !GgufReader::read_index(path.string(), &preserved, &error));
+    CPP_LLM_CHECK(suite, error == "GGUF header count exceeds teaching reader limit");
+    CPP_LLM_CHECK(suite, preserved.version == 77);
+
+    {
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        CPP_LLM_REQUIRE(suite, out);
+        out.write("GGUF", 4);
+        const std::uint32_t version = 3;
+        const std::uint64_t tensor_count = 1;
+        const std::uint64_t metadata_count = 0;
+        write_pod(out, version);
+        write_pod(out, tensor_count);
+        write_pod(out, metadata_count);
+        write_gguf_string(out, "bad-rank");
+        const std::uint32_t dimension_count = 9;
+        write_pod(out, dimension_count);
+    }
+    CPP_LLM_CHECK(suite, !GgufReader::read_index(path.string(), &preserved, &error));
+    CPP_LLM_CHECK(suite, error == "GGUF tensor rank exceeds teaching reader limit");
+    CPP_LLM_CHECK(suite, preserved.version == 77);
+
+    {
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        CPP_LLM_REQUIRE(suite, out);
+        out.write("GGUF", 4);
+        const std::uint32_t version = 3;
+        const std::uint64_t tensor_count = 0;
+        const std::uint64_t metadata_count = 2;
+        write_pod(out, version);
+        write_pod(out, tensor_count);
+        write_pod(out, metadata_count);
+        write_gguf_kv_u32(out, "duplicate.key", 1);
+        write_gguf_kv_u32(out, "duplicate.key", 2);
+    }
+    CPP_LLM_CHECK(suite, !GgufReader::read_index(path.string(), &preserved, &error));
+    CPP_LLM_CHECK(suite, error == "duplicate GGUF metadata key: duplicate.key");
+    CPP_LLM_CHECK(suite, preserved.version == 77);
+
+    {
+        std::ofstream out(path, std::ios::binary | std::ios::trunc);
+        CPP_LLM_REQUIRE(suite, out);
+        out.write("GGUF", 4);
+        const std::uint32_t version = 3;
+        const std::uint64_t tensor_count = 2;
+        const std::uint64_t metadata_count = 0;
+        write_pod(out, version);
+        write_pod(out, tensor_count);
+        write_pod(out, metadata_count);
+        for (int i = 0; i < 2; ++i) {
+            write_gguf_string(out, "duplicate.weight");
+            const std::uint32_t dimension_count = 1;
+            const std::uint64_t dimension = 1;
+            const std::uint32_t type = 0;
+            const std::uint64_t offset = 0;
+            write_pod(out, dimension_count);
+            write_pod(out, dimension);
+            write_pod(out, type);
+            write_pod(out, offset);
+        }
+    }
+    CPP_LLM_CHECK(suite, !GgufReader::read_index(path.string(), &preserved, &error));
+    CPP_LLM_CHECK(suite, error == "duplicate GGUF tensor name: duplicate.weight");
+    CPP_LLM_CHECK(suite, preserved.version == 77);
     std::filesystem::remove(path);
 }
 
@@ -527,6 +713,16 @@ void test_q4_k_payload_loader(TestSuite& suite) {
     CPP_LLM_CHECK(suite, tensor.numel() == 256);
     CPP_LLM_CHECK(suite, tensor.bytes() == 144);
     CPP_LLM_CHECK(suite, tensor.raw_data()[0] == std::byte{0x2a});
+
+    GgufModelIndex invalid_index = index;
+    invalid_index.tensors.push_back({"unsupported.weight", {1}, 999, 0});
+    std::unordered_map<std::string, Tensor> unchanged;
+    unchanged.emplace(
+        "sentinel", Tensor::from_vector<float>("sentinel", {1}, {1.0f}));
+    CPP_LLM_CHECK(
+        suite, !GgufTensorLoader::load_all(path, invalid_index, &unchanged, &error));
+    CPP_LLM_CHECK(suite, unchanged.size() == 1);
+    CPP_LLM_CHECK(suite, unchanged.find("sentinel") != unchanged.end());
     std::filesystem::remove(path);
 }
 

@@ -1,53 +1,40 @@
-# chapter01_tensor_loader 代码导航
+# Chapter 01 代码导航：模型加载与输入对象
 
-本章代码包含 Tensor、GGUF Reader、模型配置、Tokenizer adapter、ModelBuilder 和真实模型测试。
+本目录把教学格式或 GGUF 中的配置、分词信息和权重转换为教程内部对象；学习原理与顺序见 [Chapter01 导读](../chapter01_tensor_loader/intro.md)。
 
-## 阅读顺序
+## 代码架构
 
-1. 先看 `src/tensor.h` 和 `src/tensor.cpp`
-2. 再沿 `gguf_reader -> metadata/tokenizer adapter -> gguf_tensor_loader -> model_builder` 阅读真实模型加载链
-3. 选读 `model_loader.*`，理解 CIE1 教学格式和错误处理
-4. 最后运行 `gguf_inspect` 并查看测试文件
+```text
+CIE1 -> ModelLoader -----------------------------> Tensor map
+GGUF -> Reader -> metadata/index -> adapters -----+-> ModelBuilder
+                                -> TensorLoader --+   |
+                                                     +-> LoadedModel / DecoderInput
+```
 
-## 输入语义
+Reader 解析外部结构，Adapter 转换配置，Tensor Loader 读取 payload，Model Builder 检查并提交完整模型。Decoder 计算不属于本目录。
 
-| 文件 | 作用 |
-| --- | --- |
-| <a href="/_code/chapter01_tensor_loader/src/tensor.h"><code>src/tensor.h</code></a> | Tensor 接口 |
-| <a href="/_code/chapter01_tensor_loader/src/tensor.cpp"><code>src/tensor.cpp</code></a> | Tensor 实现 |
-| <a href="/_code/chapter01_tensor_loader/src/model_loader.h"><code>src/model_loader.h</code></a> | ModelLoader 接口 |
-| <a href="/_code/chapter01_tensor_loader/src/model_loader.cpp"><code>src/model_loader.cpp</code></a> | ModelLoader 实现 |
-| <a href="/_code/chapter01_tensor_loader/src/tokenizer.h"><code>src/tokenizer.h</code></a> | Tokenizer 接口和 token 类型 |
-| <a href="/_code/chapter01_tensor_loader/src/tokenizer.cpp"><code>src/tokenizer.cpp</code></a> | 教学用 tokenizer 实现 |
-| <a href="/_code/chapter01_tensor_loader/src/model_config.h"><code>src/model_config.h</code></a> | ModelConfig 和 metadata 校验 |
-| <a href="/_code/chapter01_tensor_loader/src/model_config.cpp"><code>src/model_config.cpp</code></a> | vocab、shape 和 dtype 一致性检查 |
-| <a href="/_code/chapter01_tensor_loader/src/model_metadata.h"><code>src/model_metadata.h</code></a> | 外部格式到内部 metadata 的边界 |
-| <a href="/_code/chapter01_tensor_loader/src/model_metadata.cpp"><code>src/model_metadata.cpp</code></a> | metadata 基础有效性检查 |
-| <a href="/_code/chapter01_tensor_loader/src/model_metadata_adapter.h"><code>src/model_metadata_adapter.h</code></a> | GGUF key/value 到 ModelMetadata 的适配接口 |
-| <a href="/_code/chapter01_tensor_loader/src/model_metadata_adapter.cpp"><code>src/model_metadata_adapter.cpp</code></a> | TinyLlama/Llama 风格 metadata key 映射和错误检查 |
-| <a href="/_code/chapter01_tensor_loader/src/gguf_reader.h"><code>src/gguf_reader.h</code></a> | GGUF 文件索引接口 |
-| <a href="/_code/chapter01_tensor_loader/src/gguf_reader.cpp"><code>src/gguf_reader.cpp</code></a> | GGUF header、标量 metadata 和 tensor index 读取 |
-| <a href="/_code/chapter01_tensor_loader/src/gguf_tensor_loader.h"><code>src/gguf_tensor_loader.h</code></a> | GGUF tensor payload loader 接口 |
-| <a href="/_code/chapter01_tensor_loader/src/gguf_tensor_loader.cpp"><code>src/gguf_tensor_loader.cpp</code></a> | offset、shape、dtype 和文件边界检查 |
-| <a href="/_code/chapter01_tensor_loader/src/model_builder.h"><code>src/model_builder.h</code></a> | ModelMetadata、TokenizerMetadata 和 Tensor map 的组装接口 |
-| <a href="/_code/chapter01_tensor_loader/src/model_builder.cpp"><code>src/model_builder.cpp</code></a> | vocab、embedding shape 和 payload 校验 |
+## 阅读顺序与资产
 
-## 示例
+| 顺序 | 代码入口 | 观察重点 |
+| --- | --- | --- |
+| 1 | <a href="/_code/chapter01_tensor_loader/src/tensor.h"><code>tensor.h</code></a>、<a href="/_code/chapter01_tensor_loader/src/tensor.cpp"><code>tensor.cpp</code></a> | shape、dtype、storage 和类型化访问检查 |
+| 2 | <a href="/_code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> | CIE1 记录校验与失败原子性 |
+| 3 | <a href="/_code/chapter01_tensor_loader/src/gguf_reader.cpp"><code>gguf_reader.cpp</code></a>、<a href="/_code/chapter01_tensor_loader/src/gguf_tensor_loader.cpp"><code>gguf_tensor_loader.cpp</code></a> | 索引解析与 payload 读取分离 |
+| 4 | <a href="/_code/chapter01_tensor_loader/src/model_metadata_adapter.cpp"><code>model_metadata_adapter.cpp</code></a>、<a href="/_code/chapter01_tensor_loader/src/tokenizer_metadata.cpp"><code>tokenizer_metadata.cpp</code></a> | 外部字段到内部契约 |
+| 5 | <a href="/_code/chapter01_tensor_loader/src/model_builder.cpp"><code>model_builder.cpp</code></a> | schema 检查与模型装配 |
 
-| 文件 | 作用 |
-| --- | --- |
-| <a href="/_code/chapter01_tensor_loader/examples/gguf_inspect.cpp"><code>examples/gguf_inspect.cpp</code></a> | 检查真实 GGUF，并可加载第一个 Q4_K tensor |
-| <a href="/_code/chapter01_tensor_loader/src/tokenizer_metadata.h"><code>src/tokenizer_metadata.h</code></a> | 真实 tokenizer metadata 契约 |
-| <a href="/_code/chapter01_tensor_loader/src/tokenizer_metadata.cpp"><code>src/tokenizer_metadata.cpp</code></a> | tokenizer vocabulary、scores、token types 和 special tokens 适配 |
+## 运行与验证
 
-## 验证
+```bash
+bash code/chapter01_tensor_loader/run.sh
+```
 
-| 文件 | 作用 |
-| --- | --- |
-| <a href="/_code/chapter01_tensor_loader/tests/chapter01_tensor_loader_test.cpp"><code>tests/chapter01_tensor_loader_test.cpp</code></a> | 权重加载与 Tensor 验证 |
+三个专项测试分别覆盖 Loader、Schema、Tokenizer/Payload。已有 TinyLlama 与 llama.cpp 构建时，可继续运行：
 
-## 对应文档
+```bash
+bash code/chapter01_tensor_loader/run_real_tokenizer.sh
+```
 
-- [chapter01 导读](../chapter01_tensor_loader/intro.md)
-- [输入契约与 Tokenizer](../chapter01_tensor_loader/04_input_contract_and_tokenizer.md)
-- [模型元数据与 GGUF](../chapter01_tensor_loader/05_model_metadata_and_gguf.md)
+## 扩展入口
+
+真实 Decoder 从 [`code/model`](./model.md) 继续，量化 payload 的数值计算进入 [Chapter05](../chapter05_quantization/intro.md)，模型支持范围见 [模型支持状态](../reference/model_support.md)。

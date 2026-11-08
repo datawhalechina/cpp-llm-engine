@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 566" role="img" aria-labelledby="title desc">
   <title id="title">Chapter 01 把模型文件和用户文本转换为内部对象</title>
   <desc id="desc">Chapter 01 使用 A 教学闭环验证小型权重文件与 Tokenizer 接口，使用 B 真实执行闭环读取 TinyLlama GGUF、配置与权重布局。</desc>
   <defs>
@@ -24,7 +24,7 @@
     </filter>
   </defs>
 
-  <rect width="1200" height="680" rx="24" fill="url(#background)"/>
+  <rect width="1200" height="566" rx="24" fill="url(#background)"/>
   <text x="54" y="55" font-size="27" font-weight="700" fill="#172033">Chapter 01：把外部输入转换成可检查的内部对象</text>
   <text x="54" y="84" font-size="15" fill="#52606d">模型文件产生配置、权重和布局；用户文本产生词元编号</text>
 
@@ -66,13 +66,13 @@
     <rect x="536" y="294" width="244" height="120" rx="16" fill="#e8f1f7" stroke="#79a4ba"/>
     <text x="658" y="325" font-size="15" font-weight="700" text-anchor="middle" fill="#28536b">统一的内部对象</text>
     <text x="658" y="351" font-size="13" text-anchor="middle" fill="#172033">模型配置（ModelConfig）</text>
-    <text x="658" y="375" font-size="13" text-anchor="middle" fill="#172033">权重张量（Tensor map）</text>
+    <text x="658" y="375" font-size="13" text-anchor="middle" fill="#172033">权重张量映射（Tensor Map）</text>
     <text x="658" y="397" font-size="12" text-anchor="middle" fill="#52606d">分词器元数据</text>
 
     <rect x="836" y="302" width="310" height="104" rx="16" fill="#28536b" filter="url(#shadow)"/>
     <text x="991" y="333" font-size="15" font-weight="700" text-anchor="middle" fill="#ffffff">B 交给真实解码器</text>
     <text x="991" y="360" font-size="13" text-anchor="middle" fill="#e8f6ff">模型配置 + 张量映射</text>
-    <text x="991" y="384" font-size="12" text-anchor="middle" fill="#c9e8f5">Llama Layout → Chapter 04</text>
+    <text x="991" y="384" font-size="12" text-anchor="middle" fill="#c9e8f5">Llama 权重布局 → Chapter 04</text>
   </g>
 
   <path d="M214 354 H270" fill="none" stroke="#28536b" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
@@ -82,10 +82,10 @@
   <g>
     <rect x="54" y="452" width="160" height="82" rx="15" fill="#fff0dc" stroke="#e8a765" stroke-width="2"/>
     <text x="134" y="484" font-size="15" font-weight="700" text-anchor="middle" fill="#9a4d13">A 小型输入</text>
-    <text x="134" y="511" font-size="13" text-anchor="middle" fill="#6f5438">CIE1 · 固定测试数据 · 文本</text>
+    <text x="134" y="511" font-size="12" text-anchor="middle" fill="#6f5438">CIE1 · 固定数据 · 文本</text>
 
     <rect x="270" y="452" width="210" height="82" rx="15" fill="#ffffff" stroke="#e8a765" stroke-width="2"/>
-    <text x="375" y="484" font-size="15" font-weight="700" text-anchor="middle" fill="#9a4d13">Loader 与 Tokenizer</text>
+    <text x="375" y="484" font-size="15" font-weight="700" text-anchor="middle" fill="#9a4d13">加载器与分词器</text>
     <text x="375" y="511" font-size="12" text-anchor="middle" fill="#6f5438">固定正常路径与错误路径</text>
 
     <rect x="536" y="452" width="244" height="82" rx="15" fill="#fff0dc" stroke="#e8a765"/>
@@ -101,9 +101,4 @@
   <path d="M480 493 H536" fill="none" stroke="#c45b16" stroke-width="2.5" marker-end="url(#arrow-orange)"/>
   <path d="M780 493 H836" fill="none" stroke="#0f766e" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
 
-  <rect x="54" y="576" width="1092" height="42" rx="12" fill="#ffffff" stroke="#d8e2e8"/>
-  <text x="600" y="602" font-size="14" font-weight="700" text-anchor="middle" fill="#52606d">默认验证：对象字段可检查 · 错误文件被拒绝 · 词元编号不越界 · 权重布局完整</text>
-
-  <rect x="54" y="630" width="1092" height="30" rx="10" fill="#173f3c"/>
-  <text x="600" y="651" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">学习结果：能说明外部文件和文本怎样进入推理引擎，而不会把格式细节带进后续计算</text>
 </svg>

@@ -1,6 +1,6 @@
 // Chapter 01：loader Tensor 实现
 // 职责：保存 dtype、shape、device 和 raw bytes，供 loader 与 schema 消费。
-// 契约：对象不负责数值 kernel；ready() 必须通过 shape 与 byte size 检查。
+// 契约：对象不负责数值 kernel；类型化读写必须先核对 dtype、shape 与 storage。
 // 验证：chapter01_tensor_loader_test.cpp。
 #include "tensor.h"
 
@@ -130,6 +130,12 @@ void Tensor::set_storage(StoragePtr storage, std::size_t offset_bytes) {
 
 std::size_t Tensor::offset_bytes() const { return offset_bytes_; }
 
-void Tensor::set_offset_bytes(std::size_t offset_bytes) { offset_bytes_ = offset_bytes; }
+void Tensor::set_offset_bytes(std::size_t offset_bytes) {
+    if (!storage_ || offset_bytes > storage_->size() ||
+        bytes() > storage_->size() - offset_bytes) {
+        throw std::invalid_argument("tensor storage offset leaves an incomplete payload");
+    }
+    offset_bytes_ = offset_bytes;
+}
 
 }  // namespace chapter01

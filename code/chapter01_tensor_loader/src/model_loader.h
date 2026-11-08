@@ -1,5 +1,5 @@
 // Chapter 01：教学二进制模型 loader 接口
-// 职责：声明从 CIE1 文件读取 LoadedModel 的入口。
+// 职责：声明从 CIE1 文件读取 Tensor Map 的入口。
 // 契约：loader 只处理教程格式；真实 GGUF 由 GgufReader/GgufTensorLoader 负责。
 // 验证：chapter01_tensor_loader_test.cpp。
 #pragma once
