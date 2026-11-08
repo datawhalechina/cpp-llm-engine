@@ -35,6 +35,7 @@ bool prompt_shape_valid(const WorkloadDefinition& workload) {
     if (workload.prompt_tokens.empty()) {
         return workload.prompt_tokens_per_request > 0;
     }
+    if (workload.prompt_tokens_per_request != 0) return false;
     if (workload.prompt_tokens.size() != workload.request_count) return false;
     for (const std::size_t token_count : workload.prompt_tokens) {
         if (token_count == 0) return false;
@@ -84,11 +85,14 @@ bool EvidenceRecord::valid(std::string* error) const {
         if (error != nullptr) *error = message;
         return false;
     };
-    if (schema_version == 0) return fail("schema_version must be positive");
+    if (schema_version != kEvidenceSchemaVersion) {
+        return fail("unsupported schema_version");
+    }
     if (missing(experiment_id)) return fail("missing experiment_id");
     if (missing(workload_id)) return fail("missing workload_id");
     if (missing(environment.model) || missing(environment.backend) ||
-        missing(environment.device) || missing(environment.build_type) ||
+        missing(environment.device) || missing(environment.hardware) ||
+        environment.hardware_concurrency == 0 || missing(environment.build_type) ||
         missing(environment.compiler)) {
         return fail("incomplete environment identity");
     }
@@ -99,6 +103,9 @@ bool EvidenceRecord::valid(std::string* error) const {
     }
     if (!correctness_pass) return fail("correctness gate failed");
     if (correctness_checks.empty()) return fail("missing correctness checks");
+    for (const auto& check : correctness_checks) {
+        if (missing(check)) return fail("empty correctness check");
+    }
     if (samples.size() != workload.measurement_iterations) {
         return fail("sample count does not match measurement_iterations");
     }
@@ -132,7 +139,10 @@ std::string render_evidence_json(const EvidenceRecord& record) {
            << "  \"environment\": {\"model\": \""
            << escape_json(record.environment.model) << "\", \"backend\": \""
            << escape_json(record.environment.backend) << "\", \"device\": \""
-           << escape_json(record.environment.device) << "\", \"build_type\": \""
+           << escape_json(record.environment.device) << "\", \"hardware\": \""
+           << escape_json(record.environment.hardware)
+           << "\", \"hardware_concurrency\": "
+           << record.environment.hardware_concurrency << ", \"build_type\": \""
            << escape_json(record.environment.build_type) << "\", \"compiler\": \""
            << escape_json(record.environment.compiler) << "\"},\n"
            << "  \"workload\": {\"request_count\": " << record.workload.request_count

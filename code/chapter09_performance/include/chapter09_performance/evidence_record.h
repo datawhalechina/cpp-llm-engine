@@ -11,10 +11,14 @@
 
 namespace chapter09_performance {
 
+inline constexpr std::size_t kEvidenceSchemaVersion = 2;
+
 struct EnvironmentIdentity {
     std::string model;
     std::string backend;
     std::string device;
+    std::string hardware;
+    std::size_t hardware_concurrency = 0;
     std::string build_type;
     std::string compiler;
 };
@@ -50,7 +54,7 @@ struct EvidenceSummary {
 };
 
 struct EvidenceRecord {
-    std::size_t schema_version = 1;
+    std::size_t schema_version = kEvidenceSchemaVersion;
     std::string experiment_id;
     std::string workload_id;
     EnvironmentIdentity environment;

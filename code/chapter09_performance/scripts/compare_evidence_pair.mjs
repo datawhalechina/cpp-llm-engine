@@ -27,6 +27,8 @@ function writeWire(record, file) {
     ["model", text(environment.model)],
     ["backend", text(environment.backend)],
     ["device", text(environment.device)],
+    ["hardware", text(environment.hardware)],
+    ["hardware_concurrency", size(environment.hardware_concurrency)],
     ["build_type", text(environment.build_type)],
     ["compiler", text(environment.compiler)],
     ["request_count", size(workload.request_count)],

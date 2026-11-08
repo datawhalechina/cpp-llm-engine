@@ -6,8 +6,22 @@ import { fileURLToPath } from "node:url";
 
 export class LegacyMigrationError extends Error {}
 
+function requireText(value, field) {
+  if (typeof value !== "string" || value.length === 0 || value === "unknown") {
+    throw new LegacyMigrationError(`invalid ${field}`);
+  }
+  return value;
+}
+
 function requirePositive(value, field) {
   if (!Number.isFinite(value) || value <= 0) {
+    throw new LegacyMigrationError(`invalid ${field}`);
+  }
+  return value;
+}
+
+function requirePositiveInteger(value, field) {
+  if (!Number.isSafeInteger(value) || value <= 0) {
     throw new LegacyMigrationError(`invalid ${field}`);
   }
   return value;
@@ -16,17 +30,31 @@ function requirePositive(value, field) {
 function environmentOf(document, options) {
   const environment = document.environment ?? {};
   return {
-    model: document.model ?? options.model ?? "teaching-transformer",
-    backend: options.backend ?? (document.model ? "cpp-llm-engine-cpu" : "teaching-cpu"),
-    device: document.device ?? "cpu",
-    build_type: environment.build_type,
-    compiler: environment.compiler,
+    model: requireText(
+      document.model ?? options.model ?? "teaching-transformer",
+      "environment.model",
+    ),
+    backend: requireText(
+      options.backend ?? (document.model ? "cpp-llm-engine-cpu" : "teaching-cpu"),
+      "environment.backend",
+    ),
+    device: requireText(document.device ?? "cpu", "environment.device"),
+    hardware: requireText(
+      environment.cpu_model ?? options.hardware,
+      "environment.hardware",
+    ),
+    hardware_concurrency: requirePositiveInteger(
+      environment.hardware_concurrency,
+      "environment.hardware_concurrency",
+    ),
+    build_type: requireText(environment.build_type, "environment.build_type"),
+    compiler: requireText(environment.compiler, "environment.compiler"),
   };
 }
 
 function commonRecord(document, options, overrides) {
   return {
-    schema_version: 1,
+    schema_version: 2,
     experiment_id: overrides.experiment_id,
     workload_id: overrides.workload_id,
     environment: environmentOf(document, options),

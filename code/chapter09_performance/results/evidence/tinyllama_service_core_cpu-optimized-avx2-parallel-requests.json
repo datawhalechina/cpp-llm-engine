@@ -1,11 +1,13 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "experiment_id": "tinyllama_service_core_cpu:optimized-avx2:parallel-requests",
   "workload_id": "tinyllama_service_core_cpu:requests-2",
   "environment": {
     "model": "TinyLlama-1.1B-Chat-v1.0.Q4_K_M",
     "backend": "cpp-llm-engine-cpu",
     "device": "cpu",
+    "hardware": "AMD Ryzen 9 9955HX 16-Core Processor",
+    "hardware_concurrency": 32,
     "build_type": "Release",
     "compiler": "gcc 13.1.0"
   },

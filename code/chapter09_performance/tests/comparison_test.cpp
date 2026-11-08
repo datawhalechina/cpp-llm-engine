@@ -62,6 +62,21 @@ int main() {
         CPP_LLM_CHECK(suite, result.latency_delta_percent == 0.0);
     });
 
+    suite.run("different hardware is not comparable", [&] {
+        const auto baseline = chapter09_performance::testing::sample_record("EXP-A");
+        auto experiment = chapter09_performance::testing::sample_record("EXP-HARDWARE");
+        experiment.environment.hardware = "another CPU";
+        CPP_LLM_CHECK(suite,
+                      chapter09_performance::compare(baseline, experiment).decision ==
+                          Decision::not_comparable);
+
+        experiment.environment = baseline.environment;
+        experiment.environment.hardware_concurrency = 16;
+        CPP_LLM_CHECK(suite,
+                      chapter09_performance::compare(baseline, experiment).decision ==
+                          Decision::not_comparable);
+    });
+
     suite.run("different ragged prompts are not comparable", [&] {
         auto baseline = chapter09_performance::testing::sample_record("EXP-A");
         auto experiment = chapter09_performance::testing::sample_record("EXP-B");

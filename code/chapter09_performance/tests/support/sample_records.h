@@ -12,7 +12,8 @@ inline EvidenceRecord sample_record(const std::string& experiment_id) {
     record.experiment_id = experiment_id;
     record.workload_id = "WL-CPU-BATCH-V1";
     record.environment = {
-        "TinyLlama-1.1B-Chat-Q4_K_M", "cpu", "x86_64-avx2", "Release", "gcc-13"};
+        "TinyLlama-1.1B-Chat-Q4_K_M", "cpu", "x86_64-avx2",
+        "AMD Ryzen 9 9955HX", 32, "Release", "gcc-13"};
     record.workload.request_count = 2;
     record.workload.prompt_tokens_per_request = 8;
     record.workload.output_tokens_per_request = 4;

@@ -48,10 +48,33 @@ int main() {
         CPP_LLM_CHECK(suite, error.find("workload") != std::string::npos);
     });
 
+    suite.run("prompt shape has one unambiguous representation", [&] {
+        auto record = chapter09_performance::testing::sample_record("EXP-PROMPT-SHAPE");
+        record.workload.prompt_tokens = {8, 8};
+        std::string error;
+        CPP_LLM_CHECK(suite, !record.valid(&error));
+        CPP_LLM_CHECK(suite, error.find("workload") != std::string::npos);
+    });
+
+    suite.run("schema and hardware identity are required", [&] {
+        auto record = chapter09_performance::testing::sample_record("EXP-IDENTITY");
+        record.schema_version = 1;
+        std::string error;
+        CPP_LLM_CHECK(suite, !record.valid(&error));
+        CPP_LLM_CHECK(suite, error.find("schema_version") != std::string::npos);
+
+        record.schema_version = chapter09_performance::kEvidenceSchemaVersion;
+        record.environment.hardware.clear();
+        CPP_LLM_CHECK(suite, !record.valid(&error));
+        CPP_LLM_CHECK(suite, error.find("environment") != std::string::npos);
+    });
+
     suite.run("json keeps identity and raw samples", [&] {
         const auto record = chapter09_performance::testing::sample_record("EXP-JSON");
         const std::string json = chapter09_performance::render_evidence_json(record);
-        CPP_LLM_CHECK(suite, json.find("\"schema_version\": 1") != std::string::npos);
+        CPP_LLM_CHECK(suite, json.find("\"schema_version\": 2") != std::string::npos);
+        CPP_LLM_CHECK(suite, json.find("\"hardware_concurrency\": 32") !=
+                                 std::string::npos);
         CPP_LLM_CHECK(suite, json.find("\"workload_id\": \"WL-CPU-BATCH-V1\"") !=
                                  std::string::npos);
         CPP_LLM_CHECK(suite, json.find("\"samples\": [") != std::string::npos);

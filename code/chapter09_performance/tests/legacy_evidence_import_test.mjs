@@ -5,7 +5,12 @@ import {
   migrateLegacyDocument,
 } from "../scripts/import_legacy_evidence.mjs";
 
-const environment = { compiler: "gcc 13", build_type: "Release" };
+const environment = {
+  cpu_model: "test CPU",
+  hardware_concurrency: 8,
+  compiler: "gcc 13",
+  build_type: "Release",
+};
 const teaching = {
   experiment_id: "EXP-TEACH",
   workload_id: "WL-TEACH",
@@ -32,6 +37,13 @@ const teachingRecords = migrateLegacyDocument(teaching);
 assert.equal(teachingRecords.length, 1);
 assert.equal(teachingRecords[0].samples[0].total_ms, 2);
 assert.equal(teachingRecords[0].workload.execution_mode, "multi_request_generation");
+
+const missingHardware = structuredClone(teaching);
+delete missingHardware.environment.cpu_model;
+assert.throws(
+  () => migrateLegacyDocument(missingHardware),
+  (error) => error instanceof LegacyMigrationError && /environment.hardware/.test(error.message),
+);
 
 const pair = {
   experiment_id: "EXP-PAIR",
@@ -94,6 +106,8 @@ const serviceRecord = migrateLegacyDocument(service)[0];
 assert.equal(serviceRecord.samples[0].peak_memory_mb, 1);
 assert.equal(serviceRecord.samples[0].ttft_ms, 4);
 assert.equal(serviceRecord.environment.backend, "cpp-llm-engine-cpu");
+assert.equal(serviceRecord.environment.hardware, "test CPU");
+assert.equal(serviceRecord.environment.hardware_concurrency, 8);
 assert.equal(serviceRecord.workload.execution_mode, "service_generation");
 
 process.stdout.write("legacy evidence import tests passed\n");

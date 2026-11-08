@@ -29,8 +29,9 @@ bool valid_policy(const ComparisonPolicy& policy) {
 
 bool same_environment(const EnvironmentIdentity& left, const EnvironmentIdentity& right) {
     return left.model == right.model && left.backend == right.backend &&
-           left.device == right.device && left.build_type == right.build_type &&
-           left.compiler == right.compiler;
+           left.device == right.device && left.hardware == right.hardware &&
+           left.hardware_concurrency == right.hardware_concurrency &&
+           left.build_type == right.build_type && left.compiler == right.compiler;
 }
 
 bool same_workload(const WorkloadDefinition& left, const WorkloadDefinition& right) {
