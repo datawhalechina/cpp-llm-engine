@@ -78,6 +78,12 @@ int main() {
             suite, metrics.body.find("serving_completed_total 1") != std::string::npos);
         CPP_LLM_CHECK(
             suite, metrics.body.find("serving_released_total 1") != std::string::npos);
+        CPP_LLM_CHECK(
+            suite, metrics.body.find("serving_waiting 0") != std::string::npos);
+        CPP_LLM_CHECK(
+            suite, metrics.body.find("serving_running 0") != std::string::npos);
+        CPP_LLM_CHECK(
+            suite, metrics.body.find("serving_peak_inflight 1") != std::string::npos);
     });
 
     suite.run("SSE preserves token order and emits one finish event", [&] {
@@ -116,6 +122,29 @@ int main() {
         CPP_LLM_CHECK(suite, backpressure.finished);
         CPP_LLM_CHECK_EQ(suite, service.inflight_size(), 0U);
         CPP_LLM_CHECK_EQ(suite, service.metrics().cancelled_total, 2U);
+    });
+
+    suite.run("sync and SSE timeouts return 408 and release requests", [&] {
+        HttpRequest sync_timeout{
+            "POST", "/v1/completions",
+            "{\"request_id\":8,\"prompt_tokens\":[8]}"};
+        sync_timeout.timeout_after_tokens = 1;
+        CPP_LLM_CHECK_EQ(suite, adapter.handle(sync_timeout).status_code, 408);
+
+        RecordingWriter stream_writer;
+        HttpRequest stream_timeout{
+            "POST", "/v1/completions",
+            "{\"request_id\":9,\"prompt_tokens\":[9]}"};
+        stream_timeout.timeout_after_tokens = 1;
+        CPP_LLM_CHECK_EQ(
+            suite, adapter.handle_stream(stream_timeout, stream_writer).status_code, 408);
+        CPP_LLM_CHECK(
+            suite,
+            stream_writer.body.find("\"finish_reason\":\"timeout\"") !=
+                std::string::npos);
+        CPP_LLM_CHECK(suite, stream_writer.finished);
+        CPP_LLM_CHECK_EQ(suite, service.inflight_size(), 0U);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().timed_out_total, 2U);
     });
 
     suite.run("header backpressure returns 503 and releases request", [&] {

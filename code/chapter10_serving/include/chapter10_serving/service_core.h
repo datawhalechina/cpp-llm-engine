@@ -1,5 +1,6 @@
 // Chapter 10：声明服务准入、等待/运行状态和统一终态释放接口。
 // 职责：把请求提交给 Chapter08 Scheduler，不重新实现生成或 K/V 策略。
+// 线程约束：对象本身不加锁，调用方必须串行执行准入、调度、终态和指标操作。
 // 验证：Chapter10 lifecycle、cache 和 HTTP contract 测试。
 #pragma once
 

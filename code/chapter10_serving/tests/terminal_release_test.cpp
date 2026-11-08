@@ -4,6 +4,7 @@
 #include "chapter10_serving/service_core.h"
 
 #include "chapter06_generation/embedding.h"
+#include "chapter06_generation/model_executor.h"
 #include "chapter06_generation/position_encoding.h"
 #include "chapter06_generation/request.h"
 #include "chapter06_generation/runtime.h"
@@ -13,6 +14,30 @@
 #include "cpp_llm_engine/testing/test.h"
 
 #include <memory>
+#include <string>
+
+namespace {
+
+class FailingExecutor final : public chapter06_generation::RequestModelExecutor {
+public:
+    bool prefill(
+        const chapter06_generation::TokenSequence&,
+        chapter06_generation::Logits*,
+        std::string* error) override {
+        if (error != nullptr) *error = "intentional prefill failure";
+        return false;
+    }
+
+    bool decode(
+        chapter06_generation::TokenId,
+        chapter06_generation::Logits*,
+        std::string* error) override {
+        if (error != nullptr) *error = "unexpected decode";
+        return false;
+    }
+};
+
+}  // namespace
 
 int main() {
     using namespace chapter06_generation;
@@ -58,6 +83,30 @@ int main() {
         CPP_LLM_CHECK_EQ(suite, service.waiting_size(), 1U);
         CPP_LLM_CHECK_EQ(suite, service.release_terminal(), 1U);
         CPP_LLM_CHECK_EQ(suite, service.metrics().timed_out_total, 1U);
+    });
+
+    suite.run("executor failure releases the same service and cache ownership", [&] {
+        GenerationConfig config;
+        Runtime runtime(config);
+        GreedySampler sampler;
+        auto pool = std::make_shared<chapter07_kv_cache::KvBlockPool>(2, 2);
+        ServiceCore service(1, 1, ServiceNow{}, pool);
+        Request request({4});
+        CPP_LLM_REQUIRE(
+            suite,
+            service.admit(40, request, sampler, std::make_shared<FailingExecutor>())
+                .accepted());
+        CPP_LLM_REQUIRE(suite, pool->reserve(40, 1));
+        CPP_LLM_REQUIRE(suite, pool->commit_tokens(40, 1));
+
+        const auto step = service.dispatch_step(runtime, 1);
+        CPP_LLM_CHECK_EQ(suite, step.generated_tokens, 0U);
+        CPP_LLM_CHECK(suite, request.failed());
+        CPP_LLM_CHECK_EQ(suite, service.release_terminal(), 1U);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().failed_total, 1U);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().released_total, 1U);
+        CPP_LLM_CHECK_EQ(suite, pool->free_blocks(), pool->total_blocks());
+        CPP_LLM_CHECK_EQ(suite, service.inflight_size(), 0U);
     });
 
     return suite.finish();

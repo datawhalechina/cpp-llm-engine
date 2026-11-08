@@ -1,5 +1,5 @@
 // Chapter 10：实现 cpp-httplib 的 HTTP 与 chunked SSE 写回。
-// 契约：网络库类型停留在本文件，HttpAdapter 与 ServiceCore 不依赖 httplib。
+// 契约：网络库类型停留在本文件，并在进入单线程 ServiceCore 前串行化请求。
 // 验证：可选 loopback 脚本检查 health、metrics、Completion 和 SSE。
 #include "chapter10_serving/cpp_httplib_transport.h"
 
