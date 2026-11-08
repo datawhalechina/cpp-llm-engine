@@ -47,6 +47,6 @@ bash code/chapter00_quickstart/run_real_inference.sh
 | 方向 | 后续入口 |
 | --- | --- |
 | 模型加载与分词 | [Chapter01](../../source/chapter01_tensor_loader/intro.md) |
-| 自研 CPU 执行主线 | [Chapter02–06 章节资产](../../source/reference/chapter_assets.md) |
+| 自研 CPU 执行主线 | [Chapter02–06 教程资产](../../source/reference/tutorial_assets.md) |
 | 可选 CUDA 环境 | [CUDA 环境指南](../../source/guides/setup_cuda.md) |
 | 其他模型与架构 | [模型支持状态](../../source/reference/model_support.md) |

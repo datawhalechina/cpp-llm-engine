@@ -61,23 +61,6 @@ PAIRS: tuple[DocPair, ...] = (
             (r"\]\(source/maintenance/README\.md\)", r"](/maintenance/README)"),
         ),
     ),
-    DocPair(
-        source=REPO_ROOT / "USAGE.md",
-        target=REPO_ROOT / "docs" / "guide.md",
-        sections=(
-            SectionSpec("三个入口怎么分工", "三条先记住"),
-            SectionSpec("从这里开始", "推荐顺序"),
-            SectionSpec("阅读路径", "一眼看路径"),
-            SectionSpec("如何运行代码", "运行入口"),
-        ),
-        rewrites=(
-            (r"\]\(docs/README\.md\)", r"](/README)"),
-            (r"\]\(docs/README\.en\.md\)", r"](/en/README)"),
-            (r"\]\(docs/maintenance/tutorial_positioning\.md\)", r"](/maintenance/tutorial_positioning)"),
-            (r"\]\(docs/README\.md\)", r"](/README)"),
-            (r"\]\(USAGE\.md\)", r"](/guide)"),
-        ),
-    ),
 )
 
 
