@@ -91,6 +91,16 @@ A 教学基线 → B 真实主线
 
 真实 TinyLlama CUDA 路径已连接 tokenizer、量化 embedding、22 层 Decoder、final norm、LM Head、Chapter06 Runtime、Chapter08 Decode batch、detokenizer 和 Chapter10 HTTP Adapter。Decode batch 合并 RMSNorm、Linear 与 FFN，并按精确 batch size 复用执行 workspace。CUDA 分页 payload、分页 GQA 和单请求真实 Context 已通过连续路径对照；分页 batch 事务与真实 socket server 仍在建设。
 
+### GPU 纵向验收
+
+修改 CUDA backend、真实 CUDA Model/Context 或服务接入后，依次运行下面三项。第一项验证独立 kernel、分页缓存和合成 Decoder；第二项验证 TinyLlama 真实 Runtime；第三项验证同一执行器进入同步 Completion、SSE 和终态释放。脚本默认读取 `llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf`，也可以通过 `CPP_LLM_ENGINE_MODEL_PATH` 指定模型。
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
+bash code/engine/scripts/run_real_cuda_runtime.sh
+bash code/engine/scripts/run_real_cuda_serving.sh
+```
+
 ## 验证层级
 
 不同命令提供不同强度的证据：

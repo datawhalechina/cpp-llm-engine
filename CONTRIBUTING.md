@@ -73,7 +73,8 @@ Pull request 会自动运行 `.github/workflows/ci.yml`。CI 只覆盖无模型�
 | 章节 C++ 代码 | 对应章节 `run.sh`、`npm run code:check-headers`、`npm run test:regression` |
 | Foundation 练习 | `bash exercises/foundation/run_all.sh`、`npm run test:regression` |
 | Engine / ServiceCore | `bash code/engine/scripts/run.sh` 或相关 CTest、`npm run test:regression` |
-| CUDA | `bash code/cuda/scripts/run.sh`，并记录 GPU、驱动和 CUDA 版本 |
+| CUDA backend 或 kernel | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh`，并记录 GPU、驱动和 CUDA 版本 |
+| 真实 CUDA Model、Runtime 或 Serving | 完成 [USAGE GPU 纵向验收](USAGE.md#gpu-纵向验收)中的三项命令，并记录模型、GPU、驱动和 CUDA 版本 |
 | 多模态 | `bash code/multimodal/scripts/run.sh`，涉及真实模型时补对应 golden |
 | 测试注册、CTest label 或跨章公共契约 | `npm run test:check-contracts`、`npm run test:release-contracts` |
 | 准备发布或大范围重构 | 文档检查、`npm run test:regression`、`npm run test:release-contracts` |
