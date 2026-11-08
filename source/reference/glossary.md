@@ -27,6 +27,10 @@
 | 设备内存 | device memory | GPU kernel 可访问、由设备 allocator 管理的内存 | Foundation CUDA、GPU 路线 | [F-CUDA-01](./formulas.md#f-cuda-01) |
 | CUDA 流 | CUDA stream | 保持队列内顺序、允许不同队列并发的异步 GPU 工作序列 | GPU 路线 | [F-CUDA-01](./formulas.md#f-cuda-01) |
 | CUDA 事件 | CUDA event | 记录 stream 进度并用于依赖同步或设备侧计时的对象 | GPU 路线 | - |
+| 进程 | process | 拥有独立地址空间的程序执行实例；跨进程对象需要 IPC、共享内存或网络传递 | Foundation / Chapter10 | - |
+| 线程 | thread | 进程内的执行单元；共享地址空间，因此并发修改对象需要所有权或同步规则 | Foundation / Chapter10 | - |
+| 同步调用 | synchronous call | 调用返回时，调用者需要的结果或错误已经可见 | Foundation / Chapter06、10 | - |
+| 异步工作 | asynchronous work | 先提交工作，完成状态稍后通过 callback、future、event 或队列出现 | Foundation / CUDA / Chapter08、10 | - |
 
 ## 模型与算子
 

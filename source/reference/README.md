@@ -17,6 +17,7 @@
 - [profiling.md](./profiling.md)：benchmark 之后的瓶颈解释
 - [input_pipeline.md](./input_pipeline.md)：推理引擎输入链路
 - [multimodal_inference.md](./multimodal_inference.md)：图片动态切图、视觉编码和 LLM 接入链路
+- [model_support.md](./model_support.md)：默认模型、稠密模型兼容目标与 MoE 建设顺序
 - [service_basics.md](./service_basics.md)：推理引擎服务化基础
 - [regression_testing.md](./regression_testing.md)：回归测试和版本化基线
 - [formulas.md](./formulas.md)：Tensor、模型、Runtime、性能和多模态公式索引
@@ -30,4 +31,5 @@
 - 查术语和公式时，进入 `glossary.md` 或 `formulas.md`
 - 查章节代码、图片和验证入口时，进入 `chapter_assets.md`
 - 查性能实验和复现命令时，进入 `experiment_assets.md`
+- 查模型支持状态和扩展顺序时，进入 `model_support.md`
 - 对照成熟框架时，先读 `framework_comparison.md`，再进入 `ecosystem/`

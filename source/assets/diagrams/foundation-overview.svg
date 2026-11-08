@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
   <title id="title">Foundation 内容与推理引擎主线</title>
-  <desc id="desc">Foundation 提供工程基础、对象与数据、综合组装三组 CPU 准备内容，并提供 CUDA 环境与常用库选修。完成所需准备后进入 Chapter 00 到 Chapter 09 的推理引擎主线。</desc>
+  <desc id="desc">Foundation 提供工程基础、对象与数据、工程组装与并发基础三组 CPU 准备内容，并提供 CUDA 环境与常用库选修。完成所需准备后进入 Chapter 00 到 Chapter 10 的推理引擎主线。</desc>
   <defs>
     <marker id="arrow-main" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
       <path d="M0 0L9 4.5L0 9Z" fill="#0f766e"/>
@@ -33,9 +33,9 @@
     <text x="361" y="258" font-size="14" fill="#274c4a">F08 PyTorch / C++ 映射</text>
 
     <rect x="612" y="170" width="225" height="126" rx="14" fill="#c7e5dd"/>
-    <text x="634" y="203" font-size="17" font-weight="700" fill="#0f5f59">综合组装</text>
-    <text x="634" y="232" font-size="14" fill="#274c4a">F09 最小工程</text>
-    <text x="634" y="258" font-size="14" fill="#274c4a">library · app · test</text>
+    <text x="634" y="203" font-size="17" font-weight="700" fill="#0f5f59">工程与并发</text>
+    <text x="634" y="232" font-size="14" fill="#274c4a">F09 最小工程 · F10 并发基础</text>
+    <text x="634" y="258" font-size="14" fill="#274c4a">library · app · test · worker</text>
 
     <rect x="883" y="170" width="251" height="126" rx="14" fill="#fff0cf" stroke="#d79a27" stroke-width="1.5" stroke-dasharray="7 5"/>
     <text x="905" y="203" font-size="17" font-weight="700" fill="#9a4e08">GPU 选修</text>
@@ -70,9 +70,9 @@
     <text x="606" y="536" font-size="13" fill="#4f6d6a">完成模型执行</text>
 
     <rect x="853" y="450" width="281" height="104" rx="14" fill="#83c9b8"/>
-    <text x="875" y="483" font-size="16" font-weight="700" fill="#073c38">Chapter 07-09</text>
-    <text x="875" y="512" font-size="14" fill="#123f3b">Benchmark · Profiling · Serving</text>
-    <text x="875" y="536" font-size="13" fill="#315d58">形成验证与服务闭环</text>
+    <text x="875" y="483" font-size="16" font-weight="700" fill="#073c38">Chapter 07-10</text>
+    <text x="875" y="512" font-size="14" fill="#123f3b">KV · Scheduler · Evidence · Serving</text>
+    <text x="875" y="536" font-size="13" fill="#315d58">形成缓存、调度、验证与服务闭环</text>
   </g>
 
   <path d="M276 502H315" stroke="#68a99a" stroke-width="2.5" marker-end="url(#arrow-main)"/>

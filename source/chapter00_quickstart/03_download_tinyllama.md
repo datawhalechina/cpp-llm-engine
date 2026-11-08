@@ -13,6 +13,8 @@
 
 TinyLlama 用于验证执行链，不用于代表更大模型的生成质量。
 
+不要把其他 GGUF 直接替换到后续自研命令中。当前真实 Decoder 按 Llama 架构解析权重；Qwen、DeepSeek 蒸馏模型与 MoE 模型需要分别适配模型 schema、Tokenizer 和执行拓扑。模型支持状态与接入顺序见[模型基线与扩展顺序](../reference/model_support.md)。
+
 ## 下载与校验
 
 从仓库根目录执行：
