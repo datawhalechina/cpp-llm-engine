@@ -49,6 +49,8 @@ void KvCache::clear() {
 
 std::size_t KvCache::size() const { return size_; }
 std::size_t KvCache::capacity() const { return capacity_; }
+std::size_t KvCache::heads() const { return heads_; }
+std::size_t KvCache::head_dim() const { return head_dim_; }
 std::size_t KvCache::width() const { return heads_ * head_dim_; }
 const float* KvCache::key_data() const { return ready() ? key_.data() : nullptr; }
 const float* KvCache::value_data() const { return ready() ? value_.data() : nullptr; }

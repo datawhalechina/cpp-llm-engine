@@ -28,6 +28,7 @@ add_library(chapter04_attention
     src/attention.cpp
     src/attention_backend.cpp
     src/attention_kernel.cpp
+    src/decoder_context.cpp
     src/decoder_layer.cpp
     src/feed_forward.cpp
     src/layer_norm.cpp

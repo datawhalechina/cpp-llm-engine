@@ -20,6 +20,8 @@ public:
 
     std::size_t size() const;
     std::size_t capacity() const;
+    std::size_t heads() const;
+    std::size_t head_dim() const;
     std::size_t width() const;
     const float* key_data() const;
     const float* value_data() const;

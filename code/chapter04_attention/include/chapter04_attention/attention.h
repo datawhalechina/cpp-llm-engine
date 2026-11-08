@@ -4,6 +4,7 @@
 // 验证：chapter04_attention_test.cpp。
 #pragma once
 
+#include "chapter04_attention/kv_cache.h"
 #include "chapter04_attention/linear_layer.h"
 #include "cpp_llm_engine/core/attention_contract.h"
 
@@ -25,6 +26,11 @@ public:
     Tensor forward(const Tensor& input) const;
     cpp_llm_engine::core::Status try_forward(
         const cpp_llm_engine::core::TensorViewRef& input,
+        const cpp_llm_engine::core::MutableTensorViewRef& output) const;
+    cpp_llm_engine::core::Status try_forward_with_cache(
+        const cpp_llm_engine::core::TensorViewRef& input,
+        std::size_t query_position_offset,
+        KvCache* cache,
         const cpp_llm_engine::core::MutableTensorViewRef& output) const;
     bool ready() const;
 

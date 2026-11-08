@@ -157,8 +157,54 @@ int main() {
            cpp_llm_engine::core::DecoderNormalizationKind::LayerNorm);
     CPP_LLM_CHECK(suite, layer_contract.activation ==
            cpp_llm_engine::core::DecoderActivationKind::Relu);
-    CPP_LLM_CHECK(suite, !layer_contract.uses_kv_cache);
+    CPP_LLM_CHECK(suite, layer_contract.uses_kv_cache);
 
+    });
+    suite.run("decoder request contexts isolate and commit KV state", [&] {
+        const chapter04_attention::DecoderLayer layer(4, 2, 8, 0);
+        chapter04_attention::DecoderLayerContext first_context(3, 2, 2);
+        chapter04_attention::DecoderLayerContext second_context(3, 2, 2);
+        const auto prefill_input = make_input();
+        chapter04_attention::Tensor prefill_output(2, 4, -1.0F);
+
+        auto status = layer.try_prefill(
+            prefill_input.view_ref(), &first_context,
+            prefill_output.mutable_view_ref());
+        CPP_LLM_REQUIRE(suite, status.is_ok());
+        CPP_LLM_CHECK(suite, first_context.token_count() == 2);
+        CPP_LLM_CHECK(suite, second_context.token_count() == 0);
+
+        chapter04_attention::Tensor decode_input(1, 4);
+        decode_input.at(0, 0) = 9.0F;
+        decode_input.at(0, 1) = 10.0F;
+        decode_input.at(0, 2) = 11.0F;
+        decode_input.at(0, 3) = 12.0F;
+        chapter04_attention::Tensor decode_output(1, 4, -2.0F);
+        status = layer.try_decode(
+            decode_input.view_ref(), &first_context,
+            decode_output.mutable_view_ref());
+        CPP_LLM_REQUIRE(suite, status.is_ok());
+        CPP_LLM_CHECK(suite, first_context.token_count() == 3);
+        CPP_LLM_CHECK(suite, second_context.token_count() == 0);
+
+        chapter04_attention::Tensor failed_output(1, 4, -3.0F);
+        status = layer.try_decode(
+            decode_input.view_ref(), &first_context,
+            failed_output.mutable_view_ref());
+        CPP_LLM_CHECK(suite, !status.is_ok());
+        CPP_LLM_CHECK(suite, first_context.token_count() == 3);
+        CPP_LLM_CHECK(suite, failed_output.at(0, 0) == -3.0F);
+
+        status = layer.try_decode(
+            decode_input.view_ref(), &second_context,
+            failed_output.mutable_view_ref());
+        CPP_LLM_CHECK(suite, !status.is_ok());
+        CPP_LLM_CHECK(suite, second_context.token_count() == 0);
+        CPP_LLM_CHECK(suite, failed_output.at(0, 0) == -3.0F);
+
+        first_context.reset();
+        CPP_LLM_CHECK(suite, first_context.token_count() == 0);
+        CPP_LLM_CHECK(suite, first_context.capacity() == 3);
     });
     return suite.finish();
 }

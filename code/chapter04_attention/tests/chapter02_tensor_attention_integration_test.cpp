@@ -11,6 +11,7 @@
 #include "chapter04_attention/tensor_attention_adapter.h"
 #include "cpp_llm_engine/testing/test.h"
 
+#include <algorithm>
 #include <cmath>
 #include <string_view>
 #include <vector>
@@ -29,6 +30,31 @@ public:
         const cpp_llm_engine::core::AttentionRequest&) const override {
         return cpp_llm_engine::core::Status::error("injected attention failure");
     }
+};
+
+class RecordingAttentionBackend final : public cpp_llm_engine::core::AttentionBackend {
+public:
+    cpp_llm_engine::core::BackendKind kind() const override {
+        return cpp_llm_engine::core::BackendKind::CPU;
+    }
+
+    std::string_view name() const override { return "recording-attention"; }
+
+    cpp_llm_engine::core::Status compute(
+        const cpp_llm_engine::core::AttentionRequest& request) const override {
+        ++call_count;
+        last_key_tokens = request.key_tokens;
+        last_query_position_offset = request.query_position_offset;
+        std::fill_n(
+            request.output,
+            request.query_tokens * request.heads * request.head_dim,
+            0.0F);
+        return cpp_llm_engine::core::Status::ok();
+    }
+
+    mutable std::size_t call_count = 0;
+    mutable std::size_t last_key_tokens = 0;
+    mutable std::size_t last_query_position_offset = 0;
 };
 
 bool near(float lhs, float rhs) {
@@ -301,6 +327,54 @@ int main() {
         query.view_ref(), key.view_ref(), value.view_ref(),
         cpu_reference_attention_backend(), nullptr).is_ok());
 
+    });
+    suite.run("cached attention exposes growing history to the backend", [&] {
+        RecordingAttentionBackend backend;
+        const chapter04_attention::MultiHeadAttention attention(2, 1, backend);
+        chapter04_attention::KvCache cache(3, 1, 2);
+
+        chapter02_tensor_ops::Tensor prefill_input(2, 2, 1.0F);
+        chapter02_tensor_ops::Tensor prefill_output(2, 2, -1.0F);
+        auto status = attention.try_forward_with_cache(
+            prefill_input.view_ref(), 0, &cache,
+            prefill_output.mutable_view_ref());
+        CPP_LLM_REQUIRE(suite, status.is_ok());
+        CPP_LLM_CHECK(suite, cache.size() == 2);
+        CPP_LLM_CHECK(suite, backend.call_count == 1);
+        CPP_LLM_CHECK(suite, backend.last_key_tokens == 2);
+        CPP_LLM_CHECK(suite, backend.last_query_position_offset == 0);
+
+        chapter02_tensor_ops::Tensor decode_input(1, 2, 2.0F);
+        chapter02_tensor_ops::Tensor decode_output(1, 2, -2.0F);
+        status = attention.try_forward_with_cache(
+            decode_input.view_ref(), 2, &cache,
+            decode_output.mutable_view_ref());
+        CPP_LLM_REQUIRE(suite, status.is_ok());
+        CPP_LLM_CHECK(suite, cache.size() == 3);
+        CPP_LLM_CHECK(suite, backend.call_count == 2);
+        CPP_LLM_CHECK(suite, backend.last_key_tokens == 3);
+        CPP_LLM_CHECK(suite, backend.last_query_position_offset == 2);
+
+        chapter02_tensor_ops::Tensor failed_output(1, 2, -3.0F);
+        status = attention.try_forward_with_cache(
+            decode_input.view_ref(), 3, &cache,
+            failed_output.mutable_view_ref());
+        CPP_LLM_CHECK(suite, !status.is_ok());
+        CPP_LLM_CHECK(suite, cache.size() == 3);
+        CPP_LLM_CHECK(suite, backend.call_count == 2);
+        CPP_LLM_CHECK(suite, failed_output.at(0, 0) == -3.0F);
+
+        const FailingAttentionBackend failing_backend;
+        const chapter04_attention::MultiHeadAttention failing_attention(
+            2, 1, failing_backend);
+        chapter04_attention::KvCache unchanged_cache(2, 1, 2);
+        chapter02_tensor_ops::Tensor backend_failed_output(2, 2, -4.0F);
+        status = failing_attention.try_forward_with_cache(
+            prefill_input.view_ref(), 0, &unchanged_cache,
+            backend_failed_output.mutable_view_ref());
+        CPP_LLM_CHECK(suite, !status.is_ok());
+        CPP_LLM_CHECK(suite, unchanged_cache.size() == 0);
+        CPP_LLM_CHECK(suite, backend_failed_output.at(0, 0) == -4.0F);
     });
     return suite.finish();
 }

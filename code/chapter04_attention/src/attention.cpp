@@ -5,7 +5,9 @@
 #include "chapter04_attention/attention.h"
 #include "chapter04_attention/attention_backend.h"
 
+#include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace chapter04_attention {
 
@@ -78,6 +80,72 @@ cpp_llm_engine::core::Status MultiHeadAttention::try_forward(
     status = backend_->compute(request);
     if (!status.is_ok()) return status;
     return out_proj_.try_forward(combined.view_ref(), output);
+}
+
+cpp_llm_engine::core::Status MultiHeadAttention::try_forward_with_cache(
+    const cpp_llm_engine::core::TensorViewRef& input,
+    std::size_t query_position_offset,
+    KvCache* cache,
+    const cpp_llm_engine::core::MutableTensorViewRef& output) const {
+    using cpp_llm_engine::core::Status;
+
+    if (!ready()) return Status::error("multi-head attention is not ready");
+    if (cache == nullptr || !cache->ready()) {
+        return Status::error("attention requires a ready KV cache");
+    }
+    const std::size_t head_dim = model_dim_ / num_heads_;
+    if (cache->heads() != num_heads_ || cache->head_dim() != head_dim) {
+        return Status::error("attention KV cache shape mismatch");
+    }
+    if (query_position_offset != cache->size()) {
+        return Status::error("attention query position must match KV cache size");
+    }
+
+    const auto input_status = validate_cpu_float32_matrix_view(input);
+    if (!input_status.is_ok()) return input_status;
+    const auto output_status = validate_cpu_float32_matrix_view(output.as_const());
+    if (!output_status.is_ok()) return output_status;
+    const auto tokens = input.contract.shape.dimensions[0];
+    if (input.contract.shape.dimensions[1] != model_dim_) {
+        return Status::error("multi-head attention input shape mismatch");
+    }
+    if (output.contract.shape.dimensions !=
+        std::vector<std::size_t>{tokens, model_dim_}) {
+        return Status::error("multi-head attention output shape mismatch");
+    }
+
+    Tensor q(tokens, model_dim_);
+    Tensor k(tokens, model_dim_);
+    Tensor v(tokens, model_dim_);
+    auto status = q_proj_.try_forward(input, q.mutable_view_ref());
+    if (!status.is_ok()) return status;
+    status = k_proj_.try_forward(input, k.mutable_view_ref());
+    if (!status.is_ok()) return status;
+    status = v_proj_.try_forward(input, v.mutable_view_ref());
+    if (!status.is_ok()) return status;
+
+    KvCache candidate = *cache;
+    if (!candidate.append(k.data.data(), v.data.data(), tokens)) {
+        return Status::error("attention KV cache capacity exceeded");
+    }
+
+    Tensor combined(tokens, model_dim_);
+    const cpp_llm_engine::core::AttentionRequest request{
+        q.data.data(), candidate.key_data(), candidate.value_data(),
+        combined.data.data(), tokens, candidate.size(), num_heads_, head_dim,
+        query_position_offset, true, 0.0f};
+    status = backend_->compute(request);
+    if (!status.is_ok()) return status;
+
+    Tensor projected(tokens, model_dim_);
+    status = out_proj_.try_forward(combined.view_ref(), projected.mutable_view_ref());
+    if (!status.is_ok()) return status;
+
+    *cache = std::move(candidate);
+    auto* output_data = static_cast<float*>(output.storage_data) +
+                        output.contract.storage_offset_elements;
+    std::copy(projected.data.begin(), projected.data.end(), output_data);
+    return Status::ok();
 }
 
 bool MultiHeadAttention::ready() const {

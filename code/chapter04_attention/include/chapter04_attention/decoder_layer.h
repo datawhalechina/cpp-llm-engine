@@ -5,6 +5,7 @@
 #pragma once
 
 #include "chapter04_attention/attention.h"
+#include "chapter04_attention/decoder_context.h"
 #include "chapter04_attention/feed_forward.h"
 #include "chapter04_attention/layer_norm.h"
 #include "cpp_llm_engine/core/decoder_contract.h"
@@ -21,12 +22,26 @@ public:
     cpp_llm_engine::core::Status try_forward(
         const cpp_llm_engine::core::TensorViewRef& input,
         const cpp_llm_engine::core::MutableTensorViewRef& output) const;
+    cpp_llm_engine::core::Status try_prefill(
+        const cpp_llm_engine::core::TensorViewRef& input,
+        DecoderLayerContext* context,
+        const cpp_llm_engine::core::MutableTensorViewRef& output) const;
+    cpp_llm_engine::core::Status try_decode(
+        const cpp_llm_engine::core::TensorViewRef& input,
+        DecoderLayerContext* context,
+        const cpp_llm_engine::core::MutableTensorViewRef& output) const;
     bool ready() const;
 
     std::size_t layer_index() const;
     cpp_llm_engine::core::DecoderLayerContract contract() const;
 
 private:
+    cpp_llm_engine::core::Status try_forward_with_context(
+        const cpp_llm_engine::core::TensorViewRef& input,
+        DecoderLayerContext* context,
+        bool start_new_sequence,
+        const cpp_llm_engine::core::MutableTensorViewRef& output) const;
+
     std::size_t layer_index_ = 0;
     LayerNorm pre_attn_norm_;
     MultiHeadAttention attention_;
