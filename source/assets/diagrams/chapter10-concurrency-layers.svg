@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
   <title id="title">Chapter10 连接并发、请求并发与 Tensor Batch</title>
-  <desc id="desc">多个网络连接可以并发解析和写回，ServiceCore 可以同时保存多个 waiting 和 running 请求，Chapter08 Scheduler 每步选择请求并形成 StepBatchPlan，真实 Tensor Batch 才把多行激活交给同一次模型调用。RequestWorkerPool 是独立 Context 的 CPU 线程重叠路径，不等同于 Tensor Batch。</desc>
+  <desc id="desc">网络库可以接收多个连接，当前 Transport 在进入单线程 HttpAdapter 和 ServiceCore 前串行化调用。ServiceCore 可以保存多个 waiting 和 running 请求，Chapter08 Scheduler 每步选择请求并形成 StepBatchPlan，真实 Tensor Batch 才把多行激活交给同一次模型调用。RequestWorkerPool 是独立 Context 的 CPU 线程重叠路径，不等同于 Tensor Batch。</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#52606d"/></marker>
     <style>
@@ -14,19 +14,19 @@
   </defs>
   <rect width="1200" height="700" rx="24" fill="#f8fafc"/>
   <text x="48" y="52" class="title">Chapter10 · “同时处理多个请求”发生在哪一层</text>
-  <text x="48" y="80" class="text">上层并发扩大可接入请求数；只有最下层 Tensor Batch 合并模型计算</text>
+  <text x="48" y="80" class="text">各层可以保存多个对象，但当前入口串行；只有 Tensor Batch 合并模型计算</text>
 
   <rect x="64" y="116" width="1072" height="108" rx="18" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
-  <text x="90" y="150" class="label">1 Transport 连接并发</text>
-  <text x="90" y="182" class="text">网络线程并行不代表模型并行</text>
+  <text x="90" y="150" class="label">1 Transport 接收连接</text>
+  <text x="90" y="182" class="text">网络库可接收多个连接；进入 Adapter 前串行化</text>
   <rect x="368" y="136" width="176" height="60" rx="12" fill="#fff" stroke="#60a5fa"/><text x="456" y="162" text-anchor="middle" class="text">Connection A</text><text x="456" y="183" text-anchor="middle" class="small">解析 / SSE 写回</text>
   <rect x="568" y="136" width="176" height="60" rx="12" fill="#fff" stroke="#60a5fa"/><text x="656" y="162" text-anchor="middle" class="text">Connection B</text><text x="656" y="183" text-anchor="middle" class="small">解析 / SSE 写回</text>
   <rect x="768" y="136" width="176" height="60" rx="12" fill="#fff" stroke="#60a5fa"/><text x="856" y="162" text-anchor="middle" class="text">Connection C</text><text x="856" y="183" text-anchor="middle" class="small">解析 / SSE 写回</text>
 
   <path d="M600 224V252" class="line"/>
   <rect x="126" y="258" width="948" height="104" rx="18" fill="#ede9fe" stroke="#a78bfa" stroke-width="2"/>
-  <text x="152" y="292" class="label">2 ServiceCore 请求并发</text>
-  <text x="152" y="320" class="text">waiting 与 running 中同时保存多个 Request、Deadline、Writer 和独立 Executor/Context</text>
+  <text x="152" y="292" class="label">2 ServiceCore 多请求状态</text>
+  <text x="152" y="320" class="text">单线程 API 管理 waiting/running、Request 和独立 Executor/Context</text>
   <rect x="720" y="278" width="152" height="56" rx="11" fill="#fff" stroke="#a78bfa"/><text x="796" y="312" text-anchor="middle" class="text">Request A</text>
   <rect x="888" y="278" width="152" height="56" rx="11" fill="#fff" stroke="#a78bfa"/><text x="964" y="312" text-anchor="middle" class="text">Request B</text>
 

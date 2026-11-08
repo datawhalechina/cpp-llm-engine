@@ -23,8 +23,8 @@
 | 4 | 移除服务条目和 Executor 引用 | inflight 归零 |
 | 5 | 记录终态与 released 指标 | 重复调用不重复计数 |
 
-当前测试覆盖 waiting 取消、running 完成、显式超时、重复释放，以及真实分页 payload 随请求终态归还。模型执行中的抢占式取消需要异步 Executor 支持，属于后续并发执行扩展。
+当前测试覆盖 waiting 取消、running 完成、显式超时、Executor 失败、重复释放，以及分页资源随请求终态归还。模型执行中的抢占式取消需要异步 Executor 支持，属于后续并发执行扩展。
 
 ## 验证幂等释放
 
-运行 `bash code/chapter10_serving/scripts/run.sh`。<a href="../../_code/chapter10_serving/tests/terminal_release_test.cpp"><code>chapter10_terminal_release_test</code></a> 应检查取消、超时、执行失败、重复释放和分页块归还，最终 `inflight` 与已占用块数都回到预期值。`10.4` 开始把这组终态映射到网络连接。
+运行 `bash code/chapter10_serving/scripts/run.sh`。<a href="../../_code/chapter10_serving/tests/terminal_release_test.cpp"><code>chapter10_terminal_release_test</code></a> 检查取消、超时、Executor 失败、重复释放和分页块归还，最终 `inflight` 与已占用块数都回到预期值。`10.4` 开始把这组终态映射到网络连接。

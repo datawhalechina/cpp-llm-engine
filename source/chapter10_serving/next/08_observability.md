@@ -1,15 +1,15 @@
 # 10.8 从请求时间线产生指标
 
-指标应来自明确的状态转换，而不是在 HTTP 层估算。<a href="../../_code/chapter10_serving/src/service_core.cpp"><code>ServiceCore</code></a> 使用单调时钟记录 admission、进入 running、首词元和终态，Transport 额外记录连接与写回错误。
+指标应来自明确的状态转换，而不是在 HTTP 层估算。<a href="../../_code/chapter10_serving/src/service_core.cpp"><code>ServiceCore</code></a> 使用单调时钟记录 admission、进入 running、首词元和终态；`HttpAdapter` 只把这些事实序列化为 Prometheus 文本。
 
 ## 核心计数与延迟
 
 | 指标 | 更新位置 | 回答的问题 |
 | --- | --- | --- |
 | accepted/queue_full/duplicate | admission | 请求是否进入服务 |
-| waiting/running/peak_inflight | 状态迁移 | 实例压力有多大 |
-| generated_tokens | token callback | 服务完成多少生成工作 |
-| cancelled/timed_out/failed | 终态写入 | 请求为何停止 |
+| waiting/running/peak_inflight | admission、提升与释放 | 实例压力有多大 |
+| generated_tokens | Scheduler 返回的 step 统计 | 服务完成多少生成工作 |
+| cancelled/timed_out/failed | 统一释放时按 Request 终态计数 | 请求为何停止 |
 | released | 统一释放完成 | 资源是否真正归还 |
 | queue wait | admission → running | 容量或调度等待多久 |
 | TTFT | admission → first token | 用户多久看到响应 |

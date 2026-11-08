@@ -17,7 +17,7 @@
 | 入口 | 覆盖范围 | 不代表什么 |
 | --- | --- | --- |
 | 真实 ServiceCore smoke | Model/Context、双请求 batch 和生命周期 | 网络端到端性能 |
-| HTTP `--check` | socket、Completion、SSE 和 metrics | 高并发压测 |
+| HTTP `--check` | 串行 Adapter 入口下的 socket、Completion、SSE 和 metrics | 并发 HTTP 服务或高并发压测 |
 | 服务 Benchmark | 固定 workload 的 TTFT、吞吐和内存 | 开放环生产负载 |
 | sequential/parallel A/B | 请求级 CPU 重叠 | Tensor batch 收益 |
 

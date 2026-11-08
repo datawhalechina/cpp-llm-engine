@@ -20,6 +20,8 @@ Transport 负责监听、HTTP 解析、响应写出和连接事件；<a href="..
 
 `ResponseWriter` 是 Transport 与 Adapter 之间的窄接口，只暴露 headers、event、finish 和连接状态。网络库对象不应穿过该接口进入 ServiceCore。
 
+cpp-httplib 可以并发接收连接，但当前 `ServiceCore` 是单线程状态机。`CppHttplibServer` 因此在调用 `HttpAdapter` 前持有同一把互斥锁；同步 Completion 或 SSE 生命周期结束后，下一个请求才进入 Adapter。这个边界先保证状态和资源安全，不代表已经实现多个 HTTP 请求共同进入 StepBatchPlan。后续异步 Transport 需要把连接事件与 ServiceCore 的单线程事件循环分开，而不是简单移除互斥锁。
+
 ## 验证 Transport 可替换性
 
-先运行 `bash code/chapter10_serving/scripts/run.sh`，确认 `chapter10_http_contract_test` 在不启动 socket 的情况下固定 Adapter/Writer 契约。本地已有 cpp-httplib 时，再运行 `bash code/chapter10_serving/scripts/run_cpp_httplib_loopback.sh`，通过条件是 health、metrics、同步 Completion 和 SSE 回环全部成功。`10.5` 继续追踪一次同步 Completion。
+先运行 `bash code/chapter10_serving/scripts/run.sh`，确认 `chapter10_http_contract_test` 在不启动 socket 的情况下固定 Adapter/Writer 契约。本地已有 cpp-httplib 时，再运行 `bash code/chapter10_serving/scripts/run_cpp_httplib_loopback.sh`，通过条件是 health、metrics、同步 Completion 和 SSE 回环全部成功，且所有 Adapter 调用经过串行入口。`10.5` 继续追踪一次同步 Completion。

@@ -4,13 +4,13 @@
 
 | 并发层级 | 实际发生什么 | 当前证据 |
 | --- | --- | --- |
-| Transport 并发 | 多个连接同时解析或写回 | 网络库回环与隔离测试 |
-| ServiceCore 并发 | waiting/running 中存在多个请求 | admission 与状态测试 |
+| Transport 接入 | 网络库可以接收多个连接；当前在 Adapter 前串行化 | cpp-httplib 回环与互斥入口 |
+| ServiceCore 多请求状态 | waiting/running 可以保存多个请求，但 API 由单线程调用 | admission 与状态测试 |
 | 请求级 Worker | 独立 Executor/Context 在 CPU 线程重叠 | sequential/parallel A/B |
 | Step batch | 一个调度步选择多个请求 | Chapter08 StepBatchPlan |
 | Tensor batch | 多行激活进入一次模型/算子调用 | Chapter08 批量执行证据 |
 
-下图从连接入口一直追踪到模型调用。连接、请求和 Worker 可以同时存在多个对象，但只有多个请求的激活进入同一次模型调用时，才属于真实 Tensor Batch。
+下图从连接入口一直追踪到模型调用。当前 socket 层可以出现多个连接，但进入 Adapter/ServiceCore 前会串行化；ServiceCore 保存多个请求不等于它支持多线程调用。只有多个请求的激活进入同一次模型调用时，才属于真实 Tensor Batch。
 
 ![连接并发、请求并发与 Tensor Batch](../../assets/diagrams/chapter10-concurrency-layers.svg)
 
