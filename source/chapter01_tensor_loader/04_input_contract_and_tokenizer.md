@@ -32,6 +32,8 @@ public:
 
 `RealTokenizer` 位于 <a href="../_code/chapter01_tensor_loader/src/real_tokenizer.cpp"><code>real_tokenizer.cpp</code></a>。它读取真实 GGUF vocabulary，并调用 llama.cpp tokenizer API 执行模型规定的规则：
 
+分词器只负责文本与词元编号之间的转换；聊天模板先把 system、user、assistant 等角色整理为模型约定的文本，再交给分词器。当前 TinyLlama golden 使用固定原始 prompt，没有在自研 Runtime 中自动套用聊天模板。接入 Qwen 等模型时，模板版本、特殊词元和停止词元必须与模型配置一起建立新基线，不能只替换 GGUF 文件。
+
 | 真实 Tokenizer 数据或规则 | 为什么影响结果 |
 | --- | --- |
 | 词表与词元编号 | 决定每个整数对应的字节序列 |

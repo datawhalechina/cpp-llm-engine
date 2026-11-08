@@ -10,6 +10,7 @@
 - [setup_cuda.md](./setup_cuda.md)：CUDA 安装与配置
 - [gguf_parser.md](./gguf_parser.md)：GGUF 解析与加载器实现
 - [vllm_serving_baseline.md](./vllm_serving_baseline.md)：可选 vLLM Docker 服务基线，不属于 Chapter00 必读路径
+- [multimodal_inference.md](./multimodal_inference.md)：SmolVLM 图片预处理、Vision Encoder、Projector 与现有 Runtime 的交接路线
 
 ## 怎么用
 

@@ -33,4 +33,4 @@ bash scripts/check_foundation_answer.sh /tmp/fq16-answer/main.cpp
 
 ## 主线映射
 
-对应 [`Chapter06 Request 生命周期`](/chapter06_generation/next/04_request_lifecycle)、[`单请求生成循环`](/chapter06_generation/next/03_single_request_loop) 和 [`服务化基础`](/reference/service_basics)。
+对应 [`Chapter06 Request 生命周期`](/chapter06_generation/next/04_request_lifecycle)、[`单请求生成循环`](/chapter06_generation/next/03_single_request_loop) 和 [`Chapter10 终态释放`](/chapter10_serving/next/03_terminal_release)。

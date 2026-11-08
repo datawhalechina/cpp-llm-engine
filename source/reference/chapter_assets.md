@@ -34,6 +34,6 @@ GPU、Engine 和多模态复用 Chapter01-10 的公共契约，不另建一套�
 | 扩展 | 文档入口 | 代码入口 | 图与公式 | 默认验证 |
 | --- | --- | --- | --- | --- |
 | 真实模型执行 | [Chapter04 真实 Decoder](../chapter04_attention/06_real_tinyllama_decoder.md) | [Model 资产](/code/model) | [TinyLlama 层级图](/diagrams/chapter01-tinyllama-decoder-hierarchy.svg) | `bash scripts/run_real_decoder_learning.sh` |
-| 公共契约与 Engine 组装 | [执行分层](./execution_layers.md) | [Engine 与 core](/code/engine) | [代码架构图](/diagrams/code-architecture.svg) | `npm run test:regression` |
+| 公共契约与 Engine 组装 | [系统与执行分层](./inference_engine_systems.md) | [Engine 与 core](/code/engine) | [代码架构图](/diagrams/code-architecture.svg) | `npm run test:regression` |
 | CUDA 执行扩展 | [CPU/GPU 架构](./cpu_gpu_architecture.md) | [CUDA 资产](/code/cuda) | [CPU/GPU 路线图](/diagrams/cpu-gpu-learning-route.svg)；[F-CUDA-01](./formulas.md#f-cuda-01) | CUDA 可用时按 `code/cuda/README.md` 运行 |
-| 多模态输入扩展 | [多模态输入链路](./multimodal_inference.md) | [多模态资产](/code/multimodal) | [Runtime 阶段图](/diagrams/multimodal-runtime-stages.svg)；[F-MM-01](./formulas.md#f-mm-01) 至 [F-MM-03](./formulas.md#f-mm-03) | `cmake`、`ctest` 默认 fixture 闭环 |
+| 多模态输入扩展 | [多模态学习指南](../guides/multimodal_inference.md) | [多模态资产](/code/multimodal) | [Runtime 阶段图](/diagrams/multimodal-runtime-stages.svg)；[F-MM-01](./formulas.md#f-mm-01) 至 [F-MM-03](./formulas.md#f-mm-03) | `cmake`、`ctest` 默认 fixture 闭环 |

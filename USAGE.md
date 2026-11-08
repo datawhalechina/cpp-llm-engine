@@ -87,7 +87,7 @@ A 教学基线 → B 真实主线
 | 真实 CUDA 服务 | `bash code/engine/scripts/run_real_cuda_serving.sh` | CUDA Executor 接入 Chapter10，同步 Completion、SSE 与四类终态释放通过 |
 | Engine 集成 | `bash code/engine/scripts/run.sh` | 章节组件到统一 Engine 的集成与测试 |
 | 真实 CPU 全链路验收 | `bash scripts/run_cpu_v1_acceptance.sh` | 兼容验收入口；要求本地 llama.cpp 和 TinyLlama GGUF |
-| 多模态 | `bash code/multimodal/scripts/run.sh` | [多模态输入链路](source/reference/multimodal_inference.md)：SmolVLM CPU 输入、Vision、Projector 和 Decoder golden |
+| 多模态 | `bash code/multimodal/scripts/run.sh` | [多模态学习指南](source/guides/multimodal_inference.md)：SmolVLM CPU 输入、Vision、Projector 和 Decoder golden |
 
 真实 TinyLlama CUDA 路径已连接 tokenizer、量化 embedding、22 层 Decoder、final norm、LM Head、Chapter06 Runtime、Chapter08 Decode batch、detokenizer 和 Chapter10 HTTP Adapter。Decode batch 合并 RMSNorm、Linear 与 FFN，并按精确 batch size 复用执行 workspace。CUDA 分页 payload、分页 GQA 和单请求真实 Context 已通过连续路径对照；分页 batch 事务与真实 socket server 仍在建设。
 

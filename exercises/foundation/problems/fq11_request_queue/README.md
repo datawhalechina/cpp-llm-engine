@@ -31,4 +31,4 @@ bash scripts/check_foundation_answer.sh /tmp/fq11-answer/main.cpp
 
 ## 主线映射
 
-对应 [`Chapter08 调度基线`](/chapter08_scheduling/next/01_scheduler_baseline)、[`Step Batching`](/chapter08_scheduling/next/02_step_batching) 和 [`推理引擎服务化基础`](/reference/service_basics)。
+对应 [`Chapter08 调度基线`](/chapter08_scheduling/next/01_scheduler_baseline)、[`Step Batching`](/chapter08_scheduling/next/02_step_batching) 和 [`Chapter10 准入与背压`](/chapter10_serving/next/02_admission_backpressure)。

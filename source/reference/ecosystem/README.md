@@ -17,6 +17,18 @@
 | 大规模阶段分离与联合优化 | [DeepInfer](./deepinfer.md) | [SGLang](./sglang.md) |
 | 本地产品交付 | [Ollama](./ollama.md) | [llama.cpp](./llama_cpp.md) |
 
+## 完成主线后怎样继续
+
+先回到对应章节确认教学实现和测试，再进入项目卡寻找生产扩展；不要从大型仓库目录反推教程概念。
+
+| 学习目标 | 先复查 | 再阅读 |
+| --- | --- | --- |
+| 深入 Tensor、算子和 Decoder | Chapter02–05 | Tiny-VLLM、nano-vLLM、TensorRT-LLM |
+| 深入缓存、调度与服务 | Chapter06–10 | vLLM、Mini-SGLang、SGLang |
+| 继续做性能优化 | Chapter09 的 workload、Profiling 和 A/B | TensorRT-LLM、DeepInfer |
+| 扩展模型格式或本地交付 | Chapter00–01、模型支持表 | llama.cpp、Gemma、Ollama |
+| 扩展多模态输入 | [多模态学习指南](../../guides/multimodal_inference.md) | llama.cpp、DeepInfer |
+
 ## 项目类型
 
 分类只用于避免误读，不代表项目只能承担一种职责。

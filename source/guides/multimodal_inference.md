@@ -4,7 +4,7 @@
 
 SmolVLM 500M 的 IDEFICS3 图片路径用于说明图片进入模型前发生的变化。可运行代码和验证命令位于 `code/multimodal`。
 
-多模态路线只扩展输入；CPU 与 GPU 如何在统一算子和 Decoder 契约下切换执行后端，见 [CPU 主线与 GPU 扩展架构](./cpu_gpu_architecture.md)。当前多模态闭环使用 CPU，后续 GPU 化不改变图片到统一 embedding 序列的交接点。
+多模态路线只扩展输入；CPU 与 GPU 如何在统一算子和 Decoder 契约下切换执行后端，见 [CPU 主线与 GPU 扩展架构](../reference/cpu_gpu_architecture.md)。当前多模态闭环使用 CPU，后续 GPU 化不改变图片到统一 embedding 序列的交接点。
 
 ![IDEFICS3 动态切图与视觉输入链路](../assets/diagrams/idefics3-image-tiling.svg)
 
@@ -43,7 +43,7 @@ mmproj 是独立于语言模型 GGUF 的视觉权重文件。Chapter01 的 `Gguf
 
 模型配置给出 tile size、patch size 和 merge size，运行参数给出图片 token 预算。预处理器先把 token 预算换算为像素预算，再把目标宽高对齐到 tile size；原图按长宽比缩放后居中放入 refined image，剩余区域填黑。
 
-当前固定基线使用 640×488 JPEG、512×512 tile、16×16 patch、每边 merge 4，以及 256 个 image token。`patch_area = 16 × 16 × 4 × 4 = 4096`，因此像素预算为 `256 × 4096 = 1,048,576`；统一定义见 [`F-MM-01`](./formulas.md#f-mm-01)。
+当前固定基线使用 640×488 JPEG、512×512 tile、16×16 patch、每边 merge 4，以及 256 个 image token。`patch_area = 16 × 16 × 4 × 4 = 4096`，因此像素预算为 `256 × 4096 = 1,048,576`；统一定义见 [`F-MM-01`](../reference/formulas.md#f-mm-01)。
 
 | 数据 | 结果 | 含义 |
 | --- | --- | --- |
@@ -65,7 +65,7 @@ overview 将原图直接缩放为一张 512×512 全局图，保留整体关系�
 
 ## Tile 怎样变成 Visual Embedding
 
-每张 512×512 RGB tile 先归一化为 Float32 CHW。16×16 patch 会得到 `32×32=1024` 个原始 patch，每个 patch 展平为 `3×16×16=768` 个输入值；SigLIP Vision Encoder 处理这些 patch，IDEFICS3 Projector 再进行空间合并并映射到语言模型 embedding width，数量关系见 [`F-MM-02`](./formulas.md#f-mm-02)。
+每张 512×512 RGB tile 先归一化为 Float32 CHW。16×16 patch 会得到 `32×32=1024` 个原始 patch，每个 patch 展平为 `3×16×16=768` 个输入值；SigLIP Vision Encoder 处理这些 patch，IDEFICS3 Projector 再进行空间合并并映射到语言模型 embedding width，数量关系见 [`F-MM-02`](../reference/formulas.md#f-mm-02)。
 
 | 阶段 | 形状或数量 | 当前建设状态 |
 | --- | --- | --- |

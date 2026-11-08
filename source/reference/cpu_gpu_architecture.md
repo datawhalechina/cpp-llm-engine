@@ -2,7 +2,7 @@
 
 教程先用 CPU 固定正确性和接口，再在同一套公共契约上接入 GPU。GPU 不是另一条 Runtime，而是替换 Backend、Kernel 和内存执行路径。
 
-多模态不是第三种计算后端：它在 Decoder 前增加图片、Vision Encoder 和 Projector，再把统一 embedding 序列交给现有 CPU 或 GPU 执行路径。图片怎样进入 Runtime 见[多模态推理输入链路](./multimodal_inference.md)。
+多模态不是第三种计算后端：它在 Decoder 前增加图片、Vision Encoder 和 Projector，再把统一 embedding 序列交给现有 CPU 或 GPU 执行路径。图片怎样进入 Runtime 见[多模态学习指南](../guides/multimodal_inference.md)。
 
 ![推理引擎 CPU 主线与 GPU 扩展架构](../assets/diagrams/inference-engine-cpu-gpu-architecture.svg)
 
@@ -49,7 +49,7 @@ CPU 与 GPU 可以共享上层语义，是因为每一层只承担一种主要�
 | Continuous Batching | Step 计划、token/block budget、终态和回滚 | 执行组好的 Tensor batch | CPU 与真实 CPU/CUDA batch 已接通 |
 | Paged K/V | BlockTable、预留、提交、裁剪和回收 | 分页 payload 与按页表读取的 GQA | CPU/CUDA 单请求和双请求 batch 已验证 |
 | FlashAttention | 三段式 golden 与分块在线 Softmax 参考 | tile、片上存储、Warp 归约与融合 kernel | CUDA v2、22 层 token Tensor Prefill 和 Runtime golden 通过；端到端 A/B 收益不稳定，默认仍为三阶段；分页 Prefill 未完成 |
-| Radix Cache | 前缀树、最长匹配、共享块引用和释放 | 复用命中页表读取 K/V | CPU 最小闭环与 Chapter08 缓存感知排序已实现；GPU 复用待接入 |
+| Radix Cache | 前缀树、两阶段估算/采用、共享块引用和释放 | 复用命中页表读取 K/V | CPU/CUDA Context 采用与 Chapter08 缓存感知排序已验证 |
 | MTP / 推测解码 | 候选、接受规则和状态回滚 | 并行验证多个候选词元 | 尚未实现 |
 | MLA | 压缩 K/V 和位置编码分支的数值参考 | 矩阵计算与专用 Attention kernel | 随 DeepSeek 模型路线规划 |
 | Prefill/Decode 分离 | 实例角色、路由和 K/V 传输协议 | 各实例的 Prefill/Decode 执行 | 属于分布式扩展，当前不实现 |

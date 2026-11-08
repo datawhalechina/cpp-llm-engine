@@ -11,6 +11,19 @@
 | 资源 | reserve/commit/rollback 后无泄漏 | 先修复生命周期错误 |
 | 批量语义 | 顺序执行与批量执行逐请求一致 | 不比较批量吞吐 |
 
+## 先确认哪一层证据失败
+
+测试从局部对象逐步扩大到真实模型和性能实验。下层失败时，不用更高层的“能够运行”覆盖问题：端到端输出不能证明失败回滚正确，单次 Benchmark 也不能证明历史行为没有回退。
+
+| 层级 | 检查对象 | 典型证据 |
+| --- | --- | --- |
+| 对象与不变量 | 单个函数、状态转换、容量与所有权 | 单元测试、契约测试 |
+| 组件协作 | Runtime、Cache、Scheduler 的提交与回滚 | 组件和跨章集成测试 |
+| 教学主线 | Chapter00–10、Engine 与多模态默认路径 | `npm run test:regression` |
+| 发布契约 | Release 构建中的关键 owner、label 和 target | `npm run test:release-contracts` |
+| 真实模型 | GGUF、词元、logits、HTTP/SSE | TinyLlama CPU/CUDA golden |
+| 性能实验 | 固定模型、工作负载、环境和重复样本 | Chapter09 evidence 与 A/B 决策 |
+
 ## 工作负载固定什么
 
 `workload_id` 代表一组可重复的输入条件，不是随意填写的实验名称。改变模型、prompt 集合、输入/输出长度、请求数或到达方式时，应使用新的 workload 身份。实验名称回答“这次运行是什么”，工作负载身份回答“执行了什么”；量化、后端和调度策略等待验证因素写入实验身份与检查项。<a href="../../_code/chapter09_performance/include/chapter09_performance/evidence_record.h"><code>EvidenceRecord</code></a> 同时保存 workload、环境和正确性检查，比较器会逐项核对，而不是只相信相同的 `workload_id`。

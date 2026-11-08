@@ -10,6 +10,10 @@ Step batch 回答本步选择谁，Executor batch 补齐 token、position 和 K/
 | Executor batch | token、position、K/V 写入槽 | 可校验的模型输入行 |
 | Tensor batch | 多行激活、行边界或 batch 维度 | 一次算子或 Decoder 调用的多行输出 |
 
+## 变长请求不要求先补齐
+
+当前教学 Tensor batch 保存每行边界，真实 Decode batch 则为每个请求携带独立 position 和 BlockTable，因此不同历史长度可以进入同一步，不需要用 PAD 词元补成矩形序列。Padding 是某些稠密批量实现的布局选择，不应改变有效词元、位置或 K/V 长度。输入超过 `max_context_tokens` 时由 Chapter06 在执行前拒绝；当前主线不静默截断 prompt，避免基线输入在调用方不知情时改变。
+
 ## 当前真实 Decode 合并了哪些计算
 
 `RealLlamaCpuModel::decode_batch()` 让多个请求共享只读 TinyLlama 权重，每个请求保留独立 Context。Decode 阶段的 Q/K/V、输出投影、FFN 和 LM Head 使用多行 Linear；不同历史长度的 Attention 仍按请求 ID 和 BlockTable 分别读取分页 K/V。真实多请求 Prefill 目前逐请求执行，不属于该批量路径。
