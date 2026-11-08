@@ -17,7 +17,7 @@
   <text x="48" y="80" class="text">预热只稳定运行状态；只有测量区间产生可以进入统计和 A/B 的原始样本</text>
 
   <rect x="48" y="122" width="218" height="102" rx="16" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
-  <text x="157" y="156" text-anchor="middle" class="label">1 固定实验身份</text><text x="157" y="184" text-anchor="middle" class="text">提交、编译器、硬件</text><text x="157" y="207" text-anchor="middle" class="text">workload_id 与参数</text>
+  <text x="157" y="156" text-anchor="middle" class="label">1 固定实验身份</text><text x="157" y="184" text-anchor="middle" class="text">代码版本、编译器、硬件</text><text x="157" y="207" text-anchor="middle" class="text">workload_id 与参数</text>
   <rect x="324" y="122" width="218" height="102" rx="16" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
   <text x="433" y="156" text-anchor="middle" class="label">2 正确性闸门</text><text x="433" y="184" text-anchor="middle" class="text">输出、状态、资源</text><text x="433" y="207" text-anchor="middle" class="text">失败则停止性能结论</text>
   <rect x="600" y="122" width="218" height="102" rx="16" fill="#ede9fe" stroke="#a78bfa" stroke-width="2"/>

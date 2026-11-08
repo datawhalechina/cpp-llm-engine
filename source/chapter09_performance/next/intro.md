@@ -14,6 +14,8 @@
 | --- | --- | --- |
 | A 测量 | 从正确性闸门进入固定工作负载，记录样本并聚合指标 | 可复现的测量记录 |
 | B 归因与决策 | 从阶段耗时进入热点分析，再做单变量 A/B | 可比较的实验记录与 KEEP/REJECT 结论 |
+| G GPU 坐标 | 沿用证据 schema，补充 CUDA 环境与 Nsight 附件 | 可回指 workload 的 GPU 测量；稳定基线待建设 |
+| M 多模态坐标 | 固定图片、预处理和文本输入后复用服务指标 | 多模态 workload 定义；统一基线待建设 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
@@ -26,19 +28,13 @@
 
 ## 开始学习
 
-先运行 Chapter09 独立入口：
-
-```bash
-bash code/chapter09_performance/scripts/run.sh
-```
-
-脚本构建证据记录、统计和比较器，运行六个 CTest。通过时会同时证明 schema 校验、旧结果迁移、版本化 evidence、真实样本桥接、基础统计和四类 A/B 决策没有被破坏。
+先从“错误输出不能进入性能比较”开始，再学习怎样固定 workload、保留逐轮样本和判断两次实验是否可比。Profiling 用于解释时间花在哪里，A/B 比较才负责决定是否保留修改；两类证据不能互相替代。
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应得到什么 |
 | --- | --- | --- | --- | --- |
 | 1 | A | [`09.1 正确性与工作负载`](./01_correctness_workload.md)、[`09.2 实验入口`](./02_benchmark_setup.md) | <a href="../../_code/chapter09_performance/src/evidence_record.cpp"><code>evidence_record.cpp</code></a> | 哪些条件必须固定，错误结果为何不能进入性能比较 |
 | 2 | A | [`09.3 指标`](./03_metrics.md)、[`09.4 统计与记录`](./04_statistics_schema.md) | <a href="../../_code/chapter09_performance/src/statistics.cpp"><code>statistics.cpp</code></a> | 原始样本怎样变成可复查的聚合结果 |
-| 3 | B | [`09.5 工具顺序`](./05_profiling_tools.md)、[`09.6 热点归因`](./06_hotspot_attribution.md) | 旧实验结果与阶段计时入口 | 应该先看总量、阶段、函数还是 Kernel |
+| 3 | B | [`09.5 工具顺序`](./05_profiling_tools.md)、[`09.6 热点归因`](./06_hotspot_attribution.md) | <a href="../../_code/engine/scripts/run_real_decoder_profile.sh"><code>run_real_decoder_profile.sh</code></a> | 应该先看总量、阶段、函数还是 Kernel |
 | 4 | B | [`09.7 单变量 A/B`](./07_ab_experiment.md)、[`09.8 决策与回归`](./08_decision_regression.md) | <a href="../../_code/chapter09_performance/src/comparison.cpp"><code>comparison.cpp</code></a> | 如何判断两次实验可比并形成保留或回退结论 |
 | 5 | 扩展 | [`09.9 框架对照`](./09_framework_comparison.md) | 生态卡 | 教学证据链与成熟框架工具链的对应关系 |
 
@@ -50,3 +46,5 @@ bash code/chapter09_performance/scripts/run.sh
 | L2 旧证据迁移 | `node code/chapter09_performance/scripts/import_legacy_evidence.mjs ...` | 保留逐轮样本的旧结果转换成功，聚合历史结果被拒绝 | 迁移期间必做 |
 | L3 真实模型 | `bash code/chapter09_performance/scripts/run_real_evidence.sh service` | TinyLlama 原始样本转换为统一 evidence，正确性闸门通过 | 有模型时必做 |
 | L4 服务 A/B | `bash code/chapter09_performance/scripts/run_real_evidence.sh ab` | 保留顺序与并行原始样本、统一 evidence，并输出 `real-service-ab-decision.json` | 进入 Chapter10 后完成 |
+
+L1 构建证据记录、统计和比较器，并运行六项测试；它证明数据契约与决策逻辑可用，不代表当前机器上的性能数字可以直接推广到其他环境。

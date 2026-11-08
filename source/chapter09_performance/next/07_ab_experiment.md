@@ -1,6 +1,6 @@
 # 09.7 用单变量 A/B 验证优化
 
-A/B 实验只改变一个待验证因素。baseline 与 experiment 必须通过相同正确性闸门，并使用相同 workload、模型、后端、构建类型和关键硬件条件。
+A/B 实验只改变一个待验证因素。baseline 与 experiment 必须通过相同正确性闸门，并使用相同 workload、模型、后端、构建类型、编译器和硬件身份。
 
 当前比较器还要求两侧使用相同的预热次数和测量次数。策略必须在实验前选择延迟或吞吐作为主指标；主指标没有改善时，即使保护指标没有越界，也不会输出 `KEEP`。真实服务入口默认预热 1 轮、测量 3 轮。
 
@@ -35,4 +35,4 @@ A/B 实验只改变一个待验证因素。baseline 与 experiment 必须通过�
 bash code/chapter09_performance/scripts/run.sh
 ```
 
-`chapter09_comparison_test` 应覆盖 `KEEP`、`REJECT`、`NOT_COMPARABLE` 和 `INVALID`，并证明主指标未改善时不会输出 `KEEP`。有真实模型时，`bash code/chapter09_performance/scripts/run_real_evidence.sh ab` 还会生成 `real-service-ab-decision.json`。`09.8` 把这四种结果转换为保留、回退或重测动作。
+`chapter09_comparison_test` 应覆盖 `KEEP`、`REJECT`、`NOT_COMPARABLE` 和 `INVALID`，并证明主指标未改善时不会输出 `KEEP`。有真实模型时，`bash code/chapter09_performance/scripts/run_real_evidence.sh ab` 还会生成 `real-service-ab-decision.json`，其中保存 baseline、experiment、workload、阈值、变化和结论。`09.8` 把这四种结果转换为保留、回退或重测动作。

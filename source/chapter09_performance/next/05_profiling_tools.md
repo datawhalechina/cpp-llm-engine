@@ -28,4 +28,4 @@ CPU 计时通常在函数返回后完成；CUDA Kernel launch 是异步的，只
 bash code/chapter09_performance/scripts/run_real_evidence.sh profile
 ```
 
-脚本调用 <a href="../../_code/engine/scripts/run_real_decoder_profile.sh"><code>run_real_decoder_profile.sh</code></a>，默认重复三轮，并在结果目录的 `profile/tinyllama-decoder-profile.txt` 保存 Decoder 阶段证据。通过条件是脚本输出 `chapter09_real_evidence=PASS`，且结果中的阶段时间来自明确计时范围。`09.6` 再用阶段结果选择需要下钻的函数或 Kernel。
+脚本调用 <a href="../../_code/engine/scripts/run_real_decoder_profile.sh"><code>run_real_decoder_profile.sh</code></a>，默认重复三轮，并在结果目录的 `profile/tinyllama-decoder-profile.txt` 保存 Decoder 阶段证据。文件先记录 experiment、workload、模型、CPU、编译器和构建类型，再记录正确性与阶段平均耗时；这些身份字段缺失时脚本直接失败。当前三轮归档结果见 <a href="../../_code/chapter09_performance/results/profile/tinyllama-decoder-scalar.txt"><code>tinyllama-decoder-scalar.txt</code></a>。

@@ -6,15 +6,27 @@
 bash code/chapter09_performance/scripts/run.sh
 ```
 
+## 代码架构
+
+Chapter08 或 Chapter10 产生原始样本，迁移器把现有结果规范化为 `EvidenceRecord`。`EvidenceRecord::valid()` 先检查 schema、环境、workload 和正确性，`summarize()` 再从逐轮样本生成统计值；只有两份记录都有效且可比时，`compare()` 才给出性能决策。
+
+| 阶段 | 输入 | 代码对象 | 输出 |
+| --- | --- | --- | --- |
+| 规范化 | 服务或 batch 原始 JSON | `import_legacy_evidence.mjs` | evidence v2 JSON |
+| 校验 | 单份 evidence | `EvidenceRecord::valid()` | 有效记录或字段错误 |
+| 聚合 | 逐轮 `MeasurementSample` | `summarize()` | count、范围、均值和中位数 |
+| 比较 | baseline、experiment 与策略 | `compare()` | `KEEP`、`REJECT`、`NOT_COMPARABLE` 或 `INVALID` |
+
 ## 资产总览
 
 | 模块 | 学习内容 | 验证 |
 | --- | --- | --- |
 | `statistics.h/.cpp` | 从逐轮样本计算范围、均值和中位数 | `chapter09_statistics_test` |
-| `evidence_record.h/.cpp` | 校验实验身份、工作负载、正确性和原始样本 | `chapter09_evidence_contract_test` |
+| `evidence_record.h/.cpp` | 校验 schema、硬件身份、工作负载、正确性和原始样本 | `chapter09_evidence_contract_test` |
 | `comparison.h/.cpp` | 先检查可比性，再根据主指标和保护指标给出决策 | `chapter09_comparison_test` |
 | `import_legacy_evidence.mjs` | 迁移仍保留逐轮样本的旧实验 | `chapter09_legacy_import_test` |
 | `results/raw/`、`results/evidence/` | 保存真实原始样本和统一证据 | `chapter09_versioned_evidence_test` |
+| `results/profile/`、A/B decision | 保存带 workload 身份的阶段结果和独立决策记录 | `chapter09_versioned_evidence_test` |
 | `run_real_evidence.sh` | 生成服务实验、A/B 决策或 Profiling 附件 | `chapter09_real_evidence_bridge_test` |
 
 ## 阅读顺序
@@ -24,7 +36,7 @@ bash code/chapter09_performance/scripts/run.sh
 3. 阅读 `compare()`，区分 `INVALID`、`NOT_COMPARABLE`、`KEEP` 和 `REJECT`。
 4. 最后查看 `results/raw/` 与 `results/evidence/`，把数据结构对应到真实实验文件。
 
-比较前必须同时满足两项条件：两份记录各自有效，并且环境与工作负载完全一致。主指标改善只决定优化是否有收益；延迟、吞吐和内存保护阈值还会阻止以另一项明显退化换取单项提升。
+比较前必须同时满足两项条件：两份记录各自有效，并且模型、后端、设备、硬件、构建信息与工作负载一致。主指标改善只决定优化是否有收益；延迟、吞吐和内存保护阈值还会阻止以另一项明显退化换取单项提升。
 
 ## 验证
 

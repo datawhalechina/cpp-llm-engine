@@ -19,13 +19,13 @@
 | 测量记录部分 | 必要内容 |
 | --- | --- |
 | 身份 | `schema_version`、`experiment_id`、`workload_id` |
-| 环境 | model、backend、device、build、compiler |
+| 环境 | model、backend、device、hardware、host concurrency、build、compiler |
 | 工作负载 | 请求数、输入/输出长度、执行模式、预热与迭代数 |
 | 正确性 | 是否通过及检查项 |
 | 样本 | 每轮总时间、阶段时间、吞吐和内存 |
 | 聚合 | count、min、max、mean、median |
 
-同一批请求的 prompt 长度可以不同。长度一致时使用 `prompt_tokens_per_request`；长度不一致时使用与请求一一对应的 `prompt_tokens` 数组，例如 `[6, 1]`。比较器会把该数组纳入可比性检查，避免把不同输入规模的实验放进同一结论。
+同一批请求的 prompt 长度可以不同。长度一致时只使用 `prompt_tokens_per_request`；长度不一致时只使用与请求一一对应的 `prompt_tokens` 数组，例如 `[6, 1]`。schema v2 拒绝同时填写两种表达，比较器也会核对逐请求长度，避免把不同输入规模的实验放进同一结论。
 
 | 对比记录部分 | 必要内容 |
 | --- | --- |

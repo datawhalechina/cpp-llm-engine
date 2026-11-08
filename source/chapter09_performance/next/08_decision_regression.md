@@ -19,7 +19,7 @@
 | 定期运行 | 固定机器、固定 workload、多轮样本 | 发现趋势与明显回退 |
 | 发布实验 | 环境快照、完整样本、阶段 Profiling、A/B 记录 | 支持优化保留决策 |
 
-实验资产登记表保存结论和结果路径，正文解释方法。正文中的示例数字不能替代可下载、可复查的原始结果。
+实验资产登记表保存结论和结果路径，正文解释方法。当前 AVX2 顺序/并行请求决策见 <a href="../../_code/chapter09_performance/results/evidence/tinyllama_service_core_cpu-avx2-dispatch-decision.json"><code>dispatch-decision.json</code></a>；文件引用两份 evidence，不复制原始样本。正文中的示例数字不能替代可下载、可复查的原始结果。
 
 ## 验证决策回归
 
