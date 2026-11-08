@@ -82,5 +82,5 @@ add_chapter08_test(
     chapter08_tensor_batch_test
     tests/tensor_batch_test.cpp
     "scheduler;batch;tensor"
-    component
+    integration
 )

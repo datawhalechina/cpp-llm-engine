@@ -242,9 +242,10 @@
       "target": "chapter08_tensor_batch_test",
       "source": "code/chapter08_scheduling/tests/tensor_batch_test.cpp",
       "owner": "08",
-      "level": "component",
+      "level": "integration",
       "dependencies": ["06", "08"],
-      "status": "active"
+      "status": "active",
+      "note": "验证 Chapter06 Ragged Prefill Batch 是 Chapter08 批执行的上游输入能力"
     },
     {
       "target": "real_tinyllama_batch_smoke",

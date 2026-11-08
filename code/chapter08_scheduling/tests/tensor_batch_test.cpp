@@ -1,8 +1,6 @@
-// Chapter 08：验证 Ragged Tensor Batch 的输入、提交和逐请求等价性。
-// 职责：固定批量 Prefill/Decode 契约，不测试调度预算或网络并发。
+// Chapter 08：验证上游教学 Transformer 提供的 Ragged Prefill Batch。
+// 职责：固定调度接线前所需的批量输入与准入原子性，不测试真实 Decode Batch。
 // 验证入口：chapter08_tensor_batch_test。
-#include "chapter08_scheduling/scheduler.h"
-
 #include "chapter06_generation/embedding.h"
 #include "chapter06_generation/position_encoding.h"
 #include "chapter06_generation/request.h"
@@ -17,7 +15,6 @@
 
 int main() {
     using namespace chapter06_generation;
-    using namespace chapter08_scheduling;
     cpp_llm_engine::testing::TestSuite suite("chapter08_tensor_batch");
 
     suite.run("embedding batch exposes valid ragged offsets", [&] {
