@@ -38,7 +38,29 @@ endif()
 add_executable(gguf_decoder_multilayer
     examples/gguf_decoder_multilayer.cpp
 )
-set_target_properties(gguf_decoder_multilayer PROPERTIES
+
+add_executable(gguf_first_layer_forward
+    examples/gguf_first_layer_forward.cpp
+)
+target_link_libraries(gguf_first_layer_forward
+    PRIVATE
+        chapter01_tensor_loader
+        chapter05_quantization
+)
+
+add_executable(gguf_first_layer_multitoken
+    examples/gguf_first_layer_multitoken.cpp
+)
+target_link_libraries(gguf_first_layer_multitoken
+    PRIVATE
+        chapter01_tensor_loader
+        chapter05_quantization
+)
+set_target_properties(
+    gguf_decoder_multilayer
+    gguf_first_layer_forward
+    gguf_first_layer_multitoken
+    PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 target_link_libraries(gguf_decoder_multilayer

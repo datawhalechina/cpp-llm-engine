@@ -1,5 +1,5 @@
-// Chapter 01/06：真实 TinyLlama 首层单 token CPU forward。
-// 职责：把 GGUF embedding、Q4_K/Q6_K 权重和 Llama 首层数学连接起来。
+// Chapter 04/05：真实 TinyLlama 首层单 token CPU forward。
+// 职责：把 Chapter01 的 GGUF 权重、Chapter04 的层结构和 Chapter05 的量化 Linear 连接起来。
 // 限制：只执行 layer-0 的单 token，不代表完整模型生成或 llama.cpp 数值等价。
 #include "gguf_reader.h"
 #include "gguf_tensor_loader.h"

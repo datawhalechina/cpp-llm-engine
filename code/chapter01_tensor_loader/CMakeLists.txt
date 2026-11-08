@@ -65,32 +65,6 @@ cpp_llm_prepare_test(chapter01_schema_test)
 target_link_libraries(chapter01_tokenizer_payload_test PRIVATE chapter01_test_cases)
 cpp_llm_prepare_test(chapter01_tokenizer_payload_test)
 
-# Keep Chapter 01 standalone, but allow an explicit cross-chapter integration
-# build that exercises the real GGUF payload through Chapter 05's Q4_K Linear.
-set(CHAPTER05_SOURCE_DIR "" CACHE PATH "Chapter 05 source directory for integration tests")
-if(CHAPTER05_SOURCE_DIR)
-    if(NOT EXISTS "${CHAPTER05_SOURCE_DIR}/CMakeLists.txt")
-        message(FATAL_ERROR "CHAPTER05_SOURCE_DIR must point to the Chapter 05 source directory")
-    endif()
-    add_subdirectory("${CHAPTER05_SOURCE_DIR}" "chapter05_quantization")
-    add_executable(gguf_q4k_linear_smoke
-        examples/gguf_q4k_linear_smoke.cpp
-    )
-    target_link_libraries(gguf_q4k_linear_smoke
-        PRIVATE
-            chapter01_tensor_loader
-            chapter05_quantization
-    )
-    add_executable(gguf_q4k_benchmark
-        examples/gguf_q4k_benchmark.cpp
-    )
-    target_link_libraries(gguf_q4k_benchmark
-        PRIVATE
-            chapter01_tensor_loader
-            chapter05_quantization
-    )
-endif()
-
 enable_testing()
 add_test(NAME chapter01_loader_test COMMAND chapter01_loader_test)
 cpp_llm_set_test_labels(chapter01_loader_test "component;loader;cie1")
@@ -166,51 +140,4 @@ if(CHAPTER01_ENABLE_LLAMA_CPP)
         BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
     )
 
-    if(CHAPTER05_SOURCE_DIR)
-    add_executable(gguf_q6k_compare
-        examples/gguf_q6k_compare.cpp
-    )
-        target_include_directories(gguf_q6k_compare
-            PRIVATE
-                ${LLAMA_CPP_ROOT}/ggml/src
-                ${LLAMA_CPP_ROOT}/ggml/include
-        )
-        target_link_libraries(gguf_q6k_compare
-            PRIVATE
-                chapter01_tensor_loader
-                chapter05_quantization
-                ${GGML_LIBRARY}
-                ${GGML_CPU_LIBRARY}
-                ${GGML_BASE_LIBRARY}
-        )
-        set_target_properties(gguf_q6k_compare PROPERTIES
-        BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
-        )
-    endif()
-endif()
-
-if(CHAPTER05_SOURCE_DIR)
-    add_executable(gguf_first_layer_forward
-        examples/gguf_first_layer_forward.cpp
-    )
-    target_link_libraries(gguf_first_layer_forward
-        PRIVATE
-            chapter01_tensor_loader
-            chapter05_quantization
-    )
-    add_executable(gguf_first_layer_multitoken
-        examples/gguf_first_layer_multitoken.cpp
-    )
-    target_link_libraries(gguf_first_layer_multitoken
-        PRIVATE
-            chapter01_tensor_loader
-            chapter05_quantization
-    )
-endif()
-
-if(CHAPTER05_SOURCE_DIR)
-    add_subdirectory(
-        ${CMAKE_CURRENT_SOURCE_DIR}/../model
-        ${CMAKE_CURRENT_BINARY_DIR}/model
-    )
 endif()

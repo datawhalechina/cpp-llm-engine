@@ -6,6 +6,8 @@
 | --- | --- |
 | `RealLlamaCpuModel` | 持有共享只读权重和模型结构契约 |
 | `RealLlamaCpuContext` | 保存单个请求的 position、分层 K/V 和执行统计 |
+| `gguf_first_layer_forward` | 用真实量化权重执行首层单词元前向 |
+| `gguf_first_layer_multitoken` | 用真实量化权重观察 RoPE、因果注意力和增量 K/V |
 | `gguf_decoder_multilayer` | 执行多层 Decoder，并可选与 llama.cpp 比较 |
 
 类型暂时保留在 `chapter01` 命名空间，以兼容已有 Engine 和多模态调用方；模块归属和构建依赖已经与 Chapter01 Loader 分离。

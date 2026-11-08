@@ -1,4 +1,4 @@
-// Chapter 01/04/06：真实 TinyLlama 首层多 token CPU forward。
+// Chapter 04/05：真实 TinyLlama 首层多 token CPU forward。
 // 职责：验证 RoPE、causal attention score、GQA 和增量 KV Cache 的连接。
 // 限制：只执行 layer-0；这是结构 smoke，不代表完整模型或 llama.cpp 数值等价。
 #include "gguf_reader.h"

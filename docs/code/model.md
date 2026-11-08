@@ -6,7 +6,8 @@
 
 1. 阅读 `real_llama_cpu_decoder.h`，区分共享只读 Model 与请求独占 Context
 2. 阅读 `real_llama_cpu_decoder.cpp`，跟踪 RMSNorm、RoPE、GQA、SwiGLU、分层 KV 和 LM Head
-3. 阅读 `gguf_decoder_multilayer.cpp`，查看多层执行、Context 隔离和 llama.cpp 数值对照
+3. 阅读 `gguf_first_layer_forward.cpp` 和 `gguf_first_layer_multitoken.cpp`，观察真实首层的单词元与多词元执行
+4. 阅读 `gguf_decoder_multilayer.cpp`，查看多层执行、Context 隔离和 llama.cpp 数值对照
 
 ## 核心代码
 
@@ -14,6 +15,8 @@
 | --- | --- |
 | <a href="/_code/model/include/cpp_llm_engine/model/real_llama_cpu_decoder.h"><code>real_llama_cpu_decoder.h</code></a> | 真实 Model、请求 Context、结构契约与 profiling 接口 |
 | <a href="/_code/model/src/real_llama_cpu_decoder.cpp"><code>real_llama_cpu_decoder.cpp</code></a> | 22 层 CPU Decoder 与请求级 KV Cache |
+| <a href="/_code/model/examples/gguf_first_layer_forward.cpp"><code>gguf_first_layer_forward.cpp</code></a> | 首层单词元量化前向 |
+| <a href="/_code/model/examples/gguf_first_layer_multitoken.cpp"><code>gguf_first_layer_multitoken.cpp</code></a> | 首层多词元 RoPE、因果注意力与增量 K/V |
 | <a href="/_code/model/examples/gguf_decoder_multilayer.cpp"><code>gguf_decoder_multilayer.cpp</code></a> | 多层 logits、greedy token 与 llama.cpp 对照 |
 | <a href="/_code/model/CMakeLists.txt"><code>CMakeLists.txt</code></a> | Loader、量化后端和真实模型执行目标 |
 

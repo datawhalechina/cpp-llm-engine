@@ -11,6 +11,7 @@ option(CHAPTER01_ENABLE_LLAMA_CPP "Build the real llama.cpp tokenizer backend" O
 option(CPP_LLM_ENGINE_ENABLE_CUDA "Build optional CUDA model adapters" OFF)
 set(LLAMA_CPP_ROOT "" CACHE PATH "llama.cpp checkout containing include/ and build/bin/")
 set(CPP_LLM_ENGINE_REAL_MODEL "" CACHE FILEPATH "Optional GGUF used by real-model CTest")
+set(CHAPTER05_SOURCE_DIR "" CACHE PATH "Optional Chapter 05 source directory for real-model execution")
 
 add_subdirectory(
     ${CMAKE_CURRENT_SOURCE_DIR}/../core
@@ -21,6 +22,20 @@ add_subdirectory(
     ${CMAKE_CURRENT_SOURCE_DIR}/../chapter01_tensor_loader
     ${CMAKE_CURRENT_BINARY_DIR}/chapter01_tensor_loader
 )
+
+if(CHAPTER05_SOURCE_DIR)
+    if(NOT EXISTS "${CHAPTER05_SOURCE_DIR}/CMakeLists.txt")
+        message(FATAL_ERROR "CHAPTER05_SOURCE_DIR must point to Chapter 05")
+    endif()
+    add_subdirectory(
+        ${CHAPTER05_SOURCE_DIR}
+        ${CMAKE_CURRENT_BINARY_DIR}/chapter05_quantization
+    )
+    add_subdirectory(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../model
+        ${CMAKE_CURRENT_BINARY_DIR}/model
+    )
+endif()
 
 add_subdirectory(
     ${CMAKE_CURRENT_SOURCE_DIR}/../chapter06_generation

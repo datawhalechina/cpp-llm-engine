@@ -13,7 +13,7 @@ Chapter01 已经把 TinyLlama 的模型配置、张量映射和 Llama 权重布�
 | 张量映射 / 权重数据加载器 | 取得权重形状、数据类型和原始数据 |
 | `RealLlamaLayerWeights` | 向首层计算提供已绑定字段的权重集合 |
 
-真实权重的读取入口位于 <a href="../_code/chapter01_tensor_loader/src/real_layer_weights.cpp"><code>real_layer_weights.cpp</code></a>。本章脚本调用 <a href="../_code/chapter01_tensor_loader/examples/gguf_first_layer_inspect.cpp"><code>gguf_first_layer_inspect.cpp</code></a> 核对结构；接入 Chapter05 量化计算后的首层数值入口是 <a href="../_code/chapter01_tensor_loader/examples/gguf_first_layer_forward.cpp"><code>gguf_first_layer_forward.cpp</code></a>。
+真实权重的读取入口位于 <a href="../_code/chapter01_tensor_loader/src/real_layer_weights.cpp"><code>real_layer_weights.cpp</code></a>。本章脚本调用 <a href="../_code/chapter01_tensor_loader/examples/gguf_first_layer_inspect.cpp"><code>gguf_first_layer_inspect.cpp</code></a> 核对结构；接入 Chapter05 量化计算后的首层数值入口位于 <a href="../_code/model/examples/gguf_first_layer_forward.cpp"><code>gguf_first_layer_forward.cpp</code></a>，多词元增量路径位于 <a href="../_code/model/examples/gguf_first_layer_multitoken.cpp"><code>gguf_first_layer_multitoken.cpp</code></a>。
 
 ## 九个权重怎样进入解码器块
 
