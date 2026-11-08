@@ -42,7 +42,7 @@ bash code/chapter05_quantization/scripts/run.sh
 真实 TinyLlama 链路再执行：
 
 ```bash
-bash scripts/run_real_decoder_learning.sh
+bash code/chapter05_quantization/scripts/run_real_decoder.sh
 ```
 
-通过条件是量化类型选择正确、payload 长度匹配、模型权重生命周期有效，错误输入不会覆盖输出。下一篇 [`05.4 反量化算子`](./04_dequantize_op.md) 将逐 block 解释 packed 字节怎样恢复浮点参考值。
+通过条件是量化类型选择正确、payload 长度匹配、模型权重生命周期有效，错误输入不会覆盖输出。专属脚本运行固定 TinyLlama prompt，检查 Context 隔离、embedding-prefill、llama.cpp 数值指标和 greedy 序列；包含 Generation 与多请求 batch 的跨章验收由全局回归统一执行。下一篇 [`05.4 反量化算子`](./04_dequantize_op.md) 将逐 block 解释 packed 字节怎样恢复浮点参考值。

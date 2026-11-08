@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
   <title id="title">Chapter 05 用同一输入比较浮点与量化 Linear</title>
-  <desc id="desc">Chapter 05 位于 Decoder 结构和 Generation Runtime 之间。A 教学参考线解释量化误差，B 真实执行线将 GGUF 量化权重接入 Decoder 和后端。</desc>
+  <desc id="desc">Chapter 05 位于 Decoder 结构和 Generation Runtime 之间。A 线解释量化误差，B 线接入真实 GGUF 权重，G 线替换 Linear 执行后端，M 线复用 Q8_0 权重路径。</desc>
   <defs>
     <style>text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif !important; }</style>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
@@ -96,15 +96,20 @@
   <path d="M850 330 H914" fill="none" stroke="#28536b" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
   <path d="M850 430 H914" fill="none" stroke="#c45b16" stroke-width="2.5" marker-end="url(#arrow-orange)"/>
 
-  <rect x="54" y="510" width="1092" height="72" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
-  <text x="78" y="539" font-size="14" font-weight="700" fill="#52606d">本章使用的权重格式与执行路径</text>
-  <g text-anchor="middle" font-size="12">
-    <rect x="340" y="526" width="140" height="38" rx="10" fill="#fff0dc"/><text x="410" y="550" fill="#9a4d13">INT8 + scale</text>
-    <rect x="494" y="526" width="140" height="38" rx="10" fill="#fff0dc"/><text x="564" y="550" fill="#9a4d13">GGUF Q4_K</text>
-    <rect x="648" y="526" width="140" height="38" rx="10" fill="#fff0dc"/><text x="718" y="550" fill="#9a4d13">GGUF Q6_K</text>
-    <rect x="802" y="526" width="140" height="38" rx="10" fill="#fff0dc"/><text x="872" y="550" fill="#9a4d13">GGUF Q8_0</text>
+  <rect x="54" y="500" width="1092" height="150" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
+  <text x="78" y="530" font-size="14" font-weight="700" fill="#52606d">四条学习线在本章的交接点</text>
+  <g text-anchor="middle">
+    <rect x="78" y="550" width="244" height="72" rx="12" fill="#e8f1f7" stroke="#79a4ba"/>
+    <text x="200" y="578" font-size="14" font-weight="700" fill="#28536b">A 教学证据</text>
+    <text x="200" y="601" font-size="12" fill="#52606d">小 block · 误差 · 失败路径</text>
+    <rect x="344" y="550" width="244" height="72" rx="12" fill="#fff0dc" stroke="#e8a765"/>
+    <text x="466" y="578" font-size="14" font-weight="700" fill="#9a4d13">B 真实执行</text>
+    <text x="466" y="601" font-size="12" fill="#6f5438">GGUF Q4_K / Q6_K / Q8_0</text>
+    <rect x="610" y="550" width="244" height="72" rx="12" fill="#ecfdf5" stroke="#6db5a9"/>
+    <text x="732" y="578" font-size="14" font-weight="700" fill="#0f5f59">G GPU 后端</text>
+    <text x="732" y="601" font-size="12" fill="#376963">CUDA 反量化 + cuBLAS</text>
+    <rect x="876" y="550" width="244" height="72" rx="12" fill="#fef3c7" stroke="#d4a72c"/>
+    <text x="998" y="578" font-size="14" font-weight="700" fill="#805b10">M 多模态复用</text>
+    <text x="998" y="601" font-size="12" fill="#6f5b2d">SmolVLM Q8_0 权重</text>
   </g>
-
-  <rect x="54" y="613" width="1092" height="42" rx="12" fill="#173f3c"/>
-  <text x="600" y="640" font-size="14" font-weight="700" text-anchor="middle" fill="#ffffff">学习结果：能先证明量化结果正确，再判断存储、带宽或延迟收益是否值得采用</text>
 </svg>

@@ -12,7 +12,7 @@
 | KV cache | 有些系统会继续量化 KV cache，以降低长上下文显存压力 | cache dtype、block 大小和精度影响 |
 | benchmark | 显存下降不等于吞吐一定提升 | latency、throughput、精度和显存要一起看 |
 
-权重量化主要改变模型参数的存储和 Linear 计算路径。Loader 提供 packed payload，Decoder 提交激活和输出空间，`QuantizedLinearPolicy` 再选择 scalar、AVX2 或 CUDA 后端。KV Cache 量化则发生在请求运行过程中，连接 Attention backend、缓存布局和 decode 精度；当前 CPU 主线只实现权重量化。
+权重量化主要改变模型参数的存储和 Linear 计算路径。Loader 提供 packed payload，Decoder 提交激活和输出空间，`QuantizedLinearPolicy` 在已注册的 scalar 与 AVX2 CPU backend 之间选择实现。CUDA 正确性基线由独立的 `CudaExecutionContext` 编排反量化和 cuBLAS，不进入这项 CPU policy。KV Cache 量化发生在请求运行过程中，连接 Attention backend、缓存布局和 decode 精度；当前主线实现的是权重量化。
 
 ![仅权重量化的数据路径](../assets/diagrams/chapter05-quantization-weight-only.svg)
 
@@ -32,7 +32,7 @@ Chapter06 的 `Runtime` 只调用 `RequestModelExecutor::prefill()` 和 `decode(
 - 专用 INT8 / INT4 kernel 才能进一步减少计算成本。
 - KV cache、调度或采样占主导时，端到端优化应转向对应阶段。
 
-本章只验证量化链路的正确性。固定 workload、延迟、吞吐、热点归因和真实服务内存口径统一由 Chapter09 的性能证据链记录，不能反向作为 Chapter05 的完成条件。
+量化链路先用 reference 和真实 Decoder 证明数值正确。固定 workload、延迟、吞吐、热点归因和真实服务内存口径随后进入 Chapter09 的性能证据链。
 
 ## 验证与衔接
 
@@ -41,4 +41,4 @@ Chapter06 的 `Runtime` 只调用 `RequestModelExecutor::prefill()` 和 `decode(
 | 验收层级 | 执行入口 | 通过条件 |
 | --- | --- | --- |
 | 量化 backend | `bash code/chapter05_quantization/scripts/run.sh` | reference、scalar、可用的 AVX2 与错误路径通过 |
-| 真实 Decoder | `bash code/chapter05_quantization/scripts/run_real_decoder.sh` | 22 层 Decoder 得到固定 logits、greedy token 和数值对照 |
+| 真实 Decoder | `bash code/chapter05_quantization/scripts/run_real_decoder.sh` | 22 层 Decoder 满足与 llama.cpp 的数值阈值并生成相同 greedy token 序列 |

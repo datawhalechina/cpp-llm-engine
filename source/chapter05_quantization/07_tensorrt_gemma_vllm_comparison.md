@@ -32,3 +32,11 @@
 | [llama.cpp](../reference/ecosystem/llama_cpp.md) | Q4_K/Q6_K/Q8_0 block 与 CPU 量化 kernel |
 | [vLLM](../reference/ecosystem/vllm.md) | quant method 与模型 Linear 的绑定 |
 | [TensorRT-LLM](../reference/ecosystem/tensorrt_llm.md) | GPU 量化 kernel、workspace 和执行策略 |
+
+## 验证与衔接
+
+```bash
+bash code/chapter05_quantization/scripts/run.sh
+```
+
+先用 component 测试确认三种格式共享 Linear 契约，再用 integration 测试确认 Chapter02 激活 View 不依赖具体量化格式。二者分别对应成熟框架中的格式实现和模型执行接口；[`05.8 量化在生成运行时中的位置`](./08_quantization_in_serving_runtime.md) 将继续追踪这项接口怎样被 Decoder 和 Generation Runtime 调用。

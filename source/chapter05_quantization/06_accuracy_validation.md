@@ -23,9 +23,9 @@ assert similarity >= similarity_threshold
 | block 解码 | packed payload、格式参数 | 逐元素最大误差 | layout、scale、bit unpack |
 | Linear | 激活、权重、shape | max/mean error、cosine | 解码或累加顺序 |
 | Decoder 中间量 | prompt、模型、backend policy | Attention/FFN 输出差值 | 首个偏离层和 projection |
-| 最终生成 | tokenizer、prompt、Sampler | logits、golden token | 误差传播是否改变决策 |
+| 最终生成 | tokenizer、prompt、Sampler | logits 数值指标、greedy token 序列 | 误差传播是否改变决策 |
 
-## 仓库中的固定证据
+## 仓库中的验证证据
 
 Q4_K CPU reference 使用真实 TinyLlama `token_embd.weight` 与 llama.cpp reference 交叉验证；Q6_K 使用 `blk.0.ffn_down.weight` 做同类验证。Q8_0 使用合成 block 和真实 SmolVLM 路径检查 decode-and-dot、embedding-prefill 与完整 Decoder 输出。
 
@@ -34,7 +34,7 @@ Q4_K CPU reference 使用真实 TinyLlama `token_embd.weight` 与 llama.cpp refe
 | INT8 教学格式 | 固定整数、scale 和预期浮点值 | `q * scale` 与预期一致 |
 | Q4_K/Q6_K 解码 | 真实 GGUF payload 对照 reference | 元素数、layout 和数值一致 |
 | fused CPU Linear | reference、scalar、AVX2 同输入 | 输出落在格式容差内 |
-| 真实 Decoder policy | 固定 TinyLlama prompt | golden token 与 Context 隔离不变 |
+| 真实 Decoder policy | 固定 TinyLlama prompt，同轮 llama.cpp reference | logits 满足误差阈值、greedy 序列一致、双 Context 相互隔离 |
 | Q8_0 多模态路径 | token-prefill 与 embedding-prefill | logits/top-1 一致 |
 
 性能 A/B 的硬件、编译器、warmup 和多轮统计集中在[实验与验证资产索引](../reference/experiment_assets.md)，并由 Chapter09 统一解释。不能把不同机器、模型、shape 或 backend 的耗时直接相减。
