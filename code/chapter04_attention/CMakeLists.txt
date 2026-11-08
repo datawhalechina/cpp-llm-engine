@@ -63,6 +63,10 @@ add_executable(chapter04_attention_test
     tests/chapter04_attention_test.cpp
 )
 
+add_executable(chapter04_online_softmax_test
+    tests/online_softmax_test.cpp
+)
+
 add_executable(chapter02_tensor_attention_integration_test
     tests/chapter02_tensor_attention_integration_test.cpp
 )
@@ -77,10 +81,16 @@ target_link_libraries(chapter04_attention_test
 )
 cpp_llm_prepare_test(chapter04_attention_test)
 
+target_link_libraries(chapter04_online_softmax_test
+    PRIVATE chapter04_attention
+)
+cpp_llm_prepare_test(chapter04_online_softmax_test)
+
 include(CTest)
 enable_testing()
 
 add_test(NAME chapter04_attention_test COMMAND chapter04_attention_test)
+add_test(NAME chapter04_online_softmax_test COMMAND chapter04_online_softmax_test)
 add_test(
     NAME chapter02_tensor_attention_integration_test
     COMMAND chapter02_tensor_attention_integration_test
@@ -88,6 +98,9 @@ add_test(
 cpp_llm_set_test_labels(chapter04_attention_test attention decoder)
 cpp_llm_set_test_contract(
     chapter04_attention_test OWNER 04 LEVEL component STATUS active)
+cpp_llm_set_test_labels(chapter04_online_softmax_test attention softmax online)
+cpp_llm_set_test_contract(
+    chapter04_online_softmax_test OWNER 04 LEVEL component STATUS active)
 cpp_llm_set_test_labels(
     chapter02_tensor_attention_integration_test tensor attention)
 cpp_llm_set_test_contract(

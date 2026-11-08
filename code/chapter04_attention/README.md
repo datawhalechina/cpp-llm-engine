@@ -24,7 +24,7 @@
 
 | 顺序 | 文件 | 阅读重点 | 对应证据 |
 | --- | --- | --- | --- |
-| 1 | `src/attention_kernel.cpp`、`src/attention_backend.cpp` | 因果遮罩、稳定 Softmax 与 CPU backend 分派 | `chapter04_attention_test` 的 Attention kernel 用例 |
+| 1 | `src/attention_kernel.cpp`、`src/attention_backend.cpp` | 三段式 golden、分块在线 Softmax、因果遮罩与 CPU backend 分派 | `chapter04_attention_test`、`chapter04_online_softmax_test` |
 | 2 | `src/tensor_attention_adapter.cpp` | 3D/4D Q/K/V 的批次偏移、连续布局和失败原子性 | `chapter02_tensor_attention_integration_test`，integration |
 | 3 | `src/attention.cpp`、`src/kv_cache.cpp` | 四个投影、位置偏移、候选 K/V 追加和成功提交 | `chapter04_attention_test` 的连续 KV 用例 |
 | 4 | `src/layer_norm.cpp`、`src/feed_forward.cpp`、`src/linear_layer.cpp` | 按词元归一化、ReLU FFN 和公共二维 View | 两个测试 target 的组件与跨章用例 |
@@ -42,7 +42,7 @@
 bash code/chapter04_attention/scripts/run.sh
 ```
 
-演示程序应输出 `ready: true`、`output shape: 2x4`，并打印位置 `(0,0)` 和 `(1,3)` 的有限浮点结果。CTest 随后报告三个 target 通过：Chapter04 component 测试覆盖 Attention、连续 KV、双残差和请求 Context；integration 测试覆盖 Chapter02 Tensor 到二维算子及 3D/4D Attention 的公开接口交接；Core unit 测试核对共享契约。
+演示程序应输出 `ready: true`、`output shape: 2x4`，并打印位置 `(0,0)` 和 `(1,3)` 的有限浮点结果。CTest 随后报告四个 target 通过：Chapter04 component 测试覆盖 Attention、连续 KV、双残差和请求 Context；在线 Softmax 测试用不同 tile、因果位置和极端 score 对照三段式 golden；integration 测试覆盖 Chapter02 Tensor 到二维算子及 3D/4D Attention 的公开接口交接；Core unit 测试核对共享契约。
 
 重点观察二维激活怎样通过公共只读/可写 View 进入 Linear，3D `[T,H,Dh]` 与 4D `[B,T,H,Dh]` 输入怎样进入同一 CPU Attention backend，以及单层 Context 怎样把缓存长度从 2 推进到 3。非连续 View 先显式连续化；缓存容量或输入缓冲区校验失败时，状态和输出保持不变。
 
