@@ -104,6 +104,15 @@
       "status": "active"
     },
     {
+      "target": "chapter04_online_softmax_test",
+      "source": "code/chapter04_attention/tests/online_softmax_test.cpp",
+      "owner": "04",
+      "level": "component",
+      "dependencies": ["04"],
+      "status": "active",
+      "note": "以三段式 CPU golden 核对分块在线 Softmax 的状态合并"
+    },
+    {
       "target": "chapter02_tensor_attention_integration_test",
       "source": "code/chapter04_attention/tests/chapter02_tensor_attention_integration_test.cpp",
       "owner": "04",
@@ -204,6 +213,15 @@
       "level": "component",
       "dependencies": ["04", "07"],
       "status": "active"
+    },
+    {
+      "target": "chapter07_radix_prefix_cache_test",
+      "source": "code/chapter07_kv_cache/tests/radix_prefix_cache_test.cpp",
+      "owner": "07",
+      "level": "integration",
+      "dependencies": ["07"],
+      "status": "active",
+      "note": "验证块对齐最长前缀、共享引用、私有后缀与终态释放"
     },
     {
       "target": "real_tinyllama_paged_kv_smoke",
