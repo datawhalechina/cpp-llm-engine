@@ -7,7 +7,9 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
 | A 教学闭环 | 用小尺寸 MHA、LayerNorm、FFN 和双残差组装一个 `DecoderLayer`，再用请求 Context 连接预填充与逐词元解码 | 单层输出、因果掩码、连续 KV 追加、请求隔离和失败原子性测试 |
-| B 真实结构线 | 用 3D/4D Q/K/V 契约理解 TinyLlama 的 RMSNorm、RoPE、GQA、SwiGLU、22 层拓扑和请求 Context | 真实 shape、首层权重映射和 22 层结构契约 |
+| B 真实 CPU | 先用 3D/4D Q/K/V 适配器核对通用多头注意力布局，再沿真实模型路径学习 TinyLlama 的 RMSNorm、RoPE、GQA、SwiGLU 和 22 层拓扑 | 批次隔离、首层权重映射、22 层结构与跨章数值证据 |
+| G GPU 扩展 | 保持解码器顺序和请求状态语义不变，把 Linear、RoPE、GQA、归一化和 FFN 换成 CUDA 后端 | 合成单层 CUDA Decoder 与 CPU 参考结果一致 |
+| M 多模态扩展 | 视觉编码器复用归一化、Attention、FFN 和双残差结构；视觉向量进入语言 Decoder 后复用请求 Context | SigLIP Block、视觉投影和统一 embedding 序列测试 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
@@ -28,6 +30,7 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | 2 | A | [`04.2 层归一化与激活函数`](./02_layernorm_and_activation.md)、[`04.3 前馈网络`](./03_feedforward.md)、[`04.4 解码器层`](./04_decoder_layer.md) | <a href="../_code/chapter04_attention/src/decoder_layer.cpp"><code>decoder_layer.cpp</code></a>、<a href="../_code/chapter04_attention/src/decoder_context.cpp"><code>decoder_context.cpp</code></a> | 归一化、注意力、残差和 FFN 形成单层闭环，请求 Context 连接 prefill/decode |
 | 3 | B | [`04.5 接入首层权重`](./05_load_first_layer.md)、[`04.6 连接真实 TinyLlama 解码器`](./06_real_tinyllama_decoder.md) | <a href="../_code/model/src/real_llama_cpu_decoder.cpp"><code>real_llama_cpu_decoder.cpp</code></a> | Chapter01 权重怎样映射到 22 层 Model 与请求 Context |
 | 4 | B | [`04.7 解码器成熟框架对照`](./07_framework_comparison.md) | [`解码器数据流图`](./04_decoder_layer.md) | 将教学层和真实模型映射到成熟执行器与 GPU 计算后端 |
+| 5 | G/M | [`CUDA 路线`](../guides/setup_cuda.md)、[`多模态推理`](../reference/multimodal_inference.md) | <a href="../_code/cuda/src/cuda_decoder_layer.cpp"><code>cuda_decoder_layer.cpp</code></a>、<a href="../_code/multimodal/src/vision_encoder.cpp"><code>vision_encoder.cpp</code></a> | 同一解码器骨架怎样替换计算后端或接收视觉输入 |
 
 ## 验证与下一步
 

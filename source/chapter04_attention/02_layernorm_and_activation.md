@@ -1,6 +1,6 @@
 # 04.2 层归一化与激活函数
 
-注意力负责聚合词元之间的信息，解码器还需要归一化稳定每个词元的特征尺度，并用激活函数引入非线性。教学路径实现 LayerNorm 和 ReLU；真实 TinyLlama 路径使用 RMSNorm 和 SwiGLU，两者不能互换后声称数值等价。
+注意力负责聚合词元之间的信息，解码器还需要归一化稳定每个词元的特征尺度，并用激活函数引入非线性。教学路径用 LayerNorm 和 ReLU 展示基本计算，TinyLlama 则按模型权重执行 RMSNorm 和 SwiGLU。
 
 ## 每个词元怎样完成归一化
 
@@ -47,7 +47,7 @@ SiLU(x) = x / (1 + exp(-x))
 | FFN 激活 | ReLU | SiLU 门控 |
 | 作用 | 建立可读组合结构 | 匹配真实模型配置和权重 |
 
-`apply_activation()` 位于 <a href="../_code/chapter04_attention/src/feed_forward.cpp"><code>feed_forward.cpp</code></a>，当前枚举只包含 ReLU。TinyLlama 的 RMSNorm 和 SwiGLU 由真实 CPU 解码器路径实现，不通过给教学枚举增加名字来伪装模型兼容性。
+`apply_activation()` 位于 <a href="../_code/chapter04_attention/src/feed_forward.cpp"><code>feed_forward.cpp</code></a>，当前枚举包含教学路径实际执行的 ReLU。TinyLlama 的 RMSNorm 和 SwiGLU 位于真实 CPU 解码器路径，并读取对应 GGUF 权重。
 
 ## 验证与衔接
 

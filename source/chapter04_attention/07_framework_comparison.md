@@ -4,11 +4,11 @@
 
 ## 对象映射
 
-Gemma 提供具体模型家族，nano-vLLM 提供紧凑算法骨架，vLLM 和 TensorRT-LLM 展示生产执行路径。
+TinyLlama/Llama 决定本章真实模型的数学结构，llama.cpp 提供同模型 CPU 数值基线。nano-vLLM 适合阅读紧凑前向控制流，vLLM 和 TensorRT-LLM 展示生产执行路径；Gemma 用于比较另一种模型家族怎样调整解码器块。
 
 | 教程对象 | 成熟项目中的对应物 | 阅读重点 |
 | --- | --- | --- |
-| `DecoderLayer` | Gemma/Llama 解码器块 | 归一化、注意力、残差、FFN 的顺序和结构差异 |
+| `DecoderLayer` | Llama 系解码器块 | 归一化、注意力、残差、FFN 的顺序和权重布局 |
 | Q/K/V 投影 | 模型注意力输入准备 | 注意力头数、GQA 布局、位置和权重形状 |
 | `AttentionBackend` | vLLM 注意力后端、TensorRT-LLM 内核 | 掩码、缓存元数据与内核的接口 |
 | 连续 `KvCache` | 分页/分块 KV Cache 的数值基础 | 预填充和逐词元解码怎样复用 K/V |
@@ -38,7 +38,8 @@ Gemma 提供具体模型家族，nano-vLLM 提供紧凑算法骨架，vLLM 和 T
 
 | 项目卡 | 在本章中的用途 |
 | --- | --- |
-| [Gemma](../reference/ecosystem/gemma.md) | 对照具体模型家族的解码器结构 |
+| [llama.cpp](../reference/ecosystem/llama_cpp.md) | 核对 TinyLlama/Llama 的 CPU 模型执行和数值结果 |
 | [nano-vLLM](../reference/ecosystem/nano_vllm.md) | 先阅读紧凑的模型与前向控制流 |
 | [vLLM](../reference/ecosystem/vllm.md) | 观察模型层、注意力后端和缓存元数据 |
 | [TensorRT-LLM](../reference/ecosystem/tensorrt_llm.md) | 观察 GPU 运行时、注意力和融合内核 |
+| [Gemma](../reference/ecosystem/gemma.md) | 比较模型家族变化怎样影响归一化、位置编码和 FFN |

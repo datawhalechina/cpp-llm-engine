@@ -43,7 +43,7 @@ output = weight @ V
 
 ## 从算法镜像进入 C++
 
-下面的 Python 只镜像 CPU 参考实现的循环顺序，用来先看清算法，不形成第二套运行时：
+下面的 Python 镜像 CPU 参考实现的循环顺序，帮助阅读后续 C++ 内核：
 
 ```python
 def attention_reference(query, key, value, causal, offset):

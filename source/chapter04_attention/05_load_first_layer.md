@@ -1,6 +1,6 @@
 # 04.5 接入首层权重
 
-Chapter01 已经检查 TinyLlama 的模型配置、张量映射和 Llama 权重布局。这里直接消费这些产物，把 `blk.0` 的九个权重张量接入 RMSNorm、注意力、FFN 和残差计算。
+Chapter01 已经把 TinyLlama 的模型配置、张量映射和 Llama 权重布局整理成可读取对象。本节沿这些对象追踪 `blk.0` 的九个权重怎样进入 RMSNorm、注意力、FFN 和残差计算；结构检查通过 Chapter04 脚本调用 Chapter01 的加载 target，不在 Chapter04 复制一套加载实现。
 
 ## Chapter01 交付的模型材料
 
@@ -13,7 +13,7 @@ Chapter01 已经检查 TinyLlama 的模型配置、张量映射和 Llama 权重�
 | 张量映射 / 权重数据加载器 | 取得权重形状、数据类型和原始数据 |
 | `RealLlamaLayerWeights` | 向首层计算提供已绑定字段的权重集合 |
 
-真实权重的读取入口位于 <a href="../_code/chapter01_tensor_loader/src/real_layer_weights.cpp"><code>real_layer_weights.cpp</code></a>，首层执行入口位于 <a href="../_code/chapter01_tensor_loader/examples/gguf_first_layer_forward.cpp"><code>gguf_first_layer_forward.cpp</code></a>。
+真实权重的读取入口位于 <a href="../_code/chapter01_tensor_loader/src/real_layer_weights.cpp"><code>real_layer_weights.cpp</code></a>。本章脚本调用 <a href="../_code/chapter01_tensor_loader/examples/gguf_first_layer_inspect.cpp"><code>gguf_first_layer_inspect.cpp</code></a> 核对结构；接入 Chapter05 量化计算后的首层数值入口是 <a href="../_code/chapter01_tensor_loader/examples/gguf_first_layer_forward.cpp"><code>gguf_first_layer_forward.cpp</code></a>。
 
 ## 九个权重怎样进入解码器块
 
@@ -52,18 +52,4 @@ Q4_K、Q6_K 和 Q8_0 投影由 Chapter05 的量化线性计算后端执行；Cha
 bash code/chapter04_attention/scripts/run_real_structure.sh
 ```
 
-`real_tinyllama_first_layer_structure_test` 读取首层九个权重并检查 payload 契约，不执行量化 Linear。数值 forward 在完成 Chapter05 后验证。
-
-从仓库根目录运行不依赖量化计算后端的真实首层结构检查：
-
-```bash
-cmake -S code/chapter01_tensor_loader \
-  -B /tmp/cpp-llm-engine-chapter01-build \
-  -DCMAKE_BUILD_TYPE=Release
-cmake --build /tmp/cpp-llm-engine-chapter01-build \
-  --target gguf_first_layer_inspect -j2
-/tmp/cpp-llm-engine-chapter01-build/gguf_first_layer_inspect \
-  llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
-```
-
-检查结果证明首层名称、形状和量化数据类型能够映射到解码器结构，但不执行量化 Linear。随后进入 [`连接真实 TinyLlama 解码器`](./06_real_tinyllama_decoder.md) 理解 Model/Context；完整数值执行由 Chapter05 验收。
+脚本配置 `code/chapter01_tensor_loader`，构建 `gguf_first_layer_inspect`，再运行 `real_tinyllama_first_layer_structure_test`。通过条件是首层九个权重的名称、形状、数据类型和 payload 都符合 Llama 布局；该测试不执行量化 Linear。随后进入 [`连接真实 TinyLlama 解码器`](./06_real_tinyllama_decoder.md) 理解 Model/Context，完整数值执行由 Chapter05 验收。

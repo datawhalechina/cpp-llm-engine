@@ -57,4 +57,4 @@ bash code/chapter04_attention/scripts/run.sh
 
 测试应确认输入输出形状一致、两次残差使用正确输入，并能区分教学层与 TinyLlama 的归一化、注意力和 FFN 契约。状态路径还要确认预填充后缓存长度为 2，解码后增长到 3；两个 Context 互不影响，超出容量时缓存长度和已有输出保持不变。
 
-单层结构成立后，[`接入首层权重`](./05_load_first_layer.md) 使用 Chapter01 的真实权重布局执行 TinyLlama 第一个解码器块。
+单层结构成立后，[`接入首层权重`](./05_load_first_layer.md) 使用 Chapter01 的真实权重布局核对并绑定 TinyLlama 第一个解码器块所需的九个权重；数值执行在 Chapter05 接入量化线性层后完成。

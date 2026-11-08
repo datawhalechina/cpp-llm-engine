@@ -8,7 +8,7 @@ TinyLlama 的 `block_count=22` 对应 `blk.0` 到 `blk.21`。每个解码器块�
 
 ![TinyLlama 22 个解码器块的层级结构](../assets/diagrams/chapter01-tinyllama-decoder-hierarchy.svg)
 
-真实执行代码独立放在 <a href="../_code/model/src/real_llama_cpu_decoder.cpp"><code>code/model/real_llama_cpu_decoder.cpp</code></a>，避免 Chapter01 模型加载器和 Chapter04 教学算子互相承担对方职责。`RealLlamaCpuModel` 持有共享只读权重，`RealLlamaCpuContext` 保存单个请求的位置、分层 K/V 和注意力统计。
+真实执行代码位于 <a href="../_code/model/src/real_llama_cpu_decoder.cpp"><code>code/model/real_llama_cpu_decoder.cpp</code></a>。`RealLlamaCpuModel` 持有共享只读权重，`RealLlamaCpuContext` 保存单个请求的位置、分层 K/V 和注意力统计。
 
 | 对象 | 保存内容 | 生命周期 |
 | --- | --- | --- |
@@ -20,16 +20,16 @@ TinyLlama 的 `block_count=22` 对应 `blk.0` 到 `blk.21`。每个解码器块�
 
 ## 完成 Chapter05 后的跨章数值证据
 
-以下结果使用同一组 6 个词元分别运行自研 CPU 解码器和 llama.cpp。它证明 Chapter05 量化后端接入本章结构后能够保持数值方向，不作为 Chapter04 的独立完成条件。
+跨章验收使用同一组 6 个词元分别运行自研 CPU 解码器和 llama.cpp。程序在每次运行时计算下列指标并打印实际值；正文只保存稳定门槛，避免把某台机器的一次输出当成长期结论。判定实现位于 <a href="../_code/model/examples/gguf_decoder_multilayer.cpp"><code>gguf_decoder_multilayer.cpp</code></a>。
 
-| 指标 | 当前结果 | 验收门槛 |
+| 指标 | 验收门槛 | 回答的问题 |
 | --- | --- | --- |
-| 余弦相似度 | `0.99952` | 不低于 `0.999` |
-| 平均绝对误差 | `0.117456` | 不高于 `0.15` |
-| RMSE | `0.148398` | 不高于 `0.20` |
-| Top-1 | 词元 `29892`，双方一致 | 候选一致 |
-| Top-5 重合数 | `5/5` | 至少 `4/5` |
-| 4 词元贪心序列 | `29892 306 29915 29885` | 双方序列一致 |
+| 余弦相似度 | 不低于 `0.999` | 两组 logits 的整体方向是否一致 |
+| 平均绝对误差 | 不高于 `0.15` | 词表范围内的平均偏差是否受控 |
+| RMSE | 不高于 `0.20` | 较大误差是否被均方统计放大后仍可接受 |
+| Top-1 | 候选一致 | 下一步贪心选择是否一致 |
+| Top-5 重合数 | 至少 `4/5` | 高分候选集合是否稳定 |
+| 4 词元贪心序列 | 双方序列一致 | 误差是否在连续解码中改变生成路径 |
 
 22 层会累积不同矩阵乘加顺序造成的浮点误差，因此不能只用单个最大绝对误差判断完整模型。整体方向、平均误差、候选集合和连续贪心结果共同组成数值证据。
 
@@ -41,6 +41,6 @@ TinyLlama 的 `block_count=22` 对应 `blk.0` 到 `blk.21`。每个解码器块�
 bash code/chapter05_quantization/scripts/run_real_decoder.sh
 ```
 
-该入口只构建 22 层量化 Decoder 对照，不运行 Generation、batch 或 Serving。Chapter04 的独立验收仍是教学 Decoder 和真实结构映射。
+该入口验证 22 层量化 Decoder 的 logits 和连续贪心结果。Chapter04 的本章入口验证教学 Decoder、连续 KV Context 和真实权重结构。
 
-这些结果向 [`Chapter06`](../chapter06_generation/next/intro.md) 提供可执行的解码器上下文和候选分数；生成运行时只推进请求，不重新实现模型数学。
+通过后的解码器上下文和候选分数进入 [`Chapter06`](../chapter06_generation/next/intro.md)；生成运行时只推进请求，不重新实现模型数学。
