@@ -30,4 +30,4 @@
 bash code/chapter02_tensor_ops/scripts/run.sh
 ```
 
-脚本构建并运行二维示例，随后执行三个 CTest。通过条件包括 1–4 维索引、共享关系、连续化、边界、生命周期以及只读和可写视图引用全部符合预期。Chapter03 的集成测试继续验证二维兼容接口。
+脚本构建并运行二维/三维示例，随后执行 `chapter02_tensor_ops_test` 和 `chapter02_nd_tensor_test` 两个 CTest。通过条件包括 1–4 维索引、共享关系、连续化、边界、生命周期以及只读和可写视图引用全部符合预期。Chapter03 和 Chapter04 的集成测试继续验证公共视图进入算子后的布局检查与失败行为。

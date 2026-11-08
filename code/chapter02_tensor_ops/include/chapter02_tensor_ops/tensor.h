@@ -23,6 +23,8 @@ public:
     float at(std::size_t row, std::size_t col) const;
     float& at(const std::vector<std::size_t>& indices);
     float at(const std::vector<std::size_t>& indices) const;
+
+    // 只有连续视图返回首个逻辑元素；非连续或无效视图返回 nullptr。
     float* data();
     const float* data() const;
 
@@ -31,6 +33,7 @@ public:
     bool shares_storage_with(const Tensor& other) const;
     std::size_t storage_use_count() const;
 
+    // 便捷变换失败时返回无效 Tensor，不会隐式连续化或修改源视图。
     Tensor contiguous() const;
     Tensor reshape(std::size_t rows, std::size_t cols) const;
     Tensor reshape(std::vector<std::size_t> shape) const;
@@ -38,6 +41,8 @@ public:
     Tensor slice(std::size_t axis, std::size_t start, std::size_t count) const;
     Tensor transpose() const;
     Tensor transpose(std::size_t axis_a, std::size_t axis_b) const;
+
+    // try_* 返回错误原因；output 可与源对象相同，失败时保留源视图。
     cpp_llm_engine::core::Status try_contiguous(Tensor* output) const;
     cpp_llm_engine::core::Status try_reshape(
         std::size_t rows, std::size_t cols, Tensor* output) const;
@@ -54,6 +59,8 @@ public:
     cpp_llm_engine::core::Status try_transpose(Tensor* output) const;
     cpp_llm_engine::core::Status try_transpose(
         std::size_t axis_a, std::size_t axis_b, Tensor* output) const;
+
+    // Core View 不持有 Storage，只能在当前 Tensor 或共享 View 存活时使用。
     cpp_llm_engine::core::TensorContract contract() const;
     cpp_llm_engine::core::TensorViewRef view_ref() const;
     cpp_llm_engine::core::MutableTensorViewRef mutable_view_ref();

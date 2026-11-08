@@ -158,6 +158,13 @@ int main() {
         CPP_LLM_CHECK(suite, in_place_contiguous.is_contiguous());
         CPP_LLM_CHECK(suite, !in_place_contiguous.shares_storage_with(source_view));
         CPP_LLM_CHECK(suite, in_place_contiguous.at({3, 2, 1}) == 23.0f);
+
+        Tensor invalid;
+        const auto preserved_invalid_shape = invalid.shape();
+        status = invalid.try_contiguous(&invalid);
+        CPP_LLM_CHECK(suite, !status.is_ok());
+        CPP_LLM_CHECK(suite, invalid.shape() == preserved_invalid_shape);
+        CPP_LLM_CHECK(suite, !invalid.ready());
     });
 
     suite.run("invalid rank axis and shape are rejected", [&] {

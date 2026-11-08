@@ -8,6 +8,8 @@ Chapter 01 已经建立模型形状、数据类型和底层存储概念；本章
 | --- | --- | --- |
 | A 教学闭环 | 用二维小数组观察共享存储、变形、切片、转置和显式连续化 | 可直接打印的形状、步长、偏移与共享关系 |
 | B 真实执行闭环 | 将同一地址公式扩展到 1–4 维，并通过 `TensorViewRef` 交给后续计算后端 | 3D/4D Q/K/V 布局、Chapter03/04 跨章测试 |
+| G GPU 扩展坐标 | 保留 shape、stride 和连续性语义，由 `CudaTensor` 管理设备存储 | 当前没有 Host Tensor 自动迁移；上传和设备生命周期由 CUDA 模块验证 |
+| M 多模态扩展坐标 | 用相同形状语言描述图像、patch 和 embedding 序列 | 当前多模态对象不直接依赖 Chapter02 Tensor 类型，只复用数据契约 |
 
 本章先用中文概念建立直觉，再在正文中对应到代码变量：
 
@@ -25,19 +27,13 @@ Chapter 01 已经建立模型形状、数据类型和底层存储概念；本章
 
 ## 开始学习
 
-先运行本章入口：
-
-```bash
-bash code/chapter02_tensor_ops/scripts/run.sh
-```
-
-脚本会先输出二维视图和三维 Q/K/V 示例的形状、偏移、步长与存储共享结果；随后 CTest 验证 1D、3D、4D 索引、按轴视图、越界拒绝和公共张量契约。阅读时先理解二维地址，再把同一公式推广到更多轴。
+阅读时先用二维地址理解共享存储，再把同一套形状、步长和偏移公式推广到更多轴。最后通过公共只读/可写视图，把本章张量交给后续算子；跨章测试位于 Chapter03 和 Chapter04，不属于本章默认 CTest。
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
 | 1 | A/B 公共 | [`02.1 共享底层存储`](./01_shared_ptr_memory.md) | <a href="../_code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> | 视图元数据与存储所有权分开 |
 | 2 | A | [`02.2 变形与转置`](./02_reshape.md)、[`02.3 切片`](./03_slice.md) | <a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> | 二维地址变化、共享和显式复制可以直接观察 |
-| 3 | B | [`02.4 单元测试`](./04_unit_tests.md) | <a href="../_code/chapter02_tensor_ops/tests/chapter02_nd_tensor_test.cpp"><code>chapter02_nd_tensor_test.cpp</code></a> | 1D、3D、4D 与跨章输入契约成立 |
+| 3 | B | [`02.4 单元测试`](./04_unit_tests.md) | <a href="../_code/chapter02_tensor_ops/tests/chapter02_nd_tensor_test.cpp"><code>chapter02_nd_tensor_test.cpp</code></a> | 1D、3D、4D 索引与公共视图契约成立 |
 | 4 | B | [`02.5 张量与视图框架对照`](./05_framework_tensor_comparison.md) | [`数据结构与算法资产表`](../reference/data_structures_algorithms.md) | 在 ggml 和 vLLM 中定位视图与执行布局 |
 
 ## 验证与下一步
@@ -46,6 +42,6 @@ bash code/chapter02_tensor_ops/scripts/run.sh
 
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |
-| L1 默认 CPU | `bash code/chapter02_tensor_ops/scripts/run.sh` | 1–4 维索引、变形、转置、切片、共享存储、`contiguous()` 和失败路径通过 CTest | 必做 |
-| L2 真实模型 | 不读取模型文件 | 视图与存储语义由固定形状、步长、偏移和别名关系完整验证 | 不适用 |
+| L1 默认 CPU | `bash code/chapter02_tensor_ops/scripts/run.sh` | 示例输出布局与共享关系；两个 CTest 验证 1–4 维索引、变形、转置、切片、`contiguous()` 和失败路径 | 必做 |
+| L2 相邻章节 | `bash code/chapter03_matmul/scripts/run.sh`、`bash code/chapter04_attention/scripts/run.sh` | Chapter02 公共视图进入 MatMul 与 Decoder 组件，错误布局在计算前被拒绝 | 学到对应章节后执行 |
 | L3 可选 CUDA | 不单独设置 Chapter02 CUDA 验收 | 本章只建立主机视图；设备存储由 `code/cuda` 的 `CudaTensor` 验证 | 不适用 |

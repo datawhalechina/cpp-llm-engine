@@ -185,6 +185,12 @@ Tensor Tensor::contiguous() const {
 
 Status Tensor::try_contiguous(Tensor* output) const {
     if (output == nullptr) return Status::error("contiguous output must not be null");
+    if (output == this) {
+        Tensor result;
+        const auto status = try_contiguous(&result);
+        if (status.is_ok()) *output = std::move(result);
+        return status;
+    }
     if (!ready()) {
         *output = {};
         return Status::error("contiguous source tensor is not ready");
