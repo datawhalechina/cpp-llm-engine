@@ -35,6 +35,7 @@ public:
     const std::string& failure_reason() const;
 
     void append_generated_token(TokenId token);
+    bool adopt_prefilled_prefix(std::size_t token_count);
     void advance_prefill(std::size_t token_count);
     void mark_prefilled();
     void mark_decoding();

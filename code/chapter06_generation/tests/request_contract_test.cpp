@@ -92,5 +92,18 @@ int main() {
         CPP_LLM_CHECK(suite, request.prefill_offset() == 3);
     });
 
+    suite.run("cached prefix adoption aligns progress and observable history", [&] {
+        Request request({1, 2, 3, 4});
+        CPP_LLM_REQUIRE(suite, request.adopt_prefilled_prefix(2));
+        CPP_LLM_CHECK_EQ(suite, request.prefill_offset(), 2U);
+        CPP_LLM_CHECK(
+            suite, request.token_history() == chapter06_generation::TokenSequence({1, 2}));
+        CPP_LLM_CHECK(suite, !request.adopt_prefilled_prefix(1));
+
+        Request full_hit({1, 2});
+        CPP_LLM_CHECK(suite, !full_hit.adopt_prefilled_prefix(2));
+        CPP_LLM_CHECK_EQ(suite, full_hit.prefill_offset(), 0U);
+    });
+
     return suite.finish();
 }

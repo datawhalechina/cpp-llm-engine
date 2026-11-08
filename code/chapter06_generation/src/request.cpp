@@ -90,6 +90,18 @@ void Request::append_generated_token(TokenId token) {
     generated_.push_back(token);
 }
 
+bool Request::adopt_prefilled_prefix(std::size_t token_count) {
+    if (terminal() || phase_ != RequestPhase::Initial || prefill_offset_ != 0 ||
+        !history_.empty() || token_count == 0 || token_count >= prompt_.size()) {
+        return false;
+    }
+    for (std::size_t index = 0; index < token_count; ++index) {
+        history_.append(prompt_[index]);
+    }
+    prefill_offset_ = token_count;
+    return true;
+}
+
 void Request::advance_prefill(std::size_t token_count) {
     if (terminal()) return;
     if (token_count > remaining_prompt_tokens()) {

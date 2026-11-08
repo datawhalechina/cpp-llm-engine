@@ -59,6 +59,18 @@ public:
         return true;
     }
     virtual void release_request(std::size_t) const {}
+    virtual std::size_t estimate_cached_prefix(const Request&) const {
+        return 0;
+    }
+    virtual bool adopt_cached_prefix(
+        const std::shared_ptr<RequestModelExecutor>&,
+        std::size_t,
+        Request&,
+        std::string* error = nullptr) const {
+        if (error != nullptr) error->clear();
+        return true;
+    }
+    virtual void publish_cached_prefix(std::size_t, const Request&) const {}
 
     // 成功时每个执行器恰好推进一个位置，并返回同顺序 logits。
     // 失败时实现负责恢复全部模型 Context；Scheduler 只能回滚 Request 和外部 K/V 资源。
