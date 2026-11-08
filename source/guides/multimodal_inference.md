@@ -1,10 +1,10 @@
 # 多模态推理输入链路
 
-多模态推理在文本输入旁增加图片路径。图片经过解码、动态切图、Vision Encoder 和 Projector 后形成 visual embedding，再与文本 embedding 组成统一序列；后续继续使用已有 LLM Decoder、Generation Runtime 和 Serving。
+多模态推理在文本输入旁增加图片路径。图片经过解码、动态切图、视觉编码器（Vision Encoder）和投影层（Projector）后形成视觉嵌入，再与文本嵌入组成统一序列；后续继续使用已有语言模型解码器、生成运行时和服务层。
 
 SmolVLM 500M 的 IDEFICS3 图片路径用于说明图片进入模型前发生的变化。可运行代码和验证命令位于 `code/multimodal`。
 
-多模态路线只扩展输入；CPU 与 GPU 如何在统一算子和 Decoder 契约下切换执行后端，见 [CPU 主线与 GPU 扩展架构](../reference/cpu_gpu_architecture.md)。当前多模态闭环使用 CPU，后续 GPU 化不改变图片到统一 embedding 序列的交接点。
+多模态路线在解码器前增加图片输入处理。CPU 与 GPU 如何在统一算子和解码器契约下切换执行后端，见 [CPU 主线与 GPU 扩展架构](../reference/architecture.md#cpu-主线与-gpu-扩展)。当前多模态实现使用 CPU，后续 GPU 化仍在统一嵌入序列处交接。
 
 ![IDEFICS3 动态切图与视觉输入链路](../assets/diagrams/idefics3-image-tiling.svg)
 
@@ -54,16 +54,16 @@ mmproj 是独立于语言模型 GGUF 的视觉权重文件。Chapter01 的 `Gguf
 | grid | 3×2 | refined image 切成 6 张 512×512 tile |
 | visual images | 1 overview + 6 tiles | Vision Encoder 实际处理 7 张图 |
 
-## Overview 和 Tile
+## 全局图与局部切片
 
-overview 将原图直接缩放为一张 512×512 全局图，保留整体关系；tile 来自 refined image，保留局部细节。输入顺序固定为 overview 在前，随后按 `row=0..grid_y-1`、`column=0..grid_x-1` 排列 tile。
+全局图（overview）将原图直接缩放为一张 512×512 图片，保留整体关系；局部切片（tile）来自尺寸对齐后的图片，保留局部细节。输入顺序固定为全局图在前，随后按 `row=0..grid_y-1`、`column=0..grid_x-1` 排列局部切片。
 
 | 图像类型 | 数量 | 主要作用 | 坐标约定 |
 | --- | --- | --- | --- |
 | overview | 1 | 提供整张图片的全局语义 | `row=-1, column=-1` |
 | local tile | `grid_x × grid_y` | 提供局部高分辨率信息 | 从左到右、从上到下 |
 
-## Tile 怎样变成 Visual Embedding
+## 局部切片怎样变成视觉嵌入
 
 每张 512×512 RGB tile 先归一化为 Float32 CHW。16×16 patch 会得到 `32×32=1024` 个原始 patch，每个 patch 展平为 `3×16×16=768` 个输入值；SigLIP Vision Encoder 处理这些 patch，IDEFICS3 Projector 再进行空间合并并映射到语言模型 embedding width，数量关系见 [`F-MM-02`](../reference/formulas.md#f-mm-02)。
 
@@ -94,7 +94,7 @@ overview 将原图直接缩放为一张 512×512 全局图，保留整体关系�
 | Chapter09 | 验证视觉正确性、阶段耗时和性能证据 |
 | Chapter10 | 接入服务输入、同步/SSE 输出和终态释放 |
 
-## 一个图文请求怎样进入现有 Runtime
+## 一个图文请求怎样进入现有运行时
 
 图片输入管线在统一 embedding sequence 处结束。Engine 的 `EmbeddingRequestExecutor` 持有该序列和独立 Decoder Context，并实现 Chapter06 已有的 `RequestModelExecutor`：prefill 消费整段 embedding，decode 消费上一步 token。Chapter06 继续负责 Request 状态和采样，Chapter07-08 提供 K/V 与调度契约，Chapter10 负责 admission、HTTP/SSE 与服务指标。
 
@@ -115,7 +115,7 @@ overview 将原图直接缩放为一张 512×512 全局图，保留整体关系�
 
 ![多模态请求阶段与现有 Runtime 的交接](../assets/diagrams/multimodal-runtime-stages.svg)
 
-## 单个 SigLIP Block 怎样计算
+## 单个 SigLIP 编码块怎样计算
 
 视觉 Attention 允许每个 patch 查看同一 tile 中的全部 patch，因此不使用语言模型的 causal mask。数学接口只处理 Float32；Chapter05 将每个 34-byte Q8_0 block 解码为 32 个值，多模态适配器再按视觉 tensor 语义装配权重。这样量化格式不会进入 Attention 和 MLP 的控制逻辑。
 
@@ -144,7 +144,7 @@ overview 将原图直接缩放为一张 512×512 全局图，保留整体关系�
 
 ![SigLIP 12 层 Vision Encoder 的逐层权重执行](../assets/diagrams/siglip-encoder-streaming.svg)
 
-## Projector 怎样减少视觉 Token
+## 投影层怎样减少视觉词元
 
 Vision Encoder 不改变 patch 数量。IDEFICS3 Projector 把空间相邻的 `4x4` hidden states 拼成一个 `12288` 维向量，再通过 `mm.model.fc.weight` 映射到语言模型 width 960。合并向量依次存放 `dy`、`dx`、`hidden`，因此位置关系不会退化为任意 16 个 token 的拼接。
 

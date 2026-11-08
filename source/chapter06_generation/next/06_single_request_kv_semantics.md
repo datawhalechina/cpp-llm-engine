@@ -36,6 +36,8 @@
 
 每次 Decode 只增加一个 `sequence_position`。Chapter07 会把相同逻辑位置映射到 BlockTable 和分页 payload；页面、物理槽位与回收策略不属于 Generation Core。
 
+因此本章只固定两项请求级所有权：Request 管理词元与终态，模型 Context 管理每层数值状态。Chapter07 再让 BlockTable 管理逻辑位置到物理块的引用，Chapter10 负责在请求终止时分别释放执行器和缓存资源。
+
 ## 验证增长语义
 
 默认 Generation 测试检查三个 prompt 加三个输出后，教学词元历史长度为六。真实模型执行状态可通过 Engine 的执行器测试观察：

@@ -32,4 +32,4 @@ bash scripts/check_foundation_answer.sh /tmp/fq15-answer/main.cpp
 
 ## 主线映射
 
-对应 [`Chapter07 连续基线`](/chapter07_kv_cache/next/01_kv_baseline)、[`块表与物理内存`](/chapter07_kv_cache/next/02_block_mapping) 和 [`内存管理参考`](/reference/memory_management)。
+对应 [`Chapter07 连续基线`](/chapter07_kv_cache/next/01_kv_baseline)、[`块表与物理内存`](/chapter07_kv_cache/next/02_block_mapping) 和 [`分页事务`](/chapter07_kv_cache/next/03_paged_transaction)。

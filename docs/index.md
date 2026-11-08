@@ -50,7 +50,7 @@ features:
 - `reference` 讲概念解释、术语和生态对照
 - `guides` 讲构建、环境、迁移和工程方法
 
-想先看“指挥台 / 发动机”的分工，可以直接进 [training vs inference frameworks](/reference/framework_comparison)。
+想先看训练框架、推理引擎和服务怎样分工，可以直接进[系统与执行架构](/reference/architecture)。
 
 ## 你会看到什么
 

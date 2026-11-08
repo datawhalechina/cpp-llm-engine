@@ -31,6 +31,13 @@ Tensor view = original;
 
 只要任一视图仍持有底层存储，数据就不会提前释放。`shares_storage_with()` 和 `storage_use_count()` 让这种关系可以被测试观察。
 
+所有权和观察方式必须分开：Storage owner 决定物理字节何时释放，Tensor view 只描述怎样观察这些字节。复制 view 会增加共享句柄的引用计数，不会复制 storage；最后一个 owner 消失后，底层数据才释放。
+
+| 对象 | 保存什么 | 释放责任 |
+| --- | --- | --- |
+| Storage owner | 物理元素和共享引用计数 | 最后一个 owner 消失时释放数据 |
+| Tensor view | shape、stride、offset 和 Storage 句柄 | 只释放自己的观察描述，不单独释放元素 |
+
 ## 共享存储怎样支持后续操作
 
 `reshape` 复用整个观察窗口，只改变形状和连续步长；`slice` 复用某个轴的局部窗口；`transpose` 交换两个轴的形状和步长。三种操作都建立在同一个共享存储上。

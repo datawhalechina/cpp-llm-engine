@@ -47,6 +47,12 @@ storage[offset + row * stride[0] + col * stride[1]]
 
 CPU 和 CUDA 的输入地址位于不同设备。行优先数据交给 cuBLAS 时还要处理列优先解释，具体步骤放在 [`03.4`](./04_cublas_implement.md)。
 
+## 临时结果和 Workspace 由谁持有
+
+输出临时结果用于保证失败原子性：Backend 成功后才覆盖调用者的 Tensor。Workspace 保存 Backend 执行期间的中间数据，例如量化权重解码结果或 GPU 归约空间；二者都不改变输入 Tensor 的所有权。
+
+Workspace 的容量先由 shape 计算并校验，只在不足时增长。异步 GPU 执行还要等使用它的 stream 或 event 完成后才能复用。CPU reference 不模拟 CUDA stream，但必须保留相同的输入输出和失败行为，供设备实现做数值对照。GPU 资源所有者见 <a href="../_code/cuda/include/cpp_llm_engine/cuda/cuda_workspace.h"><code>CudaWorkspace</code></a> 和 <a href="../_code/cuda/include/cpp_llm_engine/cuda/cuda_execution_context.h"><code>CudaExecutionContext</code></a>。
+
 ## 动手验证
 
 ```bash

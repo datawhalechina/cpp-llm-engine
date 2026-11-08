@@ -5,13 +5,13 @@ import path from 'node:path'
 
 const formulaFile = 'source/reference/formulas.md'
 const glossaryFile = 'source/reference/glossary.md'
-const chapterAssetsFile = 'source/reference/chapter_assets.md'
+const tutorialAssetsFile = 'source/reference/tutorial_assets.md'
 const experimentAssetsFile = 'source/reference/experiment_assets.md'
 const sourceRoot = 'source'
 
 const formulaText = fs.readFileSync(formulaFile, 'utf8')
 const glossaryText = fs.readFileSync(glossaryFile, 'utf8')
-const chapterAssetsText = fs.readFileSync(chapterAssetsFile, 'utf8')
+const tutorialAssetsText = fs.readFileSync(tutorialAssetsFile, 'utf8')
 const experimentAssetsText = fs.readFileSync(experimentAssetsFile, 'utf8')
 const findings = []
 
@@ -112,28 +112,23 @@ const chapterSlugs = [
   'chapter10_serving',
 ]
 
-const restructuredChapterAssets = {
-  chapter06_generation: ['../chapter06_generation/next/intro.md', '/diagrams/chapter06-generation-core.svg'],
-  chapter07_kv_cache: ['../chapter07_kv_cache/next/intro.md', '/diagrams/chapter07-kv-cache.svg'],
-  chapter08_scheduling: ['../chapter08_scheduling/next/intro.md', '/diagrams/chapter08-scheduling.svg'],
-  chapter09_performance: ['../chapter09_performance/next/intro.md', '/diagrams/chapter09-performance.svg'],
-  chapter10_serving: ['../chapter10_serving/next/intro.md', '/diagrams/chapter10-serving.svg'],
+const restructuredChapterIntros = {
+  chapter06_generation: '../chapter06_generation/next/intro.md',
+  chapter07_kv_cache: '../chapter07_kv_cache/next/intro.md',
+  chapter08_scheduling: '../chapter08_scheduling/next/intro.md',
+  chapter09_performance: '../chapter09_performance/next/intro.md',
+  chapter10_serving: '../chapter10_serving/next/intro.md',
 }
 
 for (const slug of chapterSlugs) {
-  const chapterNumber = slug.slice(7, 9)
-  const [introAsset, diagramAsset] = restructuredChapterAssets[slug] ?? [
-    `../${slug}/intro.md`,
-    `/diagrams/chapter${chapterNumber}-main.svg`,
-  ]
+  const introAsset = restructuredChapterIntros[slug] ?? `../${slug}/intro.md`
   const requiredAssets = [
     introAsset,
     `/code/${slug}`,
-    diagramAsset,
   ]
   for (const asset of requiredAssets) {
-    if (!chapterAssetsText.includes(asset)) {
-      findings.push(`${chapterAssetsFile}: missing ${slug} asset ${asset}`)
+    if (!tutorialAssetsText.includes(asset)) {
+      findings.push(`${tutorialAssetsFile}: missing ${slug} asset ${asset}`)
     }
   }
 

@@ -30,4 +30,4 @@ bash scripts/check_foundation_answer.sh /tmp/fq12-answer/main.cpp
 
 ## 主线映射
 
-对应 [`推理引擎内存管理`](/reference/memory_management)、[`Foundation C++ 基础`](/foundation/01_cxx_basics) 和 [`Chapter06 Generation Core`](/chapter06_generation/next/intro)。
+对应 [`Chapter02 共享底层存储`](/chapter02_tensor_ops/01_shared_ptr_memory)、[`Chapter03 矩阵乘法请求`](/chapter03_matmul/02_matmul_design) 和 [`Foundation C++ 基础`](/foundation/01_cxx_basics)。
