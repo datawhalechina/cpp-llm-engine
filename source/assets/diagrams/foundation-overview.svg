@@ -66,7 +66,7 @@
 
     <rect x="584" y="450" width="230" height="104" rx="14" fill="#c7e5dd"/>
     <text x="606" y="483" font-size="16" font-weight="700" fill="#0f5f59">Chapter 04-06</text>
-    <text x="606" y="512" font-size="14" fill="#274c4a">Decoder · Runtime · 量化</text>
+    <text x="606" y="512" font-size="14" fill="#274c4a">Decoder · 量化 · Runtime</text>
     <text x="606" y="536" font-size="13" fill="#4f6d6a">完成模型执行</text>
 
     <rect x="853" y="450" width="281" height="104" rx="14" fill="#83c9b8"/>

@@ -16,7 +16,7 @@ CUDA 学习先解决“环境是否可用”和“CPU 结果如何作为基线�
 
 | 路径 | 负责什么 | 本教程入口 |
 | --- | --- | --- |
-| CPU | 正确性、调试、回归和基线性能 | 默认路径，贯穿 Chapter 01-05 |
+| CPU | 正确性、调试、回归和基线性能 | 默认路径，贯穿 Chapter 01-10 |
 | CUDA | device memory、kernel 和加速对照 | FQ10、Chapter 03 以后 |
 | 外部框架 | 展示成熟实现的选择 | llama.cpp、vLLM、TensorRT-LLM |
 
