@@ -7,12 +7,67 @@
 #include "chapter06_generation/runtime.h"
 #include "chapter06_generation/sampler.h"
 #include "chapter07_kv_cache/block_table.h"
+#include "chapter07_kv_cache/paged_kv_cache.h"
 #include "cpp_llm_engine/testing/test.h"
 #include "support/test_executors.h"
 
 #include <memory>
 #include <string>
 #include <vector>
+
+namespace {
+
+class PartialPagedWriteFailure final
+    : public chapter06_generation::ExecutorBatchRunner {
+public:
+    explicit PartialPagedWriteFailure(
+        chapter07_kv_cache::CpuPagedKvCache* cache)
+        : cache_(cache) {}
+
+    bool decode_batch(
+        const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>&,
+        const chapter06_generation::TokenSequence&,
+        const std::vector<std::size_t>& expected_positions,
+        const std::vector<std::size_t>& request_ids,
+        std::vector<chapter06_generation::Logits>*,
+        std::string* error) const override {
+        const float key[] = {1.0f, 0.0f};
+        const float value[] = {10.0f, 1.0f};
+        if (cache_ == nullptr || expected_positions.size() != 1 ||
+            request_ids.size() != 1 ||
+            !cache_->write_token(
+                request_ids.front(),
+                0,
+                expected_positions.front(),
+                key,
+                value,
+                2,
+                error)) {
+            return false;
+        }
+        if (error != nullptr) *error = "synthetic paged decode failure";
+        return false;
+    }
+
+private:
+    chapter07_kv_cache::CpuPagedKvCache* cache_;
+};
+
+void write_all_layers(
+    cpp_llm_engine::testing::TestSuite& suite,
+    chapter07_kv_cache::CpuPagedKvCache& cache,
+    std::size_t request_id,
+    std::size_t token) {
+    const float key[] = {1.0f, 0.0f};
+    const float value[] = {10.0f, 1.0f};
+    for (std::size_t layer = 0; layer < cache.layer_count(); ++layer) {
+        CPP_LLM_CHECK(
+            suite,
+            cache.write_token(request_id, layer, token, key, value, 2));
+    }
+}
+
+}  // namespace
 
 int main() {
     using namespace chapter06_generation;
@@ -94,6 +149,48 @@ int main() {
         CPP_LLM_REQUIRE(suite, input.tokens.size() == 1);
         CPP_LLM_CHECK(suite, input.tokens.front().request_id == 99);
         CPP_LLM_CHECK(suite, error == "decode batch has no reserved KV write slot");
+    });
+
+    suite.run("failed scheduler step clears partial paged payload", [&] {
+        GenerationConfig config;
+        config.max_new_tokens = 2;
+        config.max_context_tokens = 16;
+        Runtime runtime(config);
+        GreedySampler sampler;
+        Request request({1});
+        auto executor = std::make_shared<testing::FixedTokenExecutor>(6);
+        CPP_LLM_REQUIRE(
+            suite,
+            runtime.prefill_chunk(request, sampler, *executor, 1).generated_tokens == 1);
+
+        chapter07_kv_cache::CpuPagedKvCache cache(2, 2, 1, 1, 2);
+        CPP_LLM_REQUIRE(suite, cache.reserve(70, 1));
+        write_all_layers(suite, cache, 70, 0);
+        CPP_LLM_REQUIRE(suite, cache.commit_tokens(70, 1));
+        PartialPagedWriteFailure batch_runner(&cache);
+
+        const auto failed = ContinuousBatchScheduler{}.run_step(
+            runtime,
+            {{70, &request, &sampler, executor}},
+            1,
+            0,
+            {},
+            &cache,
+            0,
+            nullptr,
+            &batch_runner);
+        CPP_LLM_CHECK(suite, failed.generated_tokens == 0);
+        CPP_LLM_CHECK(suite, request.failed());
+        CPP_LLM_CHECK(suite, cache.token_count(70) == 1);
+        CPP_LLM_CHECK(suite, cache.block_count(70) == 1);
+
+        CPP_LLM_REQUIRE(suite, cache.reserve(71, 1));
+        const float key[] = {0.0f, 1.0f};
+        const float value[] = {2.0f, 20.0f};
+        CPP_LLM_REQUIRE(suite, cache.write_token(71, 1, 0, key, value, 2));
+        std::string error;
+        CPP_LLM_CHECK(suite, !cache.commit_tokens(71, 1, &error));
+        CPP_LLM_CHECK(suite, error.find("every layer") != std::string::npos);
     });
 
     return suite.finish();

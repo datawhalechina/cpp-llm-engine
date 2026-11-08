@@ -74,7 +74,7 @@ public:
         : request_id_(request_id), cache_(cache) {}
 
     std::size_t token_count() const override {
-        return cache_->block_pool().token_count(request_id_);
+        return cache_->token_count(request_id_);
     }
 
     bool reserve(std::size_t total_tokens, std::string* error) override {
@@ -239,11 +239,10 @@ bool RealLlamaExecutorFactory::configure_paged_kv_cache(
     return true;
 }
 
-std::shared_ptr<chapter07_kv_cache::KvBlockPool>
-RealLlamaExecutorFactory::paged_block_pool() const {
+std::shared_ptr<chapter07_kv_cache::KvCacheTransaction>
+RealLlamaExecutorFactory::paged_kv_resource() const {
     if (impl_->paged_cache == nullptr) return {};
-    return std::shared_ptr<chapter07_kv_cache::KvBlockPool>(
-        impl_->paged_cache, &impl_->paged_cache->block_pool());
+    return impl_->paged_cache;
 }
 
 bool RealLlamaExecutorFactory::bind_request(
@@ -285,7 +284,7 @@ bool RealLlamaExecutorFactory::decode_batch(
                 : dynamic_cast<RealLlamaRequestExecutor*>(
                     executors[index]->underlying_executor());
             if (real_executor == nullptr || !real_executor->context()->uses_external_kv() ||
-                impl_->paged_cache->block_pool().token_count(request_ids[index]) !=
+                impl_->paged_cache->token_count(request_ids[index]) !=
                     expected_positions[index]) {
                 if (error != nullptr) *error = "paged batch request is not bound or aligned";
                 return false;
@@ -344,7 +343,7 @@ bool RealLlamaExecutorFactory::sync_paged_kv(
         return false;
     }
     const std::size_t target_tokens = real_executor->context()->token_count();
-    const std::size_t committed_tokens = cache->block_pool().token_count(request_id);
+    const std::size_t committed_tokens = cache->token_count(request_id);
     if (committed_tokens > target_tokens) {
         if (error != nullptr) *error = "paged KV is ahead of real model context";
         return false;
@@ -405,7 +404,7 @@ bool RealLlamaExecutorFactory::decode_batch_paged(
     std::unordered_set<std::size_t> unique_request_ids;
     for (std::size_t index = 0; index < executors.size(); ++index) {
         if (!unique_request_ids.insert(request_ids[index]).second ||
-            cache->block_pool().token_count(request_ids[index]) != expected_positions[index]) {
+            cache->token_count(request_ids[index]) != expected_positions[index]) {
             if (error != nullptr) *error = "paged KV position does not match batch input";
             return false;
         }
@@ -418,7 +417,7 @@ bool RealLlamaExecutorFactory::decode_batch_paged(
             : dynamic_cast<RealLlamaRequestExecutor*>(
                 executors[index]->underlying_executor());
         if (real_executor == nullptr || !real_executor->context()->uses_external_kv() ||
-            cache->block_pool().token_count(request_ids[index]) !=
+            cache->token_count(request_ids[index]) !=
                 expected_positions[index] + 1) {
             if (error != nullptr) *error = "paged decode did not commit external KV";
             return false;

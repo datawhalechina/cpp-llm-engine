@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
         std::cerr << "paged KV setup failed: " << error << '\n';
         return 1;
     }
-    auto block_pool = factory->paged_block_pool();
+    auto block_pool = factory->paged_kv_resource();
     chapter10_serving::ServiceCore service(
         2, 2, {}, block_pool, {}, factory.get());
     const bool admitted_a = service.admit(
@@ -94,8 +94,8 @@ int main(int argc, char** argv) {
         request_b.generated() == expected_b && stats.model_batch_calls > 0 &&
         stats.tensor_batch_requests >= 2;
     const bool cache_isolated =
-        request_a.cache().size() == request_a.prompt_size() + expected_a.size() &&
-        request_b.cache().size() == request_b.prompt_size() + expected_b.size();
+        request_a.history().size() == request_a.prompt_size() + expected_a.size() &&
+        request_b.history().size() == request_b.prompt_size() + expected_b.size();
     const bool chunked_prefill_match =
         request_a.prompt_size() > 3 && request_a.prefill_offset() == request_a.prompt_size() &&
         request_b.prefill_offset() == request_b.prompt_size() && dispatch_steps > 1 &&
@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
 
     const std::size_t released = service.release_terminal();
     const bool resources_released =
-        released == 2 && request_a.cache().empty() && request_b.cache().empty() &&
+        released == 2 && request_a.history().empty() && request_b.history().empty() &&
         weak_a.expired() && weak_b.expired() && block_pool->free_blocks() == 8;
     const auto& metrics = service.metrics();
     const bool metrics_match =

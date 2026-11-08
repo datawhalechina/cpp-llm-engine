@@ -224,8 +224,8 @@ RunMeasurement run_once(
         2,
         2,
         {},
-        parallel_requests ? std::shared_ptr<chapter07_kv_cache::KvBlockPool>{}
-                          : factory.paged_block_pool(),
+        parallel_requests ? std::shared_ptr<chapter07_kv_cache::KvCacheTransaction>{}
+                          : factory.paged_kv_resource(),
         {},
         parallel_requests ? nullptr : &factory);
     const bool admitted_a = service.admit(
@@ -273,8 +273,8 @@ RunMeasurement run_once(
     const auto dispatch_end = Clock::now();
 
     const bool cache_isolated =
-        request_a.cache().size() == prompt_a.size() + expected_a.size() &&
-        request_b.cache().size() == prompt_b.size() + expected_b.size();
+        request_a.history().size() == prompt_a.size() + expected_a.size() &&
+        request_b.history().size() == prompt_b.size() + expected_b.size();
     std::array<std::size_t, 2> committed_tokens{};
     std::array<std::size_t, 2> kv_cache_bytes{};
     bool memory_observed = false;
@@ -326,7 +326,7 @@ RunMeasurement run_once(
         committed_tokens[1] == prompt_b.size() + max_new_tokens - 1 &&
         kv_cache_bytes[0] == committed_tokens[0] * kv_bytes_per_token &&
         kv_cache_bytes[1] == committed_tokens[1] * kv_bytes_per_token &&
-        released == 2 && request_a.cache().empty() && request_b.cache().empty() &&
+        released == 2 && request_a.history().empty() && request_b.history().empty() &&
         weak_a.expired() && weak_b.expired() && metrics.completed_total == 2 &&
         metrics.released_total == 2 && metrics.generated_tokens_total == 8 &&
         metrics.queue_wait_count == 2 && metrics.ttft_count == 2 &&

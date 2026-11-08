@@ -60,7 +60,6 @@ GenerationResult Engine::generate(std::string_view prompt) const {
 
     chapter06_generation::GenerationConfig config;
     config.max_new_tokens = config_.max_new_tokens;
-    config.use_kv_cache = true;
 
     chapter06_generation::Embedding embedding(config_.vocab_size);
     chapter06_generation::PositionEncoding position_encoding(config_.max_position);

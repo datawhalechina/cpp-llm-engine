@@ -52,7 +52,7 @@ public:
         const std::vector<ScheduledRequest>& requests,
         std::size_t max_batch_tokens,
         std::size_t max_requests = 0,
-        const chapter07_kv_cache::KvBlockPool* block_pool = nullptr,
+        const chapter07_kv_cache::KvCacheTransaction* block_pool = nullptr,
         std::size_t max_prefill_chunk_tokens = 0,
         const PriorityAgingPolicy* policy = nullptr);
 
@@ -61,7 +61,7 @@ public:
         const std::vector<ScheduledRequest>& requests,
         const PreparedStepBatch& prepared,
         const TokenStreamCallback& on_token = {},
-        chapter07_kv_cache::KvBlockPool* block_pool = nullptr,
+        chapter07_kv_cache::KvCacheTransaction* block_pool = nullptr,
         PriorityAgingPolicy* policy = nullptr) const;
 
 private:

@@ -52,7 +52,7 @@ int main() {
             {0, 0}, {1, 0}, {0, 1}, {1, 1},
         };
         CPP_LLM_CHECK(suite, streamed == expected);
-        CPP_LLM_CHECK(suite, cancelled.cache().empty());
+        CPP_LLM_CHECK(suite, cancelled.history().empty());
     });
 
     suite.run("round robin keeps request executors isolated", [&] {

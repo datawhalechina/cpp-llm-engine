@@ -27,7 +27,7 @@ ServiceCore::ServiceCore(
     std::size_t max_inflight,
     std::size_t max_running,
     ServiceNow now,
-    std::shared_ptr<chapter07_kv_cache::KvBlockPool> block_pool,
+    std::shared_ptr<chapter07_kv_cache::KvCacheTransaction> block_pool,
     chapter08_scheduling::PriorityAgingConfig priority_config,
     const chapter06_generation::ExecutorBatchRunner* batch_runner)
     : max_inflight_(max_inflight),
@@ -262,11 +262,12 @@ std::size_t ServiceCore::release_terminal() {
                 [this, &released](Entry& entry) {
                     if (entry.request == nullptr || !entry.request->terminal()) return false;
                     observe_completion(entry, now_());
-                    entry.request->cache().clear();
+                    entry.request->history().clear();
                     if (batch_runner_ != nullptr) {
                         batch_runner_->release_request(entry.request_id);
+                    } else if (block_pool_ != nullptr) {
+                        block_pool_->release(entry.request_id);
                     }
-                    if (block_pool_ != nullptr) block_pool_->release(entry.request_id);
                     priority_policy_.forget(entry.request_id);
                     account_terminal(*entry.request);
                     ++released;

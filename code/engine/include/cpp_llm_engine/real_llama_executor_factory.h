@@ -14,7 +14,7 @@
 
 namespace chapter07_kv_cache {
 class CpuPagedKvCache;
-class KvBlockPool;
+class KvCacheTransaction;
 }
 
 namespace cpp_llm_engine {
@@ -73,7 +73,7 @@ public:
         std::size_t total_blocks,
         std::size_t block_size,
         std::string* error = nullptr);
-    std::shared_ptr<chapter07_kv_cache::KvBlockPool> paged_block_pool() const;
+    std::shared_ptr<chapter07_kv_cache::KvCacheTransaction> paged_kv_resource() const;
     bool bind_request(
         const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
         std::size_t request_id,

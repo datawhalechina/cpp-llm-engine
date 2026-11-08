@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
         paged_kv_match = paged_kv_match && factory->sync_paged_kv(
             batched[index], request_ids[index], &paged_cache, &error);
         paged_kv_match = paged_kv_match &&
-            paged_cache.block_pool().token_count(request_ids[index]) ==
+            paged_cache.token_count(request_ids[index]) ==
                 initial_positions[index];
     }
     if (!paged_kv_match) {
@@ -121,8 +121,8 @@ int main(int argc, char** argv) {
     const bool rollback_preserved_state =
         batched[0]->execution_state().committed_tokens == initial_positions[0] &&
         batched[1]->execution_state().committed_tokens == initial_positions[1] &&
-        paged_cache.block_pool().token_count(request_ids[0]) == initial_positions[0] &&
-        paged_cache.block_pool().token_count(request_ids[1]) == initial_positions[1];
+        paged_cache.token_count(request_ids[0]) == initial_positions[0] &&
+        paged_cache.token_count(request_ids[1]) == initial_positions[1];
 
     chapter06_generation::GreedySampler sampler;
     std::vector<TokenSequence> sequential_tokens(2);
@@ -171,7 +171,7 @@ int main(int argc, char** argv) {
                 batched[index]->execution_state().committed_tokens ==
                     expected_positions[index] + 1;
             paged_kv_match = paged_kv_match &&
-                paged_cache.block_pool().token_count(request_ids[index]) ==
+                paged_cache.token_count(request_ids[index]) ==
                     expected_positions[index] + 1;
         }
     }

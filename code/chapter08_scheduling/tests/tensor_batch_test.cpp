@@ -53,7 +53,7 @@ int main() {
         const auto result = runtime.prefill_batch({&request, &request});
         CPP_LLM_CHECK(suite, result.model_calls == 0);
         CPP_LLM_CHECK(suite, !request.prefilled());
-        CPP_LLM_CHECK(suite, request.cache().empty());
+        CPP_LLM_CHECK(suite, request.history().empty());
     });
 
     suite.run("batch admission rejects only the overlong request", [&] {
@@ -72,7 +72,7 @@ int main() {
         CPP_LLM_CHECK(suite, result.prefilled_requests == 1);
         CPP_LLM_CHECK(suite, accepted.prefilled());
         CPP_LLM_CHECK(suite, rejected.phase() == RequestPhase::Rejected);
-        CPP_LLM_CHECK(suite, rejected.cache().empty());
+        CPP_LLM_CHECK(suite, rejected.history().empty());
     });
 
     return suite.finish();

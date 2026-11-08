@@ -11,7 +11,7 @@ namespace {
 
 SchedulingStateSnapshot capture(
     const ScheduledRequest& scheduled,
-    const chapter07_kv_cache::KvBlockPool* block_pool) {
+    const chapter07_kv_cache::KvCacheTransaction* block_pool) {
     SchedulingStateSnapshot snapshot;
     snapshot.request_id = scheduled.request_id;
     snapshot.request = scheduled.request;
@@ -35,7 +35,7 @@ SchedulingStateSnapshot capture(
 bool same_state(
     const SchedulingStateSnapshot& expected,
     const ScheduledRequest& scheduled,
-    const chapter07_kv_cache::KvBlockPool* block_pool) {
+    const chapter07_kv_cache::KvCacheTransaction* block_pool) {
     const SchedulingStateSnapshot actual = capture(scheduled, block_pool);
     return actual.request_id == expected.request_id &&
         actual.request == expected.request &&
@@ -59,7 +59,7 @@ PreparedStepBatch OverlapScheduler::prepare(
     const std::vector<ScheduledRequest>& requests,
     std::size_t max_batch_tokens,
     std::size_t max_requests,
-    const chapter07_kv_cache::KvBlockPool* block_pool,
+    const chapter07_kv_cache::KvCacheTransaction* block_pool,
     std::size_t max_prefill_chunk_tokens,
     const PriorityAgingPolicy* policy) {
     PreparedStepBatch prepared;
@@ -82,7 +82,7 @@ OverlapDispatchResult OverlapScheduler::dispatch(
     const std::vector<ScheduledRequest>& requests,
     const PreparedStepBatch& prepared,
     const TokenStreamCallback& on_token,
-    chapter07_kv_cache::KvBlockPool* block_pool,
+    chapter07_kv_cache::KvCacheTransaction* block_pool,
     PriorityAgingPolicy* policy) const {
     OverlapDispatchResult result;
     if (!enabled_) {

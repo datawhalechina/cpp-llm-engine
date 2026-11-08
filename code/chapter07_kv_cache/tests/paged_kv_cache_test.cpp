@@ -10,6 +10,8 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -85,6 +87,10 @@ void write_all_layers(
 int main() {
     TestSuite suite("chapter07_paged_kv_cache");
 
+    static_assert(std::is_same_v<
+        decltype(std::declval<CpuPagedKvCache&>().block_pool()),
+        const chapter07_kv_cache::KvBlockPool&>);
+
     suite.run("commit requires every layer", [&] {
         CpuPagedKvCache cache(2, 4, 2, 1, 2);
         CPP_LLM_CHECK(
@@ -120,11 +126,10 @@ int main() {
                 values.data() + token * 2);
         }
         CPP_LLM_CHECK(suite, cache.commit_tokens(request_id, 3));
-        CPP_LLM_CHECK(suite, cache.block_pool().block_count(request_id) == 2);
+        CPP_LLM_CHECK(suite, cache.block_count(request_id) == 2);
         CPP_LLM_CHECK(
             suite,
-            cache.block_pool().locate(request_id, 0).block !=
-                cache.block_pool().locate(request_id, 2).block);
+            cache.locate(request_id, 0).block != cache.locate(request_id, 2).block);
         CPP_LLM_CHECK(suite, cache.key_data(request_id, 0, 2, 0)[1] == 1.0f);
         CPP_LLM_CHECK(suite, cache.value_data(request_id, 1, 1, 0)[0] == 20.0f);
 
@@ -149,14 +154,44 @@ int main() {
         std::string error;
 
         CPP_LLM_CHECK(suite, !cache.commit_batch({{20, 1}, {21, 1}}, &error));
-        CPP_LLM_CHECK(suite, cache.block_pool().token_count(20) == 0);
-        CPP_LLM_CHECK(suite, cache.block_pool().token_count(21) == 0);
+        CPP_LLM_CHECK(suite, cache.token_count(20) == 0);
+        CPP_LLM_CHECK(suite, cache.token_count(21) == 0);
         CPP_LLM_CHECK(suite, error.find("every layer") != std::string::npos);
 
         CPP_LLM_CHECK(suite, cache.write_token(21, 1, 0, key, value, 2));
         CPP_LLM_CHECK(suite, cache.commit_batch({{20, 1}, {21, 1}}, &error));
-        CPP_LLM_CHECK(suite, cache.block_pool().token_count(20) == 1);
-        CPP_LLM_CHECK(suite, cache.block_pool().token_count(21) == 1);
+        CPP_LLM_CHECK(suite, cache.token_count(20) == 1);
+        CPP_LLM_CHECK(suite, cache.token_count(21) == 1);
+    });
+
+    suite.run("write rejects invalid shape address and layer", [&] {
+        CpuPagedKvCache cache(2, 2, 2, 1, 2);
+        const float key[] = {1.0f, 0.0f};
+        const float value[] = {10.0f, 1.0f};
+        std::string error;
+
+        CPP_LLM_CHECK(suite, !cache.write_token(40, 0, 0, key, value, 2, &error));
+        CPP_LLM_CHECK(suite, error.find("reserved") != std::string::npos);
+        CPP_LLM_CHECK(suite, cache.reserve(40, 1));
+        CPP_LLM_CHECK(suite, !cache.write_token(40, 2, 0, key, value, 2, &error));
+        CPP_LLM_CHECK(suite, error.find("layer") != std::string::npos);
+        CPP_LLM_CHECK(suite, !cache.write_token(40, 0, 0, nullptr, value, 2, &error));
+        CPP_LLM_CHECK(suite, error.find("null") != std::string::npos);
+        CPP_LLM_CHECK(suite, !cache.write_token(40, 0, 0, key, value, 1, &error));
+        CPP_LLM_CHECK(suite, error.find("width") != std::string::npos);
+    });
+
+    suite.run("batch commit rejects duplicate request without mutation", [&] {
+        CpuPagedKvCache cache(1, 2, 2, 1, 2);
+        const float key[] = {1.0f, 0.0f};
+        const float value[] = {10.0f, 1.0f};
+        std::string error;
+        CPP_LLM_CHECK(suite, cache.reserve(41, 1));
+        write_all_layers(suite, cache, 41, 0, key, value);
+
+        CPP_LLM_CHECK(suite, !cache.commit_batch({{41, 1}, {41, 1}}, &error));
+        CPP_LLM_CHECK(suite, error.find("duplicate") != std::string::npos);
+        CPP_LLM_CHECK(suite, cache.token_count(41) == 0);
     });
 
     suite.run("attention failure preserves caller output", [&] {
@@ -192,7 +227,7 @@ int main() {
         CPP_LLM_CHECK(suite, cache.reserve(9, 1));
         write_all_layers(suite, cache, 9, 0, old_key, old_value);
         CPP_LLM_CHECK(suite, cache.commit_tokens(9, 1));
-        const auto released = cache.block_pool().physical_blocks(9);
+        const auto released = cache.physical_blocks(9);
         CPP_LLM_CHECK(suite, cache.release(9));
         bool rejected = false;
         try {
@@ -207,7 +242,7 @@ int main() {
         CPP_LLM_CHECK(suite, cache.reserve(10, 1));
         CPP_LLM_REQUIRE(suite, !released.empty());
         CPP_LLM_CHECK(
-            suite, cache.block_pool().physical_blocks(10).front() == released.front());
+            suite, cache.physical_blocks(10).front() == released.front());
         write_all_layers(suite, cache, 10, 0, new_key, new_value);
         CPP_LLM_CHECK(suite, cache.commit_tokens(10, 1));
         std::vector<float> output;
@@ -215,6 +250,25 @@ int main() {
         CPP_LLM_REQUIRE(suite, output.size() == 2);
         CPP_LLM_CHECK(suite, near(output[0], 100.0f));
         CPP_LLM_CHECK(suite, near(output[1], 200.0f));
+    });
+
+    suite.run("trim clears released write markers before reuse", [&] {
+        CpuPagedKvCache cache(2, 2, 1, 1, 2);
+        const float key[] = {1.0f, 0.0f};
+        const float value[] = {10.0f, 1.0f};
+        CPP_LLM_CHECK(suite, cache.reserve(50, 2));
+        write_all_layers(suite, cache, 50, 0, key, value);
+        CPP_LLM_CHECK(suite, cache.commit_tokens(50, 1));
+        CPP_LLM_CHECK(suite, cache.write_token(50, 0, 1, key, value, 2));
+        CPP_LLM_CHECK(suite, cache.trim_to_tokens(50, 1));
+
+        CPP_LLM_CHECK(suite, cache.reserve(51, 1));
+        CPP_LLM_CHECK(suite, cache.write_token(51, 1, 0, key, value, 2));
+        std::string error;
+        CPP_LLM_CHECK(suite, !cache.commit_tokens(51, 1, &error));
+        CPP_LLM_CHECK(suite, error.find("every layer") != std::string::npos);
+        CPP_LLM_CHECK(suite, cache.write_token(51, 0, 0, key, value, 2));
+        CPP_LLM_CHECK(suite, cache.commit_tokens(51, 1));
     });
 
     return suite.finish();

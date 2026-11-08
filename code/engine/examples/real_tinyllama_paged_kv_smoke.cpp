@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
     const bool initial_sync = factory->sync_paged_kv(
         paged, kRequestId, &cache, &error);
     const bool initial_count_match =
-        cache.block_pool().token_count(kRequestId) == initial_position;
+        cache.token_count(kRequestId) == initial_position;
 
     chapter06_generation::GreedySampler sampler;
     const auto contiguous_token = sampler.sample(contiguous_logits);
@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
     const std::size_t committed_position = initial_position + 1;
     const bool commit_match = paged->execution_state().committed_tokens ==
             committed_position &&
-        cache.block_pool().token_count(kRequestId) == committed_position;
+        cache.token_count(kRequestId) == committed_position;
 
     std::vector<chapter06_generation::Logits> rejected_logits;
     const bool position_rejected = !factory->decode_batch_paged(
@@ -114,11 +114,11 @@ int main(int argc, char** argv) {
         &error);
     const bool rollback_match = paged->execution_state().committed_tokens ==
             committed_position &&
-        cache.block_pool().token_count(kRequestId) == committed_position;
+        cache.token_count(kRequestId) == committed_position;
 
     const bool released = cache.release(kRequestId);
-    const bool release_match = released && !cache.block_pool().contains(kRequestId) &&
-        cache.block_pool().free_blocks() == cache.total_blocks();
+    const bool release_match = released && !cache.contains(kRequestId) &&
+        cache.free_blocks() == cache.total_blocks();
     const bool passed = initial_sync && initial_count_match && prefill_match &&
         decode_match && commit_match && position_rejected &&
         invalid_token_rejected && rollback_match && release_match;

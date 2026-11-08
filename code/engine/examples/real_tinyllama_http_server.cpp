@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     chapter10_serving::ServiceCore service(
-        16, 16, {}, factory->paged_block_pool(), {}, factory.get());
+        16, 16, {}, factory->paged_kv_resource(), {}, factory.get());
     chapter10_serving::HttpAdapter adapter(
         service,
         runtime,

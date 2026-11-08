@@ -21,7 +21,7 @@ class Sampler;
 }  // namespace chapter06_generation
 
 namespace chapter07_kv_cache {
-class KvBlockPool;
+class KvCacheTransaction;
 }
 
 namespace chapter10_serving {
@@ -87,7 +87,7 @@ public:
         std::size_t max_inflight,
         std::size_t max_running,
         ServiceNow now = {},
-        std::shared_ptr<chapter07_kv_cache::KvBlockPool> block_pool = {},
+        std::shared_ptr<chapter07_kv_cache::KvCacheTransaction> block_pool = {},
         chapter08_scheduling::PriorityAgingConfig priority_config = {},
         const chapter06_generation::ExecutorBatchRunner* batch_runner = nullptr);
 
@@ -141,7 +141,7 @@ private:
     std::deque<Entry> waiting_;
     std::vector<Entry> running_;
     ServiceNow now_;
-    std::shared_ptr<chapter07_kv_cache::KvBlockPool> block_pool_;
+    std::shared_ptr<chapter07_kv_cache::KvCacheTransaction> block_pool_;
     chapter08_scheduling::PriorityAgingPolicy priority_policy_;
     const chapter06_generation::ExecutorBatchRunner* batch_runner_ = nullptr;
     std::size_t next_enqueue_sequence_ = 0;

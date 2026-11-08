@@ -61,7 +61,6 @@ bool RealLlamaEngine::generate(std::string_view prompt,
     chapter06_generation::GenerationConfig config;
     config.max_new_tokens = max_new_tokens;
     config.eos_token_id = impl_->executor_factory->eos_token_id();
-    config.use_kv_cache = true;
     chapter06_generation::Runtime runtime(config);
     chapter06_generation::GreedySampler sampler;
     chapter06_generation::Request request(prompt_tokens);

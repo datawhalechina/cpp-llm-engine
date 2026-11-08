@@ -12,7 +12,7 @@
 
 namespace chapter07_kv_cache {
 
-class CpuPagedKvCache final {
+class CpuPagedKvCache final : public KvCacheTransaction {
 public:
     CpuPagedKvCache(
         std::size_t layer_count,
@@ -22,15 +22,29 @@ public:
         std::size_t head_dim);
 
     std::size_t layer_count() const;
-    std::size_t total_blocks() const;
-    std::size_t block_size() const;
+    std::size_t total_blocks() const override;
+    std::size_t free_blocks() const override;
+    std::size_t used_blocks() const override;
+    std::size_t block_size() const override;
     std::size_t kv_heads() const;
     std::size_t head_dim() const;
     std::size_t payload_bytes() const;
 
-    KvBlockPool& block_pool();
     const KvBlockPool& block_pool() const;
-    bool reserve(std::size_t request_id, std::size_t total_tokens);
+    bool contains(std::size_t request_id) const override;
+    std::size_t block_count(std::size_t request_id) const override;
+    std::size_t token_count(std::size_t request_id) const override;
+    std::size_t capacity_tokens(std::size_t request_id) const override;
+    std::vector<std::size_t> physical_blocks(
+        std::size_t request_id) const override;
+    BlockLocation locate(
+        std::size_t request_id,
+        std::size_t token_index) const override;
+    BlockLocation locate_reserved(
+        std::size_t request_id,
+        std::size_t token_index) const override;
+
+    bool reserve(std::size_t request_id, std::size_t total_tokens) override;
     bool write_token(
         std::size_t request_id,
         std::size_t layer,
@@ -41,13 +55,18 @@ public:
         std::string* error = nullptr);
     bool commit_tokens(
         std::size_t request_id,
+        std::size_t total_tokens) override;
+    bool commit_tokens(
+        std::size_t request_id,
         std::size_t total_tokens,
-        std::string* error = nullptr);
+        std::string* error);
     bool commit_batch(
         const std::vector<std::pair<std::size_t, std::size_t>>& requests,
         std::string* error = nullptr);
-    bool trim_to_tokens(std::size_t request_id, std::size_t total_tokens);
-    bool release(std::size_t request_id);
+    bool trim_to_tokens(
+        std::size_t request_id,
+        std::size_t total_tokens) override;
+    bool release(std::size_t request_id) override;
 
     const float* key_data(
         std::size_t request_id,
@@ -93,6 +112,7 @@ private:
     std::size_t block_size_;
     std::size_t kv_heads_;
     std::size_t head_dim_;
+    std::size_t payload_bytes_ = 0;
     KvBlockPool block_pool_;
     std::vector<float> keys_;
     std::vector<float> values_;

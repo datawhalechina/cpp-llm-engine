@@ -194,7 +194,7 @@ StepBatchStats ContinuousBatchScheduler::run_step(
     std::size_t max_batch_tokens,
     std::size_t max_requests,
     const TokenStreamCallback& on_token,
-    chapter07_kv_cache::KvBlockPool* block_pool,
+    chapter07_kv_cache::KvCacheTransaction* block_pool,
     std::size_t max_prefill_chunk_tokens,
     PriorityAgingPolicy* policy,
     const chapter06_generation::ExecutorBatchRunner* batch_runner) const {
@@ -376,7 +376,7 @@ bool ExecutorBatchInput::valid() const {
 bool build_decode_executor_batch_input(
     const StepBatchPlan& plan,
     const std::vector<ScheduledRequest>& requests,
-    const chapter07_kv_cache::KvBlockPool& block_pool,
+    const chapter07_kv_cache::KvCacheTransaction& block_pool,
     ExecutorBatchInput* output,
     std::string* error) {
     if (output == nullptr) {
@@ -445,7 +445,7 @@ RequestExecutionState inspect_request_execution_state(
     std::size_t request_id,
     const chapter06_generation::Request& request,
     const chapter06_generation::RequestModelExecutor* executor,
-    const chapter07_kv_cache::KvBlockPool* block_pool) {
+    const chapter07_kv_cache::KvCacheTransaction* block_pool) {
     RequestExecutionState state;
     state.prefill_tokens = request.prefill_offset();
     state.generated_tokens = request.generated_size();
