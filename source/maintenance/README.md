@@ -7,15 +7,14 @@
 | 文件 | 负责的问题 |
 | --- | --- |
 | [tutorial_positioning.md](./tutorial_positioning.md) | 教程定位、范围、章节职责和结构调整条件 |
-| [tutorial_writing_guidelines.md](./tutorial_writing_guidelines.md) | 导读、正文、代码 README、语言和源码关联方式 |
-| [teaching_asset_guidelines.md](./teaching_asset_guidelines.md) | 算法镜像、成熟框架对照和图片的建设规则 |
+| [tutorial_writing_guidelines.md](./tutorial_writing_guidelines.md) | 导读、正文、代码 README、算法镜像、框架对照和图片规则 |
 | [code_quality_guidelines.md](./code_quality_guidelines.md) | C++/CUDA 质量要求、审核顺序、证据和问题等级 |
 
 阶段计划、迁移过程、单章审核、终端输出和当前优先级不进入本目录。此类内容保存在被 Git 忽略的交接文档或本地归档；其中形成跨章节稳定结论后，再提炼到上表对应文件。
 
 ## 使用顺序
 
-修改教程范围或章节分工时先看定位；修改学习者页面时看写作和教学资产规则；修改实现、测试或公共接口时看代码质量规则。`CONTRIBUTING.md` 只摘要贡献者必须执行的要求，不复制完整维护规则。
+修改教程范围或章节分工时先看定位；修改学习者页面或教学资产时看写作规则；修改实现、测试或公共接口时看代码质量规则。`CONTRIBUTING.md` 只摘要贡献者必须执行的要求，不复制完整维护规则。
 
 ## 维护门禁
 
