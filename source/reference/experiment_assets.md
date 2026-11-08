@@ -26,7 +26,7 @@ CPU 主线先用教学 Runtime 固定结果结构，再进入真实 TinyLlama �
 
 ## 多模态、CUDA 与正确性资产
 
-多模态 golden 固定模型、mmproj 和输入 hash，逐步验证 Block、Encoder、Projector、图文序列和完整 Decoder。性能实验另行登记；CUDA 的 event 计时目前随设备 CTest 输出，没有归档结果文件，因而只能支持本机运行时观察。
+多模态 golden 固定模型、mmproj 和输入 hash，逐步验证 Block、Encoder、Projector、图文序列和完整 Decoder。CUDA 同时保留 kernel profile 和端到端 A/B：前者定位热点，后者决定候选优化能否进入默认路径。
 
 | ID | 类型与对象 | 事实来源 | 复现入口 | 可支持的结论 |
 | --- | --- | --- | --- | --- |
@@ -40,6 +40,9 @@ CPU 主线先用教学 Runtime 固定结果结构，再进入真实 TinyLlama �
 | <a id="val-mm-08"></a>VAL-MM-08 | 动态 tiles 与服务 smoke | <a href="../_code/multimodal/results/smolvlm_dynamic_tiles_q8_0_golden.json"><code>dynamic-tiles golden</code></a> | <a href="../_code/multimodal/reference/verify_smolvlm_service_golden.py"><code>service verifier</code></a> | `2x3 + overview`、同步/SSE token 与资源释放 |
 | <a id="exp-mm-01"></a>EXP-MM-01 | 真实动态图片服务重复 benchmark | <a href="../_code/multimodal/results/smolvlm_service_cpu_benchmark.json"><code>service benchmark JSON</code></a> | <a href="../_code/multimodal/scripts/run_real_service_benchmark.sh"><code>run_real_service_benchmark.sh</code></a> | 两轮最小重复闭环；不外推长期稳态或其他机器 |
 | <a id="exp-gpu-01"></a>EXP-GPU-01 | CUDA Vector Add、cuBLAS MatMul、量化 Linear、RoPE 与 GQA device 计时 | 暂无版本化结果；输出来自设备 CTest | <a href="../_code/cuda/scripts/run.sh"><code>CUDA run.sh</code></a> | CPU/CUDA golden 与本机 kernel/event 时间，不构成发布基线 |
+| <a id="exp-gpu-02"></a>EXP-GPU-02 | 真实 TinyLlama CUDA 四词元生成的 kernel 与内存活动 | <a href="../_code/chapter09_performance/results/profile/cuda/rtx5070ti-laptop-cuda12.8/metadata.txt"><code>环境与 workload</code></a>、<a href="../_code/chapter09_performance/results/profile/cuda/rtx5070ti-laptop-cuda12.8/kernel_cuda_gpu_kern_sum.csv"><code>kernel CSV</code></a> | <a href="../_code/chapter09_performance/scripts/run_cuda_profile.sh"><code>run_cuda_profile.sh</code></a> | 固定 golden token；该 workload 支持先做 fused quantized GEMV，不外推长 Prefill |
+| <a id="exp-gpu-03"></a>EXP-GPU-03 | 融合 Q4_K/Q6_K GEMV 是否降低真实生成 kernel 时间 | <a href="../_code/chapter09_performance/results/profile/cuda/rtx5070ti-laptop-cuda12.8-fused-gemv/metadata.txt"><code>环境与 workload</code></a>、<a href="../_code/chapter09_performance/results/profile/cuda/rtx5070ti-laptop-cuda12.8-fused-gemv/kernel_cuda_gpu_kern_sum.csv"><code>kernel CSV</code></a> | <a href="../_code/chapter09_performance/scripts/run_cuda_profile.sh"><code>run_cuda_profile.sh</code></a> | 与 EXP-GPU-02 相同 workload；量化路径约从 274.6 ms 降至 134.1 ms，golden token 不变 |
+| <a id="exp-gpu-04"></a>EXP-GPU-04 | FA2-inspired 融合 Attention 能否替换真实 Runtime 的三阶段路径 | <a href="../_code/chapter09_performance/results/benchmark/cuda/rtx5070ti-laptop-cuda12.8-attention-ab/metadata.txt"><code>环境与决策</code></a>、<a href="../_code/chapter09_performance/results/benchmark/cuda/rtx5070ti-laptop-cuda12.8-attention-ab/run-1.txt"><code>run 1</code></a>、<a href="../_code/chapter09_performance/results/benchmark/cuda/rtx5070ti-laptop-cuda12.8-attention-ab/run-2.txt"><code>run 2</code></a> | <a href="../_code/chapter09_performance/scripts/run_cuda_attention_ab.sh"><code>run_cuda_attention_ab.sh</code></a> | 32-token Tensor Prefill 与一次 Decode 均通过正确性；两轮中位数方向相反，保留三阶段默认路径，融合实现只作教学与后续调优候选 |
 
 ## 登记与引用规则
 

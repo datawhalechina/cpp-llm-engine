@@ -1,0 +1,12 @@
+Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+66.7,188888048,1215,155463.4,88318.0,1728,1619681,208890.6,"cpp_llm_engine::cuda::<unnamed>::dequantize_q4k_kernel(const unsigned char *, float *, unsigned long)"
+19.1,54169088,999,54223.3,55711.0,8544,1389125,100253.0,"void gemv2T_kernel_val<int, int, float, float, float, float, (int)128, (int)16, (int)4, (int)4, (bool)0, (bool)0, cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<const float>, cublasGemvTensorStridedBatched<const float>, cublasGemvTensorStridedBatched<float>, float>>(T13, T6, T6)"
+11.1,31494950,189,166639.9,153821.0,6815,2381874,311258.0,"cpp_llm_engine::cuda::<unnamed>::dequantize_q6k_kernel(const unsigned char *, float *, unsigned long)"
+1.0,2700075,405,6666.9,6816.0,5248,7680,475.6,"cpp_llm_engine::cuda::<unnamed>::rms_norm_kernel(const float *, const float *, float *, unsigned long, float)"
+0.8,2128370,396,5374.7,5600.0,3744,6080,590.1,"std::enable_if<!T7, void>::type internal::gemvx::kernel<int, int, float, float, float, float, (bool)0, (bool)1, (bool)1, (bool)0, (int)9, (bool)0, cublasGemvParamsEx<int, cublasGemvTensorStridedBatched<const float>, cublasGemvTensorStridedBatched<const float>, cublasGemvTensorStridedBatched<float>, float>>(T13)"
+0.4,1242575,198,6275.6,6719.5,3296,7552,1105.3,"cpp_llm_engine::cuda::<unnamed>::gqa_score_kernel(const float *, const float *, float *, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, bool, float)"
+0.3,720335,396,1819.0,1888.0,1248,2080,203.8,"cpp_llm_engine::cuda::<unnamed>::rope_kernel(float *, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, float)"
+0.2,568530,396,1435.7,1328.0,768,3232,346.6,"cpp_llm_engine::cuda::<unnamed>::vector_add_kernel(const float *, const float *, float *, unsigned long)"
+0.2,437591,198,2210.1,2304.0,1152,2944,457.9,"cpp_llm_engine::cuda::<unnamed>::gqa_value_kernel(const float *, const float *, float *, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long)"
+0.1,416186,198,2101.9,2176.0,1184,3264,391.2,"cpp_llm_engine::cuda::<unnamed>::stable_softmax_kernel(float *, unsigned long, unsigned long)"
+0.1,407959,198,2060.4,2048.0,1600,2656,175.4,"cpp_llm_engine::cuda::<unnamed>::swiglu_kernel(const float *, const float *, float *, unsigned long)"

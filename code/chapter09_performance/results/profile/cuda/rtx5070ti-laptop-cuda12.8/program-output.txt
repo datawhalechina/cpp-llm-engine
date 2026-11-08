@@ -1,0 +1,11 @@
+prompt_tokens: 6
+generated_tokens: 29892 306 29915 29885
+generated_text: , I'm
+golden_tokens_match: true
+context_isolation_match: true
+cuda_text_generation: ready
+Collecting data...
+Generating '/tmp/nsys-report-46ad.qdstrm'
+[1/1] [0%                          ] tinyllama-generation.nsys-rep[1/1] [0%                          ] tinyllama-generation.nsys-rep[1/1] [==============62%           ] tinyllama-generation.nsys-rep[1/1] [=================72%        ] tinyllama-generation.nsys-rep[1/1] [===================82%      ] tinyllama-generation.nsys-rep[1/1] [========================100%] tinyllama-generation.nsys-rep[1/1] [========================100%] tinyllama-generation.nsys-rep
+Generated:
+    /tmp/cpp-llm-nsys-profile.5D6YIK/tinyllama-generation.nsys-rep

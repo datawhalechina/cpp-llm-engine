@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | A 测量 | 从正确性闸门进入固定工作负载，记录样本并聚合指标 | 可复现的测量记录 |
 | B 归因与决策 | 从阶段耗时进入热点分析，再做单变量 A/B | 可比较的实验记录与 KEEP/REJECT 结论 |
-| G GPU 坐标 | 沿用证据 schema，补充 CUDA 环境与 Nsight 附件 | 可回指 workload 的 GPU 测量；稳定基线待建设 |
+| G GPU 坐标 | 沿用证据身份，分别记录 Nsight 热点和真实端到端 A/B | 融合量化 GEMV profile、Attention Prefill/Decode 样本与默认路径决策 |
 | M 多模态坐标 | 固定图片、预处理和文本输入后复用服务指标 | 多模态 workload 定义；统一基线待建设 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
@@ -36,7 +36,8 @@
 | 2 | A | [`09.3 指标`](./03_metrics.md)、[`09.4 统计与记录`](./04_statistics_schema.md) | <a href="../../_code/chapter09_performance/src/statistics.cpp"><code>statistics.cpp</code></a> | 原始样本怎样变成可复查的聚合结果 |
 | 3 | B | [`09.5 工具顺序`](./05_profiling_tools.md)、[`09.6 热点归因`](./06_hotspot_attribution.md) | <a href="../../_code/engine/scripts/run_real_decoder_profile.sh"><code>run_real_decoder_profile.sh</code></a> | 应该先看总量、阶段、函数还是 Kernel |
 | 4 | B | [`09.7 单变量 A/B`](./07_ab_experiment.md)、[`09.8 决策与回归`](./08_decision_regression.md) | <a href="../../_code/chapter09_performance/src/comparison.cpp"><code>comparison.cpp</code></a> | 如何判断两次实验可比并形成保留或回退结论 |
-| 5 | 扩展 | [`09.9 框架对照`](./09_framework_comparison.md) | 生态卡 | 教学证据链与成熟框架工具链的对应关系 |
+| 5 | G | [`GPU 实验资产`](../../reference/experiment_assets.md#exp-gpu-02) | <a href="../../_code/chapter09_performance/scripts/run_cuda_profile.sh"><code>run_cuda_profile.sh</code></a>、<a href="../../_code/chapter09_performance/scripts/run_cuda_attention_ab.sh"><code>run_cuda_attention_ab.sh</code></a> | kernel profile 为什么不能替代真实 Prefill/Decode A/B 决策 |
+| 6 | 扩展 | [`09.9 框架对照`](./09_framework_comparison.md) | 生态卡 | 教学证据链与成熟框架工具链的对应关系 |
 
 ## 验证与下一步
 
@@ -46,5 +47,7 @@
 | L2 旧证据迁移 | `node code/chapter09_performance/scripts/import_legacy_evidence.mjs ...` | 保留逐轮样本的旧结果转换成功，聚合历史结果被拒绝 | 迁移期间必做 |
 | L3 真实模型 | `bash code/chapter09_performance/scripts/run_real_evidence.sh service` | TinyLlama 原始样本转换为统一 evidence，正确性闸门通过 | 有模型时必做 |
 | L4 服务 A/B | `bash code/chapter09_performance/scripts/run_real_evidence.sh ab` | 保留顺序与并行原始样本、统一 evidence，并输出 `real-service-ab-decision.json` | 进入 Chapter10 后完成 |
+| L5 CUDA 热点 | `bash code/chapter09_performance/scripts/run_cuda_profile.sh` | 固定模型、词元和设备信息，保存 kernel/memory CSV 与 golden token | 有 Nsight Systems 时选做 |
+| L6 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 两轮独立 Prefill/Decode 样本和正确性检查完整；不稳定收益不会进入默认路径 | 调优融合 Attention 时必做 |
 
 L1 构建证据记录、统计和比较器，并运行六项测试；它证明数据契约与决策逻辑可用，不代表当前机器上的性能数字可以直接推广到其他环境。

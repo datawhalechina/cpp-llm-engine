@@ -28,6 +28,8 @@ Chapter08 或 Chapter10 产生原始样本，迁移器把现有结果规范化�
 | `results/raw/`、`results/evidence/` | 保存真实原始样本和统一证据 | `chapter09_versioned_evidence_test` |
 | `results/profile/`、A/B decision | 保存带 workload 身份的阶段结果和独立决策记录 | `chapter09_versioned_evidence_test` |
 | `run_real_evidence.sh` | 生成服务实验、A/B 决策或 Profiling 附件 | `chapter09_real_evidence_bridge_test` |
+| `run_cuda_profile.sh` | 用 Nsight Systems 生成真实 CUDA 四词元生成的 kernel/memory 基线 | 固定 golden token、环境元数据与 CSV 附件 |
+| `run_cuda_attention_ab.sh` | 比较三阶段与融合在线 Attention 的真实 Tensor Prefill/Decode | 两轮独立运行、逐轮样本、logits 与 greedy token 闸门 |
 
 1. 阅读 `EvidenceRecord`，明确一份证据必须包含哪些环境、负载和正确性字段。
 2. 阅读 `summarize()`，理解统计值如何从逐轮样本得到，而不是从另一组聚合值推测。
@@ -67,6 +69,34 @@ bash code/chapter09_performance/scripts/run_real_evidence.sh service
 ```
 
 需要阶段 Profiling 或顺序/并行请求 A/B 时，将模式改为 `profile`、`ab` 或 `all`。`profile` 产生用于热点归因的文本附件，不参与 A/B 决策；`service` 和 `ab` 才生成统一证据。
+
+有 NVIDIA GPU、CUDA Toolkit、Nsight Systems 和本地 TinyLlama 时，可以生成不覆盖仓库结果的当前 CUDA kernel profile：
+
+```bash
+bash code/chapter09_performance/scripts/run_cuda_profile.sh
+```
+
+脚本固定 `Hello TinyLlama` 和四个 greedy token，保存环境、程序输出、kernel 汇总与设备内存活动 CSV。`.nsys-rep` 只在临时目录中生成并在结束后删除。该结果用于决定下一项融合优化，不替代端到端 A/B benchmark。
+
+仓库保留同一 RTX 5070 Ti Laptop / CUDA 12.8 workload 的优化前后结果。EXP-GPU-02 位于 `results/profile/cuda/rtx5070ti-laptop-cuda12.8/`：Q4_K/Q6_K 反量化合计占 kernel 时间 `77.8%`，三阶段 GQA 约占 `0.7%`。EXP-GPU-03 位于相邻的 `rtx5070ti-laptop-cuda12.8-fused-gemv/`：Q4_K/Q6_K 融合 kernel 合计约 `134.1 ms`，旧反量化加主要 cuBLAS GEMV 约 `274.6 ms`，下降约 `51%`，golden token 保持一致。
+
+脚本默认使用 EXP-GPU-03 和当前融合实现；需要显式指定输出身份时可运行：
+
+```bash
+CHAPTER09_CUDA_EXPERIMENT_ID=EXP-GPU-03 \
+CHAPTER09_CUDA_OPTIMIZATION=fused-q4k-q6k-gemv-v1 \
+bash code/chapter09_performance/scripts/run_cuda_profile.sh
+```
+
+融合量化 GEMV 仍占优化后 kernel 时间 `95%` 以上，说明下一轮应继续优化该 kernel 的内存访问与归约，而不是把百分比下降误解为量化执行已经完成。旧 EXP-GPU-02 对应融合前代码，只能从归档附件或历史提交复现。该结论只适用于固定的短提示词、四词元 Decode workload；长 Prefill 和长上下文需要单独测量。
+
+Attention 微基准只能说明 kernel 本身是否值得进入候选。要决定 Runtime 默认路径，还需运行真实端到端 A/B：
+
+```bash
+bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh
+```
+
+EXP-GPU-04 固定 32-token Tensor Prefill、一次 Decode、2 次预热、15 次测量和两轮独立运行。融合路径的 logits 与 greedy token 均通过，但两轮中位数的快慢方向相反：第一轮 Prefill/Decode 分别回退约 `9.8%/4.7%`，第二轮分别改善约 `8.0%/14.5%`。该证据不支持切换默认实现，因此三阶段路径继续作为 Runtime 默认值，融合路径保留用于教学、Profiling 和后续调优。
 
 ## 扩展入口
 

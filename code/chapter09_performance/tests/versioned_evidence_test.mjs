@@ -80,4 +80,120 @@ assert.equal(decision.workload_id, baseline.workload_id);
 assert.equal(decision.policy.primary_metric, "throughput");
 assert.equal(decision.decision, "KEEP");
 
+const cudaProfileDir = path.join(
+  resultsDir,
+  "profile",
+  "cuda",
+  "rtx5070ti-laptop-cuda12.8",
+);
+const cudaMetadata = fs.readFileSync(
+  path.join(cudaProfileDir, "metadata.txt"),
+  "utf8",
+);
+const cudaProgramOutput = fs.readFileSync(
+  path.join(cudaProfileDir, "program-output.txt"),
+  "utf8",
+);
+const cudaKernelCsv = fs.readFileSync(
+  path.join(cudaProfileDir, "kernel_cuda_gpu_kern_sum.csv"),
+  "utf8",
+);
+const cudaMemoryCsv = fs.readFileSync(
+  path.join(cudaProfileDir, "memory_cuda_gpu_mem_time_sum.csv"),
+  "utf8",
+);
+assert.match(cudaMetadata, /experiment_id=EXP-GPU-02/);
+assert.match(cudaMetadata, /workload_id=WL-GPU-TINYLLAMA-GENERATION-4TOK-V1/);
+assert.match(cudaMetadata, /correctness=PASS/);
+assert.match(cudaProgramOutput, /generated_tokens: 29892 306 29915 29885/);
+assert.match(cudaProgramOutput, /golden_tokens_match: true/);
+assert.match(cudaMemoryCsv, /CUDA memcpy Host-to-Device/);
+
+const kernelShare = (name) => {
+  const line = cudaKernelCsv.split("\n").find((row) => row.includes(name));
+  assert.ok(line, `missing CUDA kernel profile row: ${name}`);
+  return Number.parseFloat(line.slice(0, line.indexOf(",")));
+};
+const quantizedDequantizeShare =
+  kernelShare("dequantize_q4k_kernel") + kernelShare("dequantize_q6k_kernel");
+const attentionShare =
+  kernelShare("gqa_score_kernel") +
+  kernelShare("stable_softmax_kernel") +
+  kernelShare("gqa_value_kernel");
+assert.ok(quantizedDequantizeShare > 70);
+assert.ok(attentionShare < 5);
+
+const fusedProfileDir = path.join(
+  resultsDir,
+  "profile",
+  "cuda",
+  "rtx5070ti-laptop-cuda12.8-fused-gemv",
+);
+const fusedMetadata = fs.readFileSync(
+  path.join(fusedProfileDir, "metadata.txt"),
+  "utf8",
+);
+const fusedProgramOutput = fs.readFileSync(
+  path.join(fusedProfileDir, "program-output.txt"),
+  "utf8",
+);
+const fusedKernelCsv = fs.readFileSync(
+  path.join(fusedProfileDir, "kernel_cuda_gpu_kern_sum.csv"),
+  "utf8",
+);
+assert.match(fusedMetadata, /experiment_id=EXP-GPU-03/);
+assert.match(fusedMetadata, /workload_id=WL-GPU-TINYLLAMA-GENERATION-4TOK-V1/);
+assert.match(fusedMetadata, /optimization=fused-q4k-q6k-gemv-v1/);
+assert.match(fusedMetadata, /correctness=PASS/);
+assert.match(fusedProgramOutput, /generated_tokens: 29892 306 29915 29885/);
+assert.match(fusedProgramOutput, /golden_tokens_match: true/);
+
+const kernelTime = (csv, name) => {
+  const line = csv.split("\n").find((row) => row.includes(name));
+  assert.ok(line, `missing CUDA kernel timing row: ${name}`);
+  return Number.parseInt(line.split(",")[1], 10);
+};
+const baselineQuantizedNs =
+  kernelTime(cudaKernelCsv, "dequantize_q4k_kernel") +
+  kernelTime(cudaKernelCsv, "dequantize_q6k_kernel") +
+  kernelTime(cudaKernelCsv, "gemv2T_kernel_val");
+const fusedQuantizedNs =
+  kernelTime(fusedKernelCsv, "quantized_gemv_kernel<(bool)1>") +
+  kernelTime(fusedKernelCsv, "quantized_gemv_kernel<(bool)0>");
+assert.ok(fusedQuantizedNs < baselineQuantizedNs * 0.6);
+
+const attentionAbDir = path.join(
+  resultsDir,
+  "benchmark",
+  "cuda",
+  "rtx5070ti-laptop-cuda12.8-attention-ab",
+);
+const attentionMetadata = fs.readFileSync(
+  path.join(attentionAbDir, "metadata.txt"),
+  "utf8",
+);
+assert.match(attentionMetadata, /experiment_id=EXP-GPU-04/);
+assert.match(attentionMetadata, /workload_id=WL-GPU-TINYLLAMA-ATTENTION-AB-V1/);
+assert.match(attentionMetadata, /correctness=PASS/);
+assert.match(attentionMetadata, /decision=KEEP_THREE_STAGE_DEFAULT/);
+for (const run of ["run-1.txt", "run-2.txt"]) {
+  const output = fs.readFileSync(path.join(attentionAbDir, run), "utf8");
+  assert.match(output, /prompt_tokens: 32/);
+  assert.match(output, /warmup: 2/);
+  assert.match(output, /iterations: 15/);
+  assert.match(output, /statistic: median/);
+  assert.match(output, /prefill_max_error: 1\.57356e-05/);
+  assert.match(output, /decode_max_error: 8\.9407e-06/);
+  for (const prefix of [
+    "three_stage_prefill_samples_ms",
+    "fused_online_prefill_samples_ms",
+    "three_stage_decode_samples_ms",
+    "fused_online_decode_samples_ms",
+  ]) {
+    const line = output.split("\n").find((candidate) => candidate.startsWith(prefix));
+    assert.ok(line, `${run}: missing ${prefix}`);
+    assert.equal(line.slice(line.indexOf(":") + 1).trim().split(/\s+/).length, 15);
+  }
+}
+
 process.stdout.write("versioned performance evidence tests passed\n");
