@@ -1,5 +1,6 @@
 // Chapter 05：声明量化教学示例使用的最小二维 Tensor。
-// 边界：只覆盖 F32 与 INT8，不替代 code/core 的跨章 TensorContract。
+// 类型覆盖 F32 与 INT8，用于观察缩放因子和反量化结果。
+// 验证入口：chapter05_quantization_test。
 #pragma once
 
 #include <cstddef>

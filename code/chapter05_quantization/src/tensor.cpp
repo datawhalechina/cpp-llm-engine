@@ -1,10 +1,25 @@
 // Chapter 05：实现量化教学 Tensor 的存储、形状与 dtype 访问。
-// 边界：对象只服务本章 INT8/F32 示例和单元测试。
+// 工厂函数先验证尺寸和量化参数，再创建可用对象。
+// 验证入口：chapter05_quantization_test。
 #include "chapter05_quantization/tensor.h"
 
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace chapter05_quantization {
+namespace {
+
+bool checked_element_count(std::size_t rows, std::size_t cols, std::size_t* count) {
+    if (count == nullptr || rows == 0 || cols == 0 ||
+        rows > std::numeric_limits<std::size_t>::max() / cols) {
+        return false;
+    }
+    *count = rows * cols;
+    return true;
+}
+
+}  // namespace
 
 Tensor::Tensor() = default;
 
@@ -22,27 +37,32 @@ Tensor::Tensor(std::size_t rows,
       int8_storage_(std::move(int8_storage)) {}
 
 Tensor Tensor::from_float(std::size_t rows, std::size_t cols, const std::vector<float>& values) {
-    if (values.size() != rows * cols) {
+    std::size_t element_count = 0;
+    if (!checked_element_count(rows, cols, &element_count) || values.size() != element_count) {
         return {};
     }
     return Tensor(rows, cols, DType::Float32, 1.0f, std::make_shared<std::vector<float>>(values), {});
 }
 
 Tensor Tensor::from_int8(std::size_t rows, std::size_t cols, const std::vector<std::int8_t>& values, float scale) {
-    if (values.size() != rows * cols || scale <= 0.0f) {
+    std::size_t element_count = 0;
+    if (!checked_element_count(rows, cols, &element_count) || values.size() != element_count ||
+        !std::isfinite(scale) || scale <= 0.0f) {
         return {};
     }
     return Tensor(rows, cols, DType::Int8, scale, {}, std::make_shared<std::vector<std::int8_t>>(values));
 }
 
 bool Tensor::ready() const {
-    if (rows_ == 0 || cols_ == 0) {
+    std::size_t element_count = 0;
+    if (!checked_element_count(rows_, cols_, &element_count)) {
         return false;
     }
     if (dtype_ == DType::Float32) {
-        return float_storage_ && float_storage_->size() == rows_ * cols_;
+        return float_storage_ && float_storage_->size() == element_count;
     }
-    return int8_storage_ && int8_storage_->size() == rows_ * cols_ && scale_ > 0.0f;
+    return int8_storage_ && int8_storage_->size() == element_count &&
+           std::isfinite(scale_) && scale_ > 0.0f;
 }
 
 bool Tensor::same_shape(const Tensor& other) const {
@@ -100,7 +120,7 @@ Tensor Tensor::dequantize() const {
     }
 
     std::vector<float> values;
-    values.reserve(rows_ * cols_);
+    values.reserve(float_storage_ ? float_storage_->size() : int8_storage_->size());
     for (std::size_t row = 0; row < rows_; ++row) {
         for (std::size_t col = 0; col < cols_; ++col) {
             values.push_back(at(row, col));
