@@ -345,6 +345,15 @@ int main() {
         CPP_LLM_CHECK(suite, backend.last_query_position_offset == 0);
 
         chapter02_tensor_ops::Tensor decode_input(1, 2, 2.0F);
+        chapter02_tensor_ops::Tensor wrong_offset_output(1, 2, -5.0F);
+        status = attention.try_forward_with_cache(
+            decode_input.view_ref(), 1, &cache,
+            wrong_offset_output.mutable_view_ref());
+        CPP_LLM_CHECK(suite, !status.is_ok());
+        CPP_LLM_CHECK(suite, cache.size() == 2);
+        CPP_LLM_CHECK(suite, backend.call_count == 1);
+        CPP_LLM_CHECK(suite, wrong_offset_output.at(0, 0) == -5.0F);
+
         chapter02_tensor_ops::Tensor decode_output(1, 2, -2.0F);
         status = attention.try_forward_with_cache(
             decode_input.view_ref(), 2, &cache,

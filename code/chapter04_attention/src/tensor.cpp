@@ -5,12 +5,19 @@
 #include "chapter04_attention/tensor.h"
 
 #include <algorithm>
+#include <limits>
 #include <stdexcept>
 
 namespace chapter04_attention {
 
-Tensor::Tensor(std::size_t r, std::size_t c, float value)
-    : rows(r), cols(c), data(r * c, value) {}
+Tensor::Tensor(std::size_t r, std::size_t c, float value) {
+    if (r == 0 || c == 0 || r > std::numeric_limits<std::size_t>::max() / c) {
+        return;
+    }
+    rows = r;
+    cols = c;
+    data.assign(rows * cols, value);
+}
 
 float& Tensor::at(std::size_t row, std::size_t col) {
     if (row >= rows || col >= cols) {
@@ -27,17 +34,23 @@ float Tensor::at(std::size_t row, std::size_t col) const {
 }
 
 bool Tensor::ready() const {
-    return rows > 0 && cols > 0 && data.size() == rows * cols;
+    return rows > 0 && cols > 0 &&
+           rows <= std::numeric_limits<std::size_t>::max() / cols &&
+           data.size() == rows * cols;
 }
 
 cpp_llm_engine::core::TensorContract Tensor::contract() const {
+    const std::size_t storage_bytes =
+        data.size() <= std::numeric_limits<std::size_t>::max() / sizeof(float)
+            ? data.size() * sizeof(float)
+            : 0;
     return cpp_llm_engine::core::TensorContract{
         cpp_llm_engine::core::Shape{{rows, cols}},
         {cols, 1},
         cpp_llm_engine::core::DType::Float32,
         cpp_llm_engine::core::DeviceKind::CPU,
         0,
-        data.size() * sizeof(float),
+        storage_bytes,
     };
 }
 
@@ -172,7 +185,8 @@ Tensor concatenate_columns(const std::vector<Tensor>& parts) {
     const std::size_t rows = parts.front().rows;
     std::size_t cols = 0;
     for (const auto& part : parts) {
-        if (!part.ready() || part.rows != rows) {
+        if (!part.ready() || part.rows != rows ||
+            part.cols > std::numeric_limits<std::size_t>::max() - cols) {
             return {};
         }
         cols += part.cols;

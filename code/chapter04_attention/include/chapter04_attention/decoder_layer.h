@@ -1,6 +1,6 @@
 // Chapter 04：DecoderLayer 接口
-// 职责：按 Pre-LN -> Attention -> Residual -> FFN -> Residual 组合单层结构。
-// 契约：输入输出保持 [tokens, model_dim]，layer_index 只标识层位置。
+// 按 Pre-LN -> Attention -> Residual -> FFN -> Residual 组合单层结构。
+// prefill/decode 使用调用方持有的 Context，成功后才提交输出和连续 K/V。
 // 验证：chapter04_attention_test.cpp 和 main_attention.cpp。
 #pragma once
 
@@ -36,7 +36,7 @@ public:
     cpp_llm_engine::core::DecoderLayerContract contract() const;
 
 private:
-    cpp_llm_engine::core::Status try_forward_with_context(
+    cpp_llm_engine::core::Status try_forward_impl(
         const cpp_llm_engine::core::TensorViewRef& input,
         DecoderLayerContext* context,
         bool start_new_sequence,

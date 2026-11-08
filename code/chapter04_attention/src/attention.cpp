@@ -125,9 +125,9 @@ cpp_llm_engine::core::Status MultiHeadAttention::try_forward_with_cache(
     if (!status.is_ok()) return status;
 
     KvCache candidate = *cache;
-    if (!candidate.append(k.data.data(), v.data.data(), tokens)) {
-        return Status::error("attention KV cache capacity exceeded");
-    }
+    const auto append_status = candidate.try_append(
+        k.data.data(), k.data.size(), v.data.data(), v.data.size(), tokens);
+    if (!append_status.is_ok()) return append_status;
 
     Tensor combined(tokens, model_dim_);
     const cpp_llm_engine::core::AttentionRequest request{

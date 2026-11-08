@@ -1,6 +1,6 @@
 // Chapter 04：固定容量 KV Cache 实现
 // 职责：分配连续 K/V storage，追加 token 并提供只读数据指针。
-// 契约：容量、head 数和 head_dim 溢出时对象无效，append 拒绝超容量写入。
+// 容量、head 数和 head_dim 溢出时对象无效，追加失败不改变已有内容。
 // 验证：chapter04_attention_test.cpp。
 #include "chapter04_attention/kv_cache.h"
 
@@ -29,18 +29,34 @@ bool KvCache::ready() const {
            key_.size() == capacity_ * heads_ * head_dim_;
 }
 
-bool KvCache::append(const float* key, const float* value, std::size_t token_count) {
-    if (!ready() || key == nullptr || value == nullptr || token_count == 0 ||
-        token_count > capacity_ - size_) {
-        return false;
+cpp_llm_engine::core::Status KvCache::try_append(
+    const float* key,
+    std::size_t key_element_count,
+    const float* value,
+    std::size_t value_element_count,
+    std::size_t token_count) {
+    using cpp_llm_engine::core::Status;
+
+    if (!ready()) return Status::error("KV cache is not ready");
+    if (key == nullptr || value == nullptr) {
+        return Status::error("KV cache input must not be null");
+    }
+    if (token_count == 0) {
+        return Status::error("KV cache token count must be positive");
+    }
+    if (token_count > capacity_ - size_) {
+        return Status::error("KV cache capacity exceeded");
     }
     const std::size_t width = heads_ * head_dim_;
     const std::size_t source_count = token_count * width;
+    if (key_element_count < source_count || value_element_count < source_count) {
+        return Status::error("KV cache input buffer is too small");
+    }
     const std::size_t destination_offset = size_ * width;
     std::copy_n(key, source_count, key_.begin() + destination_offset);
     std::copy_n(value, source_count, value_.begin() + destination_offset);
     size_ += token_count;
-    return true;
+    return Status::ok();
 }
 
 void KvCache::clear() {

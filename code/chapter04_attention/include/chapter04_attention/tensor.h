@@ -1,6 +1,6 @@
 // Chapter 04：Decoder 教学 Tensor 接口
 // 职责：提供 row-major Tensor、矩阵操作、列切片和拼接辅助函数。
-// 契约：算子失败返回空 Tensor，at() 对 shape 越界抛出异常。
+// 尺寸乘加在分配前检查溢出；算子失败返回空 Tensor，at() 越界抛异常。
 // 验证：chapter04_attention_test.cpp。
 #pragma once
 
