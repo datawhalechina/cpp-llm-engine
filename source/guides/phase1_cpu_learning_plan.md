@@ -146,4 +146,4 @@
 | CUDA 小题 | FQ10 的 CPU reference 与 CUDA 结果在允许误差内一致 |
 | 外部基线 | llama.cpp CUDA 路径加载同一 GGUF 并生成文本 |
 | 自研 backend | Vector Add、cuBLAS MatMul、量化 Linear、RoPE、连续 device KV 与 GQA 通过真实 GPU 测试 |
-| 下一里程碑 | 将现有 backend 组装为真实单层和完整 GPU Decoder |
+| 下一里程碑 | 在已验证的真实单层基础上组装多层 GPU Model/Context 与 Generation Runtime |

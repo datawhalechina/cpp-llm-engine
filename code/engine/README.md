@@ -29,7 +29,13 @@ ctest --test-dir code/engine/build --output-on-failure
 
 默认构建使用 toy config、toy tokenizer 和教学 decoder，适合快速回归接口与状态机。可选真实路径读取 TinyLlama GGUF，执行真实 tokenizer、22 层 CPU Decoder、greedy sampling 和 detokenize；真实服务 smoke 使用 3-token step budget 验证 append-prefill、双请求隔离和 Block KV 回收，但不代表生产并发性能。
 
-启用 `CPP_LLM_ENGINE_ENABLE_CUDA=ON` 后，Engine 还会构建 `CudaLlamaLayerWeights`。该对象把 Chapter01 的单层 host 权重转换为 Decoder 使用的 GPU 只读权重视图；当前验证止于上传契约，尚未把真实 TinyLlama 首层接入 CUDA Decoder forward。
+启用 CUDA 后，Engine 会用 `CudaLlamaLayerWeights` 把 Chapter01 的单层 host 权重转换为 Decoder 使用的 GPU 只读权重视图。默认模型和 CUDA Toolkit 位于教程推荐路径时，只需运行：
+
+```bash
+bash code/engine/scripts/run_real_cuda_first_layer.sh
+```
+
+模型或 Toolkit 位于其他位置时，通过 `CPP_LLM_ENGINE_MODEL_PATH` 和 `CUDA_HOME` 覆盖；需要保留构建目录排查问题时设置 `CUDA_REAL_LAYER_BUILD_DIR`。该入口需要真实 NVIDIA 设备，当前只执行单 token、单层；22 层 CUDA Model/Context 和 Generation Runtime 尚未接入。
 
 `EmbeddingRequestExecutor` 接收 Core `DecoderEmbeddingSequence` 和每请求 `DecoderExecutionContext`，把预计算 embedding 适配为 Chapter06 `RequestModelExecutor`。Request 中的 prompt position 只承担序列长度和调度计数，真实 hidden values 由 Context 消费；prefill 成功后适配器立即释放 embedding storage，decode 继续使用同一 Context 和既有 KV 生命周期。默认测试用合成 Context 验证 Runtime 生成、长度校验、错误传播与释放，不要求多模态模型文件。
 

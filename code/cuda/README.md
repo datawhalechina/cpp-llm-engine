@@ -119,7 +119,7 @@ Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续�
 
 `code/engine` 中的 `CudaLlamaLayerWeights` 接收 Chapter01 读取的单层权重，把两个 Float32 norm 和七个 Q4_K/Q6_K Linear 上传到显存。对象拥有上传后的 device storage；Chapter01 的 host Tensor 可以在同步完成后释放。上传先写入临时对象，九个权重全部成功后才替换原对象，因此格式错误不会破坏已有 GPU 权重。
 
-`cuda_llama_layer_weights_test` 检查九个权重的输入/输出方向、packed payload 字节数、norm 内容、移动语义、host 生命周期和失败原子性。该适配器完成了真实首层的权重准备；真实 TinyLlama hidden 输入、首层 CUDA forward 和 CPU 数值对照仍是下一步。
+`cuda_llama_layer_weights_test` 检查九个权重的输入/输出方向、packed payload 字节数、norm 内容、移动语义、host 生命周期和失败原子性。`real_tinyllama_cuda_first_layer_test` 继续读取真实 token embedding，在 CUDA 上执行 layer-0，并把最终 hidden 与连续 K/V 同 Chapter05 CPU fused 参考比较。当前证据覆盖真实单层，不代表 22 层 Decoder 或端到端 GPU 生成已经完成。
 
 ## 运行与验证
 
@@ -127,6 +127,12 @@ Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续�
 
 ```bash
 bash code/cuda/scripts/run.sh
+```
+
+继续验证真实 TinyLlama layer-0：
+
+```bash
+bash code/engine/scripts/run_real_cuda_first_layer.sh
 ```
 
 运行环境必须能访问 `/dev/nvidia*`。受控沙箱隐藏设备节点时，需要在宿主环境执行；编译通过不能代替真实 CTest。

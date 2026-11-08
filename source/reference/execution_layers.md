@@ -93,7 +93,7 @@ runtime 关心的是系统，不只是单次执行。
 | 观察线 | 起点 | 中段 | 终点 | 当前实现深度 |
 | --- | --- | --- | --- | --- |
 | 数据层 | Chapter01 加载配置、Tokenizer 与权重 | Chapter02 管理 Storage/View；Chapter04 追踪 Q/K/V 与 hidden state | Chapter06 管理 token history 与 Context；Chapter07 管理分页 payload 和 BlockTable | CPU 分页参考和真实 TinyLlama 分页路径已验证 |
-| 算子层 | Chapter03 定义 Operator/Backend | Chapter04 组合 Attention、FFN 与 Decoder；Chapter05 执行量化 Linear | CUDA 使用相同语义替换设备后端，Chapter09 根据 Profile 选择优化点 | CPU 真实 Decoder 完成；GPU 仍是可选算子与合成 Decoder |
+| 算子层 | Chapter03 定义 Operator/Backend | Chapter04 组合 Attention、FFN 与 Decoder；Chapter05 执行量化 Linear | CUDA 使用相同语义替换设备后端，Chapter09 根据 Profile 选择优化点 | CPU 真实 Decoder 完成；GPU 已验证真实 layer-0，多层执行待接入 |
 | 系统层 | Chapter00 建立真实外部基线 | Chapter06-08 组织 Request、K/V 资源、Scheduler 和批处理 | Chapter09 固定 workload 并定位瓶颈；Chapter10 接入 ServiceCore、HTTP/SSE | CPU 服务闭环完成；生产级抢占和分布式只作参照 |
 
 一次功能升级也应同时检查三条线。例如实现 Paged KV 时，数据层定义 block layout 与 ownership，算子层让 Attention 按页表读写，系统层负责容量预算、回滚和终态回收。只完成其中一条，不能宣称完整的生产级能力。

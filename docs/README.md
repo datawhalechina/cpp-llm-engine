@@ -57,4 +57,4 @@ bash code/chapter01_tensor_loader/run.sh
 | --- | --- | --- |
 | CPU 主线 | 已闭环 | TinyLlama 22 层 Decoder、Generation Runtime 和 HTTP/SSE 服务 |
 | 多模态输入 | 已闭环 | SmolVLM Vision、Projector、Decoder 和 ServiceCore |
-| CUDA 后端 | 建设中 | CUDA 资源、量化 Linear、RoPE、KV、GQA 和合成 Decoder |
+| CUDA 后端 | 建设中 | CUDA 资源、量化 Linear、RoPE、KV、GQA，以及真实 TinyLlama layer-0 对照 |
