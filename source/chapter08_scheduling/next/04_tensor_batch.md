@@ -1,35 +1,35 @@
-# 08.4 把调度计划交给真实 Decode Batch
+# 08.4 把调度计划交给真实解码批次
 
-Step batch 回答本步选择谁，Executor batch 补齐 token、position 和 K/V 写入位置，Tensor batch 再把多行激活交给共享模型算子。循环调用多个单请求 Executor 不属于真正的模型批量计算。
+步骤批次（Step batch）回答本步选择哪些请求，执行器批次（Executor batch）补齐词元、位置和 K/V 写入位置，张量批次（Tensor batch）再把多行激活交给共享模型算子。真正的模型批量计算会在一次共享算子调用中处理多行激活；循环调用单请求执行器仍是顺序执行。
 
 ## 三层批次分别保存什么
 
 | 层级 | 主要数据 | 产物 |
 | --- | --- | --- |
-| Step batch | request ID、阶段、token count、预算 | 候选请求列表 |
-| Executor batch | token、position、K/V 写入槽 | 可校验的模型输入行 |
-| Tensor batch | 多行激活、行边界或 batch 维度 | 一次算子或 Decoder 调用的多行输出 |
+| 步骤批次（Step batch） | 请求 ID、阶段、词元数、预算 | 候选请求列表 |
+| 执行器批次（Executor batch） | 词元、位置、K/V 写入槽 | 可校验的模型输入行 |
+| 张量批次（Tensor batch） | 多行激活、行边界或批次维度 | 一次算子或解码器调用的多行输出 |
 
 ## 变长请求不要求先补齐
 
-当前教学 Tensor batch 保存每行边界，真实 Decode batch 则为每个请求携带独立 position 和 BlockTable，因此不同历史长度可以进入同一步，不需要用 PAD 词元补成矩形序列。Padding 是某些稠密批量实现的布局选择，不应改变有效词元、位置或 K/V 长度。输入超过 `max_context_tokens` 时由 Chapter06 在执行前拒绝；当前主线不静默截断 prompt，避免基线输入在调用方不知情时改变。
+当前教学张量批次保存每行边界，真实解码批次则为每个请求携带独立位置和块表（BlockTable），因此不同历史长度可以进入同一步。某些稠密批量实现会用填充词元（PAD）补成矩形序列；填充只改变布局，有效词元、位置和 K/V 长度保持不变。输入超过 `max_context_tokens` 时，Chapter06 会在执行前报告错误，确保提示词不会被静默截断。
 
 ## 当前真实 Decode 合并了哪些计算
 
-`RealLlamaCpuModel::decode_batch()` 让多个请求共享只读 TinyLlama 权重，每个请求保留独立 Context。Decode 阶段的 Q/K/V、输出投影、FFN 和 LM Head 使用多行 Linear；不同历史长度的 Attention 仍按请求 ID 和 BlockTable 分别读取分页 K/V。真实多请求 Prefill 目前逐请求执行，不属于该批量路径。
+`RealLlamaCpuModel::decode_batch()` 让多个请求共享只读 TinyLlama 权重，每个请求保留独立上下文（Context）。解码阶段的 Q/K/V、输出投影、FFN 和语言模型头（LM Head）使用多行线性计算；不同历史长度的注意力仍按请求 ID 和块表分别读取分页 K/V。当前真实多请求预填充（Prefill）逐请求执行，张量批量路径先覆盖解码阶段。
 
 | 执行部分 | 当前方式 | 还需要什么 |
 | --- | --- | --- |
 | 量化 Linear | 多行激活共同遍历权重 | AVX2 专用批量内核和更少打包开销 |
 | Attention | 每个请求直接读取自己的分页 K/V | 融合的 Ragged/Paged Attention 批量内核 |
 | Prefill | Runtime 支持分块，但真实模型仍逐请求执行 | 真实多请求 Prefill Tensor batch |
-| Decode | CPU 与 CUDA 均有真实多 Context 批量调用 | 融合 kernel、减少行打包和跨 batch size 容量复用 |
+| 解码 | CPU 与 CUDA 均有真实多上下文批量调用 | 融合计算核、减少行打包和跨批量大小的容量复用 |
 
 ## 为什么批量临时张量需要复用
 
 CUDA Decode 每一步都会使用批量 hidden、logits、embedding rows、stream、cuBLAS handle 和 Decoder 中间 Tensor。这些对象只服务本次计算，不保存请求历史；如果每一步重新创建，就会在生成循环中重复执行设备分配与释放。
 
-当前 CUDA 执行器工厂（`RealLlamaCudaExecutorFactory`）按精确批量大小保存一个持久化工作区（workspace）。例如批量大小为 2 的连续 Decode step 会复用同一组临时资源；批量大小变为 3 时单独创建另一组，避免用无效填充行参与计算。同一 workspace 由互斥锁保护，因此当前保证正确复用，不代表多个 batch 可以并发执行。每个请求的位置和 K/V 绑定仍属于自己的模型执行上下文，不能放进共享 workspace。
+当前 CUDA 执行器工厂（`RealLlamaCudaExecutorFactory`）按精确批量大小保存一个持久化工作区（workspace）。例如，批量大小为 2 的连续解码步骤会复用同一组临时资源；批量大小变为 3 时单独创建另一组，避免无效填充行参与计算。互斥锁保证同一工作区串行复用；每个请求的位置和 K/V 绑定继续保存在各自的模型执行上下文中。多批次并发需要进一步拆分工作区和执行流。
 
 ## 分页 K/V 怎样提交
 
