@@ -4,6 +4,7 @@
 #pragma once
 
 #include "chapter07_kv_cache/block_table.h"
+#include "chapter07_kv_cache/radix_prefix_cache.h"
 
 #include <cstddef>
 #include <string>
@@ -12,7 +13,7 @@
 
 namespace chapter07_kv_cache {
 
-class CpuPagedKvCache final : public KvCacheTransaction {
+class CpuPagedKvCache final : public KvCacheTransaction, public PrefixBlockStore {
 public:
     CpuPagedKvCache(
         std::size_t layer_count,
@@ -48,12 +49,12 @@ public:
     bool attach_shared_prefix(
         std::size_t request_id,
         const std::vector<std::size_t>& physical_blocks,
-        std::size_t token_count);
+        std::size_t token_count) override;
     bool retain_prefix_blocks(
-        const std::vector<std::size_t>& physical_blocks);
+        const std::vector<std::size_t>& physical_blocks) override;
     bool release_prefix_blocks(
-        const std::vector<std::size_t>& physical_blocks);
-    std::size_t block_ref_count(std::size_t physical_block) const;
+        const std::vector<std::size_t>& physical_blocks) override;
+    std::size_t block_ref_count(std::size_t physical_block) const override;
     bool write_token(
         std::size_t request_id,
         std::size_t layer,
