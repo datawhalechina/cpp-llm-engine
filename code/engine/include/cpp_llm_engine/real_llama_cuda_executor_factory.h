@@ -1,6 +1,6 @@
 // Engine CUDA：声明真实 Llama 每请求执行器工厂。
 // 职责：共享 CUDA Model，为每个请求创建独立 Context 并适配 Chapter06 Runtime。
-// 契约：批量 Decode 复用精确 batch 形状的 workspace；分页 KV 仍由 Chapter07 演进。
+// 契约：批量 Decode 复用精确 batch 形状的 workspace；分页与 Radix 复用 Chapter07 块契约。
 #pragma once
 
 #include "chapter06_generation/model_executor.h"
@@ -19,6 +19,15 @@ namespace cpp_llm_engine {
 enum class CudaAttentionMode {
     ThreeStage,
     FusedOnline,
+};
+
+struct RealLlamaCudaPrefixCacheStats {
+    std::size_t queries = 0;
+    std::size_t hits = 0;
+    std::size_t misses = 0;
+    std::size_t matched_tokens = 0;
+    std::size_t evicted_blocks = 0;
+    std::size_t cached_blocks = 0;
 };
 
 class RealLlamaCudaExecutorFactory final
@@ -51,6 +60,19 @@ public:
         std::size_t request_id,
         std::string* error = nullptr) const override;
     void release_request(std::size_t request_id) const override;
+    std::size_t estimate_cached_prefix(
+        const chapter06_generation::Request& request) const override;
+    bool adopt_cached_prefix(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+        std::size_t request_id,
+        chapter06_generation::Request& request,
+        std::string* error = nullptr) const override;
+    void publish_cached_prefix(
+        std::size_t request_id,
+        const chapter06_generation::Request& request) const override;
+    bool prefix_cache_stats(
+        RealLlamaCudaPrefixCacheStats* stats,
+        std::string* error = nullptr) const;
     bool decode_batch(
         const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>& executors,
         const chapter06_generation::TokenSequence& tokens,

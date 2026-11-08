@@ -1247,6 +1247,22 @@ bool RealLlamaCpuContext::attach_kv_data_plane(
     return true;
 }
 
+bool RealLlamaCpuContext::adopt_external_kv_prefix(
+    std::size_t token_count,
+    std::string* error) {
+    if (impl_->external_kv == nullptr || impl_->position != 0 || token_count == 0 ||
+        token_count >= impl_->model->metadata.max_position ||
+        impl_->external_kv->token_count() != token_count) {
+        if (error != nullptr) {
+            *error = "external KV prefix does not match an empty model context";
+        }
+        return false;
+    }
+    impl_->position = token_count;
+    if (error != nullptr) error->clear();
+    return true;
+}
+
 bool RealLlamaCpuContext::uses_external_kv() const {
     return impl_->external_kv != nullptr;
 }

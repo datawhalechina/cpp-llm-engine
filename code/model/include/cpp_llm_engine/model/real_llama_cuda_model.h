@@ -132,6 +132,9 @@ public:
     bool attach_kv_data_plane(
         std::shared_ptr<RealLlamaCudaKvDataPlane> data_plane,
         std::string* error = nullptr);
+    bool adopt_external_kv_prefix(
+        std::size_t token_count,
+        std::string* error = nullptr);
     bool uses_external_kv() const;
     bool uses_external_kv_for(std::size_t request_id) const;
     std::size_t position() const;

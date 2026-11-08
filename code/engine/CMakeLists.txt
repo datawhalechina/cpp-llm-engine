@@ -438,7 +438,7 @@ if(CPP_LLM_ENGINE_REAL_MODEL)
     )
     set_tests_properties(real_tinyllama_serving_test PROPERTIES
         LABELS "real_model;slow;serving"
-        PASS_REGULAR_EXPRESSION "request_isolation_match: true"
+        PASS_REGULAR_EXPRESSION "real_serving_match: true"
     )
     cpp_llm_set_test_contract(
         real_tinyllama_serving_test

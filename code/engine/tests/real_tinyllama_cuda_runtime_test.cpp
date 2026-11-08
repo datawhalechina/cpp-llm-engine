@@ -1,6 +1,6 @@
 // Engine CUDA：验证真实 TinyLlama CUDA Executor 接入 Chapter06 Runtime。
-// 职责：用固定 token prompt 执行 prefill、greedy sampling、decode 和重复请求。
-// 通过条件：生成两个 token、状态按模型调用提交，两个请求输出完全一致。
+// 职责：执行 prefill/decode、双请求 batch、分页 K/V 与 Radix 前缀采用。
+// 通过条件：状态按模型调用提交，批量与前缀命中路径均与顺序冷启动一致。
 #include "cpp_llm_engine/real_llama_cuda_executor_factory.h"
 
 #include "chapter06_generation/request.h"
@@ -242,6 +242,42 @@ int main(int argc, char** argv) {
     factory->release_request(7002);
     factory->release_request(7003);
     CHECK(paged_resource->free_blocks() == paged_resource->total_blocks());
+
+    const chapter06_generation::TokenSequence radix_source_prompt{
+        15043, 18439, 1460, 29931, 5288, 29874};
+    const chapter06_generation::TokenSequence radix_target_prompt{
+        15043, 18439, 1460, 29931, 29871, 29973};
+    auto radix_source = factory->create_executor();
+    auto radix_target = factory->create_executor();
+    auto radix_cold = factory->create_executor();
+    CHECK(radix_source != nullptr && radix_target != nullptr && radix_cold != nullptr);
+    chapter06_generation::Request radix_source_request(radix_source_prompt);
+    chapter06_generation::Request radix_target_request(radix_target_prompt);
+    CHECK(factory->bind_request(radix_source, 7101, &error));
+    const auto radix_source_result = runtime.prefill_chunk(
+        radix_source_request, sampler, *radix_source, radix_source_prompt.size());
+    CHECK(radix_source_result.generated_tokens == 1);
+    factory->publish_cached_prefix(7101, radix_source_request);
+    factory->release_request(7101);
+    CHECK(factory->bind_request(radix_target, 7102, &error));
+    CHECK(factory->adopt_cached_prefix(
+        radix_target, 7102, radix_target_request, &error));
+    CHECK(radix_target_request.prefill_offset() == 4);
+    CHECK(radix_target->execution_state().committed_tokens == 4);
+    const auto radix_target_result = runtime.prefill_chunk(
+        radix_target_request, sampler, *radix_target, radix_target_prompt.size());
+    chapter06_generation::Logits radix_cold_logits;
+    CHECK(radix_cold->prefill(radix_target_prompt, &radix_cold_logits, &error));
+    CHECK(radix_target_result.generated_tokens == 1);
+    CHECK(radix_target_request.generated().front() ==
+          sampler.sample(radix_cold_logits));
+    cpp_llm_engine::RealLlamaCudaPrefixCacheStats radix_stats;
+    CHECK(factory->prefix_cache_stats(&radix_stats, &error));
+    CHECK(radix_stats.hits == 1);
+    CHECK(radix_stats.matched_tokens == 4);
+    CHECK(radix_stats.cached_blocks == 3);
+    factory->release_request(7102);
+
     std::cout << "cuda_runtime_generation: true\n"
               << "generated_tokens:";
     for (const auto token : first) std::cout << ' ' << token;
@@ -250,6 +286,7 @@ int main(int argc, char** argv) {
               << "persistent_batch_workspace: true\n"
               << "cuda_paged_context: true\n"
               << "cuda_paged_decode_batch: true\n"
+              << "cuda_radix_context: true\n"
               << "batch_workspace_bytes: "
               << factory->batch_workspace_device_bytes(2) << '\n'
               << "batch_max_error: " << std::max(batch_error_a, batch_error_b) << '\n'

@@ -51,6 +51,15 @@ struct RealLlamaExecutorMemory {
     std::size_t kv_cache_bytes = 0;
 };
 
+struct RealLlamaPrefixCacheStats {
+    std::size_t queries = 0;
+    std::size_t hits = 0;
+    std::size_t misses = 0;
+    std::size_t matched_tokens = 0;
+    std::size_t evicted_blocks = 0;
+    std::size_t cached_blocks = 0;
+};
+
 class RealLlamaExecutorFactory final : public chapter06_generation::ExecutorBatchRunner {
 public:
     static std::unique_ptr<RealLlamaExecutorFactory> load(
@@ -79,6 +88,16 @@ public:
         std::size_t request_id,
         std::string* error = nullptr) const override;
     void release_request(std::size_t request_id) const override;
+    std::size_t estimate_cached_prefix(
+        const chapter06_generation::Request& request) const override;
+    bool adopt_cached_prefix(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+        std::size_t request_id,
+        chapter06_generation::Request& request,
+        std::string* error = nullptr) const override;
+    void publish_cached_prefix(
+        std::size_t request_id,
+        const chapter06_generation::Request& request) const override;
     bool decode_batch(
         const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>& executors,
         const chapter06_generation::TokenSequence& tokens,
@@ -116,6 +135,9 @@ public:
     bool executor_memory(
         const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
         RealLlamaExecutorMemory* memory,
+        std::string* error = nullptr) const;
+    bool prefix_cache_stats(
+        RealLlamaPrefixCacheStats* stats,
         std::string* error = nullptr) const;
     bool executor_uses_paged_kv(
         const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor) const;

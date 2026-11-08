@@ -833,6 +833,23 @@ bool RealLlamaCudaContext::attach_kv_data_plane(
     return true;
 }
 
+bool RealLlamaCudaContext::adopt_external_kv_prefix(
+    std::size_t token_count,
+    std::string* error) {
+    if (impl_->external_kv == nullptr || impl_->position != 0 || token_count == 0 ||
+        token_count >= impl_->capacity_tokens ||
+        impl_->external_kv->token_count() != token_count) {
+        if (error != nullptr) {
+            *error = "CUDA context cannot adopt the external KV prefix";
+        }
+        return false;
+    }
+    for (auto& cache : impl_->caches) cache.clear();
+    impl_->position = token_count;
+    if (error != nullptr) error->clear();
+    return true;
+}
+
 bool RealLlamaCudaContext::uses_external_kv() const {
     return impl_->external_kv != nullptr;
 }

@@ -163,6 +163,9 @@ public:
     bool attach_kv_data_plane(
         std::shared_ptr<RealLlamaKvDataPlane> data_plane,
         std::string* error = nullptr);
+    bool adopt_external_kv_prefix(
+        std::size_t token_count,
+        std::string* error = nullptr);
     bool uses_external_kv() const;
     cpp_llm_engine::core::DecoderModelContract model_contract() const override;
 

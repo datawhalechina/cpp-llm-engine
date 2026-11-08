@@ -1,14 +1,17 @@
 // Engine CUDA：实现 CUDA Model/Context 到 Chapter06 RequestModelExecutor 的适配。
 // 所有权：Factory 共享 Model、分页 payload 与 batch workspace；Executor 独占 Context。
-// 验证：真实 Runtime CTest 检查多 token 生成、重复请求和状态推进。
+// 验证：真实 Runtime CTest 检查生成、批量解码与 Radix 前缀采用。
 #include "cpp_llm_engine/real_llama_cuda_executor_factory.h"
 
 #include "cpp_llm_engine/model/real_llama_cuda_model.h"
 #include "cpp_llm_engine/cuda/cuda_execution_context.h"
+#include "chapter06_generation/request.h"
 #include "chapter07_kv_cache/block_table.h"
+#include "chapter07_kv_cache/radix_prefix_cache.h"
 #include "cpp_llm_engine/cuda/cuda_paged_kv_cache.h"
 #include "cpp_llm_engine/cuda/cuda_stream.h"
 
+#include <algorithm>
 #include <mutex>
 #include <unordered_map>
 #include <utility>
@@ -17,13 +20,78 @@
 namespace cpp_llm_engine {
 namespace {
 
+class CudaPrefixBlockStore final : public chapter07_kv_cache::PrefixBlockStore {
+public:
+    CudaPrefixBlockStore(
+        chapter07_kv_cache::KvBlockPool* pool,
+        cuda::CudaPagedKvCache* payload,
+        cuda::CudaStream* stream)
+        : pool_(pool), payload_(payload), stream_(stream) {}
+
+    std::size_t total_blocks() const override { return pool_->total_blocks(); }
+    std::size_t free_blocks() const override { return pool_->free_blocks(); }
+    std::size_t block_size() const override { return pool_->block_size(); }
+    std::size_t token_count(std::size_t request_id) const override {
+        return pool_->token_count(request_id);
+    }
+    std::vector<std::size_t> physical_blocks(
+        std::size_t request_id) const override {
+        return pool_->physical_blocks(request_id);
+    }
+    std::size_t block_ref_count(std::size_t physical_block) const override {
+        return pool_->block_ref_count(physical_block);
+    }
+    bool attach_shared_prefix(
+        std::size_t request_id,
+        const std::vector<std::size_t>& physical_blocks,
+        std::size_t token_count) override {
+        return pool_->attach_shared_prefix(
+            request_id, physical_blocks, token_count);
+    }
+    bool retain_prefix_blocks(
+        const std::vector<std::size_t>& physical_blocks) override {
+        return pool_->retain_blocks(physical_blocks);
+    }
+    bool release_prefix_blocks(
+        const std::vector<std::size_t>& physical_blocks) override {
+        if (!clear_final_owner_blocks(physical_blocks)) return false;
+        return pool_->release_retained_blocks(physical_blocks);
+    }
+
+    bool release_request(std::size_t request_id) {
+        if (!pool_->contains(request_id)) return true;
+        const auto blocks = pool_->physical_blocks(request_id);
+        if (!clear_final_owner_blocks(blocks)) return false;
+        return pool_->release(request_id);
+    }
+
+private:
+    bool clear_final_owner_blocks(
+        const std::vector<std::size_t>& physical_blocks) {
+        bool submitted = false;
+        for (const std::size_t block : physical_blocks) {
+            if (pool_->block_ref_count(block) != 1) continue;
+            const auto status = payload_->clear_block(block, *stream_);
+            if (!status.is_ok()) return false;
+            submitted = true;
+        }
+        return !submitted || stream_->synchronize().is_ok();
+    }
+
+    chapter07_kv_cache::KvBlockPool* pool_ = nullptr;
+    cuda::CudaPagedKvCache* payload_ = nullptr;
+    cuda::CudaStream* stream_ = nullptr;
+};
+
 class CudaPagedKvDataPlane final : public model::RealLlamaCudaKvDataPlane {
 public:
     CudaPagedKvDataPlane(
         std::size_t request_id,
         chapter07_kv_cache::KvBlockPool* pool,
-        cuda::CudaPagedKvCache* payload)
-        : request_id_(request_id), pool_(pool), payload_(payload) {}
+        cuda::CudaPagedKvCache* payload,
+        chapter07_kv_cache::RadixPrefixCache* radix_cache)
+        : request_id_(request_id), pool_(pool), payload_(payload),
+          radix_cache_(radix_cache) {}
 
     std::size_t request_id() const override { return request_id_; }
     std::size_t token_count() const override {
@@ -31,6 +99,18 @@ public:
     }
     bool reserve(std::size_t total_tokens, std::string* error) override {
         if (pool_->reserve(request_id_, total_tokens)) {
+            if (error != nullptr) error->clear();
+            return true;
+        }
+        const std::size_t target_blocks =
+            total_tokens / pool_->block_size() +
+            (total_tokens % pool_->block_size() == 0 ? 0 : 1);
+        const std::size_t current_blocks = pool_->block_count(request_id_);
+        const std::size_t additional_blocks =
+            target_blocks > current_blocks ? target_blocks - current_blocks : 0;
+        if (radix_cache_ != nullptr && additional_blocks > 0 &&
+            radix_cache_->evict_until_free(additional_blocks) &&
+            pool_->reserve(request_id_, total_tokens)) {
             if (error != nullptr) error->clear();
             return true;
         }
@@ -57,6 +137,7 @@ private:
     std::size_t request_id_ = 0;
     chapter07_kv_cache::KvBlockPool* pool_ = nullptr;
     cuda::CudaPagedKvCache* payload_ = nullptr;
+    chapter07_kv_cache::RadixPrefixCache* radix_cache_ = nullptr;
 };
 
 class RealLlamaCudaRequestExecutor final
@@ -71,12 +152,34 @@ public:
         const chapter06_generation::TokenSequence& prompt,
         chapter06_generation::Logits* logits,
         std::string* error) override {
-        if (prompt.empty() || logits == nullptr) {
-            if (error != nullptr) *error = "CUDA prefill requires prompt and logits";
+        return prefill_chunk(prompt, true, true, logits, error);
+    }
+
+    bool supports_chunked_prefill() const override { return true; }
+
+    bool prefill_chunk(
+        const chapter06_generation::TokenSequence& prompt,
+        bool start_new_sequence,
+        bool produce_logits,
+        chapter06_generation::Logits* logits,
+        std::string* error) override {
+        if (prompt.empty() || (produce_logits && logits == nullptr)) {
+            if (error != nullptr) {
+                *error = prompt.empty()
+                    ? "CUDA prefill requires at least one token"
+                    : "CUDA prefill logits output must not be null";
+            }
             return false;
         }
-        context_->reset();
-        if (!context_->uses_external_kv()) {
+        if (start_new_sequence) {
+            context_->reset();
+        } else if (context_->position() == 0) {
+            if (error != nullptr) {
+                *error = "CUDA continued prefill requires an existing context";
+            }
+            return false;
+        }
+        if (start_new_sequence && produce_logits && !context_->uses_external_kv()) {
             const auto status = context_->prefill_tokens(prompt, logits);
             if (!status.is_ok()) {
                 if (error != nullptr) *error = status.message();
@@ -95,7 +198,7 @@ public:
                 return false;
             }
         }
-        *logits = std::move(current);
+        if (produce_logits) *logits = std::move(current);
         if (error != nullptr) error->clear();
         return true;
     }
@@ -134,6 +237,8 @@ struct RealLlamaCudaExecutorFactory::Impl final {
     std::shared_ptr<chapter07_kv_cache::KvBlockPool> paged_pool;
     std::unique_ptr<cuda::CudaPagedKvCache> paged_payload;
     cuda::CudaStream release_stream;
+    std::unique_ptr<CudaPrefixBlockStore> prefix_store;
+    std::unique_ptr<chapter07_kv_cache::RadixPrefixCache> radix_cache;
     CudaAttentionMode attention_mode = CudaAttentionMode::ThreeStage;
 };
 
@@ -208,6 +313,10 @@ bool RealLlamaCudaExecutorFactory::configure_paged_kv_cache(
     impl_->paged_pool = std::make_shared<chapter07_kv_cache::KvBlockPool>(
         total_blocks, block_size);
     impl_->paged_payload = std::move(payload);
+    impl_->prefix_store = std::make_unique<CudaPrefixBlockStore>(
+        impl_->paged_pool.get(), impl_->paged_payload.get(), &impl_->release_stream);
+    impl_->radix_cache = std::make_unique<chapter07_kv_cache::RadixPrefixCache>(
+        impl_->prefix_store.get());
     if (error != nullptr) error->clear();
     return true;
 }
@@ -230,19 +339,109 @@ bool RealLlamaCudaExecutorFactory::bind_request(
     }
     return real->context()->attach_kv_data_plane(
         std::make_shared<CudaPagedKvDataPlane>(
-            request_id, impl_->paged_pool.get(), impl_->paged_payload.get()),
+            request_id, impl_->paged_pool.get(), impl_->paged_payload.get(),
+            impl_->radix_cache.get()),
         error);
 }
 
 void RealLlamaCudaExecutorFactory::release_request(std::size_t request_id) const {
-    if (impl_->paged_pool == nullptr || impl_->paged_payload == nullptr ||
-        !impl_->paged_pool->contains(request_id)) return;
-    const auto blocks = impl_->paged_pool->physical_blocks(request_id);
-    for (const std::size_t block : blocks) {
-        (void)impl_->paged_payload->clear_block(block, impl_->release_stream);
+    if (impl_->prefix_store != nullptr) {
+        (void)impl_->prefix_store->release_request(request_id);
     }
-    (void)impl_->release_stream.synchronize();
-    (void)impl_->paged_pool->release(request_id);
+}
+
+std::size_t RealLlamaCudaExecutorFactory::estimate_cached_prefix(
+    const chapter06_generation::Request& request) const {
+    if (impl_->radix_cache == nullptr || request.prompt_size() <= 1 ||
+        request.prefill_offset() != 0 || !request.token_history().empty() ||
+        request.terminal()) {
+        return 0;
+    }
+    chapter06_generation::TokenSequence eligible(
+        request.prompt().begin(), request.prompt().end() - 1);
+    return impl_->radix_cache->estimate_prefix_tokens(eligible);
+}
+
+bool RealLlamaCudaExecutorFactory::adopt_cached_prefix(
+    const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+    std::size_t request_id,
+    chapter06_generation::Request& request,
+    std::string* error) const {
+    auto* real = executor == nullptr ? nullptr
+        : dynamic_cast<RealLlamaCudaRequestExecutor*>(executor->underlying_executor());
+    if (real == nullptr || impl_->paged_pool == nullptr ||
+        impl_->radix_cache == nullptr) {
+        if (error != nullptr) {
+            *error = "CUDA Radix adoption requires a paged real Llama executor";
+        }
+        return false;
+    }
+    if (request.prompt_size() <= 1 || request.prefill_offset() != 0 ||
+        !request.token_history().empty() || request.terminal()) {
+        if (error != nullptr) error->clear();
+        return true;
+    }
+
+    chapter06_generation::TokenSequence eligible(
+        request.prompt().begin(), request.prompt().end() - 1);
+    const auto match = impl_->radix_cache->longest_prefix(eligible);
+    if (match.token_count == 0) {
+        if (error != nullptr) error->clear();
+        return true;
+    }
+    if (!impl_->radix_cache->attach(request_id, match)) {
+        if (error != nullptr) *error = "CUDA Radix blocks cannot attach to request";
+        return false;
+    }
+    if (!real->context()->adopt_external_kv_prefix(match.token_count, error)) {
+        impl_->prefix_store->release_request(request_id);
+        return false;
+    }
+    if (!request.adopt_prefilled_prefix(match.token_count)) {
+        real->context()->reset();
+        impl_->prefix_store->release_request(request_id);
+        if (error != nullptr) *error = "request cannot adopt CUDA cached prefix";
+        return false;
+    }
+    if (error != nullptr) error->clear();
+    return true;
+}
+
+void RealLlamaCudaExecutorFactory::publish_cached_prefix(
+    std::size_t request_id,
+    const chapter06_generation::Request& request) const {
+    if (impl_->radix_cache == nullptr || request.prefill_offset() == 0) return;
+    const std::size_t token_count = std::min(
+        request.prefill_offset(), request.prompt_size());
+    chapter06_generation::TokenSequence committed(
+        request.prompt().begin(),
+        request.prompt().begin() +
+            static_cast<chapter06_generation::TokenSequence::difference_type>(token_count));
+    impl_->radix_cache->publish(committed, request_id);
+}
+
+bool RealLlamaCudaExecutorFactory::prefix_cache_stats(
+    RealLlamaCudaPrefixCacheStats* stats,
+    std::string* error) const {
+    if (stats == nullptr || impl_->radix_cache == nullptr) {
+        if (error != nullptr) {
+            *error = stats == nullptr
+                ? "CUDA prefix cache stats output must not be null"
+                : "CUDA paged prefix cache is not configured";
+        }
+        return false;
+    }
+    const auto source = impl_->radix_cache->stats();
+    *stats = {
+        source.queries,
+        source.hits,
+        source.misses,
+        source.matched_tokens,
+        source.evicted_blocks,
+        impl_->radix_cache->cached_blocks(),
+    };
+    if (error != nullptr) error->clear();
+    return true;
 }
 
 bool RealLlamaCudaExecutorFactory::decode_batch(

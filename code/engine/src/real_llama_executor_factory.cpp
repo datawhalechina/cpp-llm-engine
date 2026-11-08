@@ -4,8 +4,11 @@
 #include "cpp_llm_engine/real_llama_executor_factory.h"
 
 #include "cpp_llm_engine/model/real_llama_cpu_decoder.h"
+#include "chapter06_generation/request.h"
 #include "chapter07_kv_cache/paged_kv_cache.h"
+#include "chapter07_kv_cache/radix_prefix_cache.h"
 
+#include <algorithm>
 #include <unordered_set>
 #include <utility>
 
@@ -70,8 +73,9 @@ class PagedKvDataPlane final : public chapter01::RealLlamaKvDataPlane {
 public:
     PagedKvDataPlane(
         std::size_t request_id,
-        chapter07_kv_cache::CpuPagedKvCache* cache)
-        : request_id_(request_id), cache_(cache) {}
+        chapter07_kv_cache::CpuPagedKvCache* cache,
+        chapter07_kv_cache::RadixPrefixCache* radix_cache = nullptr)
+        : request_id_(request_id), cache_(cache), radix_cache_(radix_cache) {}
 
     std::size_t token_count() const override {
         return cache_->token_count(request_id_);
@@ -79,6 +83,17 @@ public:
 
     bool reserve(std::size_t total_tokens, std::string* error) override {
         if (cache_->reserve(request_id_, total_tokens)) return true;
+        const std::size_t target_blocks =
+            total_tokens / cache_->block_size() +
+            (total_tokens % cache_->block_size() == 0 ? 0 : 1);
+        const std::size_t current_blocks = cache_->block_count(request_id_);
+        const std::size_t additional_blocks =
+            target_blocks > current_blocks ? target_blocks - current_blocks : 0;
+        if (radix_cache_ != nullptr && additional_blocks > 0 &&
+            radix_cache_->evict_until_free(additional_blocks) &&
+            cache_->reserve(request_id_, total_tokens)) {
+            return true;
+        }
         if (error != nullptr) *error = "paged KV data plane cannot reserve token";
         return false;
     }
@@ -119,6 +134,7 @@ public:
 private:
     std::size_t request_id_;
     chapter07_kv_cache::CpuPagedKvCache* cache_;
+    chapter07_kv_cache::RadixPrefixCache* radix_cache_;
 };
 
 class RealLlamaRequestExecutor final
@@ -178,6 +194,7 @@ private:
 struct RealLlamaExecutorFactory::Impl {
     std::unique_ptr<chapter01::RealLlamaCpuModel> model;
     std::shared_ptr<chapter07_kv_cache::CpuPagedKvCache> paged_cache;
+    std::unique_ptr<chapter07_kv_cache::RadixPrefixCache> radix_cache;
     RealLlamaExecutionMode mode = RealLlamaExecutionMode::Scalar;
 };
 
@@ -229,12 +246,15 @@ bool RealLlamaExecutorFactory::configure_paged_kv_cache(
         return false;
     }
     const auto contract = decoder_contract();
+    impl_->radix_cache.reset();
     impl_->paged_cache = std::make_shared<chapter07_kv_cache::CpuPagedKvCache>(
         contract.layer_count,
         total_blocks,
         block_size,
         contract.layer.kv_head_count,
         contract.layer.head_dimension);
+    impl_->radix_cache = std::make_unique<chapter07_kv_cache::RadixPrefixCache>(
+        impl_->paged_cache.get());
     if (error != nullptr) error->clear();
     return true;
 }
@@ -260,11 +280,105 @@ bool RealLlamaExecutorFactory::bind_request(
         return false;
     }
     return real_executor->context()->attach_kv_data_plane(
-        std::make_shared<PagedKvDataPlane>(request_id, impl_->paged_cache.get()), error);
+        std::make_shared<PagedKvDataPlane>(
+            request_id, impl_->paged_cache.get(), impl_->radix_cache.get()), error);
 }
 
 void RealLlamaExecutorFactory::release_request(std::size_t request_id) const {
     if (impl_->paged_cache != nullptr) impl_->paged_cache->release(request_id);
+}
+
+std::size_t RealLlamaExecutorFactory::estimate_cached_prefix(
+    const chapter06_generation::Request& request) const {
+    if (impl_->radix_cache == nullptr || request.prompt_size() <= 1 ||
+        request.prefill_offset() != 0 || !request.token_history().empty() ||
+        request.terminal()) {
+        return 0;
+    }
+    chapter06_generation::TokenSequence eligible(
+        request.prompt().begin(), request.prompt().end() - 1);
+    return impl_->radix_cache->estimate_prefix_tokens(eligible);
+}
+
+bool RealLlamaExecutorFactory::adopt_cached_prefix(
+    const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+    std::size_t request_id,
+    chapter06_generation::Request& request,
+    std::string* error) const {
+    auto* real_executor = executor == nullptr ? nullptr
+        : dynamic_cast<RealLlamaRequestExecutor*>(executor->underlying_executor());
+    if (real_executor == nullptr || impl_->paged_cache == nullptr ||
+        impl_->radix_cache == nullptr) {
+        if (error != nullptr) *error = "Radix adoption requires a paged real Llama executor";
+        return false;
+    }
+    if (request.prompt_size() <= 1 || request.prefill_offset() != 0 ||
+        !request.token_history().empty() || request.terminal()) {
+        if (error != nullptr) error->clear();
+        return true;
+    }
+
+    // K/V payload 不保存末次前向的 logits，因此至少保留一个提示词词元重新计算。
+    chapter06_generation::TokenSequence eligible(
+        request.prompt().begin(), request.prompt().end() - 1);
+    const auto match = impl_->radix_cache->longest_prefix(eligible);
+    if (match.token_count == 0) {
+        if (error != nullptr) error->clear();
+        return true;
+    }
+    if (!impl_->radix_cache->attach(request_id, match)) {
+        if (error != nullptr) *error = "Radix prefix blocks cannot attach to request";
+        return false;
+    }
+    if (!real_executor->context()->adopt_external_kv_prefix(match.token_count, error)) {
+        impl_->paged_cache->release(request_id);
+        return false;
+    }
+    if (!request.adopt_prefilled_prefix(match.token_count)) {
+        real_executor->context()->reset();
+        impl_->paged_cache->release(request_id);
+        if (error != nullptr) *error = "request state cannot adopt cached prompt prefix";
+        return false;
+    }
+    if (error != nullptr) error->clear();
+    return true;
+}
+
+void RealLlamaExecutorFactory::publish_cached_prefix(
+    std::size_t request_id,
+    const chapter06_generation::Request& request) const {
+    if (impl_->radix_cache == nullptr || request.prefill_offset() == 0) return;
+    const std::size_t token_count = std::min(
+        request.prefill_offset(), request.prompt_size());
+    chapter06_generation::TokenSequence committed(
+        request.prompt().begin(),
+        request.prompt().begin() +
+            static_cast<chapter06_generation::TokenSequence::difference_type>(token_count));
+    impl_->radix_cache->publish(committed, request_id);
+}
+
+bool RealLlamaExecutorFactory::prefix_cache_stats(
+    RealLlamaPrefixCacheStats* stats,
+    std::string* error) const {
+    if (stats == nullptr || impl_->radix_cache == nullptr) {
+        if (error != nullptr) {
+            *error = stats == nullptr
+                ? "prefix cache stats output must not be null"
+                : "paged prefix cache is not configured";
+        }
+        return false;
+    }
+    const auto source = impl_->radix_cache->stats();
+    *stats = {
+        source.queries,
+        source.hits,
+        source.misses,
+        source.matched_tokens,
+        source.evicted_blocks,
+        impl_->radix_cache->cached_blocks(),
+    };
+    if (error != nullptr) error->clear();
+    return true;
 }
 
 bool RealLlamaExecutorFactory::decode_batch(
