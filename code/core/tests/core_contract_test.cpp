@@ -182,6 +182,14 @@ int main() {
         overflow_rope.position_offset = std::numeric_limits<std::size_t>::max();
         CPP_LLM_CHECK(suite, !overflow_rope.validate().is_ok());
 
+        std::size_t rope_positions[2]{0, 7};
+        const RotaryEmbeddingBatchRequest rope_batch{
+            rope_values, rope_positions, 2, 1, 8, 8, 10000.0F};
+        CPP_LLM_CHECK(suite, rope_batch.validate().is_ok());
+        auto missing_positions = rope_batch;
+        missing_positions.positions = nullptr;
+        CPP_LLM_CHECK(suite, !missing_positions.validate().is_ok());
+
         float query[16]{};
         float key[8]{};
         float value[8]{};
@@ -206,6 +214,13 @@ int main() {
         auto invalid_epsilon = rms_norm;
         invalid_epsilon.epsilon = 0.0F;
         CPP_LLM_CHECK(suite, !invalid_epsilon.validate().is_ok());
+
+        const RmsNormBatchRequest rms_norm_batch{
+            norm_input, norm_weight, elementwise_output, 2, 2, 1.0e-5F};
+        CPP_LLM_CHECK(suite, rms_norm_batch.validate().is_ok());
+        auto invalid_batch_width = rms_norm_batch;
+        invalid_batch_width.width = 0;
+        CPP_LLM_CHECK(suite, !invalid_batch_width.validate().is_ok());
 
         const SwiGluRequest swiglu{
             norm_input, norm_weight, elementwise_output, 4};

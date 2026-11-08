@@ -94,6 +94,50 @@ CublasStatus CublasMatmulBackend::compute(
         "cublasSgemm row-major");
 }
 
+CublasStatus CublasMatmulBackend::compute_rhs_transposed(
+    const float* lhs,
+    const float* rhs,
+    float* output,
+    std::size_t rows,
+    std::size_t inner,
+    std::size_t cols,
+    const CudaStream& stream) const {
+    if (!valid()) {
+        return CublasStatus::from(
+            CUBLAS_STATUS_NOT_INITIALIZED,
+            "CublasMatmulBackend::compute_rhs_transposed handle");
+    }
+    if (!stream.valid() || lhs == nullptr || rhs == nullptr || output == nullptr ||
+        rows == 0 || inner == 0 || cols == 0 || !fits_cublas_int(rows) ||
+        !fits_cublas_int(inner) || !fits_cublas_int(cols)) {
+        return CublasStatus::from(
+            CUBLAS_STATUS_INVALID_VALUE,
+            "CublasMatmulBackend::compute_rhs_transposed input");
+    }
+
+    CublasStatus status = CublasStatus::from(
+        cublasSetStream(handle_, stream.native_handle()), "cublasSetStream");
+    if (!status.is_ok()) return status;
+
+    const int batch_rows = static_cast<int>(rows);
+    const int input_width = static_cast<int>(inner);
+    const int output_width = static_cast<int>(cols);
+    constexpr float alpha = 1.0F;
+    constexpr float beta = 0.0F;
+    // Row-major output [B,N] is column-major [N,B]. The stored rhs [N,K]
+    // appears as [K,N], so OP_T recovers [N,K] without a transpose buffer.
+    return CublasStatus::from(
+        cublasSgemm(
+            handle_, CUBLAS_OP_T, CUBLAS_OP_N,
+            output_width, batch_rows, input_width,
+            &alpha,
+            rhs, input_width,
+            lhs, input_width,
+            &beta,
+            output, output_width),
+        "cublasSgemm row-major rhs-transposed");
+}
+
 CublasStatus CublasMatmulBackend::reset() {
     if (!valid()) return CublasStatus::success();
     const cublasHandle_t handle = handle_;

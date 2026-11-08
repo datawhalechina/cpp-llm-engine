@@ -32,6 +32,30 @@ __global__ void rms_norm_kernel(
     }
 }
 
+__global__ void rms_norm_batch_kernel(
+    const float* input, const float* weight, float* output,
+    std::size_t rows, std::size_t width, float epsilon) {
+    const std::size_t row = blockIdx.x;
+    if (row >= rows) return;
+    __shared__ float squares[kBlockSize];
+    const std::size_t offset = row * width;
+    float local = 0.0F;
+    for (std::size_t col = threadIdx.x; col < width; col += blockDim.x) {
+        const float value = input[offset + col];
+        local += value * value;
+    }
+    squares[threadIdx.x] = local;
+    __syncthreads();
+    for (unsigned int stride = blockDim.x / 2; stride > 0; stride /= 2) {
+        if (threadIdx.x < stride) squares[threadIdx.x] += squares[threadIdx.x + stride];
+        __syncthreads();
+    }
+    const float inverse = rsqrtf(squares[0] / static_cast<float>(width) + epsilon);
+    for (std::size_t col = threadIdx.x; col < width; col += blockDim.x) {
+        output[offset + col] = input[offset + col] * inverse * weight[col];
+    }
+}
+
 __global__ void swiglu_kernel(
     const float* gate, const float* up, float* output, std::size_t elements) {
     const std::size_t index =
@@ -63,6 +87,23 @@ CudaStatus CudaDecoderElementwiseBackend::rms_norm(
         request.input, request.weight, request.output, request.elements,
         request.epsilon);
     return check_last_cuda_error("rms_norm_kernel launch");
+}
+
+CudaStatus CudaDecoderElementwiseBackend::rms_norm_batch(
+    const core::RmsNormBatchRequest& request,
+    const CudaStream& stream) const {
+    if (!request.validate().is_ok()) {
+        return CudaStatus::from(cudaErrorInvalidValue, "CUDA batch RMSNorm request");
+    }
+    if (!stream.valid()) {
+        return CudaStatus::from(
+            cudaErrorInvalidResourceHandle, "CUDA batch RMSNorm stream");
+    }
+    rms_norm_batch_kernel<<<static_cast<unsigned int>(request.rows), kBlockSize, 0,
+                            stream.native_handle()>>>(
+        request.input, request.weight, request.output,
+        request.rows, request.width, request.epsilon);
+    return check_last_cuda_error("rms_norm_batch_kernel launch");
 }
 
 CudaStatus CudaDecoderElementwiseBackend::swiglu(

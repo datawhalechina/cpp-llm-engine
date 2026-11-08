@@ -32,6 +32,14 @@ public:
     CublasStatus compute(
         const core::MatmulRequest& request,
         const CudaStream& stream) const;
+    CublasStatus compute_rhs_transposed(
+        const float* lhs,
+        const float* rhs,
+        float* output,
+        std::size_t rows,
+        std::size_t inner,
+        std::size_t cols,
+        const CudaStream& stream) const;
     CublasStatus reset();
     bool valid() const;
 

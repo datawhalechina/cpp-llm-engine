@@ -6,12 +6,41 @@
 
 #include "cpp_llm_engine/cuda/cuda_execution_context.h"
 #include "cpp_llm_engine/cuda/cuda_kv_cache.h"
+#include "cpp_llm_engine/cuda/cuda_paged_kv_cache.h"
 
 #include <cmath>
 #include <utility>
 #include <vector>
 
 namespace cpp_llm_engine::cuda {
+namespace {
+
+bool tensor_matches(const CudaTensor* tensor, std::size_t width) {
+    return tensor != nullptr && !tensor->empty() &&
+        tensor->contract().dtype == core::DType::Float32 &&
+        tensor->contract().device == core::DeviceKind::CUDA &&
+        tensor->contract().shape.dimensions == std::vector<std::size_t>{width};
+}
+
+bool linear_weight_matches(
+    const CudaLinearWeight& weight,
+    std::size_t input_width,
+    std::size_t output_width) {
+    if (!weight.valid()) return false;
+    if (weight.kind() == CudaLinearWeight::Kind::Float32) {
+        const CudaTensor* tensor = weight.float32_tensor();
+        return tensor != nullptr &&
+            tensor->contract().dtype == core::DType::Float32 &&
+            tensor->contract().device == core::DeviceKind::CUDA &&
+            tensor->contract().shape.dimensions ==
+                std::vector<std::size_t>{input_width, output_width};
+    }
+    const CudaQuantizedMatrix* matrix = weight.quantized_matrix();
+    return matrix != nullptr && matrix->cols() == input_width &&
+        matrix->rows() == output_width;
+}
+
+}  // namespace
 
 core::Status CudaDecoderLayer::create(
     const CudaDecoderLayerConfig& config, CudaDecoderLayer* output) {
@@ -27,13 +56,15 @@ core::Status CudaDecoderLayer::create(
     CudaDecoderLayer replacement;
     replacement.config_ = config;
     const std::vector<std::vector<std::size_t>> shapes{
-        {config.hidden_size}, {1, config.query_heads, config.head_dimension},
+        {config.hidden_size}, {config.hidden_size},
+        {1, config.query_heads, config.head_dimension},
         {1, config.kv_heads, config.head_dimension}, {1, config.kv_heads, config.head_dimension},
         {1, config.query_heads, config.head_dimension}, {config.hidden_size},
         {config.hidden_size}, {config.ffn_size}, {config.ffn_size},
         {config.ffn_size}, {config.hidden_size}};
     CudaTensor* tensors[]{
-        &replacement.attention_normalized_, &replacement.query_, &replacement.key_,
+        &replacement.hidden_backup_, &replacement.attention_normalized_,
+        &replacement.query_, &replacement.key_,
         &replacement.value_, &replacement.attention_context_, &replacement.projection_,
         &replacement.ffn_normalized_, &replacement.gate_, &replacement.up_,
         &replacement.swiglu_, &replacement.down_};
@@ -52,14 +83,38 @@ core::Status CudaDecoderLayer::forward(
     if (context == nullptr || cache == nullptr || hidden == nullptr) {
         return core::Status::error("CudaDecoderLayer forward input is null");
     }
-    if (weights.attention_norm == nullptr || weights.ffn_norm == nullptr ||
-        !weights.query.valid() || !weights.key.valid() || !weights.value.valid() ||
-        !weights.attention_output.valid() || !weights.gate.valid() ||
-        !weights.up.valid() || !weights.down.valid()) {
-        return core::Status::error("CudaDecoderLayer weight is invalid");
+    const std::size_t kv_width = config_.kv_heads * config_.head_dimension;
+    if (!tensor_matches(hidden, config_.hidden_size) ||
+        !tensor_matches(weights.attention_norm, config_.hidden_size) ||
+        !tensor_matches(weights.ffn_norm, config_.hidden_size) ||
+        !linear_weight_matches(
+            weights.query, config_.hidden_size, config_.hidden_size) ||
+        !linear_weight_matches(weights.key, config_.hidden_size, kv_width) ||
+        !linear_weight_matches(weights.value, config_.hidden_size, kv_width) ||
+        !linear_weight_matches(
+            weights.attention_output, config_.hidden_size, config_.hidden_size) ||
+        !linear_weight_matches(weights.gate, config_.hidden_size, config_.ffn_size) ||
+        !linear_weight_matches(weights.up, config_.hidden_size, config_.ffn_size) ||
+        !linear_weight_matches(weights.down, config_.ffn_size, config_.hidden_size)) {
+        return core::Status::error("CudaDecoderLayer tensor or weight shape is invalid");
     }
-#define RETURN_IF_ERROR(expression) do { const auto status = (expression); \
-    if (!status.is_ok()) return status; } while (false)
+    if (!cache->valid() || cache->kv_head_count() != config_.kv_heads ||
+        cache->head_dimension() != config_.head_dimension ||
+        position != cache->size_tokens()) {
+        return core::Status::error("CudaDecoderLayer cache position or shape is invalid");
+    }
+    const std::size_t initial_cache_size = cache->size_tokens();
+    core::Status status = context->copy(*hidden, &hidden_backup_);
+    if (!status.is_ok()) return status;
+    const auto rollback = [&](const core::Status& failure) {
+        const core::Status cache_status = cache->trim(initial_cache_size);
+        const core::Status hidden_status = context->copy(hidden_backup_, hidden);
+        if (!cache_status.is_ok()) return cache_status;
+        if (!hidden_status.is_ok()) return hidden_status;
+        return failure;
+    };
+#define RETURN_IF_ERROR(expression) do { status = (expression); \
+    if (!status.is_ok()) return rollback(status); } while (false)
     RETURN_IF_ERROR(context->rms_norm(
         *hidden, *weights.attention_norm, &attention_normalized_, config_.rms_epsilon));
     RETURN_IF_ERROR(context->linear(attention_normalized_, weights.query, &query_));
@@ -83,6 +138,73 @@ core::Status CudaDecoderLayer::forward(
     RETURN_IF_ERROR(context->linear(swiglu_, weights.down, &down_));
     RETURN_IF_ERROR(context->vector_add(*hidden, down_, hidden));
 #undef RETURN_IF_ERROR
+    return core::Status::ok();
+}
+
+core::Status CudaDecoderLayer::forward_paged(
+    CudaExecutionContext* context,
+    const CudaDecoderLayerWeights& weights,
+    CudaPagedKvCache* cache,
+    std::size_t layer,
+    const std::vector<std::size_t>& physical_blocks,
+    CudaTensor* hidden,
+    std::size_t position) {
+    if (context == nullptr || cache == nullptr || hidden == nullptr ||
+        !cache->valid() || layer >= cache->layer_count() ||
+        cache->kv_head_count() != config_.kv_heads ||
+        cache->head_dimension() != config_.head_dimension ||
+        physical_blocks.empty() || position / cache->block_size() >= physical_blocks.size()) {
+        return core::Status::error("CudaDecoderLayer paged input is invalid");
+    }
+    const std::size_t kv_width = config_.kv_heads * config_.head_dimension;
+    if (!tensor_matches(hidden, config_.hidden_size) ||
+        !tensor_matches(weights.attention_norm, config_.hidden_size) ||
+        !tensor_matches(weights.ffn_norm, config_.hidden_size) ||
+        !linear_weight_matches(weights.query, config_.hidden_size, config_.hidden_size) ||
+        !linear_weight_matches(weights.key, config_.hidden_size, kv_width) ||
+        !linear_weight_matches(weights.value, config_.hidden_size, kv_width) ||
+        !linear_weight_matches(
+            weights.attention_output, config_.hidden_size, config_.hidden_size) ||
+        !linear_weight_matches(weights.gate, config_.hidden_size, config_.ffn_size) ||
+        !linear_weight_matches(weights.up, config_.hidden_size, config_.ffn_size) ||
+        !linear_weight_matches(weights.down, config_.ffn_size, config_.hidden_size)) {
+        return core::Status::error("CudaDecoderLayer paged tensor or weight shape is invalid");
+    }
+    core::Status status = context->copy(*hidden, &hidden_backup_);
+    if (!status.is_ok()) return status;
+    const auto rollback = [&](const core::Status& failure) {
+        const core::Status hidden_status = context->copy(hidden_backup_, hidden);
+        return hidden_status.is_ok() ? failure : hidden_status;
+    };
+#define RETURN_IF_PAGED_ERROR(expression) do { status = (expression); \
+    if (!status.is_ok()) return rollback(status); } while (false)
+    RETURN_IF_PAGED_ERROR(context->rms_norm(
+        *hidden, *weights.attention_norm, &attention_normalized_, config_.rms_epsilon));
+    RETURN_IF_PAGED_ERROR(context->linear(attention_normalized_, weights.query, &query_));
+    RETURN_IF_PAGED_ERROR(context->linear(attention_normalized_, weights.key, &key_));
+    RETURN_IF_PAGED_ERROR(context->linear(attention_normalized_, weights.value, &value_));
+    RETURN_IF_PAGED_ERROR(context->rope(
+        &query_, position, config_.rotary_dimension, config_.rope_frequency_base));
+    RETURN_IF_PAGED_ERROR(context->rope(
+        &key_, position, config_.rotary_dimension, config_.rope_frequency_base));
+    const std::size_t physical_block = physical_blocks[position / cache->block_size()];
+    const std::size_t slot = position % cache->block_size();
+    RETURN_IF_PAGED_ERROR(context->write_paged_kv(
+        cache, layer, physical_block, slot, key_, value_));
+    RETURN_IF_PAGED_ERROR(context->paged_gqa_attention(
+        query_, *cache, layer, physical_blocks, position + 1,
+        &attention_context_, position));
+    RETURN_IF_PAGED_ERROR(context->linear(
+        attention_context_, weights.attention_output, &projection_));
+    RETURN_IF_PAGED_ERROR(context->vector_add(*hidden, projection_, hidden));
+    RETURN_IF_PAGED_ERROR(context->rms_norm(
+        *hidden, *weights.ffn_norm, &ffn_normalized_, config_.rms_epsilon));
+    RETURN_IF_PAGED_ERROR(context->linear(ffn_normalized_, weights.gate, &gate_));
+    RETURN_IF_PAGED_ERROR(context->linear(ffn_normalized_, weights.up, &up_));
+    RETURN_IF_PAGED_ERROR(context->swiglu(gate_, up_, &swiglu_));
+    RETURN_IF_PAGED_ERROR(context->linear(swiglu_, weights.down, &down_));
+    RETURN_IF_PAGED_ERROR(context->vector_add(*hidden, down_, hidden));
+#undef RETURN_IF_PAGED_ERROR
     return core::Status::ok();
 }
 

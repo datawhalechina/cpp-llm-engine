@@ -90,8 +90,10 @@ bool test_append_clear_and_move() {
     CHECK(moved.valid());
     CHECK(moved.size_tokens() == 3);
     CHECK(!cache.valid());
-    moved.clear();
-    CHECK(moved.size_tokens() == 0);
+    CHECK(moved.trim(1).is_ok());
+    CHECK(moved.size_tokens() == 1);
+    CHECK(!moved.trim(2).is_ok());
+    CHECK(moved.trim(0).is_ok());
     CHECK(moved.append(key_tensor_b, value_tensor_b, stream).is_ok());
     std::vector<float> cleared_key(6);
     std::vector<float> cleared_value(6);
@@ -102,6 +104,7 @@ bool test_append_clear_and_move() {
     CHECK(cleared_value == value_b);
     CHECK(moved.reset().is_ok());
     CHECK(!moved.valid());
+    CHECK(!moved.trim(0).is_ok());
     return true;
 }
 

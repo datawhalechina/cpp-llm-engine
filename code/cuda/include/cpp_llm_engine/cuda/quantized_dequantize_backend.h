@@ -23,6 +23,12 @@ public:
         float* output,
         std::size_t output_elements,
         const CudaStream& stream) const;
+    CudaStatus dequantize_row(
+        const CudaQuantizedMatrix& weights,
+        std::size_t row,
+        float* output,
+        std::size_t output_elements,
+        const CudaStream& stream) const;
 };
 
 const CudaQuantizedDequantizeBackend& cuda_quantized_dequantize_backend();

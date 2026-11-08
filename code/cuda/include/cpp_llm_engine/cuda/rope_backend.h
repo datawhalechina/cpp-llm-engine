@@ -21,6 +21,9 @@ public:
     CudaStatus apply(
         const core::RotaryEmbeddingRequest& request,
         const CudaStream& stream) const;
+    CudaStatus apply_batch(
+        const core::RotaryEmbeddingBatchRequest& request,
+        const CudaStream& stream) const;
 };
 
 const CudaRopeBackend& cuda_rope_backend();

@@ -29,6 +29,26 @@ struct RmsNormRequest final {
     }
 };
 
+struct RmsNormBatchRequest final {
+    const float* input = nullptr;
+    const float* weight = nullptr;
+    float* output = nullptr;
+    std::size_t rows = 0;
+    std::size_t width = 0;
+    float epsilon = 0.0F;
+
+    Status validate() const {
+        if (input == nullptr || weight == nullptr || output == nullptr ||
+            rows == 0 || width == 0) {
+            return Status::error("batch RMSNorm buffers and shape are invalid");
+        }
+        if (!std::isfinite(epsilon) || epsilon <= 0.0F) {
+            return Status::error("batch RMSNorm epsilon must be finite and positive");
+        }
+        return Status::ok();
+    }
+};
+
 struct SwiGluRequest final {
     const float* gate = nullptr;
     const float* up = nullptr;

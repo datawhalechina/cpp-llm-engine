@@ -66,6 +66,34 @@ void apply_cpu_rope(
     }
 }
 
+void apply_cpu_rope_positions(
+    std::vector<float>* values,
+    const std::vector<std::size_t>& positions,
+    std::size_t heads,
+    std::size_t head_dimension,
+    std::size_t rotary_dimension,
+    float frequency_base) {
+    for (std::size_t row = 0; row < positions.size(); ++row) {
+        for (std::size_t head = 0; head < heads; ++head) {
+            float* vector = values->data() +
+                (row * heads + head) * head_dimension;
+            for (std::size_t pair = 0; pair < rotary_dimension / 2; ++pair) {
+                const float exponent =
+                    -2.0F * static_cast<float>(pair) /
+                    static_cast<float>(rotary_dimension);
+                const float angle = static_cast<float>(positions[row]) *
+                    std::pow(frequency_base, exponent);
+                const float cosine = std::cos(angle);
+                const float sine = std::sin(angle);
+                const float x = vector[pair * 2];
+                const float y = vector[pair * 2 + 1];
+                vector[pair * 2] = x * cosine - y * sine;
+                vector[pair * 2 + 1] = x * sine + y * cosine;
+            }
+        }
+    }
+}
+
 bool run_correctness_case(
     std::size_t tokens,
     std::size_t heads,
@@ -97,6 +125,45 @@ bool run_correctness_case(
     for (std::size_t index = 0; index < elements; ++index) {
         CHECK(std::fabs(output[index] - golden[index]) <= 2.0e-5F);
     }
+    return true;
+}
+
+bool run_batch_position_case() {
+    constexpr std::size_t heads = 3;
+    constexpr std::size_t head_dimension = 10;
+    constexpr std::size_t rotary_dimension = 8;
+    const std::vector<std::size_t> positions{0, 7, 31};
+    const std::size_t elements = positions.size() * heads * head_dimension;
+    std::vector<float> input(elements);
+    for (std::size_t index = 0; index < elements; ++index) {
+        input[index] = static_cast<float>(static_cast<int>(index % 31) - 15) * 0.0625F;
+    }
+    std::vector<float> golden = input;
+    apply_cpu_rope_positions(
+        &golden, positions, heads, head_dimension, rotary_dimension, 10000.0F);
+
+    CudaExecutionContext context;
+    CudaTensor tensor;
+    CHECK(CudaExecutionContext::create(&context).is_ok());
+    CHECK(CudaTensor::create_contiguous(
+        {positions.size(), heads, head_dimension}, DType::Float32, &tensor).is_ok());
+    CHECK(context.upload(&tensor, input.data(), input.size() * sizeof(float)).is_ok());
+    CHECK(context.rope_batch(
+        &tensor, positions, rotary_dimension, 10000.0F).is_ok());
+    std::vector<float> output(elements);
+    CHECK(context.download(
+        tensor, output.data(), output.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    for (std::size_t index = 0; index < elements; ++index) {
+        CHECK(std::fabs(output[index] - golden[index]) <= 2.0e-5F);
+    }
+
+    CHECK(!context.rope_batch(
+        &tensor, {0, 1}, rotary_dimension, 10000.0F).is_ok());
+    CHECK(!context.rope_batch(
+        nullptr, positions, rotary_dimension, 10000.0F).is_ok());
+    CHECK(!context.rope_batch(
+        &tensor, {}, rotary_dimension, 10000.0F).is_ok());
     return true;
 }
 
@@ -199,6 +266,7 @@ int main() {
     if (!run_correctness_case(1, 1, 8, 8, 0)) return 1;
     if (!run_correctness_case(3, 2, 8, 6, 5)) return 1;
     if (!run_correctness_case(257, 3, 10, 8, 31)) return 1;
+    if (!run_batch_position_case()) return 1;
     if (!run_benchmark()) return 1;
     return 0;
 }

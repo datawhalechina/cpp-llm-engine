@@ -31,8 +31,10 @@ add_library(cpp_llm_engine_cuda
     src/cublas_status.cpp
     src/cuda_event.cpp
     src/cuda_execution_context.cpp
+    src/cuda_decoder_batch_layer.cpp
     src/cuda_decoder_layer.cpp
     src/cuda_kv_cache.cpp
+    src/cuda_paged_kv_cache.cpp
     src/cuda_quantized_matrix.cpp
     src/cuda_status.cpp
     src/cuda_stream.cpp
@@ -44,6 +46,7 @@ add_library(cpp_llm_engine_cuda
     src/gqa_attention_backend.cu
     src/pinned_host_buffer.cpp
     src/quantized_dequantize_backend.cu
+    src/quantized_gemv_backend.cu
     src/rope_backend.cu
 )
 target_include_directories(cpp_llm_engine_cuda
@@ -100,6 +103,19 @@ add_executable(cpp_llm_engine_cuda_kv_cache_test
 target_link_libraries(
     cpp_llm_engine_cuda_kv_cache_test PRIVATE cpp_llm_engine_cuda)
 
+if(NOT TARGET chapter07_kv_cache)
+    add_subdirectory(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../chapter07_kv_cache
+        ${CMAKE_CURRENT_BINARY_DIR}/chapter07_kv_cache
+    )
+endif()
+add_executable(cpp_llm_engine_cuda_paged_kv_cache_test
+    tests/cuda_paged_kv_cache_test.cu
+)
+target_link_libraries(
+    cpp_llm_engine_cuda_paged_kv_cache_test
+    PRIVATE cpp_llm_engine_cuda chapter07_kv_cache)
+
 add_executable(cpp_llm_engine_cuda_gqa_attention_test
     tests/cuda_gqa_attention_test.cu
 )
@@ -125,6 +141,7 @@ cpp_llm_prepare_test(cpp_llm_engine_cuda_execution_context_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_quantized_linear_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_rope_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_kv_cache_test)
+cpp_llm_prepare_test(cpp_llm_engine_cuda_paged_kv_cache_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_gqa_attention_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_decoder_elementwise_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_decoder_layer_test)
@@ -151,6 +168,9 @@ add_test(
     NAME cpp_llm_engine_cuda_kv_cache_test
     COMMAND cpp_llm_engine_cuda_kv_cache_test)
 add_test(
+    NAME cpp_llm_engine_cuda_paged_kv_cache_test
+    COMMAND cpp_llm_engine_cuda_paged_kv_cache_test)
+add_test(
     NAME cpp_llm_engine_cuda_gqa_attention_test
     COMMAND cpp_llm_engine_cuda_gqa_attention_test)
 add_test(
@@ -166,6 +186,8 @@ cpp_llm_set_test_labels(cpp_llm_engine_cuda_execution_context_test contract cuda
 cpp_llm_set_test_labels(cpp_llm_engine_cuda_quantized_linear_test integration cuda quantization)
 cpp_llm_set_test_labels(cpp_llm_engine_cuda_rope_test unit cuda rope)
 cpp_llm_set_test_labels(cpp_llm_engine_cuda_kv_cache_test component cuda cache)
+cpp_llm_set_test_labels(
+    cpp_llm_engine_cuda_paged_kv_cache_test integration cuda cache paged)
 cpp_llm_set_test_labels(cpp_llm_engine_cuda_gqa_attention_test component cuda attention)
 cpp_llm_set_test_labels(cpp_llm_engine_cuda_decoder_elementwise_test component cuda decoder)
 cpp_llm_set_test_labels(cpp_llm_engine_cuda_decoder_layer_test integration cuda decoder)

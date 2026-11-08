@@ -9,11 +9,13 @@
 #include "cpp_llm_engine/cuda/cuda_linear_weight.h"
 
 #include <cstddef>
+#include <vector>
 
 namespace cpp_llm_engine::cuda {
 
 class CudaExecutionContext;
 class CudaKvCache;
+class CudaPagedKvCache;
 
 struct CudaDecoderLayerConfig final {
     std::size_t hidden_size = 0;
@@ -48,6 +50,14 @@ public:
         CudaKvCache* cache,
         CudaTensor* hidden,
         std::size_t position);
+    core::Status forward_paged(
+        CudaExecutionContext* context,
+        const CudaDecoderLayerWeights& weights,
+        CudaPagedKvCache* cache,
+        std::size_t layer,
+        const std::vector<std::size_t>& physical_blocks,
+        CudaTensor* hidden,
+        std::size_t position);
     const CudaTensor& attention_normalized() const;
     const CudaTensor& attention_context() const;
     const CudaTensor& ffn_normalized() const;
@@ -55,6 +65,7 @@ public:
 
 private:
     CudaDecoderLayerConfig config_;
+    CudaTensor hidden_backup_;
     CudaTensor attention_normalized_;
     CudaTensor query_;
     CudaTensor key_;

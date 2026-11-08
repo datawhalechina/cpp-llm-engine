@@ -178,6 +178,57 @@ CudaStatus CudaQuantizedDequantizeBackend::dequantize(
     return check_last_cuda_error("quantized dequantize kernel launch");
 }
 
+CudaStatus CudaQuantizedDequantizeBackend::dequantize_row(
+    const CudaQuantizedMatrix& weights,
+    std::size_t row,
+    float* output,
+    std::size_t output_elements,
+    const CudaStream& stream) const {
+    if (weights.empty() || output == nullptr) {
+        return CudaStatus::from(
+            cudaErrorInvalidDevicePointer,
+            "CudaQuantizedDequantizeBackend::dequantize_row pointers");
+    }
+    if (!stream.valid()) {
+        return CudaStatus::from(
+            cudaErrorInvalidResourceHandle,
+            "CudaQuantizedDequantizeBackend::dequantize_row stream");
+    }
+    if (row >= weights.rows() || output_elements != weights.cols()) {
+        return CudaStatus::from(
+            cudaErrorInvalidValue,
+            "CudaQuantizedDequantizeBackend::dequantize_row shape");
+    }
+    const std::size_t blocks = output_elements / kBlockSize +
+        (output_elements % kBlockSize != 0 ? 1 : 0);
+    if (blocks > std::numeric_limits<unsigned int>::max()) {
+        return CudaStatus::from(
+            cudaErrorInvalidConfiguration,
+            "CudaQuantizedDequantizeBackend::dequantize_row grid");
+    }
+    const std::size_t row_bytes = weights.size_bytes() / weights.rows();
+    const auto* input = static_cast<const std::uint8_t*>(weights.data()) +
+        row * row_bytes;
+    if (weights.format() == core::WeightFormat::Q4K) {
+        dequantize_q4k_kernel<<<
+            static_cast<unsigned int>(blocks),
+            static_cast<unsigned int>(kBlockSize),
+            0,
+            stream.native_handle()>>>(input, output, output_elements);
+    } else if (weights.format() == core::WeightFormat::Q6K) {
+        dequantize_q6k_kernel<<<
+            static_cast<unsigned int>(blocks),
+            static_cast<unsigned int>(kBlockSize),
+            0,
+            stream.native_handle()>>>(input, output, output_elements);
+    } else {
+        return CudaStatus::from(
+            cudaErrorInvalidValue,
+            "CudaQuantizedDequantizeBackend::dequantize_row format");
+    }
+    return check_last_cuda_error("quantized row dequantize kernel launch");
+}
+
 const CudaQuantizedDequantizeBackend& cuda_quantized_dequantize_backend() {
     static const CudaQuantizedDequantizeBackend backend;
     return backend;

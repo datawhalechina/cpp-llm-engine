@@ -19,6 +19,9 @@ public:
     std::string_view name() const override;
     CudaStatus rms_norm(
         const core::RmsNormRequest& request, const CudaStream& stream) const;
+    CudaStatus rms_norm_batch(
+        const core::RmsNormBatchRequest& request,
+        const CudaStream& stream) const;
     CudaStatus swiglu(
         const core::SwiGluRequest& request, const CudaStream& stream) const;
 };

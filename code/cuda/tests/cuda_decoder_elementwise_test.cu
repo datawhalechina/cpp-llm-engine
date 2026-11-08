@@ -72,6 +72,60 @@ bool run_case(std::size_t elements) {
     return true;
 }
 
+bool run_batch_case(std::size_t rows, std::size_t width) {
+    CudaExecutionContext context;
+    CHECK(CudaExecutionContext::create(&context).is_ok());
+    std::vector<float> input(rows * width);
+    std::vector<float> weight(width);
+    for (std::size_t col = 0; col < width; ++col) {
+        weight[col] = 0.75F + static_cast<float>(col % 7) * 0.03F;
+    }
+    for (std::size_t index = 0; index < input.size(); ++index) {
+        input[index] = static_cast<float>(static_cast<int>(index % 23) - 11) * 0.05F;
+    }
+    CudaTensor input_tensor;
+    CudaTensor weight_tensor;
+    CudaTensor output_tensor;
+    CHECK(CudaTensor::create_contiguous(
+        {rows, width}, DType::Float32, &input_tensor).is_ok());
+    CHECK(CudaTensor::create_contiguous(
+        {width}, DType::Float32, &weight_tensor).is_ok());
+    CHECK(CudaTensor::create_contiguous(
+        {rows, width}, DType::Float32, &output_tensor).is_ok());
+    CHECK(context.upload(
+        &input_tensor, input.data(), input.size() * sizeof(float)).is_ok());
+    CHECK(context.upload(
+        &weight_tensor, weight.data(), weight.size() * sizeof(float)).is_ok());
+    constexpr float epsilon = 1.0e-5F;
+    CHECK(context.rms_norm_batch(
+        input_tensor, weight_tensor, &output_tensor, epsilon).is_ok());
+    std::vector<float> output(input.size());
+    CHECK(context.download(
+        output_tensor, output.data(), output.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    for (std::size_t row = 0; row < rows; ++row) {
+        float mean_square = 0.0F;
+        for (std::size_t col = 0; col < width; ++col) {
+            const float value = input[row * width + col];
+            mean_square += value * value;
+        }
+        const float inverse = 1.0F /
+            std::sqrt(mean_square / static_cast<float>(width) + epsilon);
+        for (std::size_t col = 0; col < width; ++col) {
+            const float expected = input[row * width + col] * inverse * weight[col];
+            CHECK(std::fabs(output[row * width + col] - expected) <= 2.0e-5F);
+        }
+    }
+    CudaTensor wrong_weight;
+    CHECK(CudaTensor::create_contiguous(
+        {width + 1}, DType::Float32, &wrong_weight).is_ok());
+    CHECK(!context.rms_norm_batch(
+        input_tensor, wrong_weight, &output_tensor, epsilon).is_ok());
+    CHECK(!context.rms_norm_batch(
+        weight_tensor, weight_tensor, &output_tensor, epsilon).is_ok());
+    return true;
+}
+
 }  // namespace
 
 int main() {
@@ -79,6 +133,8 @@ int main() {
     if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count <= 0) return 1;
     if (!run_case(257)) return 1;
     if (!run_case(2048)) return 1;
+    if (!run_batch_case(3, 257)) return 1;
+    if (!run_batch_case(4, 2048)) return 1;
     return 0;
 }
 

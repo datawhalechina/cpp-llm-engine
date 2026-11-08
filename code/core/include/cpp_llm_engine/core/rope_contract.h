@@ -44,4 +44,31 @@ struct RotaryEmbeddingRequest final {
     }
 };
 
+struct RotaryEmbeddingBatchRequest final {
+    float* values = nullptr;
+    const std::size_t* positions = nullptr;
+    std::size_t batch_size = 0;
+    std::size_t head_count = 0;
+    std::size_t head_dimension = 0;
+    std::size_t rotary_dimension = 0;
+    float frequency_base = 10000.0F;
+
+    Status validate() const {
+        if (values == nullptr || positions == nullptr || batch_size == 0 ||
+            head_count == 0 || head_dimension == 0 || rotary_dimension == 0 ||
+            rotary_dimension > head_dimension || rotary_dimension % 2 != 0) {
+            return Status::error("batch RoPE request has invalid pointer or dimensions");
+        }
+        if (!std::isfinite(frequency_base) || frequency_base <= 0.0F) {
+            return Status::error("batch RoPE frequency base must be finite and positive");
+        }
+        if (head_count > std::numeric_limits<std::size_t>::max() / head_dimension ||
+            batch_size > std::numeric_limits<std::size_t>::max() /
+                             (head_count * head_dimension)) {
+            return Status::error("batch RoPE element count overflows");
+        }
+        return Status::ok();
+    }
+};
+
 }  // namespace cpp_llm_engine::core

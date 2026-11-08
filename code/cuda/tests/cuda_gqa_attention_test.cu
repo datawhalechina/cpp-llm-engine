@@ -1,6 +1,6 @@
-// CUDA Backend：验证 causal GQA Attention 的 prefill、decode、head 映射和计时。
-// 职责：用独立 CPU 公式检查连续 KV、稳定 softmax及非整除 grid。
-// 通过条件：CPU/CUDA 逐元素误差通过，错误 shape 被拒绝并输出固定 event 均值。
+// CUDA Backend：验证三阶段与融合在线 GQA 的 prefill、decode、head 映射和计时。
+// 职责：用独立 CPU 公式检查连续 KV、稳定 softmax 和在线状态合并。
+// 通过条件：两条 CUDA 路径数值通过，错误 shape 被拒绝并输出 A/B event 均值。
 #include "cpp_llm_engine/core/gqa_attention_contract.h"
 #include "cpp_llm_engine/core/tensor_contract.h"
 #include "cpp_llm_engine/cuda/cuda_event.h"
@@ -223,6 +223,80 @@ bool test_errors() {
     return true;
 }
 
+bool test_fused_online_prefill_and_decode() {
+    const auto run_case = [](
+                              std::size_t query_tokens,
+                              std::size_t key_tokens,
+                              std::size_t position_offset) {
+        constexpr std::size_t query_heads = 4;
+        constexpr std::size_t kv_heads = 2;
+        constexpr std::size_t head_dimension = 64;
+        const std::size_t query_elements = query_tokens * query_heads * head_dimension;
+        const std::size_t kv_elements = key_tokens * kv_heads * head_dimension;
+        std::vector<float> query_host(query_elements);
+        std::vector<float> key_host(kv_elements);
+        std::vector<float> value_host(kv_elements);
+        for (std::size_t index = 0; index < query_elements; ++index) {
+            query_host[index] =
+                static_cast<float>(static_cast<int>(index % 17) - 8) * 0.03125F;
+        }
+        for (std::size_t index = 0; index < kv_elements; ++index) {
+            key_host[index] =
+                static_cast<float>(static_cast<int>(index % 13) - 6) * 0.025F;
+            value_host[index] =
+                static_cast<float>(static_cast<int>(index % 19) - 9) * 0.05F;
+        }
+        const auto golden = cpu_gqa(
+            query_host, key_host, value_host, query_tokens, key_tokens,
+            query_heads, kv_heads, head_dimension, position_offset);
+
+        DeviceBuffer query;
+        DeviceBuffer key;
+        DeviceBuffer value;
+        DeviceBuffer output;
+        CudaStream stream;
+        CHECK(DeviceBuffer::allocate(query_elements * sizeof(float), &query).is_ok());
+        CHECK(DeviceBuffer::allocate(kv_elements * sizeof(float), &key).is_ok());
+        CHECK(DeviceBuffer::allocate(kv_elements * sizeof(float), &value).is_ok());
+        CHECK(DeviceBuffer::allocate(query_elements * sizeof(float), &output).is_ok());
+        CHECK(CudaStream::create(&stream).is_ok());
+        CHECK(query.copy_from_host_async(
+            query_host.data(), query_elements * sizeof(float), stream).is_ok());
+        CHECK(key.copy_from_host_async(
+            key_host.data(), kv_elements * sizeof(float), stream).is_ok());
+        CHECK(value.copy_from_host_async(
+            value_host.data(), kv_elements * sizeof(float), stream).is_ok());
+        const GqaAttentionRequest request{
+            static_cast<const float*>(query.data()),
+            static_cast<const float*>(key.data()),
+            static_cast<const float*>(value.data()),
+            static_cast<float*>(output.data()),
+            query_tokens, key_tokens, query_heads, kv_heads, head_dimension,
+            position_offset, true, 0.0F};
+        CHECK(cpp_llm_engine::cuda::cuda_gqa_attention_backend()
+                  .compute_online(request, stream)
+                  .is_ok());
+        std::vector<float> actual(query_elements);
+        CHECK(output.copy_to_host_async(
+            actual.data(), query_elements * sizeof(float), stream).is_ok());
+        CHECK(stream.synchronize().is_ok());
+        for (std::size_t index = 0; index < actual.size(); ++index) {
+            CHECK(std::fabs(actual[index] - golden[index]) <= 4.0e-5F);
+        }
+
+        auto unsupported = request;
+        unsupported.head_dimension = 129;
+        CHECK(!cpp_llm_engine::cuda::cuda_gqa_attention_backend()
+                   .compute_online(unsupported, stream)
+                   .is_ok());
+        return true;
+    };
+
+    CHECK(run_case(5, 7, 2));
+    CHECK(run_case(1, 7, 6));
+    return true;
+}
+
 bool run_benchmark() {
     constexpr std::size_t query_tokens = 17;
     constexpr std::size_t key_tokens = 257;
@@ -279,8 +353,25 @@ bool run_benchmark() {
     }
     CHECK(end.record(stream).is_ok());
     CHECK(end.synchronize().is_ok());
-    float elapsed_ms = 0.0F;
-    CHECK(CudaEvent::elapsed_time_ms(start, end, &elapsed_ms).is_ok());
+    float three_stage_elapsed_ms = 0.0F;
+    CHECK(CudaEvent::elapsed_time_ms(start, end, &three_stage_elapsed_ms).is_ok());
+
+    for (int iteration = 0; iteration < warmup; ++iteration) {
+        CHECK(cpp_llm_engine::cuda::cuda_gqa_attention_backend()
+                  .compute_online(request, stream)
+                  .is_ok());
+    }
+    CHECK(stream.synchronize().is_ok());
+    CHECK(start.record(stream).is_ok());
+    for (int iteration = 0; iteration < iterations; ++iteration) {
+        CHECK(cpp_llm_engine::cuda::cuda_gqa_attention_backend()
+                  .compute_online(request, stream)
+                  .is_ok());
+    }
+    CHECK(end.record(stream).is_ok());
+    CHECK(end.synchronize().is_ok());
+    float fused_elapsed_ms = 0.0F;
+    CHECK(CudaEvent::elapsed_time_ms(start, end, &fused_elapsed_ms).is_ok());
     std::cout << "gqa_query_tokens=" << query_tokens
               << " key_tokens=" << key_tokens
               << " query_heads=" << query_heads
@@ -288,7 +379,8 @@ bool run_benchmark() {
               << " head_dimension=" << head_dimension
               << " warmup=" << warmup
               << " iterations=" << iterations
-              << " kernel_mean_ms=" << elapsed_ms / iterations << '\n';
+              << " three_stage_mean_ms=" << three_stage_elapsed_ms / iterations
+              << " fused_online_mean_ms=" << fused_elapsed_ms / iterations << '\n';
     return true;
 }
 
@@ -299,6 +391,7 @@ int main() {
     if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count <= 0) return 1;
     if (!test_errors()) return 1;
     if (!test_prefill_and_decode()) return 1;
+    if (!test_fused_online_prefill_and_decode()) return 1;
     if (!run_benchmark()) return 1;
     return 0;
 }

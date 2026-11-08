@@ -86,8 +86,59 @@ int main() {
         CHECK(output_host[index] == lhs_host[index] + rhs_host[index]);
     }
 
+    CudaTensor copied;
+    CHECK(CudaTensor::create_contiguous({elements}, DType::Float32, &copied).is_ok());
+    CHECK(context.copy(output, &copied).is_ok());
+    output_host.fill(0.0F);
+    CHECK(context.download(copied, output_host.data(), sizeof(output_host)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    for (std::size_t index = 0; index < elements; ++index) {
+        CHECK(output_host[index] == lhs_host[index] + rhs_host[index]);
+    }
+    CHECK(!context.copy(output, nullptr).is_ok());
+
+    CudaTensor row_a;
+    CudaTensor row_b;
+    CudaTensor row_c;
+    CudaTensor batch;
+    for (CudaTensor* row : {&row_a, &row_b, &row_c}) {
+        CHECK(CudaTensor::create_contiguous({4}, DType::Float32, row).is_ok());
+    }
+    CHECK(CudaTensor::create_contiguous({3, 4}, DType::Float32, &batch).is_ok());
+    const std::array<float, 4> row_a_host{1, 2, 3, 4};
+    const std::array<float, 4> row_b_host{5, 6, 7, 8};
+    const std::array<float, 4> row_c_host{9, 10, 11, 12};
+    CHECK(context.upload(&row_a, row_a_host.data(), sizeof(row_a_host)).is_ok());
+    CHECK(context.upload(&row_b, row_b_host.data(), sizeof(row_b_host)).is_ok());
+    CHECK(context.upload(&row_c, row_c_host.data(), sizeof(row_c_host)).is_ok());
+    CHECK(context.pack_rows({&row_a, &row_b, &row_c}, &batch).is_ok());
+    std::array<float, 12> batch_host{};
+    CHECK(context.download(batch, batch_host.data(), sizeof(batch_host)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    CHECK((batch_host == std::array<float, 12>{
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}));
+
+    const std::array<float, 12> replacement_batch{
+        12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1};
+    CHECK(context.upload(
+        &batch, replacement_batch.data(), sizeof(replacement_batch)).is_ok());
+    CHECK(context.unpack_rows(batch, {&row_a, &row_b, &row_c}).is_ok());
+    std::array<float, 4> unpacked_a{};
+    std::array<float, 4> unpacked_b{};
+    std::array<float, 4> unpacked_c{};
+    CHECK(context.download(row_a, unpacked_a.data(), sizeof(unpacked_a)).is_ok());
+    CHECK(context.download(row_b, unpacked_b.data(), sizeof(unpacked_b)).is_ok());
+    CHECK(context.download(row_c, unpacked_c.data(), sizeof(unpacked_c)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    CHECK((unpacked_a == std::array<float, 4>{12, 11, 10, 9}));
+    CHECK((unpacked_b == std::array<float, 4>{8, 7, 6, 5}));
+    CHECK((unpacked_c == std::array<float, 4>{4, 3, 2, 1}));
+    CHECK(!context.pack_rows({&row_a, &row_b}, &batch).is_ok());
+    CHECK(!context.unpack_rows(batch, {&row_a, nullptr, &row_c}).is_ok());
+
     CudaTensor wrong_shape;
     CHECK(CudaTensor::create_contiguous({256}, DType::Float32, &wrong_shape).is_ok());
+    CHECK(!context.copy(output, &wrong_shape).is_ok());
     CHECK(!context.vector_add(lhs, wrong_shape, &output).is_ok());
     CHECK(!context.vector_add(lhs, rhs, nullptr).is_ok());
 

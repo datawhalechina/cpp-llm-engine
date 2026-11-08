@@ -1,5 +1,5 @@
-// CUDA Quantized Linear：验证 Q4_K/Q6_K dequantize + SGEMM 基线。
-// 职责：与 Chapter05 CPU reference 对照，并覆盖 payload、shape、移动和 workspace 复用。
+// CUDA Quantized Linear：验证 Q4_K/Q6_K 融合 GEMV 和批量 SGEMM 回退。
+// 职责：与 Chapter05 CPU reference 对照，并覆盖 payload、shape、移动和 workspace。
 // 通过条件：真实 GPU 输出满足误差阈值，且测试不直接管理 DeviceBuffer/stream/handle。
 #include "chapter05_quantization/q4k_dequantize.h"
 #include "chapter05_quantization/q6k_dequantize.h"
@@ -43,6 +43,23 @@ std::vector<float> cpu_linear(
         for (std::size_t col = 0; col < cols; ++col) {
             output[row] += weights[row * cols + col] * input[col];
         }
+    }
+    return output;
+}
+
+std::vector<float> cpu_linear_batch(
+    const std::vector<float>& weights,
+    std::size_t rows,
+    std::size_t cols,
+    const std::vector<float>& input,
+    std::size_t batch_size) {
+    std::vector<float> output(batch_size * rows, 0.0F);
+    for (std::size_t batch = 0; batch < batch_size; ++batch) {
+        const std::vector<float> row(
+            input.begin() + static_cast<std::ptrdiff_t>(batch * cols),
+            input.begin() + static_cast<std::ptrdiff_t>((batch + 1) * cols));
+        const auto result = cpu_linear(weights, rows, cols, row);
+        std::copy(result.begin(), result.end(), output.begin() + batch * rows);
     }
     return output;
 }
@@ -150,6 +167,21 @@ int main() {
     CHECK(context.synchronize().is_ok());
     CHECK(close_enough(output_host[0], q4k_expected[0]));
     CHECK(close_enough(output_host[1], q4k_expected[1]));
+    CudaTensor embedding_row;
+    CHECK(CudaTensor::create_contiguous(
+        {256}, DType::Float32, &embedding_row).is_ok());
+    CHECK(context.embedding_lookup(q4k_weights, 1, &embedding_row).is_ok());
+    std::vector<float> embedding_host(256, 0.0F);
+    CHECK(context.download(
+        embedding_row,
+        embedding_host.data(),
+        embedding_host.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    for (std::size_t index = 0; index < embedding_host.size(); ++index) {
+        CHECK(close_enough(embedding_host[index], q4k_decoded[256 + index]));
+    }
+    CHECK(!context.embedding_lookup(q4k_weights, 2, &embedding_row).is_ok());
+    CHECK(!context.embedding_lookup(q4k_weights, 0, nullptr).is_ok());
     CudaTensor rank_three_output;
     CHECK(CudaTensor::create_contiguous(
         {1, 1, 2}, DType::Float32, &rank_three_output).is_ok());
@@ -162,8 +194,52 @@ int main() {
     CHECK(context.synchronize().is_ok());
     CHECK(close_enough(output_host[0], q4k_expected[0]));
     CHECK(close_enough(output_host[1], q4k_expected[1]));
+    CHECK(context.workspace_capacity_bytes() == 0);
+    CHECK(context.workspace_allocation_count() == 0);
+
+    constexpr std::size_t batch_size = 3;
+    std::vector<float> batch_input_host(batch_size * 256);
+    for (std::size_t batch = 0; batch < batch_size; ++batch) {
+        for (std::size_t col = 0; col < 256; ++col) {
+            batch_input_host[batch * 256 + col] =
+                input_host[col] * static_cast<float>(batch + 1);
+        }
+    }
+    const auto batch_expected = cpu_linear_batch(
+        q4k_decoded, 2, 256, batch_input_host, batch_size);
+    CudaTensor batch_input;
+    CudaTensor batch_output;
+    CHECK(CudaTensor::create_contiguous(
+        {batch_size, 256}, DType::Float32, &batch_input).is_ok());
+    CHECK(CudaTensor::create_contiguous(
+        {batch_size, 2}, DType::Float32, &batch_output).is_ok());
+    CHECK(context.upload(
+        &batch_input,
+        batch_input_host.data(),
+        batch_input_host.size() * sizeof(float)).is_ok());
+    CHECK(context.quantized_linear_batch(
+        q4k_weights, batch_input, &batch_output).is_ok());
+    std::vector<float> batch_output_host(batch_size * 2);
+    CHECK(context.download(
+        batch_output,
+        batch_output_host.data(),
+        batch_output_host.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
+        CHECK(close_enough(batch_output_host[index], batch_expected[index]));
+    }
     CHECK(context.workspace_capacity_bytes() == 512 * sizeof(float));
     CHECK(context.workspace_allocation_count() == 1);
+
+    CudaTensor wrong_batch_output;
+    CHECK(CudaTensor::create_contiguous(
+        {batch_size + 1, 2}, DType::Float32, &wrong_batch_output).is_ok());
+    CHECK(!context.quantized_linear_batch(
+        q4k_weights, input, &batch_output).is_ok());
+    CHECK(!context.quantized_linear_batch(
+        q4k_weights, batch_input, &wrong_batch_output).is_ok());
+    CHECK(!context.quantized_linear_batch(
+        q4k_weights, batch_input, nullptr).is_ok());
 
     const std::vector<std::uint8_t> q6k_payload = make_q6k_payload();
     std::vector<float> q6k_decoded;
@@ -190,6 +266,7 @@ int main() {
     CudaTensor wrong_output;
     CHECK(CudaTensor::create_contiguous({257}, DType::Float32, &wrong_input).is_ok());
     CHECK(CudaTensor::create_contiguous({3}, DType::Float32, &wrong_output).is_ok());
+    CHECK(!context.embedding_lookup(q4k_weights, 0, &wrong_output).is_ok());
     CHECK(!context.quantized_linear(q4k_weights, wrong_input, &output).is_ok());
     CHECK(!context.quantized_linear(q4k_weights, input, &wrong_output).is_ok());
     CHECK(!context.quantized_linear(q4k_weights, input, nullptr).is_ok());
@@ -253,14 +330,14 @@ int main() {
                   << " rows=" << benchmark_rows
                   << " cols=256 warmup=" << warmup
                   << " iterations=" << iterations
-                  << " dequant_sgemm_host_mean_ms=" << elapsed_ms / iterations
+                  << " fused_gemv_host_mean_ms=" << elapsed_ms / iterations
                   << '\n';
         return true;
     };
     CHECK(run_benchmark(q4k_benchmark_weights, "Q4_K"));
     CHECK(run_benchmark(q6k_benchmark_weights, "Q6_K"));
-    CHECK(context.workspace_capacity_bytes() == benchmark_rows * 256 * sizeof(float));
-    CHECK(context.workspace_allocation_count() == 2);
+    CHECK(context.workspace_capacity_bytes() == 512 * sizeof(float));
+    CHECK(context.workspace_allocation_count() == 1);
     std::vector<float> benchmark_output_host(benchmark_rows, 0.0F);
     CHECK(context.download(
         benchmark_output,

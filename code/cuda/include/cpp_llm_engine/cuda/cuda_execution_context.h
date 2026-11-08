@@ -12,10 +12,17 @@
 #include "cpp_llm_engine/cuda/cuda_workspace.h"
 
 #include <cstddef>
+#include <vector>
 
 namespace cpp_llm_engine::cuda {
 
+enum class CudaAttentionPath {
+    ThreeStage,
+    FusedOnline,
+};
+
 class CudaKvCache;
+class CudaPagedKvCache;
 
 class CudaExecutionContext final {
 public:
@@ -38,11 +45,25 @@ public:
         const CudaTensor& tensor,
         void* destination,
         std::size_t bytes) const;
+    core::Status copy(
+        const CudaTensor& source,
+        CudaTensor* destination) const;
+    core::Status pack_rows(
+        const std::vector<const CudaTensor*>& rows,
+        CudaTensor* batch) const;
+    core::Status unpack_rows(
+        const CudaTensor& batch,
+        const std::vector<CudaTensor*>& rows) const;
     core::Status vector_add(
         const CudaTensor& lhs,
         const CudaTensor& rhs,
         CudaTensor* output) const;
     core::Status rms_norm(
+        const CudaTensor& input,
+        const CudaTensor& weight,
+        CudaTensor* output,
+        float epsilon) const;
+    core::Status rms_norm_batch(
         const CudaTensor& input,
         const CudaTensor& weight,
         CudaTensor* output,
@@ -63,17 +84,41 @@ public:
         const CudaTensor& input,
         const CudaLinearWeight& weights,
         CudaTensor* output);
+    core::Status linear_batch(
+        const CudaTensor& input,
+        const CudaLinearWeight& weights,
+        CudaTensor* output);
     core::Status quantized_linear(
         const CudaQuantizedMatrix& weights,
         const CudaTensor& input,
         CudaTensor* output);
+    core::Status quantized_linear_batch(
+        const CudaQuantizedMatrix& weights,
+        const CudaTensor& input,
+        CudaTensor* output);
+    core::Status embedding_lookup(
+        const CudaQuantizedMatrix& table,
+        std::size_t row,
+        CudaTensor* output) const;
     core::Status rope(
         CudaTensor* values,
         std::size_t position_offset,
         std::size_t rotary_dimension,
         float frequency_base) const;
+    core::Status rope_batch(
+        CudaTensor* values,
+        const std::vector<std::size_t>& positions,
+        std::size_t rotary_dimension,
+        float frequency_base);
     core::Status append_kv(
         CudaKvCache* cache,
+        const CudaTensor& key,
+        const CudaTensor& value) const;
+    core::Status write_paged_kv(
+        CudaPagedKvCache* cache,
+        std::size_t layer,
+        std::size_t physical_block,
+        std::size_t slot,
         const CudaTensor& key,
         const CudaTensor& value) const;
     core::Status download_kv(
@@ -88,8 +133,21 @@ public:
         std::size_t query_position_offset,
         bool causal = true,
         float scale = 0.0F);
+    core::Status paged_gqa_attention(
+        const CudaTensor& query,
+        const CudaPagedKvCache& cache,
+        std::size_t layer,
+        const std::vector<std::size_t>& physical_blocks,
+        std::size_t key_tokens,
+        CudaTensor* output,
+        std::size_t query_position_offset,
+        bool causal = true,
+        float scale = 0.0F);
     core::Status reserve_workspace(std::size_t bytes);
     core::Status synchronize() const;
+
+    void set_attention_path(CudaAttentionPath path);
+    CudaAttentionPath attention_path() const;
 
     std::size_t workspace_capacity_bytes() const;
     std::size_t workspace_allocation_count() const;
@@ -99,6 +157,7 @@ private:
     CudaStream stream_;
     CublasMatmulBackend matmul_backend_;
     CudaWorkspace workspace_;
+    CudaAttentionPath attention_path_ = CudaAttentionPath::ThreeStage;
 };
 
 }  // namespace cpp_llm_engine::cuda

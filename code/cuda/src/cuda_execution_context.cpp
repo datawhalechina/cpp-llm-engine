@@ -11,9 +11,13 @@
 #include "cpp_llm_engine/cuda/elementwise_backend.h"
 #include "cpp_llm_engine/cuda/decoder_elementwise_backend.h"
 #include "cpp_llm_engine/cuda/cuda_kv_cache.h"
+#include "cpp_llm_engine/cuda/cuda_paged_kv_cache.h"
 #include "cpp_llm_engine/cuda/gqa_attention_backend.h"
 #include "cpp_llm_engine/cuda/quantized_dequantize_backend.h"
+#include "cpp_llm_engine/cuda/quantized_gemv_backend.h"
 #include "cpp_llm_engine/cuda/rope_backend.h"
+
+#include <cuda_runtime_api.h>
 
 #include <limits>
 #include <string>
@@ -82,6 +86,115 @@ core::Status CudaExecutionContext::download(
     return tensor.copy_to_host_async(destination, bytes, stream_);
 }
 
+core::Status CudaExecutionContext::copy(
+    const CudaTensor& source,
+    CudaTensor* destination) const {
+    if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
+    if (destination == nullptr) return core::Status::error("copy destination is null");
+    const core::Status source_status = validate_tensor(source, "copy source");
+    if (!source_status.is_ok()) return source_status;
+    const core::Status destination_status =
+        validate_tensor(*destination, "copy destination");
+    if (!destination_status.is_ok()) return destination_status;
+    if (!same_shape(source, *destination)) {
+        return core::Status::error("copy source and destination shapes must match");
+    }
+    if (source.data() == destination->data()) return core::Status::ok();
+    return CudaStatus::from(
+        cudaMemcpyAsync(
+            destination->data(), source.data(), source.size_bytes(),
+            cudaMemcpyDeviceToDevice, stream_.native_handle()),
+        "CudaExecutionContext D2D copy").to_core_status();
+}
+
+core::Status CudaExecutionContext::pack_rows(
+    const std::vector<const CudaTensor*>& rows,
+    CudaTensor* batch) const {
+    if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
+    if (rows.empty() || batch == nullptr) {
+        return core::Status::error("pack rows requires inputs and batch output");
+    }
+    const core::Status batch_status = validate_tensor(*batch, "pack rows batch");
+    if (!batch_status.is_ok()) return batch_status;
+    const auto& batch_shape = batch->contract().shape.dimensions;
+    if (batch_shape.size() < 2 || batch_shape[0] != rows.size()) {
+        return core::Status::error("pack rows requires batch with leading B dimension");
+    }
+    std::size_t batch_elements = 0;
+    if (!batch->contract().shape.checked_numel(&batch_elements).is_ok() ||
+        batch_elements % rows.size() != 0) {
+        return core::Status::error("pack rows batch element count is invalid");
+    }
+    const std::size_t row_elements = batch_elements / rows.size();
+    for (const CudaTensor* row : rows) {
+        if (row == nullptr) return core::Status::error("pack rows input is null");
+        const core::Status row_status = validate_tensor(*row, "pack row");
+        if (!row_status.is_ok()) return row_status;
+        std::size_t elements = 0;
+        if (!row->contract().shape.checked_numel(&elements).is_ok() ||
+            elements != row_elements) {
+            return core::Status::error("pack row elements do not match batch");
+        }
+    }
+    const std::size_t row_bytes = row_elements * sizeof(float);
+    auto* destination = static_cast<unsigned char*>(batch->data());
+    for (std::size_t index = 0; index < rows.size(); ++index) {
+        const CudaStatus status = CudaStatus::from(
+            cudaMemcpyAsync(
+                destination + index * row_bytes,
+                rows[index]->data(),
+                row_bytes,
+                cudaMemcpyDeviceToDevice,
+                stream_.native_handle()),
+            "pack rows D2D copy");
+        if (!status.is_ok()) return status.to_core_status();
+    }
+    return core::Status::ok();
+}
+
+core::Status CudaExecutionContext::unpack_rows(
+    const CudaTensor& batch,
+    const std::vector<CudaTensor*>& rows) const {
+    if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
+    if (rows.empty()) return core::Status::error("unpack rows output is empty");
+    const core::Status batch_status = validate_tensor(batch, "unpack rows batch");
+    if (!batch_status.is_ok()) return batch_status;
+    const auto& batch_shape = batch.contract().shape.dimensions;
+    if (batch_shape.size() < 2 || batch_shape[0] != rows.size()) {
+        return core::Status::error("unpack rows requires batch with leading B dimension");
+    }
+    std::size_t batch_elements = 0;
+    if (!batch.contract().shape.checked_numel(&batch_elements).is_ok() ||
+        batch_elements % rows.size() != 0) {
+        return core::Status::error("unpack rows batch element count is invalid");
+    }
+    const std::size_t row_elements = batch_elements / rows.size();
+    for (CudaTensor* row : rows) {
+        if (row == nullptr) return core::Status::error("unpack row output is null");
+        const core::Status row_status = validate_tensor(*row, "unpack row");
+        if (!row_status.is_ok()) return row_status;
+        std::size_t elements = 0;
+        if (!row->contract().shape.checked_numel(&elements).is_ok() ||
+            elements != row_elements) {
+            return core::Status::error("unpack row elements do not match batch");
+        }
+    }
+    const std::size_t row_bytes = row_elements * sizeof(float);
+    const auto* source = static_cast<const unsigned char*>(batch.data());
+    for (std::size_t index = 0; index < rows.size(); ++index) {
+        const CudaStatus status = CudaStatus::from(
+            cudaMemcpyAsync(
+                rows[index]->data(),
+                source + index * row_bytes,
+                row_bytes,
+                cudaMemcpyDeviceToDevice,
+                stream_.native_handle()),
+            "unpack rows D2D copy");
+        if (!status.is_ok()) return status.to_core_status();
+    }
+    return core::Status::ok();
+}
+
 core::Status CudaExecutionContext::vector_add(
     const CudaTensor& lhs,
     const CudaTensor& rhs,
@@ -127,6 +240,31 @@ core::Status CudaExecutionContext::rms_norm(
         static_cast<const float*>(weight.data()),
         static_cast<float*>(output->data()), elements, epsilon};
     return cuda_decoder_elementwise_backend().rms_norm(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::rms_norm_batch(
+    const CudaTensor& input,
+    const CudaTensor& weight,
+    CudaTensor* output,
+    float epsilon) const {
+    if (!valid() || output == nullptr) {
+        return core::Status::error("batch RMSNorm context/output invalid");
+    }
+    const auto& input_shape = input.contract().shape.dimensions;
+    const auto& weight_shape = weight.contract().shape.dimensions;
+    if (input_shape.size() != 2 || weight_shape.size() != 1 ||
+        output->contract().shape.dimensions != input_shape ||
+        input_shape[1] != weight_shape[0]) {
+        return core::Status::error(
+            "batch RMSNorm requires input/output[B,D] and weight[D]");
+    }
+    const core::RmsNormBatchRequest request{
+        static_cast<const float*>(input.data()),
+        static_cast<const float*>(weight.data()),
+        static_cast<float*>(output->data()),
+        input_shape[0], input_shape[1], epsilon};
+    return cuda_decoder_elementwise_backend().rms_norm_batch(
+        request, stream_).to_core_status();
 }
 
 core::Status CudaExecutionContext::swiglu(
@@ -200,6 +338,45 @@ core::Status CudaExecutionContext::linear(
     return matmul_backend_.compute(request, stream_).to_core_status();
 }
 
+core::Status CudaExecutionContext::linear_batch(
+    const CudaTensor& input,
+    const CudaLinearWeight& weights,
+    CudaTensor* output) {
+    if (!valid() || !weights.valid() || output == nullptr) {
+        return core::Status::error("batch linear context, weights or output invalid");
+    }
+    const auto& input_shape = input.contract().shape.dimensions;
+    const auto& output_shape = output->contract().shape.dimensions;
+    if (input_shape.size() < 2 || output_shape.size() < 2 ||
+        input_shape[0] != output_shape[0]) {
+        return core::Status::error("batch linear requires matching leading B dimension");
+    }
+    std::size_t input_elements = 0;
+    std::size_t output_elements = 0;
+    if (!input.contract().shape.checked_numel(&input_elements).is_ok() ||
+        !output->contract().shape.checked_numel(&output_elements).is_ok() ||
+        input_elements % input_shape[0] != 0 ||
+        output_elements % output_shape[0] != 0) {
+        return core::Status::error("batch linear element count is invalid");
+    }
+    const std::size_t input_width = input_elements / input_shape[0];
+    const std::size_t output_width = output_elements / output_shape[0];
+    if (weights.kind() == CudaLinearWeight::Kind::Float32) {
+        const CudaTensor* matrix = weights.float32_tensor();
+        if (matrix == nullptr || matrix->contract().shape.dimensions !=
+            std::vector<std::size_t>{input_width, output_width}) {
+            return core::Status::error("batch Float32 Linear weight shape is invalid");
+        }
+        const core::MatmulRequest request{
+            static_cast<const float*>(input.data()),
+            static_cast<const float*>(matrix->data()),
+            static_cast<float*>(output->data()),
+            input_shape[0], input_width, output_width};
+        return matmul_backend_.compute(request, stream_).to_core_status();
+    }
+    return quantized_linear_batch(*weights.quantized_matrix(), input, output);
+}
+
 core::Status CudaExecutionContext::linear(
     const CudaTensor& input,
     const CudaLinearWeight& weights,
@@ -230,26 +407,84 @@ core::Status CudaExecutionContext::quantized_linear(
         return core::Status::error(
             "quantized_linear requires input/output element counts matching weights");
     }
+    return cuda_quantized_gemv_backend().compute(
+        weights,
+        static_cast<const float*>(input.data()),
+        input_elements,
+        static_cast<float*>(output->data()),
+        output_elements,
+        stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::quantized_linear_batch(
+    const CudaQuantizedMatrix& weights,
+    const CudaTensor& input,
+    CudaTensor* output) {
+    if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
+    if (weights.empty()) return core::Status::error("batch quantized weights are empty");
+    if (output == nullptr) return core::Status::error("batch quantized output is null");
+    const core::Status input_status = validate_tensor(input, "batch quantized input");
+    if (!input_status.is_ok()) return input_status;
+    const core::Status output_status = validate_tensor(*output, "batch quantized output");
+    if (!output_status.is_ok()) return output_status;
+    const auto& input_shape = input.contract().shape.dimensions;
+    const auto& output_shape = output->contract().shape.dimensions;
+    if (input_shape.size() < 2 || output_shape.size() < 2 ||
+        input_shape[0] != output_shape[0]) {
+        return core::Status::error(
+            "batch quantized linear requires matching leading B dimension");
+    }
+    std::size_t input_elements = 0;
+    std::size_t output_elements = 0;
+    if (!input.contract().shape.checked_numel(&input_elements).is_ok() ||
+        !output->contract().shape.checked_numel(&output_elements).is_ok() ||
+        input_elements / input_shape[0] != weights.cols() ||
+        output_elements / output_shape[0] != weights.rows()) {
+        return core::Status::error(
+            "batch quantized linear row widths do not match weights");
+    }
     if (weights.rows() > std::numeric_limits<std::size_t>::max() / weights.cols()) {
-        return core::Status::error("quantized_linear element count overflows");
+        return core::Status::error("batch quantized linear element count overflows");
     }
     const std::size_t elements = weights.rows() * weights.cols();
     if (elements > std::numeric_limits<std::size_t>::max() / sizeof(float)) {
-        return core::Status::error("quantized_linear workspace byte count overflows");
+        return core::Status::error("batch quantized linear workspace byte count overflows");
     }
     const core::Status workspace_status = reserve_workspace(elements * sizeof(float));
     if (!workspace_status.is_ok()) return workspace_status;
     const CudaStatus dequantize_status = cuda_quantized_dequantize_backend().dequantize(
         weights, static_cast<float*>(workspace_.data()), elements, stream_);
     if (!dequantize_status.is_ok()) return dequantize_status.to_core_status();
-    const core::MatmulRequest request{
-        static_cast<const float*>(workspace_.data()),
+    return matmul_backend_.compute_rhs_transposed(
         static_cast<const float*>(input.data()),
+        static_cast<const float*>(workspace_.data()),
         static_cast<float*>(output->data()),
-        weights.rows(),
+        input_shape[0],
         weights.cols(),
-        1};
-    return matmul_backend_.compute(request, stream_).to_core_status();
+        weights.rows(),
+        stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::embedding_lookup(
+    const CudaQuantizedMatrix& table,
+    std::size_t row,
+    CudaTensor* output) const {
+    if (!valid() || table.empty() || output == nullptr) {
+        return core::Status::error("embedding lookup context/table/output is invalid");
+    }
+    const core::Status output_status = validate_tensor(*output, "embedding output");
+    if (!output_status.is_ok()) return output_status;
+    std::size_t output_elements = 0;
+    if (!output->contract().shape.checked_numel(&output_elements).is_ok() ||
+        output_elements != table.cols()) {
+        return core::Status::error("embedding output width does not match table");
+    }
+    return cuda_quantized_dequantize_backend().dequantize_row(
+        table,
+        row,
+        static_cast<float*>(output->data()),
+        output_elements,
+        stream_).to_core_status();
 }
 
 core::Status CudaExecutionContext::rope(
@@ -274,6 +509,42 @@ core::Status CudaExecutionContext::rope(
         position_offset,
         frequency_base};
     return cuda_rope_backend().apply(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::rope_batch(
+    CudaTensor* values,
+    const std::vector<std::size_t>& positions,
+    std::size_t rotary_dimension,
+    float frequency_base) {
+    if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
+    if (values == nullptr || positions.empty()) {
+        return core::Status::error("batch RoPE values or positions are empty");
+    }
+    const core::Status tensor_status = validate_tensor(*values, "batch RoPE tensor");
+    if (!tensor_status.is_ok()) return tensor_status;
+    const auto& shape = values->contract().shape.dimensions;
+    if (shape.size() != 3 || shape[0] != positions.size()) {
+        return core::Status::error(
+            "batch RoPE requires values[B,H,D] and one position per row");
+    }
+    if (positions.size() > std::numeric_limits<std::size_t>::max() /
+                               sizeof(std::size_t)) {
+        return core::Status::error("batch RoPE position byte count overflows");
+    }
+    const std::size_t position_bytes = positions.size() * sizeof(std::size_t);
+    const core::Status workspace_status = reserve_workspace(position_bytes);
+    if (!workspace_status.is_ok()) return workspace_status;
+    const CudaStatus upload_status = CudaStatus::from(
+        cudaMemcpyAsync(
+            workspace_.data(), positions.data(), position_bytes,
+            cudaMemcpyHostToDevice, stream_.native_handle()),
+        "batch RoPE positions upload");
+    if (!upload_status.is_ok()) return upload_status.to_core_status();
+    const core::RotaryEmbeddingBatchRequest request{
+        static_cast<float*>(values->data()),
+        static_cast<const std::size_t*>(workspace_.data()),
+        shape[0], shape[1], shape[2], rotary_dimension, frequency_base};
+    return cuda_rope_backend().apply_batch(request, stream_).to_core_status();
 }
 
 core::Status CudaExecutionContext::gqa_attention(
@@ -315,6 +586,11 @@ core::Status CudaExecutionContext::gqa_attention(
         scale};
     const core::Status request_status = request.validate();
     if (!request_status.is_ok()) return request_status;
+    if (attention_path_ == CudaAttentionPath::FusedOnline) {
+        return cuda_gqa_attention_backend()
+            .compute_online(request, stream_)
+            .to_core_status();
+    }
     if (request.score_count() >
         std::numeric_limits<std::size_t>::max() / sizeof(float)) {
         return core::Status::error("GQA workspace byte count overflows");
@@ -327,6 +603,99 @@ core::Status CudaExecutionContext::gqa_attention(
         stream_).to_core_status();
 }
 
+void CudaExecutionContext::set_attention_path(CudaAttentionPath path) {
+    attention_path_ = path;
+}
+
+CudaAttentionPath CudaExecutionContext::attention_path() const {
+    return attention_path_;
+}
+
+core::Status CudaExecutionContext::paged_gqa_attention(
+    const CudaTensor& query,
+    const CudaPagedKvCache& cache,
+    std::size_t layer,
+    const std::vector<std::size_t>& physical_blocks,
+    std::size_t key_tokens,
+    CudaTensor* output,
+    std::size_t query_position_offset,
+    bool causal,
+    float scale) {
+    if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
+    if (output == nullptr) return core::Status::error("paged GQA output is null");
+    const core::Status query_status = validate_tensor(query, "paged GQA query");
+    if (!query_status.is_ok()) return query_status;
+    const core::Status output_status = validate_tensor(*output, "paged GQA output");
+    if (!output_status.is_ok()) return output_status;
+    const auto& query_shape = query.contract().shape.dimensions;
+    if (!cache.valid() || layer >= cache.layer_count() || key_tokens == 0 ||
+        query_shape.size() != 3 || output->contract().shape.dimensions != query_shape ||
+        query_shape[2] != cache.head_dimension() ||
+        query_shape[1] % cache.kv_head_count() != 0 || physical_blocks.empty()) {
+        return core::Status::error("paged GQA tensor, cache, or page table is invalid");
+    }
+    if (physical_blocks.size() >
+            std::numeric_limits<std::size_t>::max() / cache.block_size() ||
+        key_tokens > physical_blocks.size() * cache.block_size()) {
+        return core::Status::error("paged GQA key tokens exceed the page table");
+    }
+    for (const std::size_t block : physical_blocks) {
+        if (block >= cache.total_blocks()) {
+            return core::Status::error("paged GQA physical block is out of range");
+        }
+    }
+    CudaPagedGqaAttentionRequest request{
+        static_cast<const float*>(query.data()),
+        cache.key_data(),
+        cache.value_data(),
+        physical_blocks.data(),
+        static_cast<float*>(output->data()),
+        query_shape[0],
+        key_tokens,
+        query_shape[1],
+        cache.kv_head_count(),
+        query_shape[2],
+        query_position_offset,
+        layer,
+        cache.layer_count(),
+        cache.total_blocks(),
+        cache.block_size(),
+        physical_blocks.size(),
+        causal,
+        scale};
+    const core::Status request_status = request.validate();
+    if (!request_status.is_ok()) return request_status;
+    if (request.score_count() >
+        std::numeric_limits<std::size_t>::max() / sizeof(float)) {
+        return core::Status::error("paged GQA score workspace overflows");
+    }
+    if (physical_blocks.size() >
+        std::numeric_limits<std::size_t>::max() / sizeof(std::size_t)) {
+        return core::Status::error("paged GQA page table bytes overflow");
+    }
+    const std::size_t page_bytes = physical_blocks.size() * sizeof(std::size_t);
+    const std::size_t score_bytes = request.score_count() * sizeof(float);
+    if (page_bytes > std::numeric_limits<std::size_t>::max() - score_bytes) {
+        return core::Status::error("paged GQA total workspace overflows");
+    }
+    const core::Status workspace_status = reserve_workspace(page_bytes + score_bytes);
+    if (!workspace_status.is_ok()) return workspace_status;
+    auto* workspace_bytes = static_cast<unsigned char*>(workspace_.data());
+    const CudaStatus copy_status = CudaStatus::from(
+        cudaMemcpyAsync(
+            workspace_bytes,
+            physical_blocks.data(),
+            page_bytes,
+            cudaMemcpyHostToDevice,
+            stream_.native_handle()),
+        "paged GQA page table H2D");
+    if (!copy_status.is_ok()) return copy_status.to_core_status();
+    request.physical_blocks = reinterpret_cast<const std::size_t*>(workspace_bytes);
+    auto* scores = reinterpret_cast<float*>(workspace_bytes + page_bytes);
+    return cuda_gqa_attention_backend().compute_paged(
+        request, scores, request.score_count(), stream_).to_core_status();
+}
+
 core::Status CudaExecutionContext::append_kv(
     CudaKvCache* cache,
     const CudaTensor& key,
@@ -334,6 +703,19 @@ core::Status CudaExecutionContext::append_kv(
     if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
     if (cache == nullptr) return core::Status::error("KV Cache is null");
     return cache->append(key, value, stream_);
+}
+
+core::Status CudaExecutionContext::write_paged_kv(
+    CudaPagedKvCache* cache,
+    std::size_t layer,
+    std::size_t physical_block,
+    std::size_t slot,
+    const CudaTensor& key,
+    const CudaTensor& value) const {
+    if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
+    if (cache == nullptr) return core::Status::error("paged KV cache is null");
+    return cache->write_token(
+        layer, physical_block, slot, key, value, stream_);
 }
 
 core::Status CudaExecutionContext::download_kv(

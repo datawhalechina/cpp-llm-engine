@@ -138,6 +138,15 @@ core::Status CudaKvCache::copy_to_host_async(
     return value_.copy_to_host_async(value, bytes, stream).to_core_status();
 }
 
+core::Status CudaKvCache::trim(std::size_t token_count) {
+    if (!valid()) return core::Status::error("CudaKvCache is not initialized");
+    if (token_count > size_tokens_) {
+        return core::Status::error("CudaKvCache trim cannot grow the cache");
+    }
+    size_tokens_ = token_count;
+    return core::Status::ok();
+}
+
 void CudaKvCache::clear() { size_tokens_ = 0; }
 
 core::Status CudaKvCache::reset() {

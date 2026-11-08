@@ -39,6 +39,7 @@ public:
         float* value,
         std::size_t token_count,
         const CudaStream& stream) const;
+    core::Status trim(std::size_t token_count);
     void clear();
     core::Status reset();
 
