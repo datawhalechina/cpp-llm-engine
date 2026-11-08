@@ -19,6 +19,9 @@ std::size_t BlockTable::block_count() const { return physical_blocks_.size(); }
 std::size_t BlockTable::capacity_tokens() const {
     return physical_blocks_.size() * block_size_;
 }
+std::size_t BlockTable::immutable_prefix_tokens() const {
+    return immutable_prefix_tokens_;
+}
 const std::vector<std::size_t>& BlockTable::physical_blocks() const {
     return physical_blocks_;
 }
@@ -39,6 +42,19 @@ BlockLocation BlockTable::locate_reserved(std::size_t token_index) const {
 
 void BlockTable::append_block(std::size_t physical_block) {
     physical_blocks_.push_back(physical_block);
+}
+
+void BlockTable::attach_prefix(
+    const std::vector<std::size_t>& physical_blocks,
+    std::size_t token_count) {
+    if (!physical_blocks_.empty() || token_count == 0 ||
+        token_count % block_size_ != 0 ||
+        physical_blocks.size() != token_count / block_size_) {
+        throw std::invalid_argument("shared prefix must contain complete blocks");
+    }
+    physical_blocks_ = physical_blocks;
+    token_count_ = token_count;
+    immutable_prefix_tokens_ = token_count;
 }
 
 std::size_t BlockTable::remove_last_block() {
@@ -65,12 +81,13 @@ KvBlockPool::KvBlockPool(std::size_t total_blocks, std::size_t block_size)
     if (total_blocks > std::numeric_limits<std::size_t>::max() / block_size_) {
         throw std::overflow_error("KV block capacity overflows size_t");
     }
-    free_.assign(total_blocks, true);
+    block_ref_counts_.assign(total_blocks, 0);
 }
 
-std::size_t KvBlockPool::total_blocks() const { return free_.size(); }
+std::size_t KvBlockPool::total_blocks() const { return block_ref_counts_.size(); }
 std::size_t KvBlockPool::free_blocks() const {
-    return static_cast<std::size_t>(std::count(free_.begin(), free_.end(), true));
+    return static_cast<std::size_t>(
+        std::count(block_ref_counts_.begin(), block_ref_counts_.end(), 0));
 }
 std::size_t KvBlockPool::used_blocks() const { return total_blocks() - free_blocks(); }
 std::size_t KvBlockPool::block_size() const { return block_size_; }
@@ -95,6 +112,10 @@ std::vector<std::size_t> KvBlockPool::physical_blocks(std::size_t request_id) co
         ? std::vector<std::size_t>{}
         : table->second.physical_blocks();
 }
+std::size_t KvBlockPool::block_ref_count(std::size_t physical_block) const {
+    return physical_block >= block_ref_counts_.size()
+        ? 0 : block_ref_counts_[physical_block];
+}
 
 bool KvBlockPool::reserve(std::size_t request_id, std::size_t total_tokens) {
     const std::size_t target_blocks = required_blocks(total_tokens);
@@ -109,10 +130,10 @@ bool KvBlockPool::reserve(std::size_t request_id, std::size_t total_tokens) {
         table = tables_.emplace(request_id, BlockTable(block_size_)).first;
     }
     for (std::size_t block = 0, allocated = 0;
-         block < free_.size() && allocated < additional_blocks;
+         block < block_ref_counts_.size() && allocated < additional_blocks;
          ++block) {
-        if (!free_[block]) continue;
-        free_[block] = false;
+        if (block_ref_counts_[block] != 0) continue;
+        block_ref_counts_[block] = 1;
         table->second.append_block(block);
         ++allocated;
     }
@@ -132,11 +153,13 @@ bool KvBlockPool::commit_tokens(std::size_t request_id, std::size_t total_tokens
 bool KvBlockPool::trim_to_tokens(std::size_t request_id, std::size_t total_tokens) {
     auto table = tables_.find(request_id);
     if (table == tables_.end()) return total_tokens == 0;
-    if (total_tokens > table->second.token_count()) return false;
+    if (total_tokens > table->second.token_count() ||
+        (total_tokens != 0 &&
+         total_tokens < table->second.immutable_prefix_tokens())) return false;
 
     const std::size_t target_blocks = required_blocks(total_tokens);
     while (table->second.block_count() > target_blocks) {
-        free_[table->second.remove_last_block()] = true;
+        release_block(table->second.remove_last_block());
     }
     table->second.set_token_count(total_tokens);
     if (target_blocks == 0) tables_.erase(table);
@@ -146,8 +169,58 @@ bool KvBlockPool::trim_to_tokens(std::size_t request_id, std::size_t total_token
 bool KvBlockPool::release(std::size_t request_id) {
     auto table = tables_.find(request_id);
     if (table == tables_.end()) return false;
-    for (const std::size_t block : table->second.physical_blocks()) free_[block] = true;
+    for (const std::size_t block : table->second.physical_blocks()) release_block(block);
     tables_.erase(table);
+    return true;
+}
+
+bool KvBlockPool::attach_shared_prefix(
+    std::size_t request_id,
+    const std::vector<std::size_t>& physical_blocks,
+    std::size_t token_count) {
+    if (contains(request_id) || token_count == 0 || token_count % block_size_ != 0 ||
+        physical_blocks.size() != required_blocks(token_count)) return false;
+    std::vector<bool> seen(total_blocks(), false);
+    for (const std::size_t block : physical_blocks) {
+        if (block >= total_blocks() || seen[block] || block_ref_counts_[block] == 0 ||
+            block_ref_counts_[block] == std::numeric_limits<std::size_t>::max()) {
+            return false;
+        }
+        seen[block] = true;
+    }
+    BlockTable table(block_size_);
+    table.attach_prefix(physical_blocks, token_count);
+    for (const std::size_t block : physical_blocks) ++block_ref_counts_[block];
+    tables_.emplace(request_id, std::move(table));
+    return true;
+}
+
+bool KvBlockPool::retain_blocks(
+    const std::vector<std::size_t>& physical_blocks) {
+    if (physical_blocks.empty()) return false;
+    std::vector<bool> seen(total_blocks(), false);
+    for (const std::size_t block : physical_blocks) {
+        if (block >= total_blocks() || seen[block] || block_ref_counts_[block] == 0 ||
+            block_ref_counts_[block] == std::numeric_limits<std::size_t>::max()) {
+            return false;
+        }
+        seen[block] = true;
+    }
+    for (const std::size_t block : physical_blocks) ++block_ref_counts_[block];
+    return true;
+}
+
+bool KvBlockPool::release_retained_blocks(
+    const std::vector<std::size_t>& physical_blocks) {
+    if (physical_blocks.empty()) return false;
+    std::vector<bool> seen(total_blocks(), false);
+    for (const std::size_t block : physical_blocks) {
+        if (block >= total_blocks() || seen[block] || block_ref_counts_[block] == 0) {
+            return false;
+        }
+        seen[block] = true;
+    }
+    for (const std::size_t block : physical_blocks) release_block(block);
     return true;
 }
 
@@ -169,6 +242,14 @@ BlockLocation KvBlockPool::locate_reserved(
 
 std::size_t KvBlockPool::required_blocks(std::size_t token_count) const {
     return token_count / block_size_ + (token_count % block_size_ == 0 ? 0 : 1);
+}
+
+void KvBlockPool::release_block(std::size_t physical_block) {
+    if (physical_block >= block_ref_counts_.size() ||
+        block_ref_counts_[physical_block] == 0) {
+        throw std::logic_error("cannot release an unreferenced KV block");
+    }
+    --block_ref_counts_[physical_block];
 }
 
 }  // namespace chapter07_kv_cache

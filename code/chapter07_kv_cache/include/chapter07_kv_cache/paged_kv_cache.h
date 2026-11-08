@@ -45,6 +45,15 @@ public:
         std::size_t token_index) const override;
 
     bool reserve(std::size_t request_id, std::size_t total_tokens) override;
+    bool attach_shared_prefix(
+        std::size_t request_id,
+        const std::vector<std::size_t>& physical_blocks,
+        std::size_t token_count);
+    bool retain_prefix_blocks(
+        const std::vector<std::size_t>& physical_blocks);
+    bool release_prefix_blocks(
+        const std::vector<std::size_t>& physical_blocks);
+    std::size_t block_ref_count(std::size_t physical_block) const;
     bool write_token(
         std::size_t request_id,
         std::size_t layer,

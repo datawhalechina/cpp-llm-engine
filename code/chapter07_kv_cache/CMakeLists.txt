@@ -13,6 +13,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/../testing/cmake/CppLlmTesting.cmake)
 add_library(chapter07_kv_cache
     src/block_table.cpp
     src/paged_kv_cache.cpp
+    src/radix_prefix_cache.cpp
 )
 
 target_include_directories(chapter07_kv_cache
@@ -41,4 +42,10 @@ add_chapter07_test(
     tests/paged_kv_cache_test.cpp
     "cache;transaction"
     component
+)
+add_chapter07_test(
+    chapter07_radix_prefix_cache_test
+    tests/radix_prefix_cache_test.cpp
+    "cache;prefix;radix"
+    integration
 )

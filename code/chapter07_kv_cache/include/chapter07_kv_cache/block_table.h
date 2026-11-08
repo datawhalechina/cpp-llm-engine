@@ -51,6 +51,7 @@ public:
     std::size_t token_count() const;
     std::size_t block_count() const;
     std::size_t capacity_tokens() const;
+    std::size_t immutable_prefix_tokens() const;
     const std::vector<std::size_t>& physical_blocks() const;
     BlockLocation locate(std::size_t token_index) const;
     BlockLocation locate_reserved(std::size_t token_index) const;
@@ -59,11 +60,15 @@ private:
     friend class KvBlockPool;
 
     void append_block(std::size_t physical_block);
+    void attach_prefix(
+        const std::vector<std::size_t>& physical_blocks,
+        std::size_t token_count);
     std::size_t remove_last_block();
     void set_token_count(std::size_t token_count);
 
     std::size_t block_size_;
     std::size_t token_count_ = 0;
+    std::size_t immutable_prefix_tokens_ = 0;
     std::vector<std::size_t> physical_blocks_;
 };
 
@@ -81,11 +86,19 @@ public:
     std::size_t capacity_tokens(std::size_t request_id) const override;
     std::vector<std::size_t> physical_blocks(
         std::size_t request_id) const override;
+    std::size_t block_ref_count(std::size_t physical_block) const;
 
     bool reserve(std::size_t request_id, std::size_t total_tokens) override;
     bool commit_tokens(std::size_t request_id, std::size_t total_tokens) override;
     bool trim_to_tokens(std::size_t request_id, std::size_t total_tokens) override;
     bool release(std::size_t request_id) override;
+    bool attach_shared_prefix(
+        std::size_t request_id,
+        const std::vector<std::size_t>& physical_blocks,
+        std::size_t token_count);
+    bool retain_blocks(const std::vector<std::size_t>& physical_blocks);
+    bool release_retained_blocks(
+        const std::vector<std::size_t>& physical_blocks);
     BlockLocation locate(
         std::size_t request_id,
         std::size_t token_index) const override;
@@ -95,9 +108,10 @@ public:
 
 private:
     std::size_t required_blocks(std::size_t token_count) const;
+    void release_block(std::size_t physical_block);
 
     std::size_t block_size_;
-    std::vector<bool> free_;
+    std::vector<std::size_t> block_ref_counts_;
     std::unordered_map<std::size_t, BlockTable> tables_;
 };
 

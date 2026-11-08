@@ -103,6 +103,33 @@ bool CpuPagedKvCache::reserve(std::size_t request_id, std::size_t total_tokens) 
     return block_pool_.reserve(request_id, total_tokens);
 }
 
+bool CpuPagedKvCache::attach_shared_prefix(
+    std::size_t request_id,
+    const std::vector<std::size_t>& physical_blocks,
+    std::size_t token_count) {
+    return block_pool_.attach_shared_prefix(
+        request_id, physical_blocks, token_count);
+}
+
+bool CpuPagedKvCache::retain_prefix_blocks(
+    const std::vector<std::size_t>& physical_blocks) {
+    return block_pool_.retain_blocks(physical_blocks);
+}
+
+bool CpuPagedKvCache::release_prefix_blocks(
+    const std::vector<std::size_t>& physical_blocks) {
+    if (!block_pool_.release_retained_blocks(physical_blocks)) return false;
+    for (const std::size_t block : physical_blocks) {
+        if (block_pool_.block_ref_count(block) == 0) clear_block(block);
+    }
+    return true;
+}
+
+std::size_t CpuPagedKvCache::block_ref_count(
+    std::size_t physical_block) const {
+    return block_pool_.block_ref_count(physical_block);
+}
+
 bool CpuPagedKvCache::write_token(
     std::size_t request_id,
     std::size_t layer,
@@ -217,15 +244,23 @@ bool CpuPagedKvCache::trim_to_tokens(
     if (!block_pool_.contains(request_id)) return total_tokens == 0;
     if (total_tokens > block_pool_.token_count(request_id)) return false;
     const std::vector<std::size_t> blocks = block_pool_.physical_blocks(request_id);
-    const std::size_t old_capacity = blocks.size() * block_size_;
-    for (std::size_t token = total_tokens; token < old_capacity; ++token) {
-        const BlockLocation location{blocks[token / block_size_], token % block_size_};
-        for (std::size_t layer = 0; layer < layer_count_; ++layer) {
-            clear_slot(layer, location);
-        }
+    if (!block_pool_.trim_to_tokens(request_id, total_tokens)) return false;
+
+    const std::size_t kept_blocks =
+        total_tokens / block_size_ + (total_tokens % block_size_ == 0 ? 0 : 1);
+    for (std::size_t index = kept_blocks; index < blocks.size(); ++index) {
+        if (block_pool_.block_ref_count(blocks[index]) == 0) clear_block(blocks[index]);
     }
-    if (!block_pool_.trim_to_tokens(request_id, total_tokens)) {
-        throw std::logic_error("validated paged KV trim failed");
+    if (total_tokens % block_size_ != 0 && kept_blocks != 0) {
+        const std::size_t block = blocks[kept_blocks - 1];
+        if (block_pool_.block_ref_count(block) == 1) {
+            for (std::size_t slot = total_tokens % block_size_;
+                 slot < block_size_; ++slot) {
+                for (std::size_t layer = 0; layer < layer_count_; ++layer) {
+                    clear_slot(layer, {block, slot});
+                }
+            }
+        }
     }
     return true;
 }
@@ -233,9 +268,11 @@ bool CpuPagedKvCache::trim_to_tokens(
 bool CpuPagedKvCache::release(std::size_t request_id) {
     const std::vector<std::size_t> blocks = block_pool_.physical_blocks(request_id);
     if (blocks.empty()) return false;
-    for (const std::size_t block : blocks) clear_block(block);
     if (!block_pool_.release(request_id)) {
         throw std::logic_error("validated paged KV release failed");
+    }
+    for (const std::size_t block : blocks) {
+        if (block_pool_.block_ref_count(block) == 0) clear_block(block);
     }
     return true;
 }
