@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 330" role="img" aria-labelledby="title desc">
   <title id="title">Chapter 00 在教程中的位置与学习步骤</title>
-  <desc id="desc">Foundation 之后先完成 A 准备检查，再通过 B 真实基线运行 TinyLlama，随后进入 Chapter01 到 Chapter06。</desc>
+  <desc id="desc">Foundation 之后先完成 A 准备检查，再通过 B 真实基线运行 TinyLlama，随后进入 Chapter01 到 Chapter10。</desc>
   <defs>
     <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#64748b"/></marker>
     <style>
@@ -21,7 +21,7 @@
   <text x="287" y="163" text-anchor="middle" class="label" fill="#ffffff">Chapter 00</text>
   <text x="287" y="185" text-anchor="middle" class="small" fill="#dbeafe">真实外部基线</text>
   <rect x="394" y="143" width="115" height="52" rx="9" fill="#ffffff"/>
-  <text x="451" y="165" text-anchor="middle" class="label">Chapter01–06</text>
+  <text x="451" y="165" text-anchor="middle" class="label">Chapter01–10</text>
   <text x="451" y="184" text-anchor="middle" class="small">自研 CPU 主线</text>
   <path d="M180 169H218M356 169H394" class="line"/>
   <rect x="566" y="65" width="598" height="225" rx="14" fill="#fff7ed"/>

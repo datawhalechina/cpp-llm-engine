@@ -21,3 +21,13 @@ add_test(NAME chapter00_quickstart_test COMMAND chapter00_quickstart --check)
 cpp_llm_set_test_labels(chapter00_quickstart_test smoke quickstart)
 cpp_llm_set_test_contract(
     chapter00_quickstart_test OWNER 00 LEVEL e2e STATUS active)
+
+find_program(BASH_EXECUTABLE bash REQUIRED)
+add_test(
+    NAME chapter00_real_inference_script_test
+    COMMAND ${BASH_EXECUTABLE}
+            ${CMAKE_CURRENT_LIST_DIR}/tests/run_real_inference_contract.sh)
+cpp_llm_set_test_labels(
+    chapter00_real_inference_script_test quickstart script contract)
+cpp_llm_set_test_contract(
+    chapter00_real_inference_script_test OWNER 00 LEVEL contract STATUS active)

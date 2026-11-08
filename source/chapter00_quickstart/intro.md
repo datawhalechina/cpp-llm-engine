@@ -41,4 +41,4 @@ bash code/chapter00_quickstart/run.sh
 | --- | --- | --- | --- |
 | L1 默认 CPU | `bash code/chapter00_quickstart/run.sh` | 仓库快速检查编译成功并输出 `smoke check passed` | 必做 |
 | L2 真实模型 | `bash code/chapter00_quickstart/run_real_inference.sh` | TinyLlama GGUF 被读取，真实分词器处理输入文本，模型生成结果并正常退出 | 必做 |
-| L3 可选 CUDA | 不单独设置 Chapter00 CUDA 验收 | GPU 计算后端从 Chapter03 和 Chapter05 开始验证 | 不适用 |
+| L3 可选 CUDA | 使用 `llama.cpp/build-cuda` 运行同一真实推理脚本 | 外部 GPU 基线生成非空结果；不代表教程自研 CUDA backend | 选做 |

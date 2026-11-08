@@ -12,7 +12,7 @@ test -d llama.cpp/.git || git clone https://github.com/ggml-org/llama.cpp.git ll
 git -C llama.cpp checkout "$LLAMA_CPP_COMMIT"
 ```
 
-该 commit 对应本教程当前验证过的 `llama-simple` 参数和输出格式。需要升级 llama.cpp 时，先在新 commit 上重新执行 Chapter00、真实 Tokenizer 和真实 Decoder 验收，再更新记录。
+该 commit 与本章脚本使用的 `llama-simple` 参数和输出格式一致。学习时先使用这个版本，避免外部命令变化干扰排错。
 
 ## 构建 CPU 基线
 

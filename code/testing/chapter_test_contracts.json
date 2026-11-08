@@ -25,6 +25,15 @@
       "note": "不下载模型的工具链和可执行入口 smoke check"
     },
     {
+      "target": "chapter00_real_inference_script_test",
+      "source": "code/chapter00_quickstart/tests/run_real_inference_contract.sh",
+      "owner": "00",
+      "level": "contract",
+      "dependencies": ["00"],
+      "status": "active",
+      "note": "不下载模型的真实推理脚本参数、失败分支与输出解析契约"
+    },
+    {
       "target": "chapter01_loader_test",
       "source": "code/chapter01_tensor_loader/tests/chapter01_loader_test.cpp",
       "additional_sources": [

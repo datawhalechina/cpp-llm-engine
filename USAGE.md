@@ -16,11 +16,12 @@ npm run test:regression
 
 回归通过后，按下面的顺序开始学习：
 
-1. 运行 `bash code/chapter00_quickstart/run.sh`，建立真实推理基线。
-2. C++、CMake 或测试基础不足时，按需学习 [Foundation](source/foundation/intro.md)。
-3. 按 Chapter 01 到 Chapter 10 完成 CPU 主线。
-4. 需要按产物分解主线时，使用 [CPU 六任务学习计划](source/guides/phase1_cpu_learning_plan.md)。
-5. CPU 基线稳定后，再选择 CUDA 或多模态扩展。
+1. 运行 `bash code/chapter00_quickstart/run.sh`，确认 C++、CMake 和仓库入口可用。
+2. 按 [Chapter00](source/chapter00_quickstart/intro.md) 准备 llama.cpp 与 TinyLlama，再运行 `bash code/chapter00_quickstart/run_real_inference.sh` 建立真实推理基线。
+3. C++、CMake 或测试基础不足时，按需学习 [Foundation](source/foundation/intro.md)。
+4. 按 Chapter 01 到 Chapter 10 完成 CPU 主线。
+5. 需要按产物分解主线时，使用 [CPU 六任务学习计划](source/guides/phase1_cpu_learning_plan.md)。
+6. CPU 基线稳定后，再选择 CUDA 或多模态扩展。
 
 ## 选择学习路线
 
@@ -58,7 +59,7 @@ A 教学基线 → B 真实主线
 | 模块 | 学习产物 | 运行入口 |
 | --- | --- | --- |
 | Foundation | C++、构建、测试和 CUDA 前置能力 | `bash exercises/foundation/run_all.sh` |
-| Chapter00 | TinyLlama 真实推理基线 | `bash code/chapter00_quickstart/run.sh` |
+| Chapter00 | 工具链检查与 TinyLlama 真实推理基线 | `bash code/chapter00_quickstart/run.sh`<br>`bash code/chapter00_quickstart/run_real_inference.sh` |
 | Chapter01 | tokenizer、metadata、权重与 Model | `bash code/chapter01_tensor_loader/run.sh` |
 | Chapter02 | 共享 Storage 的 Tensor view | `bash code/chapter02_tensor_ops/scripts/run.sh` |
 | Chapter03 | 可验证的 CPU MatMul backend | `bash code/chapter03_matmul/scripts/run.sh` |

@@ -8,15 +8,15 @@
 
 | 章节 | 文档入口 | 代码入口 | 主图与公式 | 最小验证 |
 | --- | --- | --- | --- | --- |
-| Chapter00 真实推理起点 | [导读](../chapter00_quickstart/intro.md) | [代码资产](/code/chapter00_quickstart) | [主图](/diagrams/chapter00-main.svg)；本章以外部真实输出为准，不引入公式 | `bash code/chapter00_quickstart/run.sh` |
+| Chapter00 真实推理起点 | [导读](../chapter00_quickstart/intro.md) | [代码资产](/code/chapter00_quickstart) | [主图](/diagrams/chapter00-main.svg)；本章以外部真实输出为准，不引入公式 | `bash code/chapter00_quickstart/run.sh`<br>`bash code/chapter00_quickstart/run_real_inference.sh` |
 | Chapter01 输入、权重与模型配置 | [导读](../chapter01_tensor_loader/intro.md) | [代码资产](/code/chapter01_tensor_loader) | [主图](/diagrams/chapter01-main.svg)；[加载链](/diagrams/chapter01-gguf-loading-chain.svg)；[F-LOAD-01](./formulas.md#f-load-01) | `bash code/chapter01_tensor_loader/run.sh` |
 | Chapter02 Tensor、Storage 与 View | [导读](../chapter02_tensor_ops/intro.md) | [代码资产](/code/chapter02_tensor_ops) | [主图](/diagrams/chapter02-main.svg)；[F-TENSOR-01/02](./formulas.md#f-tensor-01) | `bash code/chapter02_tensor_ops/scripts/run.sh` |
 | Chapter03 Operator、MatMul 与 Backend | [导读](../chapter03_matmul/intro.md) | [代码资产](/code/chapter03_matmul) | [主图](/diagrams/chapter03-main.svg)；[执行分层图](/diagrams/chapter03-operator-backend-kernel.svg)；[F-LINEAR-01](./formulas.md#f-linear-01) | `bash code/chapter03_matmul/scripts/run.sh` |
 | Chapter04 Attention、FFN 与 Decoder | [导读](../chapter04_attention/intro.md) | [代码资产](/code/chapter04_attention) | [主图](/diagrams/chapter04-main.svg)；[Decoder 数据流](/diagrams/chapter04-decoder-attention-flow.svg)；[F-ATTN-01](./formulas.md#f-attn-01) 至 [F-FFN-01](./formulas.md#f-ffn-01) | `bash code/chapter04_attention/scripts/run.sh` |
 
-## Chapter 06-10：从生成 Runtime 到服务
+## Chapter 05-10：从量化执行到服务
 
-后五章把 Decoder 放进请求生命周期，补上量化、可重复测量、性能归因和网络协议之外的 Service Core。
+后六章补上量化执行，再把 Decoder 放进请求生命周期，连接缓存、调度、性能证据和 Service Core。
 
 | 章节 | 文档入口 | 代码入口 | 主图与公式 | 最小验证 |
 | --- | --- | --- | --- | --- |
