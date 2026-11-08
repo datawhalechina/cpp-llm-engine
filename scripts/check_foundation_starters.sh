@@ -14,7 +14,11 @@ for starter in "${starter_root}"/*/starter/main.cpp; do
   checked=$((checked + 1))
 done
 
-test -f "${starter_root}/fq04_cmake_ctest/starter/README.md"
+test -f "${starter_root}/fq04_cmake_ctest/starter/CMakeLists.txt"
+test -f "${starter_root}/fq04_cmake_ctest/starter/include/arithmetic.h"
+test -f "${starter_root}/fq04_cmake_ctest/starter/src/arithmetic.cpp"
+test -f "${starter_root}/fq04_cmake_ctest/starter/app/main.cpp"
+test -f "${starter_root}/fq04_cmake_ctest/starter/tests/arithmetic_test.cpp"
 test -f "${starter_root}/fq10_vector_add/starter/main.cu"
 fq17_build="${tmp_dir}/fq17-build"
 cmake -S "${starter_root}/fq17_minimal_project/starter" -B "${fq17_build}"

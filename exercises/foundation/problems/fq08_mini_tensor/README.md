@@ -14,6 +14,8 @@
 
 ## 验证
 
+复制并完成 starter 后，先运行 `bash scripts/check_foundation_answer.sh /tmp/fq08-answer/main.cpp`。
+
 运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq08_mini_tensor`；再用 UBSan/ASan 检查生命周期。
 
 ## 提示

@@ -13,6 +13,12 @@
 
 ## 验证
 
+复制并完成 starter 后，先运行自己的答案：
+
+```bash
+bash scripts/check_foundation_answer.sh /tmp/fq01-answer/main.cpp
+```
+
 参考实现：`../../fq01_move_buffer.cpp`。完成后运行：
 
 ```bash

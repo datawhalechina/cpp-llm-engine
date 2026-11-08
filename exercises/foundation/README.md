@@ -24,7 +24,7 @@
 | `FQ16` | 综合 | Prefill/Decode State | 阶段迁移、token 计数、终态 | `chapter06` |
 | `FQ17` | 综合 | Minimal Project Integration | library、app、test、workspace 所有权 | `F09` / `chapter00` / `chapter01` |
 
-每道题都包含问题说明、完成标准、验证命令、提示和主线链接。题目入口：
+每道题都包含问题说明、完成标准、答案验证命令、提示和主线链接。验证顺序固定为：复制并完成 starter，先运行学习者答案，再运行 `run_all.sh` 检查参考实现没有回归。题目入口：
 
 - [`FQ01 move-only Buffer`](./problems/fq01_move_buffer/README.md)
 - [`FQ02 Tensor shape`](./problems/fq02_tensor_shape/README.md)
@@ -44,7 +44,7 @@
 - [`FQ16 Prefill/Decode State`](./problems/fq16_prefill_decode_state/README.md)
 - [`FQ17 Minimal Project Integration`](./problems/fq17_minimal_project/README.md)
 
-当前目录中的 `.cpp` 是可运行参考实现；每道题的 `starter/` 目录提供不含答案的最小起点。
+当前目录中的 `.cpp` 是可运行参考实现；每道题的 `starter/` 目录提供不含答案的最小起点。单文件答案统一使用 `bash scripts/check_foundation_answer.sh /tmp/<answer>/main.cpp` 编译并运行；FQ04 和 FQ17 按各自 README 使用 CMake/CTest 验收。
 
 `bash scripts/check_foundation_starters.sh` 会编译所有 C++ starter，并检查 FQ04 的 CMake starter 与 FQ10 的 CUDA starter 文件存在。它验证 starter 能作为起点构建，不替代题目本身的行为测试。
 
@@ -93,7 +93,7 @@ bash exercises/foundation/run_all.sh
 | 核心对象 | ownership、Tensor、view、MatMul、Request、batch、scheduler、KV block、Prefill/Decode | device、thread index、kernel 边界、host/device 数据搬运、CUDA 库 |
 | 默认环境 | C++17、CMake、CTest，无模型、无 GPU | CPU 可完成 reference；CUDA kernel 需要 CUDA toolkit 和 GPU |
 | 验证方式 | 17 题 CTest、starter 编译、元数据检查、回归基线 | FQ10 CPU reference 默认验证；CUDA starter 需要独立 CUDA 工程对照验证 |
-| 主线出口 | Chapter 01-05 的 CPU 推理引擎 | Chapter 03 CUDA backend、后续 GPU kernel 和 benchmark |
+| 主线出口 | Chapter 01-08 的数据、算子、Runtime、缓存与调度 | Chapter 03 CUDA backend、后续 GPU kernel 和 benchmark |
 | 当前完成度 | 主线完整，可作为默认学习路径 | 入门映射已具备，尚未覆盖完整 CUDA allocator、stream、event、kernel benchmark |
 
 当前 Foundation 的 GPU 资产是 CPU 主线的选修入口，不是独立完整 GPU 题库。后续扩展 GPU 题库时，应优先补 `device memory -> stream/event -> kernel benchmark`，并复用 CPU 题库已经固定的输入、输出和正确性标准。

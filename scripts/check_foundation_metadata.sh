@@ -19,6 +19,13 @@ for problem in "${problem_root}"/fq*; do
   for heading in '## 任务' '## 完成标准' '## 验证' '## 提示' '## 主线映射'; do
     grep -Fqx "${heading}" "${problem}/README.md"
   done
+  if [[ "${problem}" == *"/fq04_cmake_ctest" ||
+        "${problem}" == *"/fq17_minimal_project" ]]; then
+    grep -Fq 'ctest --test-dir' "${problem}/README.md"
+  else
+    grep -Fq 'check_foundation_answer.sh' "${problem}/README.md"
+  fi
+  grep -Fq 'exercises/foundation/run_all.sh' "${problem}/README.md"
   count=$((count + 1))
 done
 

@@ -13,7 +13,17 @@
 
 ## 验证
 
-参考工程位于 `exercises/foundation`，运行：
+复制 starter 并完成 `CMakeLists.txt`，先验证自己的工程：
+
+```bash
+cp -r exercises/foundation/problems/fq04_cmake_ctest/starter /tmp/fq04-answer
+cmake -S /tmp/fq04-answer -B /tmp/fq04-answer/build
+cmake --build /tmp/fq04-answer/build
+ctest --test-dir /tmp/fq04-answer/build --output-on-failure
+/tmp/fq04-answer/build/fq04_demo
+```
+
+再运行题库参考回归：
 
 ```bash
 bash exercises/foundation/run_all.sh

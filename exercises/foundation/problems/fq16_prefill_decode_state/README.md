@@ -16,6 +16,8 @@
 
 ## 验证
 
+复制并完成 starter 后，先运行 `bash scripts/check_foundation_answer.sh /tmp/fq16-answer/main.cpp`。
+
 运行 `bash exercises/foundation/run_all.sh`，重点检查 `fq16_prefill_decode_state` 的正常、完成和取消路径。
 
 ## 提示

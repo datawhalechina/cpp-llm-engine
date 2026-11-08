@@ -13,6 +13,8 @@
 
 ## 验证
 
+复制并完成 starter 后，先运行 `bash scripts/check_foundation_answer.sh /tmp/fq05-answer/main.cpp`。
+
 运行普通题库和 UBSan 题库：
 
 ```bash
