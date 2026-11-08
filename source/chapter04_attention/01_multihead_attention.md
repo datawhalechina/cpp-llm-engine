@@ -85,7 +85,7 @@ def attention_reference(query, key, value, causal, offset):
 
 Prefill 可以同时产生多个位置的 Q/K/V；decode 每次只产生一个新位置。连续缓存把新 K/V 追加到 `[S,Hkv,Dh]` 尾部，再让当前 query 读取更新后的 `S+1` 个位置。分页缓存改变存储和寻址方式，但不改变这套注意力语义。
 
-Chapter04 的 `KvCache` 用固定容量连续数组验证追加、容量和清空；真实 TinyLlama Context 为 22 层分别保存连续 K/V，并在每次 decode 后推进 position。Block 分配和逻辑位置映射由 Chapter07 负责，Chapter10 在请求终态触发释放。
+Chapter04 的 `KvCache` 用固定容量连续数组保存 K/V。`MultiHeadAttention::try_forward_with_cache()` 先投影当前输入，再把新 K/V 追加到候选缓存，并将完整历史交给 Attention backend。`DecoderLayerContext` 为单个请求保存这一层的缓存；只有整层计算成功，候选 Context 和输出才一起提交。真实 TinyLlama Context 为 22 层分别保存 K/V。Block 分配和逻辑位置映射由 Chapter07 负责，Chapter10 在请求终态触发释放。
 
 | 观察点 | 连续 CPU 路径 | 分页路径目标 |
 | --- | --- | --- |
@@ -102,6 +102,6 @@ Chapter04 的 `KvCache` 用固定容量连续数组验证追加、容量和清�
 bash code/chapter04_attention/scripts/run.sh
 ```
 
-测试提供四组可观察证据：因果预填充的首个输出只能读取首个 V；`query_position_offset=1` 的逐词元解码可以读取两项历史 V，并得到 `51`；4D 输入中的两个批次分别保持数值 `3` 和 `7`；非连续视图在显式连续化前被拒绝。
+测试提供五组可观察证据：因果预填充的首个输出只能读取首个 V；`query_position_offset=1` 的逐词元解码可以读取两项历史 V，并得到 `51`；缓存路径向 backend 报告 `key_tokens: 2 -> 3` 和解码偏移 `2`；4D 输入中的两个批次分别保持数值 `3` 和 `7`；非连续视图在显式连续化前被拒绝。
 
 验证还应看到 `MultiHeadAttention(4,2)` 保持输入输出形状 `[2,4]`，计算后端类型为 CPU。下一节将补上解码器中围绕注意力和 FFN 使用的归一化与激活函数。

@@ -103,7 +103,7 @@
     <rect x="54" y="488" width="334" height="94" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
     <text x="76" y="518" font-size="14" font-weight="700" fill="#28536b">A 教学注意力数据流</text>
     <text x="76" y="544" font-size="13" fill="#52606d">相关性分数 → 因果遮罩 → 稳定 Softmax</text>
-    <text x="76" y="566" font-size="12" fill="#708090">[tokens,D] → MHA → [tokens,D]</text>
+    <text x="76" y="566" font-size="12" fill="#708090">prefill/decode → 请求级连续 KV</text>
 
     <rect x="413" y="488" width="334" height="94" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
     <text x="435" y="518" font-size="14" font-weight="700" fill="#9a4d13">前馈网络变换每个词元</text>

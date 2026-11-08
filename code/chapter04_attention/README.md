@@ -13,6 +13,9 @@
                                                                 │
                                                                 ▼
                                                       单层 Decoder 输出
+
+每个请求的 DecoderLayerContext
+  └─ prefill 写入多个 K/V → decode 追加一个 K/V → 成功后提交状态
 ```
 
 这条教学路径用于看清单层数据流，不冒充 TinyLlama 的真实数学结构。真实模型使用 RMSNorm、RoPE、GQA、SwiGLU、量化 Linear 和模型级 KV 状态；对应权重由 Chapter01 加载，量化计算由 Chapter05 提供，完整多层执行位于 `code/model`，生成状态进入 Chapter06。
@@ -27,6 +30,7 @@
 | `src/attention_kernel.cpp` | CPU causal attention kernel |
 | `src/tensor_attention_adapter.cpp` | 3D/4D Q/K/V 与可写输出 View 到 Attention backend 的适配 |
 | `src/kv_cache.cpp` | 固定容量 KV Cache append/clear |
+| `src/decoder_context.cpp` | 单请求、单层连续 K/V 的生命周期 |
 | `src/layer_norm.cpp` | LayerNorm 及公共只读/可写 View 入口 |
 | `src/feed_forward.cpp` | FFN、ReLU 及公共只读/可写 View 入口 |
 | `src/decoder_layer.cpp` | 公共 View 上组合 Attention、残差和 FFN，并输出结构契约 |
@@ -38,7 +42,7 @@
 | `scripts/run_real_structure.sh` | TinyLlama 首层九个权重的真实结构装配 |
 | `code/core` | 共享 backend 和 operator 契约 |
 
-先读 `attention_kernel.cpp`，单独理解遮罩和 Softmax；再读 `attention.cpp` 的四个投影；最后读 `decoder_layer.cpp`，观察两次归一化和两条残差路径。`kv_cache.cpp` 只演示连续 K/V 的追加，分页管理属于 Chapter07。
+先读 `attention_kernel.cpp`，单独理解遮罩和 Softmax；再读 `attention.cpp` 的四个投影和缓存入口；最后读 `decoder_layer.cpp` 与 `decoder_context.cpp`，观察双残差、prefill/decode 和成功后提交。连续 KV 只表达数值语义，分页管理属于 Chapter07。
 
 ## 运行与验证
 
@@ -48,7 +52,7 @@
 bash code/chapter04_attention/scripts/run.sh
 ```
 
-重点观察：二维激活怎样通过公共只读/可写 View 进入 Linear，3D `[T,H,Dh]` 与 4D `[B,T,H,Dh]` 输入怎样进入同一 CPU Attention backend，以及非连续 View 为什么必须先显式连续化。
+重点观察：二维激活怎样通过公共只读/可写 View 进入 Linear，3D `[T,H,Dh]` 与 4D `[B,T,H,Dh]` 输入怎样进入同一 CPU Attention backend，以及单层 Context 怎样把缓存长度从 2 推进到 3。非连续 View 必须先显式连续化，缓存容量失败不能提交状态或输出。
 
 准备 TinyLlama 后，运行首层真实结构验收：
 
