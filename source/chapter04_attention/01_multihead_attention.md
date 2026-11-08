@@ -81,6 +81,63 @@ def attention_reference(query, key, value, causal, offset):
 
 适配器不隐式复制非连续视图。Chapter02 的转置或切片如果破坏连续布局，调用者必须先执行 `contiguous()`，复制成本因此保持可见。`try_compute_tensor_attention_into()` 接收调用方提供的可写输出视图；它先完成全部批次计算，成功后统一提交，因此形状校验或计算后端失败不会覆盖已有输出。返回 Chapter02 张量的旧入口继续作为兼容外壳。
 
+## 分块在线 Softmax 怎样合并状态
+
+三段式实现为一个 query 保存全部 `S` 个 score，再求最大值、指数和与 Value 加权和。分块在线 Softmax 每次只处理 `B` 个 key，并为当前已处理前缀保存三个状态：最大分数 `m`、指数和 `l`、未归一化的 Value 累加向量 `o`。
+
+当前状态与新分块使用不同最大值作为指数基准，不能直接相加。设新块状态为 `m_b、l_b、o_b`，先取共同最大值 `m_new`，再把两边缩放到同一基准：
+
+```text
+m_new = max(m, m_b)
+l_new = exp(m - m_new) * l + exp(m_b - m_new) * l_b
+o_new = exp(m - m_new) * o + exp(m_b - m_new) * o_b
+
+output = o / l
+```
+
+每个分块内部仍使用稳定 Softmax：先求块最大值，再计算 `exp(score - m_b)`。因果掩码在 score 进入块状态前生效；不可见 key 不参与 `m_b、l_b、o_b`。CPU reference 保存一个分块 score 和一个 `Dh` 宽累加向量，工作集从随序列长度增长的 `O(S)` 变为 `O(B + Dh)`。
+
+| 对象 | 三段式稳定 Softmax | 分块在线 Softmax |
+| --- | --- | --- |
+| score 临时空间 | 当前 query 的全部 `S` 个分数 | 最多 `B` 个分数 |
+| 数值稳定性 | 全局最大值统一重标定 | 每次合并时重标定旧状态和新块 |
+| Value 聚合 | 概率全部得到后再读取 V | 每个块得到指数权重后立即累加 V |
+| CPU 教学目标 | 直接、易核对的数值基线 | 验证分块状态和有限工作集 |
+| GPU 扩展方向 | 多 kernel 与全局 score workspace | tile、片上存储和融合 Attention kernel |
+
+![分块在线 Softmax 的状态更新与 Value 累加](../assets/diagrams/chapter04-online-softmax.svg)
+
+## 从在线 Softmax 到 FlashAttention
+
+在线 Softmax 解决的是“分块后怎样得到与完整 Softmax 等价的结果”。FlashAttention 还要继续解决 Q/K/V 怎样分块、分块怎样留在片上存储、线程块和 Warp 怎样分工，以及计算和数据搬运怎样重叠。因此，本节的 CPU 分块实现是 FlashAttention 各代共享的数学基础，不等同于某一代 FlashAttention。
+
+| 演进阶段 | 主要解决的问题 | 本教程处理方式 |
+| --- | --- | --- |
+| FlashAttention-1 | 用分块和在线 Softmax 避免物化完整注意力矩阵，减少 HBM 与片上存储之间的读写 | 完整讲解；先实现 CPU 等价参考，再建设 CUDA 教学内核 |
+| FlashAttention-2 | 减少非矩阵运算，增加单头跨线程块并行，并调整 Warp 分工 | 完整讲解；后续实现 `FA2-inspired` 推理前向实验 |
+| FlashAttention-3 | 在 Hopper 上用异步执行、Warp specialization、TMA 和 FP8 提高利用率 | 讲解设计与硬件前提，不承诺本地实现 |
+| FlashAttention-4 | 针对数据中心 Blackwell 的异步 MMA、Tensor Memory 和 2-CTA MMA 重构流水线 | 讲解硬件与算法协同演进，不作为消费级单卡实现目标 |
+
+`FA2-inspired` 表示教学内核只吸收分块在线 Softmax、线程块并行和 Warp 工作划分等关键思想。它只覆盖本教程需要的推理前向、因果掩码和 GQA，不包含官方实现的反向传播、完整数据类型、变长序列、全部 head size 和跨架构调优，因此不能标记为“FlashAttention-2 实现”。
+
+CUDA `compute_online()` 已把在线状态合并、key tile 和 Value 聚合放进一个 kernel，并消除完整 score workspace。第一版为每个 key 执行线程块归约，固定 workload 慢于三阶段路径；第二版改为 4 个 Warp 并行处理 4 个 key，并用 Warp shuffle 归约，三轮微基准均约为三阶段路径的 31%。因此第二版可以标记为 FA2-inspired 候选，并通过显式开关进入真实 Runtime A/B；它仍不是默认实现。
+
+真实 TinyLlama 的 2 层和 22 层单-query 双步对照已经通过，融合路径保持 hidden、logits 和 greedy token。它验证带历史 K/V 的真实 Decode 数值；多 token Tensor Prefill 由下一个实验单独验证。
+
+多 token Decoder Prefill 现已增加：连续 `[T,D]` embedding 经过批量投影、逐位置 RoPE、一次 K/V append 和因果融合 Attention。TinyLlama 22 层、2-token 结果与顺序执行一致。随后补入批量 embedding、最终 logits 和按 shape 复用的持久 workspace，连续 CUDA Executor 已使用完整 token Tensor Prefill；分页 Prefill 仍逐 token。
+
+Chapter09 的 EXP-GPU-04 用 32-token Prompt 分别测量完整 Tensor Prefill 和一次 Decode。融合路径通过 logits 与 greedy token 检查，但两轮独立中位数一次回退、一次改善，没有稳定端到端收益。因此三阶段路径继续作为默认实现；融合路径保留为可读算法、显存访问和 kernel 调优之间的教学对照。
+
+| 实验版本 | QK 工作划分 | 固定 workload 结果 | 决策 |
+| --- | --- | --- | --- |
+| 三阶段 golden | score、Softmax、Value 三个 kernel | 约 `0.223–0.226 ms` | 保留正确性与回退基线 |
+| 融合 v1 | 整个线程块逐 key 树形归约 | `0.296630 ms` | 拒绝接入 |
+| 融合 v2 | 4 个 Warp 并行处理 4 个 key，Warp shuffle 归约 | 约 `0.0697–0.0699 ms` | 进入真实模型候选验证 |
+
+Prefill 同时处理多个 query，二维分块和融合计算可以避免较大的 score workspace，是本路线的主要性能实验。单 token decode 只有一个 query，瓶颈通常转向读取不断增长的 K/V；此时分页布局、GQA 和内存访问比照搬 Prefill tile 更重要。Chapter09 必须分别记录两种 workload，不能用 Prefill 的加速结果代表 Decode。
+
+论文入口：[FlashAttention-1](https://arxiv.org/abs/2205.14135)、[FlashAttention-2](https://arxiv.org/abs/2307.08691)、[FlashAttention-3](https://arxiv.org/abs/2407.08608)、[FlashAttention-4](https://arxiv.org/abs/2603.05451)。
+
 ## 从单次 Attention 进入 KV Cache
 
 Prefill 可以同时产生多个位置的 Q/K/V；decode 每次只产生一个新位置。连续缓存把新 K/V 追加到 `[S,Hkv,Dh]` 尾部，再让当前 query 读取更新后的 `S+1` 个位置。分页缓存改变存储和寻址方式，但不改变这套注意力语义。
@@ -102,6 +159,6 @@ Chapter04 的 `KvCache` 用固定容量连续数组保存 K/V。`MultiHeadAttent
 bash code/chapter04_attention/scripts/run.sh
 ```
 
-测试提供五组可观察证据：因果预填充的首个输出只能读取首个 V；`query_position_offset=1` 的逐词元解码可以读取两项历史 V，并得到 `51`；缓存路径向 backend 报告 `key_tokens: 2 -> 3` 和解码偏移 `2`；4D 输入中的两个批次分别保持数值 `3` 和 `7`；非连续视图在显式连续化前被拒绝。
+测试提供六组可观察证据：因果预填充的首个输出只能读取首个 V；`query_position_offset=1` 的逐词元解码可以读取两项历史 V，并得到 `51`；缓存路径向 backend 报告 `key_tokens: 2 -> 3` 和解码偏移 `2`；4D 输入中的两个批次分别保持数值 `3` 和 `7`；非连续视图在显式连续化前被拒绝；分块在线 Softmax 在不同 tile、因果位置和极端 score 下与三段式 CPU golden 一致。
 
 验证还应看到 `MultiHeadAttention(4,2)` 保持输入输出形状 `[2,4]`，计算后端类型为 CPU。下一节将补上解码器中围绕注意力和 FFN 使用的归一化与激活函数。

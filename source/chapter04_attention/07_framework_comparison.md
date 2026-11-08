@@ -23,7 +23,7 @@ TinyLlama/Llama 决定本章真实模型的数学结构，llama.cpp 提供同模
 | 本章可验证对象 | 成熟系统继续增加 | 后续入口 |
 | --- | --- | --- |
 | 单层前置归一化与 22 个 TinyLlama 解码器块 | 多模型架构注册和并行执行计划 | [`运行真实 TinyLlama 解码器`](./06_real_tinyllama_decoder.md) |
-| CPU 因果注意力与稳定 softmax | FlashAttention、融合注意力、GPU 工作区 | CUDA 计算后端 |
+| CPU 三段式与分块在线 Softmax | FlashAttention 融合、片上 tile 和 GPU 工作划分 | CUDA 三阶段基线与 FA2-inspired 教学内核；端到端收益不稳定，默认仍用三阶段 |
 | 位置偏移与连续 K/V | 分页 K/V、前缀复用和缓存感知调度 | Chapter07、Chapter08 |
 | 单层结构和数值测试 | 张量并行、流水线并行、跨设备通信 | 分布式扩展 |
 

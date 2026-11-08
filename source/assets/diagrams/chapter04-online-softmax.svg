@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">分块在线 Softmax 的状态更新与 Value 累加</title>
+  <desc id="desc">Key 和 Value 按块进入计算。每块产生最大值、指数和与 Value 小计，再与历史状态重标定合并，最终用指数和归一化输出。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#28536b"/></marker>
+    <style>.title{font:700 24px sans-serif;fill:#17324d}.label{font:700 15px sans-serif;fill:#17324d}.text{font:14px sans-serif;fill:#405568}.small{font:12px sans-serif;fill:#607486}.line{stroke:#28536b;stroke-width:2.5;fill:none;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1200" height="620" rx="22" fill="#f7fafc"/>
+  <text x="600" y="46" text-anchor="middle" class="title">Key / Value 分块进入，同一组在线状态持续更新</text>
+
+  <rect x="55" y="92" width="250" height="128" rx="15" fill="#e8f1f7" stroke="#79a4ba"/>
+  <text x="180" y="124" text-anchor="middle" class="label">分块 0</text>
+  <text x="180" y="158" text-anchor="middle" class="text">scores[0:B]</text>
+  <text x="180" y="188" text-anchor="middle" class="small">得到 m₀、l₀、o₀</text>
+  <rect x="475" y="92" width="250" height="128" rx="15" fill="#fff0dc" stroke="#e8a765"/>
+  <text x="600" y="124" text-anchor="middle" class="label">分块 1</text>
+  <text x="600" y="158" text-anchor="middle" class="text">scores[B:2B]</text>
+  <text x="600" y="188" text-anchor="middle" class="small">得到 m₁、l₁、o₁</text>
+  <rect x="895" y="92" width="250" height="128" rx="15" fill="#ecfdf5" stroke="#6db5a9"/>
+  <text x="1020" y="124" text-anchor="middle" class="label">后续分块</text>
+  <text x="1020" y="158" text-anchor="middle" class="text">直到可见 key 结束</text>
+  <text x="1020" y="188" text-anchor="middle" class="small">因果掩码先排除未来位置</text>
+
+  <rect x="125" y="310" width="950" height="150" rx="18" fill="#ffffff" stroke="#28536b" stroke-width="2"/>
+  <text x="600" y="344" text-anchor="middle" class="label">把旧状态与新块切换到共同最大值</text>
+  <text x="600" y="378" text-anchor="middle" class="text">m_new = max(m, m_b)</text>
+  <text x="600" y="408" text-anchor="middle" class="text">l_new = exp(m-m_new) × l + exp(m_b-m_new) × l_b</text>
+  <text x="600" y="438" text-anchor="middle" class="text">o_new = exp(m-m_new) × o + exp(m_b-m_new) × o_b</text>
+  <path d="M180 220V276H420V303" class="line"/>
+  <path d="M600 220V303" class="line"/>
+  <path d="M1020 220V276H780V303" class="line"/>
+
+  <rect x="390" y="515" width="420" height="70" rx="15" fill="#fef3c7" stroke="#d4a72c"/>
+  <text x="600" y="544" text-anchor="middle" class="label">最终输出</text>
+  <text x="600" y="570" text-anchor="middle" class="text">output = o / l</text>
+  <path d="M600 460V508" class="line"/>
+</svg>

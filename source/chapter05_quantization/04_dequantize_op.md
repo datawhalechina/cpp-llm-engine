@@ -14,6 +14,17 @@
 
 下图按字段职责对齐三种 block。量化码必须与同一 block 内的 scale、minimum 或高位数据一起解释，不能把 payload 当作普通整数数组逐元素读取。
 
+三种格式可以先用概念公式区分；实际代码还要负责 half 转换、bit unpack、分组索引和边界检查：
+
+```text
+Q8_0:  weight = block_scale * signed_q8
+Q4_K:  weight = block_scale * group_scale * q4
+                 - block_min * group_min
+Q6_K:  weight = block_scale * group_scale * signed_q6
+```
+
+Q8_0 的 8-bit 值可直接解释为有符号整数。Q4_K 需要组合 4-bit 量化码、分组 scale 和 minimum；Q6_K 则把低 4 bit 与高 2 bit 合成有符号 6-bit 值，再应用分组与 block scale。相同的 `weight` 结果契约让三种 reference 可以被同一 Linear 测试比较，但它们的 payload 不能共用一套解包代码。
+
 ![Q8_0、Q4_K 与 Q6_K block 布局](../assets/diagrams/chapter05-quantized-block-layout.svg)
 
 Q4_K 同时具有分组 scale 和 minimum，适合用来观察完整的 block 解码顺序。下面的算法镜像省略字节对齐、half 转换、边界检查和输出内存所有权；Q6_K 与 Q8_0 复用相同的“读取参数、解包 quant、应用 scale”结构，但字段布局不同。

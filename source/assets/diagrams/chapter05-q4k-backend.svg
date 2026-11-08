@@ -54,10 +54,10 @@
   <text x="744" y="493" text-anchor="middle" class="text">多行：当前逐行兼容调用</text>
   <text x="744" y="527" text-anchor="middle" class="small">尚无专用 SIMD batch kernel</text>
   <rect x="906" y="402" width="252" height="154" rx="15" fill="#dbeafe" stroke="#60a5fa"/>
-  <text x="1032" y="436" text-anchor="middle" class="label">CUDA baseline</text>
-  <text x="1032" y="467" text-anchor="middle" class="text">设备端反量化</text>
-  <text x="1032" y="493" text-anchor="middle" class="text">Float32 workspace + SGEMM</text>
-  <text x="1032" y="527" text-anchor="middle" class="small">GPU 正确性与融合 A/B 基线</text>
+  <text x="1032" y="436" text-anchor="middle" class="label">CUDA</text>
+  <text x="1032" y="467" text-anchor="middle" class="text">单 token：融合 GEMV</text>
+  <text x="1032" y="493" text-anchor="middle" class="text">batch：反量化 + SGEMM</text>
+  <text x="1032" y="527" text-anchor="middle" class="small">同一 Linear 契约，两条执行路径</text>
 
   <rect x="130" y="604" width="940" height="58" rx="14" fill="#ffffff" stroke="#cbd5e1"/>
   <text x="600" y="630" text-anchor="middle" class="label">统一输出契约：Float32 logits / hidden rows</text>

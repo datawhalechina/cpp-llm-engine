@@ -8,12 +8,14 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | --- | --- | --- |
 | A 教学闭环 | 用小尺寸 MHA、LayerNorm、FFN 和双残差组装一个 `DecoderLayer`，再用请求 Context 连接预填充与逐词元解码 | 单层输出、因果掩码、连续 KV 追加、请求隔离和失败原子性测试 |
 | B 真实 CPU | 先用 3D/4D Q/K/V 适配器核对通用多头注意力布局，再沿真实模型路径学习 TinyLlama 的 RMSNorm、RoPE、GQA、SwiGLU 和 22 层拓扑 | 批次隔离、首层权重映射、22 层结构与跨章数值证据 |
-| G GPU 扩展 | 保持解码器顺序和请求状态语义不变，把 Linear、RoPE、GQA、归一化和 FFN 换成 CUDA 后端 | 合成层和真实 TinyLlama layer-0 已与 CPU 参考对齐；多层 Model/Context 待接入 |
+| G GPU 扩展 | 保持解码器顺序和请求状态语义不变，把 Linear、RoPE、GQA、归一化和 FFN 换成 CUDA 后端 | 真实 2/22 层对照、Tensor Prefill、融合在线 Attention 与端到端 A/B |
 | M 多模态扩展 | 视觉编码器复用归一化、Attention、FFN 和双残差结构；视觉向量进入语言 Decoder 后复用请求 Context | SigLIP Block、视觉投影和统一 embedding 序列测试 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
 | 多头注意力（Multi-head Attention） | 让每个词元按相关程度读取当前及历史词元的信息 | [`04.1 多头注意力`](./01_multihead_attention.md) |
+| 在线 Softmax | 分块读取 K/V 时持续更新最大值、指数和与 Value 累加，不保存完整分数矩阵 | [`04.1 多头注意力`](./01_multihead_attention.md) |
+| FA2-inspired | 只吸收 FlashAttention-2 的在线状态与 Warp 分工思想，不等同于官方完整实现 | [`04.1 多头注意力`](./01_multihead_attention.md) |
 | 残差连接（Residual） | 把子模块输出加回原输入，保留一条直接数据通路 | [`04.4 解码器层`](./04_decoder_layer.md) |
 | 前馈网络（FFN） | 对每个词元独立执行“扩展、激活、投影回原维度” | [`04.3 前馈网络`](./03_feedforward.md) |
 | 解码器层（`DecoderLayer`） | 按固定顺序组合注意力、前馈网络、归一化和残差连接 | [`04.4 解码器层`](./04_decoder_layer.md) |
@@ -26,7 +28,7 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
-| 1 | A/B 公共 | [`04.1 多头注意力`](./01_multihead_attention.md) | <a href="../_code/chapter04_attention/src/tensor_attention_adapter.cpp"><code>tensor_attention_adapter.cpp</code></a>、<a href="../_code/chapter04_attention/src/attention.cpp"><code>attention.cpp</code></a> | Q/K/V 布局、因果掩码、softmax 和输出合并顺序 |
+| 1 | A/B/G 公共 | [`04.1 多头注意力`](./01_multihead_attention.md) | <a href="../_code/chapter04_attention/src/attention_kernel.cpp"><code>attention_kernel.cpp</code></a>、<a href="../_code/cuda/src/gqa_attention_backend.cu"><code>gqa_attention_backend.cu</code></a> | 三阶段 Attention、在线 Softmax、融合 kernel 与端到端门禁怎样逐层建立证据 |
 | 2 | A | [`04.2 层归一化与激活函数`](./02_layernorm_and_activation.md)、[`04.3 前馈网络`](./03_feedforward.md)、[`04.4 解码器层`](./04_decoder_layer.md) | <a href="../_code/chapter04_attention/src/decoder_layer.cpp"><code>decoder_layer.cpp</code></a>、<a href="../_code/chapter04_attention/src/decoder_context.cpp"><code>decoder_context.cpp</code></a> | 归一化、注意力、残差和 FFN 形成单层闭环，请求 Context 连接 prefill/decode |
 | 3 | B | [`04.5 接入首层权重`](./05_load_first_layer.md)、[`04.6 连接真实 TinyLlama 解码器`](./06_real_tinyllama_decoder.md) | <a href="../_code/model/src/real_llama_cpu_decoder.cpp"><code>real_llama_cpu_decoder.cpp</code></a> | Chapter01 权重怎样映射到 22 层 Model 与请求 Context |
 | 4 | B | [`04.7 解码器成熟框架对照`](./07_framework_comparison.md) | [`解码器数据流图`](./04_decoder_layer.md) | 将教学层和真实模型映射到成熟执行器与 GPU 计算后端 |
@@ -40,4 +42,5 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | --- | --- | --- | --- |
 | L1 默认 CPU | `bash code/chapter04_attention/scripts/run.sh` | 公共视图上的归一化、残差、FFN、解码器与 3D/4D 注意力通过 CTest；连续 KV 按 2→3 增长，请求互不影响，失败不提交 Context 或输出 | 必做 |
 | L2 真实结构 | `bash code/chapter04_attention/scripts/run_real_structure.sh` | 22 层配置、首层九个权重的名称、shape、dtype 和 payload 通过 CTest；不执行完整 Decoder | 有模型时必做 |
-| L3 可选 CUDA | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | CUDA GQA、RoPE、KV Cache、RMSNorm、SwiGLU 和单层解码器分别匹配 CPU 参考实现 | 有 NVIDIA GPU 时选做 |
+| L3 可选 CUDA | `bash code/engine/scripts/run_real_cuda_decoder.sh` | TinyLlama 2 层与 22 层 hidden、分层 K/V 匹配 CPU 参考实现 | 有 NVIDIA GPU 和模型时选做 |
+| L4 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 三阶段与融合路径均通过 logits/greedy 检查，并保留两轮 Prefill/Decode 样本；收益不稳定时不切换默认路径 | 调优融合内核时必做 |

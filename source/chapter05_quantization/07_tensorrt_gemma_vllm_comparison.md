@@ -18,6 +18,7 @@
 | --- | --- | --- |
 | INT8 教学格式、真实 Q4_K/Q6_K/Q8_0 | AWQ、GPTQ、FP8 等多格式 | 适配不同模型资产和硬件能力 |
 | block reference 与 fused CPU Linear | GPU quantized GEMM | 降低设备端带宽和计算成本 |
+| Float32 激活输入 | SmoothQuant、W8A8、FP8 activation | 让低精度表示继续进入矩阵计算 |
 | scalar/AVX2 显式策略 | 自动硬件调优和 tactic selection | 为不同 shape 选择稳定高效实现 |
 | Tensor、Decoder、服务级回归 | 校准和训练后量化工具链 | 在部署前控制精度损失 |
 

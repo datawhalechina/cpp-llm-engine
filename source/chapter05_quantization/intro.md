@@ -6,13 +6,13 @@ Chapter 04 已经固定 Decoder、Attention 和 FFN 的计算结构；本章在 
 
 | 本章实现 | 成熟系统继续增加 | 深入入口 |
 | --- | --- | --- |
-| INT8 教学路径、GGUF Q4_K/Q6_K/Q8_0 解码、CPU reference/fused/scalar batch/SIMD 和 CUDA 非融合基线 | 校准、混合精度、专用 batch SIMD、融合 GPU kernel 和多格式调度 | [`05.7 量化框架对照`](./07_tensorrt_gemma_vllm_comparison.md) |
+| INT8 教学路径、GGUF Q4_K/Q6_K/Q8_0 解码、CPU reference/fused/scalar batch/SIMD 和 CUDA 单 token 融合 GEMV | 校准、混合精度、专用 batch SIMD/GPU kernel 和多格式调度 | [`05.7 量化框架对照`](./07_tensorrt_gemma_vllm_comparison.md) |
 
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
 | A 教学证据线 | 用小型 INT8、Q4_K/Q6_K/Q8_0 block 和 CPU reference 看清 scale、反量化与误差 | 固定反量化数值、浮点/量化输出误差和失败状态 |
 | B 真实执行线 | 读取 GGUF packed 权重，通过 fused/SIMD backend 接入 TinyLlama 22 层 Decoder | 与 llama.cpp 对照 logits 数值指标和 greedy token 序列 |
-| G GPU 执行线 | 保持 packed 权重和 Linear 语义不变，用 CUDA 反量化与 cuBLAS 替换 CPU 计算 | Q4_K/Q6_K 设备端结果与 CPU reference 一致 |
+| G GPU 执行线 | 保持 packed 权重和 Linear 语义不变，单 token 融合解码与点积，batch 保留反量化加 cuBLAS | Q4_K/Q6_K 设备端结果、真实生成 token 与性能证据 |
 | M 多模态复用线 | 复用 Q8_0 解码与 Linear 契约处理 SmolVLM 视觉权重 | 视觉 Encoder、Projector 和语言模型权重通过真实模型测试 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
@@ -21,13 +21,15 @@ Chapter 04 已经固定 Decoder、Attention 和 FFN 的计算结构；本章在 
 | 缩放因子（`scale`） | 把整数值映射回近似浮点范围的比例 | [`05.1 用整数近似浮点权重`](./01_quantization_basics.md) |
 | 反量化（dequantization） | 根据整数值和 scale 恢复近似浮点值 | [`05.4 反量化算子`](./04_dequantize_op.md) |
 | 仅权重量化（weight-only） | 权重使用低比特格式，输入与输出仍按浮点计算 | [`05.5 量化线性层`](./05_linear_with_quant.md) |
+| 混合量化（mixed quantization） | 不同 Tensor 根据精度和执行需求使用不同量化格式 | [`05.1 用整数近似浮点权重`](./01_quantization_basics.md) |
+| K-quant | ggml 的分块量化格式族，其中 `K` 与 K/V Cache 无关 | [`05.1 用整数近似浮点权重`](./01_quantization_basics.md) |
 | 融合路径（fused path） | 读取量化 block 时直接乘加，不生成完整浮点权重副本 | [`05.5 量化线性层`](./05_linear_with_quant.md) |
 
 ![Chapter 05 主图：浮点与量化 Linear 路径对照](../assets/diagrams/chapter05-main.svg)
 
 ## 开始学习
 
-先从 INT8 的整数、缩放因子和反量化关系入手，再沿着 GGUF block、量化 Linear 和 backend policy 进入真实 Decoder。默认示例使用固定小矩阵展示量化结果；真实 TinyLlama 提供 Q4_K/Q6_K 验证，Q8_0 的真实模型证据来自可选的 SmolVLM CPU 路径。
+先区分权重量化、激活量化和 K/V Cache 量化，再从 INT8 的整数、缩放因子和反量化关系入手，沿着 GGUF block、量化 Linear 和 backend policy 进入真实 Decoder。默认示例使用固定小矩阵展示量化结果；真实 TinyLlama 提供混合 Q4_K/Q6_K 验证，Q8_0 的真实模型证据来自可选的 SmolVLM CPU 路径。
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
@@ -45,4 +47,4 @@ Chapter 04 已经固定 Decoder、Attention 和 FFN 的计算结构；本章在 
 | --- | --- | --- | --- |
 | L1 默认 CPU | `bash code/chapter05_quantization/scripts/run.sh` | 三个 CTest 覆盖本章 backend、Chapter02 激活 View 集成和 Core Tensor 契约 | 必做 |
 | L2 真实模型 | `bash code/chapter05_quantization/scripts/run_real_decoder.sh` | TinyLlama 22 层输出满足与 llama.cpp 约定的余弦相似度、误差和 greedy 序列条件 | 有模型时必做 |
-| L3 可选 CUDA | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备端 Q4_K/Q6_K 反量化、Float32 Workspace 和 cuBLAS 结果匹配 CPU reference | 有 NVIDIA GPU 时选做 |
+| L3 可选 CUDA | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 单 token 融合 GEMV 与 batch 回退均匹配 CPU reference | 有 NVIDIA GPU 时选做 |
