@@ -60,6 +60,8 @@ public:
     }
     virtual void release_request(std::size_t) const {}
 
+    // 成功时每个执行器恰好推进一个位置，并返回同顺序 logits。
+    // 失败时实现负责恢复全部模型 Context；Scheduler 只能回滚 Request 和外部 K/V 资源。
     virtual bool decode_batch(
         const std::vector<std::shared_ptr<RequestModelExecutor>>& executors,
         const TokenSequence& tokens,

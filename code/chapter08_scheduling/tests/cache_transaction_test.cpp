@@ -53,6 +53,22 @@ private:
     chapter07_kv_cache::CpuPagedKvCache* cache_;
 };
 
+class CountingBatchRunner final : public chapter06_generation::ExecutorBatchRunner {
+public:
+    bool decode_batch(
+        const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>&,
+        const chapter06_generation::TokenSequence&,
+        const std::vector<std::size_t>&,
+        const std::vector<std::size_t>&,
+        std::vector<chapter06_generation::Logits>*,
+        std::string*) const override {
+        ++calls;
+        return true;
+    }
+
+    mutable std::size_t calls = 0;
+};
+
 void write_all_layers(
     cpp_llm_engine::testing::TestSuite& suite,
     chapter07_kv_cache::CpuPagedKvCache& cache,
@@ -149,6 +165,47 @@ int main() {
         CPP_LLM_REQUIRE(suite, input.tokens.size() == 1);
         CPP_LLM_CHECK(suite, input.tokens.front().request_id == 99);
         CPP_LLM_CHECK(suite, error == "decode batch has no reserved KV write slot");
+    });
+
+    suite.run("duplicate request IDs are rejected before model execution", [&] {
+        GenerationConfig config;
+        config.max_new_tokens = 2;
+        Runtime runtime(config);
+        GreedySampler sampler;
+        Request request_a({1});
+        Request request_b({2});
+        auto executor_a = std::make_shared<testing::FixedTokenExecutor>(5);
+        auto executor_b = std::make_shared<testing::FixedTokenExecutor>(6);
+        CPP_LLM_REQUIRE(
+            suite,
+            runtime.prefill_chunk(request_a, sampler, *executor_a, 1).generated_tokens == 1);
+        CPP_LLM_REQUIRE(
+            suite,
+            runtime.prefill_chunk(request_b, sampler, *executor_b, 1).generated_tokens == 1);
+
+        chapter07_kv_cache::KvBlockPool pool(2, 2);
+        CPP_LLM_REQUIRE(suite, pool.reserve(65, 1));
+        CPP_LLM_REQUIRE(suite, pool.commit_tokens(65, 1));
+        CountingBatchRunner batch_runner;
+
+        const auto failed = ContinuousBatchScheduler{}.run_step(
+            runtime,
+            {{65, &request_a, &sampler, executor_a},
+             {65, &request_b, &sampler, executor_b}},
+            2,
+            0,
+            {},
+            &pool,
+            0,
+            nullptr,
+            &batch_runner);
+
+        CPP_LLM_CHECK(suite, batch_runner.calls == 0);
+        CPP_LLM_CHECK(suite, failed.generated_tokens == 0);
+        CPP_LLM_CHECK(suite, failed.model_batch_calls == 0);
+        CPP_LLM_CHECK(suite, request_a.failed() && request_b.failed());
+        CPP_LLM_CHECK(suite, pool.token_count(65) == 1);
+        CPP_LLM_CHECK(suite, pool.capacity_tokens(65) == 2);
     });
 
     suite.run("failed scheduler step clears partial paged payload", [&] {

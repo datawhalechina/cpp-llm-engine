@@ -246,16 +246,42 @@ StepBatchStats ContinuousBatchScheduler::run_step(
         std::vector<std::size_t> positions;
         std::vector<std::size_t> request_ids;
         std::vector<chapter06_generation::BatchDecodeItem> runtime_items;
+        ExecutorBatchInput executor_input;
+        std::string error;
+        bool input_ok = true;
+        if (block_pool != nullptr) {
+            StepBatchPlan reserved_plan;
+            reserved_plan.candidates.reserve(batched.size());
+            for (const BatchedDecode& item : batched) {
+                reserved_plan.candidates.push_back(*item.candidate);
+            }
+            input_ok = build_decode_executor_batch_input(
+                reserved_plan, requests, *block_pool, &executor_input, &error);
+        }
+
         executors.reserve(batched.size());
         tokens.reserve(batched.size());
         positions.reserve(batched.size());
         request_ids.reserve(batched.size());
         runtime_items.reserve(batched.size());
-        for (const BatchedDecode& item : batched) {
+        std::set<std::size_t> unique_request_ids;
+        for (std::size_t index = 0; index < batched.size(); ++index) {
+            const BatchedDecode& item = batched[index];
             executors.push_back(item.scheduled->executor);
-            tokens.push_back(item.scheduled->request->generated().back());
-            positions.push_back(item.committed_tokens);
-            request_ids.push_back(item.candidate->request_id);
+            if (block_pool != nullptr && input_ok) {
+                const ExecutorBatchToken& token = executor_input.tokens[index];
+                tokens.push_back(token.token);
+                positions.push_back(token.position);
+                request_ids.push_back(token.request_id);
+            } else {
+                tokens.push_back(item.scheduled->request->generated().back());
+                positions.push_back(item.committed_tokens);
+                request_ids.push_back(item.candidate->request_id);
+                if (!unique_request_ids.insert(item.candidate->request_id).second) {
+                    input_ok = false;
+                    error = "decode batch contains duplicate request ID";
+                }
+            }
             runtime_items.push_back({item.scheduled->request, item.scheduled->sampler});
             ++stats.scheduled_requests;
             ++stats.scheduled_tokens;
@@ -263,8 +289,7 @@ StepBatchStats ContinuousBatchScheduler::run_step(
         }
 
         std::vector<chapter06_generation::Logits> logits;
-        std::string error;
-        const bool model_ok = batch_runner->decode_batch(
+        const bool model_ok = input_ok && batch_runner->decode_batch(
             executors, tokens, positions, request_ids, &logits, &error);
         const chapter06_generation::BatchDecodeResult decoded = model_ok
             ? runtime.commit_batch_logits(runtime_items, logits)
