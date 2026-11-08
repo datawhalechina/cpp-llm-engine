@@ -70,7 +70,7 @@ bash code/chapter01_tensor_loader/run.sh
 | 2026-08 | 教程骨架与 Foundation | 完成 | 章节主线、基础题库、benchmark trace |
 | 2026-10 | CPU 主线闭环 | 完成 | TinyLlama 22 层 Decoder、Runtime、HTTP/SSE 和真实模型验收 |
 | 2026-10 | 多模态输入闭环 | 完成 | SmolVLM Vision、Projector、Decoder、ServiceCore 和 profiling golden |
-| 2026-11 | CUDA 后端 | 建设中 | CUDA 资源、量化 Linear、RoPE、KV、GQA，以及真实 TinyLlama layer-0 CPU/CUDA 对照；下一步接多层 Model/Context |
+| 2026-11 | CUDA 后端 | 建设中 | CUDA 资源、22 层 Model/Context、真实文本生成、Decode batch、单请求分页 Context/GQA 与 Chapter10 服务；下一步接分页 batch 事务 |
 | 2026-11 | 工程验证体系 | 完成 | 默认回归、Release 契约、测试资产审计、文档检查和 GitHub Actions CI |
 
 ## 查阅与贡献

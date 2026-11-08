@@ -79,13 +79,17 @@ A 教学基线 → B 真实主线
 
 | 扩展 | 命令 | 当前范围 |
 | --- | --- | --- |
-| CUDA | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | [CPU/GPU 架构](source/reference/cpu_gpu_architecture.md)：设备资源、量化 Linear、连续 KV、GQA、合成 Decoder；真实 layer-0 入口见 `code/engine/README.md` |
-| 真实 CUDA 首层 | `bash code/engine/scripts/run_real_cuda_first_layer.sh` | TinyLlama layer-0 的 CPU/CUDA hidden、K/V 和缓存增长对照 |
+| CUDA | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | [CPU/GPU 架构](source/reference/cpu_gpu_architecture.md)：设备资源、量化 Linear、连续/分页 K/V、GQA 和 Decoder；真实模型入口见 `code/engine/README.md` |
+| 真实 CUDA 首层 | `bash code/engine/scripts/run_real_cuda_first_layer.sh` | TinyLlama layer-0 的 CPU/CUDA hidden 对照，以及 Model/Context 隔离 |
+| 真实 CUDA Decoder | `bash code/engine/scripts/run_real_cuda_decoder.sh` | TinyLlama 2 层与 22 层的 CPU/CUDA hidden、分层 K/V 对照 |
+| 真实 CUDA Runtime | `bash code/engine/scripts/run_real_cuda_runtime.sh` | 固定 token prompt 的 22 层 prefill、greedy decode 与请求隔离 |
+| 真实 CUDA 文本生成 | `bash code/engine/scripts/run_real_cuda_generation.sh` | `Hello TinyLlama` 经 tokenizer、CUDA Runtime 和 detokenizer 得到 CPU 同款 golden |
+| 真实 CUDA 服务 | `bash code/engine/scripts/run_real_cuda_serving.sh` | CUDA Executor 接入 Chapter10，同步 Completion、SSE 与四类终态释放通过 |
 | Engine 集成 | `bash code/engine/scripts/run.sh` | 章节组件到统一 Engine 的集成与测试 |
 | 真实 CPU 全链路验收 | `bash scripts/run_cpu_v1_acceptance.sh` | 兼容验收入口；要求本地 llama.cpp 和 TinyLlama GGUF |
 | 多模态 | `bash code/multimodal/scripts/run.sh` | [多模态输入链路](source/reference/multimodal_inference.md)：SmolVLM CPU 输入、Vision、Projector 和 Decoder golden |
 
-真实 TinyLlama layer-0 已完成 CPU/CUDA 数值对照，但 22 层 GPU Decoder、Generation Runtime 和服务仍在建设，不能把单层测试描述成完整 GPU 端到端推理。
+真实 TinyLlama CUDA 路径已连接 tokenizer、量化 embedding、22 层 Decoder、final norm、LM Head、Chapter06 Runtime、Chapter08 Decode batch、detokenizer 和 Chapter10 HTTP Adapter。Decode batch 合并 RMSNorm、Linear 与 FFN，并按精确 batch size 复用执行 workspace。CUDA 分页 payload、分页 GQA 和单请求真实 Context 已通过连续路径对照；分页 batch 事务与真实 socket server 仍在建设。
 
 ## 验证层级
 

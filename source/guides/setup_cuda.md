@@ -149,7 +149,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON
 - 你可以先把 CPU 版本跑通，再考虑 GPU 加速
 - 只有当你要做 GPU 加速实验、对照 GPU 路径，或者尝试 CUDA 相关优化时，才需要真正启用 CUDA
 
-现有 CUDA 实现集中在 `code/cuda`，通过独立脚本显式构建和运行；Chapter03、Chapter05 的 CPU 默认脚本不会自动启用它。后续 Attention、device KV 和 GPU Decoder 也应继续在对应 README 与章节导读中标出运行条件。
+现有 CUDA 实现集中在 `code/cuda`，通过独立脚本显式构建和运行；Chapter03、Chapter05 的 CPU 默认脚本不会自动启用它。Attention、连续/分页 device K/V、22 层 Decoder、Generation 和 Service 的真实入口见 `code/cuda/README.md` 与 `code/engine/README.md`。
 
 ## 12. 验证清单
 

@@ -92,7 +92,7 @@ Linux 可直接使用上述配置。Windows 推荐使用 WSL2 Ubuntu，并把仓
 
 ### 2. 本地带 GPU 的学习环境
 
-当前 GPU 路径可以运行 `code/cuda` 的设备资源、cuBLAS MatMul、Q4_K/Q6_K Linear、RoPE、连续 KV、GQA 和合成 Decoder；`code/engine` 已能上传 Chapter01 的真实单层权重，并让 TinyLlama layer-0 在 CUDA Decoder 中执行。测试同时核对 CPU/CUDA hidden、K/V 和缓存增长；下一里程碑是多层 CUDA Model/Context。
+当前 GPU 路径可以运行设备资源、量化 Linear、RoPE、连续/分页 KV、GQA 和 22 层 Decoder；`code/model` 提供共享 CUDA 权重、请求级 Context 和按 batch size 复用的执行 workspace。数值测试核对 hidden、每层 K/V 和 logits，单请求真实 Context 已完成 reserve、逐层写入、分页 GQA、commit、trim 和 release。下一里程碑是分页 Decode batch 的整批事务。
 
 建议配置：
 
@@ -197,4 +197,4 @@ npm run test:release-contracts
 | 真实模型 | `code/engine` 中设置 `CPP_LLM_ENGINE_REAL_MODEL` 的 CTest | TinyLlama golden、Context 隔离、HTTP adapter、profiling |
 | 真实 transport | `bash code/chapter10_serving/scripts/run_cpp_httplib_loopback.sh` | loopback HTTP、metrics、同步与 SSE |
 | 性能实验 | Chapter09 与 Engine benchmark 脚本 | 固定 workload 的结果文件和 A/B 判定 |
-| GPU | `bash code/cuda/scripts/run.sh`<br>`bash code/engine/scripts/run_real_cuda_first_layer.sh` | CUDA 基础层，以及真实 TinyLlama layer-0 CPU/CUDA 对照；不包含端到端 GPU 生成 |
+| GPU | `bash code/cuda/scripts/run.sh`<br>`bash code/engine/scripts/run_real_cuda_generation.sh`<br>`bash code/engine/scripts/run_real_cuda_serving.sh` | CUDA 基础层、真实 TinyLlama 文本生成、分页 K/V Decode batch 和 Chapter10 服务契约；尚不包含融合 PagedAttention 或 socket server |

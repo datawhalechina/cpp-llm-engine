@@ -10,8 +10,7 @@
 - [chapter_assets.md](./chapter_assets.md)：各章正文、代码、图、公式和验证入口
 - [experiment_assets.md](./experiment_assets.md)：性能实验、正确性 golden、结果文件和复现入口
 - [data_structures_algorithms.md](./data_structures_algorithms.md)：跨章节数据结构、算法、代码入口和验证产物总表
-- [cpu_backend_architecture.md](./cpu_backend_architecture.md)：CPU 主线、公共契约和 GPU 扩展边界
-- [cpu_gpu_architecture.md](./cpu_gpu_architecture.md)：CPU 主线、GPU 扩展和证据闭环的统一架构
+- [cpu_gpu_architecture.md](./cpu_gpu_architecture.md)：CPU 主线、公共契约、GPU 扩展和证据闭环的统一架构
 - [memory_management.md](./memory_management.md)：Tensor、workspace、KV Cache 和 staging 的资源生命周期
 - [runtime_systems.md](./runtime_systems.md)：推理引擎运行时边界
 - [profiling.md](./profiling.md)：benchmark 之后的瓶颈解释

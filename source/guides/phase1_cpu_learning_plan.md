@@ -135,7 +135,7 @@
 
 ## 可选任务 7：GPU 初探
 
-任务 7 建立 CPU/GPU 对照方法，并运行当前 GPU 基础层。先确认驱动和 Toolkit，用 llama.cpp 的 `GGML_CUDA=ON` 路径固定外部基线，再运行 `code/cuda` 的 DeviceBuffer、stream/event、Vector Add、cuBLAS MatMul、Q4_K/Q6_K 非融合 Quantized Linear、RoPE、连续 device KV Cache 和 causal GQA Attention。Chapter03 解释 MatMul backend 语义，Chapter04 解释 RoPE、KV 与 Attention，Chapter05 解释量化格式，设备实现集中在 `code/cuda`。
+任务 7 建立 CPU/GPU 对照方法，并运行当前 GPU 基础层。先确认驱动和 Toolkit，用 llama.cpp 的 `GGML_CUDA=ON` 路径固定外部基线，再运行 `code/cuda` 的 DeviceBuffer、stream/event、Vector Add、cuBLAS MatMul、Q4_K/Q6_K 融合 GEMV、RoPE、连续/分页 device KV Cache 和 causal GQA Attention。Chapter03 解释 MatMul backend 语义，Chapter04 解释 RoPE、KV 与 Attention，Chapter05 解释量化格式，设备实现集中在 `code/cuda`。
 
 | 任务卡 | 内容 |
 | --- | --- |

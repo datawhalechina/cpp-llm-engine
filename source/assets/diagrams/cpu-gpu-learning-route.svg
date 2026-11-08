@@ -22,15 +22,15 @@
   <text x="325" y="320" text-anchor="middle" class="small">Chapter02 Tensor view</text>
   <text x="325" y="348" text-anchor="middle" class="small">Chapter03-04 Operator / Decoder</text>
   <text x="325" y="376" text-anchor="middle" class="small">Chapter05 Q4_K / Chapter06 Runtime</text>
-  <text x="325" y="404" text-anchor="middle" class="small">Chapter07 Benchmark / Chapter08 Profiling</text>
-  <text x="325" y="432" text-anchor="middle" class="small">Chapter09 CPU Service Core</text>
+  <text x="325" y="404" text-anchor="middle" class="small">Chapter07 KV / Chapter08 Scheduler</text>
+  <text x="325" y="432" text-anchor="middle" class="small">Chapter09 Performance / Chapter10 Serving</text>
   <rect x="620" y="245" width="510" height="220" rx="14" fill="#dbeafe" stroke="#334155" stroke-width="2"/>
-  <text x="875" y="282" text-anchor="middle" class="label">GPU 可选扩展路线（P1-4B 已完成）</text>
+  <text x="875" y="282" text-anchor="middle" class="label">GPU 可选扩展路线</text>
   <text x="875" y="320" text-anchor="middle" class="small">DeviceBuffer / Stream / Event</text>
   <text x="875" y="348" text-anchor="middle" class="small">Vector Add / cuBLAS MatMul</text>
-  <text x="875" y="376" text-anchor="middle" class="small">Q4_K / Q6_K dequantize + SGEMM</text>
+  <text x="875" y="376" text-anchor="middle" class="small">Q4_K / Q6_K 单 token 融合 GEMV</text>
   <text x="875" y="404" text-anchor="middle" class="small">RoPE / device KV / causal GQA 已完成</text>
-  <text x="875" y="432" text-anchor="middle" class="small">合成单层已完成；下一步：TinyLlama 真实首层</text>
+  <text x="875" y="432" text-anchor="middle" class="small">TinyLlama 22 层 Runtime / 分页 batch</text>
   <path d="M600 230 H325 V245" class="branch"/>
   <path d="M600 230 H875 V245" class="branch"/>
   <rect x="70" y="510" width="510" height="70" rx="14" fill="#f1f5f9" stroke="#334155" stroke-width="2"/>
