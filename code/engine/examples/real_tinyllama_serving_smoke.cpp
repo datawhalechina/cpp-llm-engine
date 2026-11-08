@@ -1,5 +1,5 @@
 // Engine/Chapter 10：真实 TinyLlama 双请求服务 smoke。
-// 职责：验证共享 Model、独立 Context、Step batch 执行和终态资源释放。
+// 职责：验证双请求服务、终态释放和真实 Radix 命中调度。
 // 运行：real_tinyllama_serving_smoke <model.gguf>。
 #include "cpp_llm_engine/real_llama_executor_factory.h"
 #include "cpp_llm_engine/real_tokenizer_backend.h"
@@ -106,14 +106,80 @@ int main(int argc, char** argv) {
         factory->executor_uses_paged_kv(weak_b.lock());
 
     const std::size_t released = service.release_terminal();
-    const bool resources_released =
-        released == 2 && request_a.history().empty() && request_b.history().empty() &&
-        weak_a.expired() && weak_b.expired() && block_pool->free_blocks() == 8;
+    cpp_llm_engine::RealLlamaPrefixCacheStats retained_stats;
+    const bool retained_stats_ready =
+        factory->prefix_cache_stats(&retained_stats, &error);
+    const bool resources_released = released == 2 &&
+        request_a.history().empty() && request_b.history().empty() &&
+        weak_a.expired() && weak_b.expired() &&
+        !block_pool->contains(101) && !block_pool->contains(102);
+    const bool reusable_prefix_retained = retained_stats_ready &&
+        retained_stats.cached_blocks > 0 &&
+        block_pool->free_blocks() < block_pool->total_blocks();
     const auto& metrics = service.metrics();
     const bool metrics_match =
         metrics.accepted_total == 2 && metrics.completed_total == 2 &&
         metrics.failed_total == 0 && metrics.released_total == 2 &&
         metrics.generated_tokens_total == 8;
+
+    chapter06_generation::GenerationConfig cache_config;
+    cache_config.max_new_tokens = 1;
+    cache_config.eos_token_id = factory->eos_token_id();
+    chapter06_generation::Runtime cache_runtime(cache_config);
+    const TokenSequence shared_prompt{15043, 18439, 1460, 29931, 5288, 29874};
+    const TokenSequence cached_prompt{15043, 18439, 1460, 29931, 29871, 29973};
+    Request source(shared_prompt);
+    chapter10_serving::ServiceCore source_service(
+        1, 1, {}, block_pool, {}, factory.get());
+    const bool source_admitted = source_service.admit(
+        201, source, sampler, factory->create_executor()).accepted();
+    const auto source_step = source_admitted
+        ? source_service.dispatch_step(cache_runtime, shared_prompt.size())
+        : chapter10_serving::DispatchStats{};
+    const bool source_published = source.finished() &&
+        source_step.generated_tokens == 1 && source_service.release_terminal() == 1;
+    cpp_llm_engine::RealLlamaPrefixCacheStats stats_before_scheduling;
+    const bool stats_before_ready =
+        factory->prefix_cache_stats(&stats_before_scheduling, &error);
+
+    Request cold({1, 15043});
+    Request cached(cached_prompt);
+    chapter10_serving::ServiceCore cache_service(
+        2, 1, {}, block_pool, {}, factory.get());
+    const bool cold_admitted = cache_service.admit(
+        202, cold, sampler, factory->create_executor()).accepted();
+    const bool cached_admitted = cache_service.admit(
+        203, cached, sampler, factory->create_executor()).accepted();
+    const bool waiting_requests_not_adopted =
+        cold.prefill_offset() == 0 && cached.prefill_offset() == 0;
+    std::size_t first_scheduled_id = 0;
+    const auto cache_step = cache_service.dispatch_step(
+        cache_runtime,
+        2,
+        [&](std::size_t request_id, chapter06_generation::TokenId, std::size_t) {
+            first_scheduled_id = request_id;
+        });
+    cpp_llm_engine::RealLlamaPrefixCacheStats stats_after_scheduling;
+    const bool stats_after_ready =
+        factory->prefix_cache_stats(&stats_after_scheduling, &error);
+    const bool cached_prefix_adopted_at_promotion = stats_before_ready &&
+        stats_after_ready &&
+        stats_after_scheduling.hits == stats_before_scheduling.hits + 1 &&
+        stats_after_scheduling.matched_tokens >=
+            stats_before_scheduling.matched_tokens + 4;
+    const bool cache_aware_scheduling = source_published && cold_admitted &&
+        cached_admitted && waiting_requests_not_adopted &&
+        cached_prefix_adopted_at_promotion && cache_step.generated_tokens == 1 &&
+        first_scheduled_id == 203 && cached.finished() && !cold.prefilled();
+    if (!cold.terminal()) cache_service.cancel(202);
+    if (!cached.terminal()) cache_service.cancel(203);
+    const bool cache_requests_released = cache_service.release_terminal() == 2 &&
+        !block_pool->contains(202) && !block_pool->contains(203);
+
+    const bool real_serving_match = request_isolation_match && cache_isolated &&
+        chunked_prefill_match && paged_payload_active && resources_released &&
+        reusable_prefix_retained && metrics_match && decoder_contract_match &&
+        cache_aware_scheduling && cache_requests_released;
 
     std::cout << "model_layers: " << factory->layer_count() << '\n'
               << "request_a_tokens:";
@@ -127,11 +193,17 @@ int main(int argc, char** argv) {
               << "chunked_prefill_match: " << chunked_prefill_match << '\n'
               << "paged_payload_active: " << paged_payload_active << '\n'
               << "resources_released: " << resources_released << '\n'
+              << "reusable_prefix_retained: " << reusable_prefix_retained << '\n'
+              << "waiting_requests_not_adopted: "
+              << waiting_requests_not_adopted << '\n'
+              << "cached_prefix_adopted_at_promotion: "
+              << cached_prefix_adopted_at_promotion << '\n'
+              << "cache_aware_scheduling: " << cache_aware_scheduling << '\n'
+              << "cache_requests_released: " << cache_requests_released << '\n'
               << "metrics_match: " << metrics_match << '\n'
               << "decoder_contract_match: " << decoder_contract_match << '\n'
+              << "real_serving_match: " << real_serving_match << '\n'
               << "real_serving: ready\n";
 
-    return request_isolation_match && cache_isolated && chunked_prefill_match &&
-        paged_payload_active &&
-        resources_released && metrics_match && decoder_contract_match ? 0 : 1;
+    return real_serving_match ? 0 : 1;
 }

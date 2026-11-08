@@ -86,6 +86,10 @@ AdmissionResult ServiceCore::admit(
         ++metrics_.invalid_total;
         return {AdmissionStatus::invalid_request};
     }
+    const std::size_t estimated_cached_prefix =
+        executor != nullptr && batch_runner_ != nullptr
+        ? batch_runner_->estimate_cached_prefix(request)
+        : 0;
     waiting_.push_back({
         request_id,
         &request,
@@ -93,6 +97,7 @@ AdmissionResult ServiceCore::admit(
         std::move(executor),
         priority,
         next_enqueue_sequence_++,
+        estimated_cached_prefix,
         now_(),
         false,
         false});
@@ -124,11 +129,28 @@ void ServiceCore::promote_waiting() {
             if (candidate->request == nullptr || candidate->request->terminal()) continue;
             if (next == waiting_.end() || candidate->priority > next->priority ||
                 (candidate->priority == next->priority &&
+                 candidate->cached_prefix_tokens > next->cached_prefix_tokens) ||
+                (candidate->priority == next->priority &&
+                 candidate->cached_prefix_tokens == next->cached_prefix_tokens &&
                  candidate->enqueue_sequence < next->enqueue_sequence)) {
                 next = candidate;
             }
         }
         if (next == waiting_.end()) return;
+        std::string adoption_error;
+        if (next->executor != nullptr && batch_runner_ != nullptr &&
+            !batch_runner_->adopt_cached_prefix(
+                next->executor, next->request_id, *next->request,
+                &adoption_error)) {
+            batch_runner_->release_request(next->request_id);
+            next->request->mark_failed(
+                adoption_error.empty()
+                ? "cached prefix adoption failed"
+                : adoption_error);
+            observe_completion(*next, now_());
+            continue;
+        }
+        next->cached_prefix_tokens = next->request->prefill_offset();
         Entry entry = std::move(*next);
         waiting_.erase(next);
         metrics_.queue_wait_seconds_sum += elapsed_seconds(entry.admitted_at, now_());
@@ -154,7 +176,8 @@ DispatchStats ServiceCore::dispatch_step(
                 entry.request,
                 entry.sampler,
                 entry.executor,
-                {entry.priority, entry.enqueue_sequence}});
+                {entry.priority, entry.enqueue_sequence,
+                 entry.cached_prefix_tokens}});
         }
     }
 
@@ -262,12 +285,14 @@ std::size_t ServiceCore::release_terminal() {
                 [this, &released](Entry& entry) {
                     if (entry.request == nullptr || !entry.request->terminal()) return false;
                     observe_completion(entry, now_());
-                    entry.request->history().clear();
                     if (batch_runner_ != nullptr) {
+                        batch_runner_->publish_cached_prefix(
+                            entry.request_id, *entry.request);
                         batch_runner_->release_request(entry.request_id);
                     } else if (block_pool_ != nullptr) {
                         block_pool_->release(entry.request_id);
                     }
+                    entry.request->history().clear();
                     priority_policy_.forget(entry.request_id);
                     account_terminal(*entry.request);
                     ++released;

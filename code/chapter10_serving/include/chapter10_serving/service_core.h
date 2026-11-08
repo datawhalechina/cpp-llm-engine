@@ -125,6 +125,7 @@ private:
         std::shared_ptr<chapter06_generation::RequestModelExecutor> executor;
         int priority = 0;
         std::size_t enqueue_sequence = 0;
+        std::size_t cached_prefix_tokens = 0;
         ServiceClock::time_point admitted_at;
         bool first_token_observed = false;
         bool completion_observed = false;

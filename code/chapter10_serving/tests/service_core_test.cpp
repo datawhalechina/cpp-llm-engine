@@ -43,6 +43,28 @@ public:
         return true;
     }
 
+    bool supports_chunked_prefill() const override { return true; }
+
+    bool prefill_chunk(
+        const chapter06_generation::TokenSequence& prompt,
+        bool start_new_sequence,
+        bool produce_logits,
+        chapter06_generation::Logits* logits,
+        std::string* error) override {
+        if (start_new_sequence) position_ = 0;
+        position_ += prompt.size();
+        if (produce_logits) {
+            if (logits == nullptr) {
+                if (error != nullptr) *error = "batch test logits are required";
+                return false;
+            }
+            logits->assign(8, 0.0f);
+            (*logits)[token_] = 1.0f;
+        }
+        if (error != nullptr) error->clear();
+        return true;
+    }
+
     chapter06_generation::ModelExecutionState execution_state() const override {
         return {true, position_, 1, true};
     }
@@ -81,6 +103,109 @@ public:
 
     mutable std::size_t calls = 0;
     mutable std::size_t max_batch_size = 0;
+};
+
+class PrefixLifecycleRunner final : public chapter06_generation::ExecutorBatchRunner {
+public:
+    std::size_t estimate_cached_prefix(
+        const chapter06_generation::Request&) const override {
+        ++estimate_calls;
+        return 1;
+    }
+
+    bool adopt_cached_prefix(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>&,
+        std::size_t,
+        chapter06_generation::Request& request,
+        std::string* error) const override {
+        ++adopt_calls;
+        if (error != nullptr) error->clear();
+        return request.adopt_prefilled_prefix(1);
+    }
+
+    void publish_cached_prefix(
+        std::size_t,
+        const chapter06_generation::Request& request) const override {
+        ++publish_calls;
+        published_tokens = request.prefill_offset();
+    }
+
+    bool decode_batch(
+        const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>&,
+        const chapter06_generation::TokenSequence&,
+        const std::vector<std::size_t>&,
+        const std::vector<std::size_t>&,
+        std::vector<chapter06_generation::Logits>*,
+        std::string*) const override {
+        return false;
+    }
+
+    mutable std::size_t estimate_calls = 0;
+    mutable std::size_t adopt_calls = 0;
+    mutable std::size_t publish_calls = 0;
+    mutable std::size_t published_tokens = 0;
+};
+
+class SelectivePrefixRunner final : public chapter06_generation::ExecutorBatchRunner {
+public:
+    std::size_t estimate_cached_prefix(
+        const chapter06_generation::Request& request) const override {
+        return request.prompt().front() == 9 ? 2 : 0;
+    }
+
+    bool adopt_cached_prefix(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>&,
+        std::size_t,
+        chapter06_generation::Request& request,
+        std::string* error) const override {
+        if (error != nullptr) error->clear();
+        return request.prompt().front() != 9 || request.adopt_prefilled_prefix(2);
+    }
+
+    bool decode_batch(
+        const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>&,
+        const chapter06_generation::TokenSequence&,
+        const std::vector<std::size_t>&,
+        const std::vector<std::size_t>&,
+        std::vector<chapter06_generation::Logits>*,
+        std::string*) const override {
+        return false;
+    }
+};
+
+class FailingPrefixRunner final : public chapter06_generation::ExecutorBatchRunner {
+public:
+    std::size_t estimate_cached_prefix(
+        const chapter06_generation::Request&) const override {
+        return 2;
+    }
+
+    bool adopt_cached_prefix(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>&,
+        std::size_t,
+        chapter06_generation::Request&,
+        std::string* error) const override {
+        if (error != nullptr) *error = "estimated prefix became unavailable";
+        return false;
+    }
+
+    void release_request(std::size_t request_id) const override {
+        ++release_calls;
+        released_request_id = request_id;
+    }
+
+    bool decode_batch(
+        const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>&,
+        const chapter06_generation::TokenSequence&,
+        const std::vector<std::size_t>&,
+        const std::vector<std::size_t>&,
+        std::vector<chapter06_generation::Logits>*,
+        std::string*) const override {
+        return false;
+    }
+
+    mutable std::size_t release_calls = 0;
+    mutable std::size_t released_request_id = 0;
 };
 
 }  // namespace
@@ -206,6 +331,91 @@ int main() {
         CPP_LLM_CHECK(suite, first.finished() && second.finished());
         CPP_LLM_CHECK(suite, first.generated() == TokenSequence({3, 3}));
         CPP_LLM_CHECK(suite, second.generated() == TokenSequence({4, 4}));
+    });
+
+    suite.run("service estimates before queueing and adopts when promoted", [&] {
+        GreedySampler sampler;
+        Request request({1, 2, 3});
+        PrefixLifecycleRunner runner;
+        GenerationConfig config;
+        config.max_new_tokens = 1;
+        Runtime runtime(config);
+        ServiceCore service(1, 1, {}, {}, {}, &runner);
+        CPP_LLM_REQUIRE(
+            suite,
+            service.admit(
+                40, request, sampler, std::make_shared<BatchTestExecutor>(3))
+                .accepted());
+        CPP_LLM_CHECK_EQ(suite, runner.estimate_calls, 1U);
+        CPP_LLM_CHECK_EQ(suite, runner.adopt_calls, 0U);
+        CPP_LLM_CHECK_EQ(suite, request.prefill_offset(), 0U);
+        const auto step = service.dispatch_step(runtime, 2);
+        CPP_LLM_CHECK_EQ(suite, step.generated_tokens, 1U);
+        CPP_LLM_CHECK_EQ(suite, runner.adopt_calls, 1U);
+        CPP_LLM_CHECK_EQ(suite, request.prefill_offset(), 3U);
+        CPP_LLM_CHECK_EQ(suite, service.release_terminal(), 1U);
+        CPP_LLM_CHECK_EQ(suite, runner.publish_calls, 1U);
+        CPP_LLM_CHECK_EQ(suite, runner.published_tokens, 3U);
+    });
+
+    suite.run("real adopted prefix reaches waiting and step scheduling", [&] {
+        GenerationConfig config;
+        config.max_new_tokens = 1;
+        Runtime runtime(config);
+        GreedySampler sampler;
+        Request cold({1, 2, 3});
+        Request cached({9, 2, 3});
+        SelectivePrefixRunner runner;
+        ServiceCore service(2, 1, {}, {}, {}, &runner);
+        CPP_LLM_REQUIRE(
+            suite,
+            service.admit(
+                50, cold, sampler, std::make_shared<BatchTestExecutor>(3))
+                .accepted());
+        CPP_LLM_REQUIRE(
+            suite,
+            service.admit(
+                51, cached, sampler, std::make_shared<BatchTestExecutor>(4))
+                .accepted());
+        CPP_LLM_CHECK_EQ(suite, cold.prefill_offset(), 0U);
+        CPP_LLM_CHECK_EQ(suite, cached.prefill_offset(), 0U);
+
+        std::size_t selected_id = 0;
+        const auto step = service.dispatch_step(
+            runtime,
+            1,
+            [&](std::size_t request_id, TokenId, std::size_t) {
+                selected_id = request_id;
+            });
+        CPP_LLM_CHECK_EQ(suite, step.scheduled_requests, 1U);
+        CPP_LLM_CHECK_EQ(suite, selected_id, 51U);
+        CPP_LLM_CHECK_EQ(suite, cached.prefill_offset(), 3U);
+        CPP_LLM_CHECK(suite, cached.finished());
+        CPP_LLM_CHECK(suite, !cold.prefilled());
+    });
+
+    suite.run("stale prefix estimate fails only at promotion and releases resources", [&] {
+        GenerationConfig config;
+        config.max_new_tokens = 1;
+        Runtime runtime(config);
+        GreedySampler sampler;
+        Request request({1, 2, 3});
+        FailingPrefixRunner runner;
+        ServiceCore service(1, 1, {}, {}, {}, &runner);
+        CPP_LLM_REQUIRE(
+            suite,
+            service.admit(
+                60, request, sampler, std::make_shared<BatchTestExecutor>(3))
+                .accepted());
+        CPP_LLM_CHECK_EQ(suite, request.prefill_offset(), 0U);
+
+        const auto step = service.dispatch_step(runtime, 2);
+        CPP_LLM_CHECK_EQ(suite, step.scheduled_requests, 0U);
+        CPP_LLM_CHECK(suite, request.failed());
+        CPP_LLM_CHECK_EQ(suite, runner.release_calls, 1U);
+        CPP_LLM_CHECK_EQ(suite, runner.released_request_id, 60U);
+        CPP_LLM_CHECK_EQ(suite, service.release_terminal(), 1U);
+        CPP_LLM_CHECK_EQ(suite, service.metrics().failed_total, 1U);
     });
 
     return suite.finish();
