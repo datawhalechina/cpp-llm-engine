@@ -13,4 +13,5 @@ struct TensorView {
 
 int main() {
   // TODO: create storage, create a view, and verify shared updates.
+  return 1;
 }

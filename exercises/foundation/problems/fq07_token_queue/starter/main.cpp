@@ -9,4 +9,5 @@ class TokenQueue {
 
 int main() {
   // TODO: implement FIFO behavior and empty-queue handling.
+  return 1;
 }

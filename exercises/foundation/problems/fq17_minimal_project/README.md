@@ -17,10 +17,11 @@
 在临时目录完成 starter 后运行：
 
 ```bash
-cmake -S . -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
-./build/engine_demo
+cp -r exercises/foundation/problems/fq17_minimal_project/starter /tmp/fq17-answer
+cmake -S /tmp/fq17-answer -B /tmp/fq17-answer/build
+cmake --build /tmp/fq17-answer/build
+ctest --test-dir /tmp/fq17-answer/build --output-on-failure
+/tmp/fq17-answer/build/engine_demo
 ```
 
 预期输出：

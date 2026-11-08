@@ -14,4 +14,5 @@ std::vector<float> matmul(const std::vector<float>& a, std::size_t m, std::size_
 
 int main() {
   // TODO: compare a small result with a hand-computed reference.
+  return 1;
 }

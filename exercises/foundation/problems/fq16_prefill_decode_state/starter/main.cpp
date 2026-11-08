@@ -20,4 +20,7 @@ class GenerationState {
   Phase phase_ = Phase::Waiting;
 };
 
-int main() { return 0; }
+int main() {
+  // TODO: add legal transition, completion, cancellation, and failure checks.
+  return 1;
+}

@@ -2,53 +2,31 @@
 
 这套题库把 `foundation` 的最低门槛落实为可编译、可测试的小题。题目默认不需要模型文件或 GPU；FQ10 提供 CPU 参考实现和可选 CUDA starter。
 
-## 当前题目
+## 题目资产
 
 | 编号 | 难度 | 主题 | 验证重点 | 对应正文 / 主线 |
 | --- | --- | --- | --- | --- |
-| `FQ01` | 入门 | move-only Buffer | 所有权、移动、释放 | `F01` / `foundation` |
-| `FQ02` | 入门 | Tensor shape | shape、numel、边界 | `chapter01` |
-| `FQ03` | 主线 | Tensor view | offset、共享存储 | `F06` / `chapter02` |
-| `FQ04` | 入门 | CMake + CTest | target、构建、测试注册 | `F02` / `foundation` |
-| `FQ05` | 入门 | 安全缓冲区 | 输入检查、失败路径 | `F04` / `foundation` |
-| `FQ06` | 主线 | CPU MatMul | shape 检查、数值结果 | `F06` / `chapter03` |
-| `FQ07` | 主线 | Token queue | FIFO、状态转移 | `F06` / `chapter06` |
-| `FQ08` | 主线 | Mini Tensor | ownership、view、索引组合 | `F05`、`F08` / `chapter01` |
-| `FQ09` | 主线 | Request State | 状态迁移、终态、取消 | `chapter06` |
-| `FQ10` | 进阶选修 | Vector Add / CUDA 映射 | CPU 参考、kernel 索引、边界 | `F03`、`F07` / `chapter03` |
-| `FQ11` | 主线 | Request Queue | 容量、FIFO、取消、backpressure | `chapter06` |
-| `FQ12` | 主线 | RAII Workspace | 移动所有权、边界、异常安全 | `F09` / `chapter06` / `reference` |
-| `FQ13` | 主线 | Shape-aware Batch | sequence length、padding、buffer offset | `chapter06` |
-| `FQ14` | 主线 | Step Scheduler | FIFO、token budget、round-robin | `chapter06` |
-| `FQ15` | 主线 | KV Block Pool | block 分配、释放、复用 | `chapter06` / `reference` |
-| `FQ16` | 综合 | Prefill/Decode State | 阶段迁移、token 计数、终态 | `chapter06` |
-| `FQ17` | 综合 | Minimal Project Integration | library、app、test、workspace 所有权 | `F09` / `chapter00` / `chapter01` |
+| [`FQ01`](./problems/fq01_move_buffer/README.md) | 入门 | 仅移动缓冲区 | 所有权、移动、释放 | `F01` / Foundation |
+| [`FQ02`](./problems/fq02_tensor_shape/README.md) | 入门 | Tensor shape | shape、numel、边界 | `F06` / Chapter01 |
+| [`FQ03`](./problems/fq03_tensor_view/README.md) | 主线 | Tensor view | offset、共享存储 | `F06` / Chapter02 |
+| [`FQ04`](./problems/fq04_cmake_ctest/README.md) | 入门 | CMake + CTest | target、构建、测试注册 | `F02` / Foundation |
+| [`FQ05`](./problems/fq05_debug_safe_buffer/README.md) | 入门 | 安全缓冲区 | 输入检查、失败路径 | `F04` / Foundation |
+| [`FQ06`](./problems/fq06_cpu_matmul/README.md) | 主线 | CPU MatMul | shape 检查、数值结果 | `F06` / Chapter03 |
+| [`FQ07`](./problems/fq07_token_queue/README.md) | 主线 | 词元队列 | FIFO、状态转移 | `F06`、`F10` / Chapter08 |
+| [`FQ08`](./problems/fq08_mini_tensor/README.md) | 主线 | 最小 Tensor | 所有权、视图、索引组合 | `F05`、`F08` / Chapter01–02 |
+| [`FQ09`](./problems/fq09_request_state/README.md) | 主线 | Request State | 状态迁移、终态、取消 | `F10` / Chapter06、08 |
+| [`FQ10`](./problems/fq10_vector_add/README.md) | 进阶选修 | 向量加法与 CUDA 映射 | CPU 参考、核函数索引、边界 | `F03`、`F07` / Chapter03 |
+| [`FQ11`](./problems/fq11_request_queue/README.md) | 主线 | 请求队列 | 容量、FIFO、取消、背压 | `F10` / Chapter08 |
+| [`FQ12`](./problems/fq12_raii_workspace/README.md) | 主线 | RAII Workspace | 移动所有权、边界、异常安全 | `F01`、`F09` / Chapter06 |
+| [`FQ13`](./problems/fq13_shape_aware_batch/README.md) | 主线 | 感知形状的批次 | 序列长度、填充、缓冲区偏移 | `F06` / Chapter08 |
+| [`FQ14`](./problems/fq14_step_scheduler/README.md) | 主线 | 单步调度器 | FIFO、词元预算、轮转推进 | `F10` / Chapter08 |
+| [`FQ15`](./problems/fq15_kv_block_pool/README.md) | 主线 | KV Block Pool | block 分配、释放、复用 | `F06` / Chapter07 |
+| [`FQ16`](./problems/fq16_prefill_decode_state/README.md) | 综合 | Prefill/Decode State | 阶段迁移、token 计数、终态 | `F10` / Chapter06 |
+| [`FQ17`](./problems/fq17_minimal_project/README.md) | 综合 | Minimal Project Integration | library、app、test、workspace 所有权 | `F02`、`F09` / Chapter00–01 |
 
-每道题都包含问题说明、完成标准、答案验证命令、提示和主线链接。验证顺序固定为：复制并完成 starter，先运行学习者答案，再运行 `run_all.sh` 检查参考实现没有回归。题目入口：
+每道题都包含问题说明、完成标准、答案验证命令、提示和主线链接。验证顺序固定为：复制并完成 starter，先运行学习者答案，再运行 `run_all.sh` 检查参考实现没有回归。
 
-- [`FQ01 move-only Buffer`](./problems/fq01_move_buffer/README.md)
-- [`FQ02 Tensor shape`](./problems/fq02_tensor_shape/README.md)
-- [`FQ03 Tensor view`](./problems/fq03_tensor_view/README.md)
-- [`FQ04 CMake + CTest`](./problems/fq04_cmake_ctest/README.md)
-- [`FQ05 安全缓冲区`](./problems/fq05_debug_safe_buffer/README.md)
-- [`FQ06 CPU MatMul`](./problems/fq06_cpu_matmul/README.md)
-- [`FQ07 Token queue`](./problems/fq07_token_queue/README.md)
-- [`FQ08 Mini Tensor`](./problems/fq08_mini_tensor/README.md)
-- [`FQ09 Request State`](./problems/fq09_request_state/README.md)
-- [`FQ10 Vector Add / CUDA Mapping`](./problems/fq10_vector_add/README.md)
-- [`FQ11 Request Queue`](./problems/fq11_request_queue/README.md)
-- [`FQ12 RAII Workspace`](./problems/fq12_raii_workspace/README.md)
-- [`FQ13 Shape-aware Batch`](./problems/fq13_shape_aware_batch/README.md)
-- [`FQ14 Step Scheduler`](./problems/fq14_step_scheduler/README.md)
-- [`FQ15 KV Block Pool`](./problems/fq15_kv_block_pool/README.md)
-- [`FQ16 Prefill/Decode State`](./problems/fq16_prefill_decode_state/README.md)
-- [`FQ17 Minimal Project Integration`](./problems/fq17_minimal_project/README.md)
-
-当前目录中的 `.cpp` 是可运行参考实现；每道题的 `starter/` 目录提供不含答案的最小起点。单文件答案统一使用 `bash scripts/check_foundation_answer.sh /tmp/<answer>/main.cpp` 编译并运行；FQ04 和 FQ17 按各自 README 使用 CMake/CTest 验收。
-
-`bash scripts/check_foundation_starters.sh` 会编译所有 C++ starter，并检查 FQ04 的 CMake starter 与 FQ10 的 CUDA starter 文件存在。它验证 starter 能作为起点构建，不替代题目本身的行为测试。
-
-`bash scripts/check_foundation_metadata.sh` 会检查每道题的 README、starter 和统一栏目是否存在。
+题库根目录中的 `.cpp` 是可运行参考实现；每道题的 `starter/` 目录提供不含答案的最小起点。单文件答案统一使用 `bash scripts/check_foundation_answer.sh /tmp/<answer>/main.cpp` 编译并运行；FQ04 和 FQ17 按各自 README 使用 CMake/CTest 验收。
 
 ## 如何完成一道题
 
@@ -94,9 +72,8 @@ bash exercises/foundation/run_all.sh
 | 默认环境 | C++17、CMake、CTest，无模型、无 GPU | CPU 可完成 reference；CUDA kernel 需要 CUDA toolkit 和 GPU |
 | 验证方式 | 17 题 CTest、starter 编译、元数据检查、回归基线 | FQ10 CPU reference 默认验证；CUDA starter 需要独立 CUDA 工程对照验证 |
 | 主线出口 | Chapter 01-08 的数据、算子、Runtime、缓存与调度 | Chapter 03 CUDA backend、后续 GPU kernel 和 benchmark |
-| 当前完成度 | 主线完整，可作为默认学习路径 | 入门映射已具备，尚未覆盖完整 CUDA allocator、stream、event、kernel benchmark |
 
-当前 Foundation 的 GPU 资产是 CPU 主线的选修入口，不是独立完整 GPU 题库。后续扩展 GPU 题库时，应优先补 `device memory -> stream/event -> kernel benchmark`，并复用 CPU 题库已经固定的输入、输出和正确性标准。
+Foundation 的 GPU 练习先用 FQ10 建立 CPU/CUDA 对照；继续学习设备内存、stream、event、更多 kernel 和 benchmark 时，进入 [`code/cuda`](/code/cuda)。
 
 ## 两道状态题的区别
 
@@ -107,7 +84,7 @@ bash exercises/foundation/run_all.sh
 
 ## Foundation 完成标准
 
-完成入门组后，学习者应能独立构建和测试 C++ 小程序；完成 CPU 主线和 FQ17 后，应能读懂 Chapter 00-03 的项目组织、对象和算子；完成 Runtime 综合练习后，应能进入 Chapter 06 阅读 Request、Scheduler、KV Cache 和 Prefill/Decode。题库参考实现的 CTest 通过不等于学习完成，学习者还需要把 starter 改完并运行对应验证。
+完成入门组后，应能独立构建和测试 C++ 小程序；完成 CPU 主线和 FQ17 后，应能读懂 Chapter00–03 的项目组织、对象和算子；完成 Runtime 综合练习后，应能分别阅读 Chapter06 的生成状态、Chapter07 的 K/V 资源和 Chapter08 的调度。参考实现 CTest 通过只说明题库基线有效，自己的 starter 还需通过对应答案命令。
 
 ## 运行全部题目
 
@@ -121,7 +98,6 @@ bash exercises/foundation/run_all.sh
 cmake -S exercises/foundation -B exercises/foundation/build
 cmake --build exercises/foundation/build
 ctest --test-dir exercises/foundation/build --output-on-failure
-npm run test:regression
 ```
 
 内存安全题可以额外启用 Sanitizer：
@@ -132,7 +108,7 @@ cmake --build exercises/foundation/build-asan
 ctest --test-dir exercises/foundation/build-asan --output-on-failure
 ```
 
-当前受控执行环境会限制 AddressSanitizer 的运行时和 LeakSanitizer；如果出现 `DEADLYSIGNAL` 或 `LeakSanitizer has encountered a fatal error`，应在普通本地环境重跑。当前环境使用 UBSan 做可运行验证：
+容器或受限环境可能无法运行 AddressSanitizer/LeakSanitizer；遇到运行时权限错误时，可先用 UBSan 检查未定义行为，再在本地 Linux 环境重跑 ASan：
 
 ```bash
 cmake -S exercises/foundation -B exercises/foundation/build-ubsan \
@@ -140,7 +116,3 @@ cmake -S exercises/foundation -B exercises/foundation/build-ubsan \
 cmake --build exercises/foundation/build-ubsan
 ctest --test-dir exercises/foundation/build-ubsan --output-on-failure
 ```
-
-## 题目规范
-
-学习目标统一写成“动作 + 对象 + 条件 + 验证结果”。例如：完成 `FQ03` 后，应能在不复制底层数组的前提下创建 view，并通过测试确认修改 view 会反映到原始 storage。

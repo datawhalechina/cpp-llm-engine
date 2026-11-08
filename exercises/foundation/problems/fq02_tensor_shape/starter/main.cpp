@@ -9,4 +9,5 @@ std::size_t numel(const std::vector<std::size_t>& shape) {
 
 int main() {
   // TODO: add normal and invalid-input tests.
+  return 1;
 }

@@ -31,4 +31,7 @@ class KvBlockPool {
   std::unordered_map<int, std::vector<std::size_t>> owners_;
 };
 
-int main() { return 0; }
+int main() {
+  // TODO: add allocation, rollback, release, and reuse checks.
+  return 1;
+}

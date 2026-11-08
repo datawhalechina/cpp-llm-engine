@@ -19,4 +19,5 @@ class Buffer {
 
 int main() {
   // TODO: implement Buffer and add move-semantics assertions.
+  return 1;
 }

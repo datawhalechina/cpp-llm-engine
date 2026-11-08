@@ -13,9 +13,14 @@
 
 ## 验证
 
-复制并完成 starter 后，先运行 `bash scripts/check_foundation_answer.sh /tmp/fq09-answer/main.cpp`。
+复制并完成 starter 后，先运行自己的答案：
 
-运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq09_request_state`；再对照 Chapter 06 的 Request 生命周期和 scheduler admission 规则。
+```bash
+cp -r exercises/foundation/problems/fq09_request_state/starter /tmp/fq09-answer
+bash scripts/check_foundation_answer.sh /tmp/fq09-answer/main.cpp
+```
+
+运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq09_request_state`；再对照 Chapter06 的 Request 生命周期和 Chapter08 的 admission 规则。
 
 ## 提示
 

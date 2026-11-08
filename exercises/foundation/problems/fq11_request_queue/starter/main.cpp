@@ -17,4 +17,5 @@ class RequestQueue {
 
 int main() {
   // TODO: enforce capacity, FIFO order, cancellation, and empty-queue rules.
+  return 1;
 }

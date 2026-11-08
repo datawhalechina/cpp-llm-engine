@@ -8,4 +8,5 @@ float read_checked(const std::vector<float>& values, std::size_t index) {
 
 int main() {
   // TODO: verify both valid and invalid access.
+  return 1;
 }

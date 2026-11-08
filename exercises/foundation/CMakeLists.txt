@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 project(foundation_exercises LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -16,7 +16,11 @@ enable_testing()
 
 function(add_foundation_exercise name source)
   add_executable(${name} ${source})
-  target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic)
+  if(MSVC)
+    target_compile_options(${name} PRIVATE /W4 /WX /UNDEBUG)
+  else()
+    target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)
+  endif()
   add_test(NAME ${name} COMMAND ${name})
 endfunction()
 

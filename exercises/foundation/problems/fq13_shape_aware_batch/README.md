@@ -14,7 +14,12 @@
 
 ## 验证
 
-复制并完成 starter 后，先运行 `bash scripts/check_foundation_answer.sh /tmp/fq13-answer/main.cpp`。
+复制并完成 starter 后，先运行自己的答案：
+
+```bash
+cp -r exercises/foundation/problems/fq13_shape_aware_batch/starter /tmp/fq13-answer
+bash scripts/check_foundation_answer.sh /tmp/fq13-answer/main.cpp
+```
 
 运行 `bash exercises/foundation/run_all.sh`，重点检查 `fq13_shape_aware_batch`。
 

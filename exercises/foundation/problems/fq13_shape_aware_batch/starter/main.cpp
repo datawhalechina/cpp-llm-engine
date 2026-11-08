@@ -26,4 +26,7 @@ class BatchLayout {
   std::vector<std::size_t> lengths_;
 };
 
-int main() { return 0; }
+int main() {
+  // TODO: add layout, capacity, padding, and invalid-input checks.
+  return 1;
+}

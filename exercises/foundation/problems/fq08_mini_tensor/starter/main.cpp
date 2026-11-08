@@ -15,4 +15,5 @@ class MiniTensor {
 
 int main() {
   // TODO: implement shared storage, slicing, and bounds checks.
+  return 1;
 }

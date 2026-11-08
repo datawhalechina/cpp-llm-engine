@@ -16,6 +16,7 @@
 复制并完成 starter 后，先运行自己的答案：
 
 ```bash
+cp -r exercises/foundation/problems/fq01_move_buffer/starter /tmp/fq01-answer
 bash scripts/check_foundation_answer.sh /tmp/fq01-answer/main.cpp
 ```
 

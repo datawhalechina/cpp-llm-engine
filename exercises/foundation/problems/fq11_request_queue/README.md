@@ -14,9 +14,14 @@
 
 ## 验证
 
-复制并完成 starter 后，先运行 `bash scripts/check_foundation_answer.sh /tmp/fq11-answer/main.cpp`。
+复制并完成 starter 后，先运行自己的答案：
 
-运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq11_request_queue`；再对照 Chapter 06 的 scheduler admission 和 continuous batching 规则。
+```bash
+cp -r exercises/foundation/problems/fq11_request_queue/starter /tmp/fq11-answer
+bash scripts/check_foundation_answer.sh /tmp/fq11-answer/main.cpp
+```
+
+运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq11_request_queue`；再对照 Chapter08 的 admission 和 continuous batching 规则。
 
 ## 提示
 

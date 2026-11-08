@@ -18,4 +18,5 @@ class Workspace {
 
 int main() {
   // TODO: make workspace ownership move-only and exception-safe.
+  return 1;
 }

@@ -1,37 +1,40 @@
 #include "engine.h"
 
-#include <cassert>
-#include <utility>
+#include <stdexcept>
 
-Workspace::Workspace(std::size_t size)
-    : data_(size ? std::make_unique<int[]>(size) : nullptr), size_(size) {}
+Workspace::Workspace(std::size_t size) {
+  // TODO: allocate the workspace and record its size.
+  (void)size;
+}
 
-Workspace::Workspace(Workspace&& other) noexcept
-    : data_(std::move(other.data_)), size_(other.size_) {
-  other.size_ = 0;
+Workspace::Workspace(Workspace&& other) noexcept {
+  // TODO: transfer ownership and clear the source state.
+  (void)other;
 }
 
 Workspace& Workspace::operator=(Workspace&& other) noexcept {
-  if (this != &other) {
-    data_ = std::move(other.data_);
-    size_ = other.size_;
-    other.size_ = 0;
-  }
+  // TODO: release the old value, transfer ownership, and clear the source.
+  (void)other;
   return *this;
 }
 
 Workspace::~Workspace() = default;
 
 int& Workspace::at(std::size_t index) {
-  assert(index < size_);
-  return data_[index];
+  // TODO: reject invalid indexes and return the selected element.
+  (void)index;
+  throw std::logic_error("Workspace::at is not implemented");
 }
 
-std::size_t Workspace::size() const { return size_; }
+std::size_t Workspace::size() const {
+  // TODO: report the owned element count.
+  return 0;
+}
 
 EngineStep::EngineStep(std::size_t workspace_size) : workspace_(workspace_size) {}
 
 int EngineStep::run(int input) {
-  workspace_.at(0) = input;
-  return workspace_.at(0) + 1;
+  // TODO: use the workspace and return the transformed value.
+  (void)input;
+  throw std::logic_error("EngineStep::run is not implemented");
 }

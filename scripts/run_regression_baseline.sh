@@ -62,7 +62,8 @@ run_and_check \
 run_and_check \
     foundation_starters \
     "cd '${repo_root}' && bash scripts/check_foundation_starters.sh" \
-    "Foundation starter compile check passed"
+    "Foundation starter contract passed" \
+    "FQ04 starts with zero tests; FQ17 builds but its behavior test fails until completed"
 
 run_and_check \
     foundation_metadata \

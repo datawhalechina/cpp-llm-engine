@@ -32,4 +32,7 @@ class StepScheduler {
   std::deque<Entry> queue_;
 };
 
-int main() { return 0; }
+int main() {
+  // TODO: add multi-step ordering, budget, and completion checks.
+  return 1;
+}

@@ -21,4 +21,5 @@ class RequestState {
 
 int main() {
   // TODO: enforce legal runtime transitions and terminal cleanup rules.
+  return 1;
 }
