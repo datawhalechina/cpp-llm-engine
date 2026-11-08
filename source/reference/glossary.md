@@ -29,6 +29,9 @@
 | CUDA 事件 | CUDA event | 记录 stream 进度并用于依赖同步或设备侧计时的对象 | GPU 路线 | - |
 | 进程 | process | 拥有独立地址空间的程序执行实例；跨进程对象需要 IPC、共享内存或网络传递 | Foundation / Chapter10 | - |
 | 线程 | thread | 进程内的执行单元；共享地址空间，因此并发修改对象需要所有权或同步规则 | Foundation / Chapter10 | - |
+| Warp | warp | CUDA 中按同一指令协同执行的一组线程；当前 NVIDIA GPU 通常每组 32 个线程 | Chapter05 | `threadIdx.x / 32` |
+| 归约 | reduction | 把多个线程的局部结果按求和、最大值等规则合并为一个结果 | Chapter05 / Chapter04 | `warp_reduce` |
+| 合并内存访问 | coalesced memory access | 相邻线程访问相邻 device 地址，使多个请求尽量合并为较少的显存事务 | Chapter05 | packed weights / input |
 | 同步调用 | synchronous call | 调用返回时，调用者需要的结果或错误已经可见 | Foundation / Chapter06、10 | - |
 | 异步工作 | asynchronous work | 先提交工作，完成状态稍后通过 callback、future、event 或队列出现 | Foundation / CUDA / Chapter08、10 | - |
 
@@ -69,6 +72,10 @@
 | 词元 | token | tokenizer 和模型处理的离散输入输出单位 | Chapter00-01 | - |
 | 提示输入 | prompt | 用户提供并在生成前完成 prefill 的输入序列 | Chapter00、Chapter06 | - |
 | 请求 | Request | 保存 prompt、生成 token、执行阶段、停止原因和请求级资源的运行时对象 | [Chapter06 Request 生命周期](../chapter06_generation/next/04_request_lifecycle.md) | [F-SCHED-01](./formulas.md#f-sched-01) |
+| 上下文窗口 | context window | 模型一次请求最多能够处理的词元范围，描述容量限制，不是一个 C++ 状态对象 | Chapter00、Chapter06 | - |
+| 模型执行上下文 | model execution context, Context | 保存或绑定一个请求的当前位置、分层 K/V 和后端执行状态；不保存所有请求共享的模型权重 | [Chapter04 解码器层](../chapter04_attention/04_decoder_layer.md) | [F-KV-01](./formulas.md#f-kv-01) |
+| 请求模型执行器 | Request Model Executor, Executor | 接收一个请求的 prefill/decode 输入，使用该请求的 Context 返回 logits | [Chapter06 请求与执行契约](../chapter06_generation/next/01_request_contract.md) | - |
+| 执行器工厂 | Executor Factory, Factory | 集中持有共享模型和后端资源，并按统一规则创建请求执行器及其 Context 的长生命周期对象 | [Chapter06 请求与执行契约](../chapter06_generation/next/01_request_contract.md) | - |
 | 预填充 | prefill | 批量处理 prompt 并建立初始 KV Cache 的阶段 | Chapter06 | [F-KV-01](./formulas.md#f-kv-01) |
 | 逐词元解码 | decode | 利用已有 KV Cache 每步生成一个新词元的阶段 | Chapter06 | [F-KV-01](./formulas.md#f-kv-01) |
 | 键值缓存 | Key-Value Cache, KV Cache | 保存历史 token 的 Attention key/value tensor | Chapter04、Chapter07 | [F-KV-01](./formulas.md#f-kv-01) |
@@ -93,6 +100,10 @@
 | 缩放因子 | scale | 将量化整数映射回近似浮点范围的比例参数 | [Chapter05 Quantization Basics](../chapter05_quantization/01_quantization_basics.md) | [F-QUANT-01](./formulas.md#f-quant-01) |
 | 反量化 | dequantization | 根据 scale、zero point 或 block metadata 恢复近似浮点值 | Chapter05 | [F-QUANT-01](./formulas.md#f-quant-01) |
 | 仅权重量化 | weight-only quantization | 权重使用低比特格式、激活与输出仍保持浮点表示的推理方式 | [Chapter05 Quantized Linear](../chapter05_quantization/05_linear_with_quant.md) | [F-QUANT-02](./formulas.md#f-quant-02) |
+| 混合量化 | mixed quantization | 根据不同 Tensor 的精度敏感性和执行支持选择不同位宽或格式 | [Chapter05 Quantization Basics](../chapter05_quantization/01_quantization_basics.md) | [F-QUANT-02](./formulas.md#f-quant-02) |
+| K-quant | ggml K-quant | 使用 super-block、分组 scale 和 packed quant 的 ggml 格式族；名称与 K/V Cache 无关 | [Chapter05 Dequantization](../chapter05_quantization/04_dequantize_op.md) | [F-QUANT-01](./formulas.md#f-quant-01) |
+| 激活量化 | activation quantization | 对 Prefill/Decode 产生的中间 Tensor 进行静态或动态低精度表示 | [Chapter05 Runtime Quantization](../chapter05_quantization/08_quantization_in_serving_runtime.md) | [F-QUANT-03](./formulas.md#f-quant-03) |
+| K/V Cache 量化 | KV cache quantization | 用低精度 payload 和 scale metadata 保存请求级 key/value 历史 | [Chapter07 Production Extensions](../chapter07_kv_cache/next/06_production_extensions.md) | [F-QUANT-04](./formulas.md#f-quant-04) |
 | 融合内核 | fused kernel | 在一次 kernel 或紧密循环中完成原本分离的多个阶段 | Chapter05、GPU 路线 | [F-QUANT-02](./formulas.md#f-quant-02) |
 | 性能基准 | benchmark | 在固定 workload 和环境下测量延迟、吞吐与资源使用 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
 | 性能剖析 | profiling | 将性能结果归因到阶段、算子、带宽或同步 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |

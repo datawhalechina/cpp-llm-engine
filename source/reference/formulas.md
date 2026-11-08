@@ -159,6 +159,23 @@ required: Hq % Hkv == 0
 
 代码对应：Chapter01 TinyLlama GQA 与 `code/cuda` 三阶段 GQA backend。验证重点：head 边界、K/V width、每组映射和 prefill/decode 一致性。
 
+<a id="f-attn-04"></a>
+### F-ATTN-04 分块在线 Softmax
+
+每个分块保存最大值 `m_b`、指数和 `l_b` 和未归一化 Value 累加 `o_b`。合并时先切换到共同指数基准，避免直接对大分数取指数。
+
+```text
+m_new = max(m, m_b)
+alpha = exp(m - m_new)
+beta  = exp(m_b - m_new)
+
+l_new = alpha * l + beta * l_b
+o_new = alpha * o + beta * o_b
+output = o / l
+```
+
+代码对应：Chapter04 CPU 分块在线 Attention 参考路径。验证重点：不同分块大小、极端分数、因果可见范围和三段式参考输出一致。
+
 <a id="f-rope-01"></a>
 ### F-ROPE-01 Rotary Position Embedding
 
@@ -228,9 +245,14 @@ required: sum(required_blocks[i]) <= free_blocks
 ```text
 symmetric:  x_approx = scale × q
 asymmetric: x_approx = scale × (q - zero_point)
+
+Q8_0: x_approx = block_scale × signed_q8
+Q4_K: x_approx = block_scale × group_scale × q4
+                   - block_min × group_min
+Q6_K: x_approx = block_scale × group_scale × signed_q6
 ```
 
-代码对应：Chapter05 Q4_K/Q6_K reference、fused CPU kernel 和 CUDA dequantize backend。
+这些是解释参数层级的概念公式；实际实现还必须按格式完成 half 转换、bit unpack 和分组索引。代码对应：Chapter05 Q4_K/Q6_K/Q8_0 reference、fused CPU kernel 和 CUDA dequantize backend。
 
 <a id="f-quant-02"></a>
 ### F-QUANT-02 压缩率与误差
@@ -244,6 +266,36 @@ relative_error = absolute_error / max(abs(reference), epsilon)
 ```
 
 代码对应：Chapter05 block contract 和 correctness 测试。
+
+<a id="f-quant-03"></a>
+### F-QUANT-03 动态激活量化
+
+动态对称量化先从当前激活计算 scale，再让低精度矩阵 kernel 消费整数输入。实际实现可以按 Tensor、row 或 token 选择更细粒度。
+
+```text
+activation_scale = max(abs(x)) / qmax
+q_x = clamp(round(x / activation_scale), -qmax, qmax)
+
+W8A8 accumulation:
+y_approx = weight_scale × activation_scale × sum(q_w × q_x)
+```
+
+当前 Chapter05 尚未实现该路径；接入时需要独立验证 scale 统计、饱和比例、Linear 输出和最终 logits。
+
+<a id="f-quant-04"></a>
+### F-QUANT-04 K/V Cache 量化
+
+K/V 可以使用不同 scale，并按层、head、token 或 block 保存 metadata。下面只表达对称量化语义，不规定生产布局。
+
+```text
+q_K = clamp(round(K / scale_K), -qmax, qmax)
+q_V = clamp(round(V / scale_V), -qmax, qmax)
+
+K_approx = scale_K × q_K
+V_approx = scale_V × q_V
+```
+
+Chapter07 当前保存浮点 K/V；未来量化实现仍需保持 BlockTable、提交、回滚和引用计数语义。
 
 ## CUDA 执行
 

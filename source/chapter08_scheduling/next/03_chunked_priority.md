@@ -1,6 +1,6 @@
 # 08.3 让长输入和普通请求都能推进
 
-完整 Prefill 可能一次占满词元预算。Chunked Prefill 把长输入拆成多个调度片段；优先级老化则让等待请求逐步提高选择机会。两者共同处理“谁先执行”和“每次执行多少”的问题。
+完整 Prefill 可能一次占满词元预算。Chunked Prefill 把长输入拆成多个调度片段；优先级老化让等待请求逐步提高选择机会；Chapter07 的前缀命中长度帮助同级请求选择先后。三者共同处理“谁先执行”和“每次执行多少”的问题。
 
 ## 分块 Prefill 保留模型进度
 
@@ -30,8 +30,11 @@ effective_priority = base_priority
 | --- | --- | --- |
 | 有效优先级 | 较大者优先 | 表达业务优先级和老化结果 |
 | 等待步数 | 较大者优先 | 有效优先级相同时照顾久等请求 |
+| 缓存前缀词元数 | 较大者优先 | 同级 Prefill 先利用较长命中 |
 | Prefill 进度 | 较少者优先 | 让多个长输入轮换推进 |
 | 入队序号 | 较小者优先 | 固定平局结果 |
+
+`cached_prefix_tokens` 来自 Chapter07 的最长前缀匹配。Planner 只用它排序，不据此修改 `prefill_offset`，也不直接读取共享 K/V。只有模型 Context 和请求页表都采用命中后，执行层才能真正跳过对应 Prefill；当前实现尚未完成这一步。
 
 ## 当前公平性保证到哪里
 
@@ -43,6 +46,7 @@ effective_priority = base_priority
 | 多个长输入按进度轮换 | step 边界协作式抢占 |
 | 小优先级差可由有界老化追平 | 缓存压力和持续 admission 下的长期公平性 |
 | 同优先级结果可复现 | 配额与多租户策略 |
+| 同级 Prefill 优先选择较长缓存命中 | 模型 Context 采用命中后的 Prefill 跳过 |
 
 ## 验证分块和老化
 
@@ -61,3 +65,4 @@ ctest --test-dir /tmp/cpp-llm-chapter08-policy \
 | 两个长输入轮换并完成 | `prefill_offset` |
 | 高优先级先执行，普通请求等待后获得机会 | 有效优先级 |
 | 老化不超过配置上限 | `max_aging_boost` |
+| 同级请求中缓存命中较长者先进入计划 | `cached_prefix_tokens` |

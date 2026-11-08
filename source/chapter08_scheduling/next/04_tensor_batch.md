@@ -19,7 +19,13 @@ Step batch 回答本步选择谁，Executor batch 补齐 token、position 和 K/
 | 量化 Linear | 多行激活共同遍历权重 | AVX2 专用批量内核和更少打包开销 |
 | Attention | 每个请求直接读取自己的分页 K/V | 融合的 Ragged/Paged Attention 批量内核 |
 | Prefill | Runtime 支持分块，但真实模型仍逐请求执行 | 真实多请求 Prefill Tensor batch |
-| Decode | 真实多 Context 批量调用 | 减少打包开销并接入 GPU backend |
+| Decode | CPU 与 CUDA 均有真实多 Context 批量调用 | 融合 kernel、减少行打包和跨 batch size 容量复用 |
+
+## 为什么批量临时张量需要复用
+
+CUDA Decode 每一步都会使用批量 hidden、logits、embedding rows、stream、cuBLAS handle 和 Decoder 中间 Tensor。这些对象只服务本次计算，不保存请求历史；如果每一步重新创建，就会在生成循环中重复执行设备分配与释放。
+
+当前 CUDA 执行器工厂（`RealLlamaCudaExecutorFactory`）按精确批量大小保存一个持久化工作区（workspace）。例如批量大小为 2 的连续 Decode step 会复用同一组临时资源；批量大小变为 3 时单独创建另一组，避免用无效填充行参与计算。同一 workspace 由互斥锁保护，因此当前保证正确复用，不代表多个 batch 可以并发执行。每个请求的位置和 K/V 绑定仍属于自己的模型执行上下文，不能放进共享 workspace。
 
 ## 分页 K/V 怎样提交
 
@@ -40,9 +46,10 @@ admission bind request ID
 | 当前证据 | 后续扩展 |
 | --- | --- |
 | 顺序与 batch logits、greedy token 一致 | 融合的 CPU PagedAttention 内核 |
-| 错误 position 与无效 token 会整体回滚 | GPU Tensor batch 和 PagedAttention backend |
+| 错误 position 与无效 token 会整体回滚 | CUDA 双请求分页 batch 已接入同一事务边界 |
+| CUDA 连续两步复用同尺寸 workspace | 多 batch 并发与容量型 workspace |
 | ServiceCore 自动传递 request ID 并选择真实 batch | 协作式抢占和设备事件重叠 |
-| Context position、页表和分页 payload 同步提交 | 跨请求 Prefix Cache |
+| Context position、页表和分页 payload 按整批提交 | 跨请求 Prefix Cache |
 
 下图强调共享模型计算与独立请求历史的分界：Linear 和 LM Head 接收多行激活，每个请求的 Attention 仍通过自己的 BlockTable 访问分页 K/V。
 

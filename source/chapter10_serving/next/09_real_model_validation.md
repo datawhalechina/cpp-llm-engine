@@ -18,6 +18,7 @@
 | --- | --- | --- |
 | 真实 ServiceCore smoke | Model/Context、双请求 batch 和生命周期 | 网络端到端性能 |
 | HTTP `--check` | 串行 Adapter 入口下的 socket、Completion、SSE 和 metrics | 并发 HTTP 服务或高并发压测 |
+| CUDA Service smoke | CUDA Executor、分页 Decode batch、Completion/SSE、取消、超时和释放 | 融合 PagedAttention 或 socket 服务 |
 | 服务 Benchmark | 固定 workload 的 TTFT、吞吐和内存 | 开放环生产负载 |
 | sequential/parallel A/B | 请求级 CPU 重叠 | Tensor batch 收益 |
 
@@ -34,3 +35,11 @@ bash code/engine/scripts/run_real_http_server.sh --check
 ```
 
 通过条件是 health、同步 Completion、SSE、metrics 和固定 token golden 全部成功，两个请求的 Context/K/V 不串扰，终态后服务条目和分页块归零。`10.10` 将这个单进程闭环映射到成熟服务架构。
+
+有 NVIDIA GPU 时再运行：
+
+```bash
+bash code/engine/scripts/run_real_cuda_serving.sh
+```
+
+该入口保持 `ServiceCore` 和 `HttpAdapter` 不变，只把每请求 Executor 换成 CUDA Context。验收覆盖正常 Completion、SSE、客户端取消和超时，并要求四个请求释放后 `inflight`、`waiting`、`running` 全部归零。

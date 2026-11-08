@@ -32,6 +32,18 @@
 
 请求归 Generation Core 管理可观察状态；执行器持有真实模型 Context。`history()` 保存词元 ID，用于观察请求推进；真实模型的分层 K/V 由执行器持有，物理 Block 分配在 Chapter07 引入。
 
+## Factory 为什么叫“工厂”
+
+一个真实请求进入 Runtime 时，需要取得已经加载的模型、创建独立 Context，并选择 CPU 或 CUDA 执行器。如果每个调用方分别完成这些步骤，模型可能被重复加载，Context 容量和后端配置也容易不一致。执行器工厂（Executor Factory）把对象创建和共享资源复用集中在一个入口：
+
+```text
+执行器工厂（共享模型、后端资源）
+  ├─ 创建执行器 A -> Context A -> 请求 A
+  └─ 创建执行器 B -> Context B -> 请求 B
+```
+
+“Factory”来自工厂模式的命名：调用方只提出“创建一个请求执行器”，工厂决定怎样装配依赖。它不负责请求排队、采样或终态转换。Model 和 Factory 通常在多个请求之间长期复用，Executor 和 Context 随单个请求创建和释放。CUDA 批量临时张量或分页块池也可以由 Factory 复用，但请求的位置和 K/V 绑定仍归各自 Context。
+
 ## 验证请求状态
 
 从仓库根目录执行 Request 契约测试：

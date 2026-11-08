@@ -82,7 +82,7 @@
     <rect x="550" y="456" width="164" height="54" rx="12" fill="#e7f6f3" stroke="#79b8b1"/>
     <text x="632" y="489" font-size="13" font-weight="700" fill="#0f5f59">AVX2 / FMA fused</text>
     <rect x="550" y="520" width="164" height="54" rx="12" fill="#e8f1f7" stroke="#79a4ba"/>
-    <text x="632" y="553" font-size="13" font-weight="700" fill="#28536b">CUDA baseline</text>
+    <text x="632" y="553" font-size="13" font-weight="700" fill="#28536b">CUDA fused / batch</text>
 
     <rect x="794" y="424" width="174" height="98" rx="15" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
     <text x="881" y="456" font-size="14" font-weight="700" fill="#0f5f59">统一 Linear 输出</text>
