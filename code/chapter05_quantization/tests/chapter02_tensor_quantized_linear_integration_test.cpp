@@ -62,111 +62,121 @@ int main() {
 
     cpp_llm_engine::testing::TestSuite suite(
         "chapter02_tensor_quantized_linear_integration");
-    suite.run("一维和二维激活遵守量化 Linear 契约", [&] {
-    const auto packed_weights = make_unit_q4k_block();
-    const QuantizedMatrixView weights{
-        packed_weights.data(), packed_weights.size(), 1, 256,
-        cpp_llm_engine::core::WeightFormat::Q4K};
+    suite.run("Q4_K supports vector and batch activations", [&] {
+        const auto packed_weights = make_unit_q4k_block();
+        const QuantizedMatrixView weights{
+            packed_weights.data(), packed_weights.size(), 1, 256,
+            cpp_llm_engine::core::WeightFormat::Q4K};
+        Tensor vector_input(std::vector<std::size_t>{256}, 2.0f);
+        Tensor vector_output(std::vector<std::size_t>{1}, -1.0f);
+        auto status = compute_quantized_linear_views(
+            weights, vector_input.view_ref(), vector_output.mutable_view_ref());
+        CPP_LLM_REQUIRE(suite, status.is_ok());
+        CPP_LLM_CHECK(suite, near(vector_output.at({0}), 512.0f));
 
-    Tensor vector_input(std::vector<std::size_t>{256}, 2.0f);
-    Tensor vector_output(std::vector<std::size_t>{1}, -1.0f);
-    auto status = compute_quantized_linear_views(
-        weights, vector_input.view_ref(), vector_output.mutable_view_ref());
-    CPP_LLM_REQUIRE(suite, status.is_ok());
-    CPP_LLM_CHECK(suite, near(vector_output.at({0}), 512.0f));
+        Tensor matrix_input(std::vector<std::size_t>{2, 256}, 2.0f);
+        for (std::size_t col = 0; col < 256; ++col) {
+            matrix_input.at({1, col}) = 3.0f;
+        }
+        Tensor matrix_output(std::vector<std::size_t>{2, 1}, -1.0f);
+        status = compute_quantized_linear_views(
+            weights, matrix_input.view_ref(), matrix_output.mutable_view_ref());
+        CPP_LLM_REQUIRE(suite, status.is_ok());
+        CPP_LLM_CHECK(suite, near(matrix_output.at({0, 0}), 512.0f));
+        CPP_LLM_CHECK(suite, near(matrix_output.at({1, 0}), 768.0f));
+    });
 
-    Tensor matrix_input(std::vector<std::size_t>{2, 256}, 2.0f);
-    for (std::size_t col = 0; col < 256; ++col) {
-        matrix_input.at({1, col}) = 3.0f;
-    }
-    Tensor matrix_output(std::vector<std::size_t>{2, 1}, -1.0f);
-    status = compute_quantized_linear_views(
-        weights, matrix_input.view_ref(), matrix_output.mutable_view_ref());
-    CPP_LLM_REQUIRE(suite, status.is_ok());
-    CPP_LLM_CHECK(suite, near(matrix_output.at({0, 0}), 512.0f));
-    CPP_LLM_CHECK(suite, near(matrix_output.at({1, 0}), 768.0f));
+    suite.run("Q6_K supports vector and batch activations", [&] {
+        const auto packed_weights = make_q6k_block();
+        const QuantizedMatrixView weights{
+            packed_weights.data(), packed_weights.size(), 1, 256,
+            cpp_llm_engine::core::WeightFormat::Q6K};
+        Tensor vector_input(std::vector<std::size_t>{256}, 1.0f);
+        Tensor vector_output(std::vector<std::size_t>{1}, -1.0f);
+        auto status = compute_quantized_linear_views(
+            weights, vector_input.view_ref(), vector_output.mutable_view_ref());
+        CPP_LLM_REQUIRE(suite, status.is_ok());
+        CPP_LLM_CHECK(suite, near(vector_output.at({0}), -8086.0f));
 
-    const auto q6k_weights = make_q6k_block();
-    const QuantizedMatrixView q6k_matrix{
-        q6k_weights.data(), q6k_weights.size(), 1, 256,
-        cpp_llm_engine::core::WeightFormat::Q6K};
-    Tensor q6k_input(std::vector<std::size_t>{256}, 1.0f);
-    Tensor q6k_output(std::vector<std::size_t>{1}, -1.0f);
-    status = compute_quantized_linear_views(
-        q6k_matrix, q6k_input.view_ref(), q6k_output.mutable_view_ref());
-    CPP_LLM_REQUIRE(suite, status.is_ok());
-    CPP_LLM_CHECK(suite, near(q6k_output.at({0}), -8086.0f));
-    Tensor q6k_batch_input(std::vector<std::size_t>{2, 256}, 1.0f);
-    for (std::size_t col = 0; col < 256; ++col) {
-        q6k_batch_input.at({1, col}) = 2.0f;
-    }
-    Tensor q6k_batch_output(std::vector<std::size_t>{2, 1}, -1.0f);
-    status = compute_quantized_linear_views(
-        q6k_matrix, q6k_batch_input.view_ref(), q6k_batch_output.mutable_view_ref());
-    CPP_LLM_REQUIRE(suite, status.is_ok());
-    CPP_LLM_CHECK(suite, near(q6k_batch_output.at({0, 0}), -8086.0f));
-    CPP_LLM_CHECK(suite, near(q6k_batch_output.at({1, 0}), -16172.0f));
+        Tensor matrix_input(std::vector<std::size_t>{2, 256}, 1.0f);
+        for (std::size_t col = 0; col < 256; ++col) {
+            matrix_input.at({1, col}) = 2.0f;
+        }
+        Tensor matrix_output(std::vector<std::size_t>{2, 1}, -1.0f);
+        status = compute_quantized_linear_views(
+            weights, matrix_input.view_ref(), matrix_output.mutable_view_ref());
+        CPP_LLM_REQUIRE(suite, status.is_ok());
+        CPP_LLM_CHECK(suite, near(matrix_output.at({0, 0}), -8086.0f));
+        CPP_LLM_CHECK(suite, near(matrix_output.at({1, 0}), -16172.0f));
+    });
 
-    const auto q8_0_weights = make_q8_0_block();
-    const QuantizedMatrixView q8_0_matrix{
-        q8_0_weights.data(), q8_0_weights.size(), 1, 32,
-        cpp_llm_engine::core::WeightFormat::Q8_0};
-    Tensor q8_0_input(std::vector<std::size_t>{32}, 2.0f);
-    Tensor q8_0_output(std::vector<std::size_t>{1}, -1.0f);
-    status = compute_quantized_linear_views(
-        q8_0_matrix, q8_0_input.view_ref(), q8_0_output.mutable_view_ref());
-    CPP_LLM_REQUIRE(suite, status.is_ok());
-    CPP_LLM_CHECK(suite, near(q8_0_output.at({0}), -16.0f));
-    Tensor q8_0_batch_input(std::vector<std::size_t>{2, 32}, 2.0f);
-    for (std::size_t col = 0; col < 32; ++col) {
-        q8_0_batch_input.at({1, col}) = 3.0f;
-    }
-    Tensor q8_0_batch_output(std::vector<std::size_t>{2, 1}, -1.0f);
-    status = compute_quantized_linear_views(
-        q8_0_matrix, q8_0_batch_input.view_ref(), q8_0_batch_output.mutable_view_ref());
-    CPP_LLM_REQUIRE(suite, status.is_ok());
-    CPP_LLM_CHECK(suite, near(q8_0_batch_output.at({0, 0}), -16.0f));
-    CPP_LLM_CHECK(suite, near(q8_0_batch_output.at({1, 0}), -24.0f));
+    suite.run("Q8_0 supports vector and batch activations", [&] {
+        const auto packed_weights = make_q8_0_block();
+        const QuantizedMatrixView weights{
+            packed_weights.data(), packed_weights.size(), 1, 32,
+            cpp_llm_engine::core::WeightFormat::Q8_0};
+        Tensor vector_input(std::vector<std::size_t>{32}, 2.0f);
+        Tensor vector_output(std::vector<std::size_t>{1}, -1.0f);
+        auto status = compute_quantized_linear_views(
+            weights, vector_input.view_ref(), vector_output.mutable_view_ref());
+        CPP_LLM_REQUIRE(suite, status.is_ok());
+        CPP_LLM_CHECK(suite, near(vector_output.at({0}), -16.0f));
 
-    Tensor layout_owner(std::vector<std::size_t>{2, 257}, 2.0f);
-    const auto non_contiguous = layout_owner.slice(1, 0, 256);
-    Tensor preserved_output(std::vector<std::size_t>{2, 1}, -2.0f);
-    status = compute_quantized_linear_views(
-        weights, non_contiguous.view_ref(), preserved_output.mutable_view_ref());
-    CPP_LLM_CHECK(suite, !status.is_ok());
-    CPP_LLM_CHECK(suite, status.message() ==
-           "quantized Linear activation must be contiguous row-major");
-    CPP_LLM_CHECK(suite, preserved_output.at({0, 0}) == -2.0f);
+        Tensor matrix_input(std::vector<std::size_t>{2, 32}, 2.0f);
+        for (std::size_t col = 0; col < 32; ++col) {
+            matrix_input.at({1, col}) = 3.0f;
+        }
+        Tensor matrix_output(std::vector<std::size_t>{2, 1}, -1.0f);
+        status = compute_quantized_linear_views(
+            weights, matrix_input.view_ref(), matrix_output.mutable_view_ref());
+        CPP_LLM_REQUIRE(suite, status.is_ok());
+        CPP_LLM_CHECK(suite, near(matrix_output.at({0, 0}), -16.0f));
+        CPP_LLM_CHECK(suite, near(matrix_output.at({1, 0}), -24.0f));
+    });
 
-    Tensor bad_shape_output(std::vector<std::size_t>{1, 2}, -3.0f);
-    status = compute_quantized_linear_views(
-        weights, matrix_input.view_ref(), bad_shape_output.mutable_view_ref());
-    CPP_LLM_CHECK(suite, !status.is_ok());
-    CPP_LLM_CHECK(suite, status.message() ==
-           "quantized Linear output shape does not match weights");
-    CPP_LLM_CHECK(suite, bad_shape_output.at({0, 0}) == -3.0f);
+    suite.run("invalid views and policies preserve caller output", [&] {
+        const auto packed_weights = make_unit_q4k_block();
+        const QuantizedMatrixView weights{
+            packed_weights.data(), packed_weights.size(), 1, 256,
+            cpp_llm_engine::core::WeightFormat::Q4K};
+        Tensor matrix_input(std::vector<std::size_t>{2, 256}, 2.0f);
+        Tensor preserved_output(std::vector<std::size_t>{2, 1}, -2.0f);
+        Tensor layout_owner(std::vector<std::size_t>{2, 257}, 2.0f);
+        const auto non_contiguous = layout_owner.slice(1, 0, 256);
+        auto status = compute_quantized_linear_views(
+            weights, non_contiguous.view_ref(), preserved_output.mutable_view_ref());
+        CPP_LLM_CHECK(suite, !status.is_ok());
+        CPP_LLM_CHECK(suite, status.message() ==
+            "quantized Linear activation must be contiguous row-major");
+        CPP_LLM_CHECK(suite, preserved_output.at({0, 0}) == -2.0f);
 
-    auto short_weights = weights;
-    --short_weights.bytes;
-    status = compute_quantized_linear_views(
-        short_weights, matrix_input.view_ref(),
-        preserved_output.mutable_view_ref());
-    CPP_LLM_CHECK(suite, !status.is_ok());
-    CPP_LLM_CHECK(suite, status.message() ==
-           "quantized weight byte count does not match shape");
-    CPP_LLM_CHECK(suite, preserved_output.at({1, 0}) == -2.0f);
+        Tensor bad_shape_output(std::vector<std::size_t>{1, 2}, -3.0f);
+        status = compute_quantized_linear_views(
+            weights, matrix_input.view_ref(), bad_shape_output.mutable_view_ref());
+        CPP_LLM_CHECK(suite, !status.is_ok());
+        CPP_LLM_CHECK(suite, status.message() ==
+            "quantized Linear output shape does not match weights");
+        CPP_LLM_CHECK(suite, bad_shape_output.at({0, 0}) == -3.0f);
 
-    const QuantizedLinearPolicy unavailable_policy{
-        QuantizedLinearBackendKind::Avx2Fused,
-        QuantizedLinearBackendKind::ScalarFused,
-        QuantizedLinearBackendKind::ScalarFused};
-    status = compute_quantized_linear_views(
-        weights, matrix_input.view_ref(), preserved_output.mutable_view_ref(),
-        unavailable_policy);
-    CPP_LLM_CHECK(suite, !status.is_ok());
-    CPP_LLM_CHECK(suite, status.message() == "Q4_K AVX2 backend is unavailable");
-    CPP_LLM_CHECK(suite, preserved_output.at({0, 0}) == -2.0f);
+        auto short_weights = weights;
+        --short_weights.bytes;
+        status = compute_quantized_linear_views(
+            short_weights, matrix_input.view_ref(), preserved_output.mutable_view_ref());
+        CPP_LLM_CHECK(suite, !status.is_ok());
+        CPP_LLM_CHECK(suite, status.message() ==
+            "quantized weight byte count does not match shape");
+        CPP_LLM_CHECK(suite, preserved_output.at({1, 0}) == -2.0f);
 
+        const QuantizedLinearPolicy unavailable_policy{
+            QuantizedLinearBackendKind::Avx2Fused,
+            QuantizedLinearBackendKind::ScalarFused,
+            QuantizedLinearBackendKind::ScalarFused};
+        status = compute_quantized_linear_views(
+            weights, matrix_input.view_ref(), preserved_output.mutable_view_ref(),
+            unavailable_policy);
+        CPP_LLM_CHECK(suite, !status.is_ok());
+        CPP_LLM_CHECK(suite, status.message() == "Q4_K AVX2 backend is unavailable");
+        CPP_LLM_CHECK(suite, preserved_output.at({0, 0}) == -2.0f);
     });
     return suite.finish();
 }
