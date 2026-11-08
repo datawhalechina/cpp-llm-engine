@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
   <title id="title">Chapter 04 从解码器块走到真实 TinyLlama</title>
-  <desc id="desc">Chapter 04 接收三维或四维 Q/K/V 张量，调用注意力后端，再把归一化、注意力、残差和前馈网络组装为解码器块；TinyLlama 重复 22 个解码器块后得到最终候选分数。</desc>
+  <desc id="desc">Chapter 04 把归一化、注意力、残差和前馈网络组装为解码器块；教学 CPU、真实 TinyLlama、CUDA 后端和多模态输入沿共同骨架形成四条学习路线。</desc>
   <defs>
     <style>text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif !important; }</style>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
@@ -18,7 +18,7 @@
     </filter>
   </defs>
 
-  <rect width="1200" height="680" rx="24" fill="url(#background)"/>
+  <rect width="1200" height="610" rx="24" fill="url(#background)"/>
   <text x="54" y="55" font-size="27" font-weight="700" fill="#172033">Chapter 04：从解码器块走到真实 TinyLlama</text>
   <text x="54" y="84" font-size="15" fill="#52606d">前三章提供模型材料、张量视图和矩阵乘法语义；本章组装解码器，Chapter 05 再接入真实量化线性层</text>
 
@@ -45,8 +45,7 @@
   <path d="M294 188H350M568 188H624M842 188H898" fill="none" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- Decoder main path -->
-  <text x="54" y="278" font-size="18" font-weight="700" fill="#172033">A 教学闭环：先验证一层解码器数据流</text>
-  <text x="1146" y="278" font-size="12" text-anchor="end" fill="#64748b">B 跨章执行：3D/4D Q/K/V → Chapter 05 Linear → TinyLlama 22 层</text>
+  <text x="54" y="278" font-size="18" font-weight="700" fill="#172033">共同骨架：注意力和前馈网络各有一次前置归一化与残差相加</text>
   <g text-anchor="middle">
     <rect x="54" y="307" width="100" height="68" rx="13" fill="#ffffff" stroke="#93b6c8" stroke-width="2"/>
     <text x="104" y="334" font-size="15" font-weight="700" fill="#28536b">输入 x</text>
@@ -54,11 +53,11 @@
 
     <rect x="184" y="307" width="112" height="68" rx="13" fill="#fff0dc" stroke="#e8a765"/>
     <text x="240" y="334" font-size="14" font-weight="700" fill="#9a4d13">先归一化</text>
-    <text x="240" y="357" font-size="12" fill="#6f5438">LayerNorm / RMSNorm</text>
+    <text x="240" y="357" font-size="12" fill="#6f5438">归一化输入</text>
 
     <rect x="326" y="299" width="154" height="84" rx="14" fill="#c45b16" filter="url(#shadow)"/>
     <text x="403" y="332" font-size="15" font-weight="700" fill="#ffffff">注意力</text>
-    <text x="403" y="353" font-size="12" fill="#fff2e8">MHA / GQA + RoPE</text>
+    <text x="403" y="353" font-size="12" fill="#fff2e8">在词元之间聚合信息</text>
     <text x="403" y="372" font-size="10" fill="#ffe0ca">[T,H,Dh] / [B,T,H,Dh]</text>
 
     <circle cx="548" cy="341" r="27" fill="#ffffff" stroke="#c45b16" stroke-width="2"/>
@@ -66,11 +65,11 @@
 
     <rect x="605" y="307" width="112" height="68" rx="13" fill="#fff0dc" stroke="#e8a765"/>
     <text x="661" y="334" font-size="14" font-weight="700" fill="#9a4d13">再归一化</text>
-    <text x="661" y="357" font-size="12" fill="#6f5438">LayerNorm / RMSNorm</text>
+    <text x="661" y="357" font-size="12" fill="#6f5438">归一化隐藏状态</text>
 
     <rect x="747" y="299" width="154" height="84" rx="14" fill="#0f766e" filter="url(#shadow)"/>
     <text x="824" y="332" font-size="15" font-weight="700" fill="#ffffff">前馈网络</text>
-    <text x="824" y="357" font-size="12" fill="#d9fffa">ReLU / SwiGLU</text>
+    <text x="824" y="357" font-size="12" fill="#d9fffa">逐词元升维再降维</text>
 
     <circle cx="969" cy="341" r="27" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
     <text x="969" y="349" font-size="25" font-weight="700" fill="#0f766e">+</text>
@@ -98,24 +97,26 @@
   <text x="326" y="418" font-size="12" fill="#9a4d13">第一次残差：x + Attention(Norm(x))</text>
   <text x="746" y="446" font-size="12" fill="#0f5f59">第二次残差：h + FFN(Norm(h))</text>
 
-  <!-- What each module contributes -->
+  <!-- Four learning routes -->
   <g>
-    <rect x="54" y="488" width="334" height="94" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
-    <text x="76" y="518" font-size="14" font-weight="700" fill="#28536b">A 教学注意力数据流</text>
-    <text x="76" y="544" font-size="13" fill="#52606d">相关性分数 → 因果遮罩 → 稳定 Softmax</text>
-    <text x="76" y="566" font-size="12" fill="#708090">prefill/decode → 请求级连续 KV</text>
+    <rect x="54" y="488" width="258" height="94" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
+    <text x="76" y="518" font-size="14" font-weight="700" fill="#28536b">A 教学闭环</text>
+    <text x="76" y="544" font-size="12" fill="#52606d">LayerNorm · MHA · ReLU</text>
+    <text x="76" y="566" font-size="11" fill="#708090">单层前向 · 连续 K/V</text>
 
-    <rect x="413" y="488" width="334" height="94" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
-    <text x="435" y="518" font-size="14" font-weight="700" fill="#9a4d13">前馈网络变换每个词元</text>
-    <text x="435" y="544" font-size="13" fill="#52606d">D 维 → 扩展维度 → 激活 → D 维</text>
-    <text x="435" y="566" font-size="12" fill="#708090">不同词元之间不在这里交换信息</text>
+    <rect x="330" y="488" width="258" height="94" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
+    <text x="352" y="518" font-size="14" font-weight="700" fill="#9a4d13">B 真实 CPU</text>
+    <text x="352" y="544" font-size="12" fill="#52606d">RMSNorm · GQA · SwiGLU</text>
+    <text x="352" y="566" font-size="11" fill="#708090">TinyLlama 22 层与请求状态</text>
 
-    <rect x="772" y="488" width="374" height="94" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
-    <text x="794" y="518" font-size="14" font-weight="700" fill="#0f5f59">B 进入真实 TinyLlama</text>
-    <text x="794" y="544" font-size="13" fill="#52606d">解码器块 × 22 → 最终 RMSNorm</text>
-    <text x="794" y="566" font-size="12" fill="#708090">LM Head → 最终候选分数</text>
+    <rect x="606" y="488" width="258" height="94" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
+    <text x="628" y="518" font-size="14" font-weight="700" fill="#1d4ed8">G GPU 后端</text>
+    <text x="628" y="544" font-size="12" fill="#52606d">CUDA Linear · RoPE · GQA</text>
+    <text x="628" y="566" font-size="11" fill="#708090">保持层顺序与状态语义</text>
+
+    <rect x="882" y="488" width="264" height="94" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
+    <text x="904" y="518" font-size="14" font-weight="700" fill="#0f5f59">M 多模态输入</text>
+    <text x="904" y="544" font-size="12" fill="#52606d">视觉 Block · 统一向量序列</text>
+    <text x="904" y="566" font-size="11" fill="#708090">汇入并复用语言 Decoder</text>
   </g>
-
-  <rect x="54" y="613" width="1092" height="42" rx="12" fill="#173f3c"/>
-  <text x="600" y="640" font-size="15" font-weight="700" text-anchor="middle" fill="#ffffff">学习结果：能追踪一层计算，并说明接入 Chapter 05 后怎样执行 22 层并得到候选分数</text>
 </svg>
