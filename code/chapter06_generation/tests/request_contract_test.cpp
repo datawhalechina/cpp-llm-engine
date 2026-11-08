@@ -46,7 +46,7 @@ void try_all_transitions(Request& request) {
 int main() {
     cpp_llm_engine::testing::TestSuite suite("chapter06_request_contract");
 
-    suite.run("request exposes prompt and owns cache independently", [&] {
+    suite.run("request owns prompt and token history independently", [&] {
         Request request({1, 2, 3});
         CPP_LLM_CHECK(suite, request.prompt_size() == 3);
         CPP_LLM_CHECK(suite, request.prompt() == chapter06_generation::TokenSequence({1, 2, 3}));

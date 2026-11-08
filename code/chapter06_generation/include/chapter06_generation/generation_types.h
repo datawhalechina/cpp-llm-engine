@@ -84,7 +84,6 @@ struct GenerationConfig {
     std::size_t max_new_tokens = 1;
     std::size_t max_context_tokens = 0;  // 0 means no tutorial admission limit.
     TokenId eos_token_id = -1;
-    bool use_kv_cache = true;
 };
 
 }  // namespace chapter06_generation

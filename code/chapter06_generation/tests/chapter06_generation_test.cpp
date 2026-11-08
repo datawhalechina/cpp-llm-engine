@@ -71,7 +71,6 @@ int main() {
     suite.run("assembled transformer prefills and decodes to configured length", [&] {
         GenerationConfig config;
         config.max_new_tokens = 3;
-        config.use_kv_cache = true;
         Embedding embedding(32);
         PositionEncoding position_encoding(16);
         Transformer transformer(2, embedding, position_encoding);
@@ -129,6 +128,8 @@ int main() {
         std::vector<TokenId> streamed_tokens;
         std::vector<std::size_t> streamed_steps;
         std::vector<std::size_t> observed_output_sizes;
+        std::vector<std::size_t> observed_history_sizes;
+        std::vector<RequestPhase> observed_phases;
 
         CPP_LLM_CHECK(
             suite,
@@ -140,56 +141,75 @@ int main() {
                     streamed_tokens.push_back(token);
                     streamed_steps.push_back(step);
                     observed_output_sizes.push_back(request.generated_size());
+                    observed_history_sizes.push_back(request.history().size());
+                    observed_phases.push_back(request.phase());
                 }) == 1);
         CPP_LLM_CHECK(suite, request.generated() == TokenSequence({7}));
         CPP_LLM_CHECK(suite, streamed_tokens == TokenSequence({7}));
         CPP_LLM_CHECK(suite, streamed_steps == std::vector<std::size_t>({0}));
         CPP_LLM_CHECK(suite, observed_output_sizes == std::vector<std::size_t>({1}));
+        CPP_LLM_CHECK(suite, observed_history_sizes == std::vector<std::size_t>({3}));
+        CPP_LLM_CHECK(suite, observed_phases == std::vector<RequestPhase>({RequestPhase::Finished}));
         CPP_LLM_CHECK(suite, request.history().size() == 3);
         CPP_LLM_CHECK(suite, request.finished());
     });
 
-    suite.run("provider failure and callback cancellation stop generation", [&] {
+    suite.run("empty provider logits fail without generated output", [&] {
         GenerationConfig config;
         config.max_new_tokens = 4;
         Runtime runtime(config);
         GreedySampler sampler;
-
-        Request empty_logits_request({1});
         const LogitsProvider empty_provider = [](const Request&, std::size_t) {
             return Logits{};
         };
+        Request request({1});
         CPP_LLM_CHECK(
             suite,
-            runtime.generate(empty_logits_request, sampler, empty_provider) == 0);
-        CPP_LLM_CHECK(suite, empty_logits_request.failed());
-        CPP_LLM_CHECK(suite, empty_logits_request.generated().empty());
+            runtime.generate(request, sampler, empty_provider) == 0);
+        CPP_LLM_CHECK(suite, request.failed());
+        CPP_LLM_CHECK(suite, request.generated().empty());
+    });
 
-        Request cancelled_request({1});
+    suite.run("callback cancellation stops after the committed token", [&] {
+        GenerationConfig config;
+        config.max_new_tokens = 4;
+        Runtime runtime(config);
+        GreedySampler sampler;
         const LogitsProvider token_provider = [](const Request&, std::size_t) {
             return Logits{0.0F, 1.0F};
         };
+        Request request({1});
         std::size_t callback_count = 0;
         CPP_LLM_CHECK(
             suite,
             runtime.generate(
-                cancelled_request,
+                request,
                 sampler,
                 token_provider,
                 [&](TokenId, std::size_t) {
                     ++callback_count;
-                    cancelled_request.cancel();
+                    request.cancel();
                 }) == 1);
-        CPP_LLM_CHECK(suite, cancelled_request.cancelled());
-        CPP_LLM_CHECK(suite, cancelled_request.generated() == TokenSequence({1}));
+        CPP_LLM_CHECK(suite, request.cancelled());
+        CPP_LLM_CHECK(suite, request.generated() == TokenSequence({1}));
+        CPP_LLM_CHECK(suite, request.history().tokens() == TokenSequence({1, 1}));
         CPP_LLM_CHECK(suite, callback_count == 1);
+    });
 
-        Request one_step_request({1});
-        one_step_request.mark_prefilled();
+    suite.run("decode_one commits one sampled token", [&] {
+        GenerationConfig config;
+        config.max_new_tokens = 4;
+        Runtime runtime(config);
+        GreedySampler sampler;
+        const LogitsProvider token_provider = [](const Request&, std::size_t) {
+            return Logits{0.0F, 1.0F};
+        };
+        Request request({1});
+        request.mark_prefilled();
         CPP_LLM_CHECK(
             suite,
-            runtime.decode_one(one_step_request, sampler, token_provider) == 1);
-        CPP_LLM_CHECK(suite, one_step_request.generated() == TokenSequence({1}));
+            runtime.decode_one(request, sampler, token_provider) == 1);
+        CPP_LLM_CHECK(suite, request.generated() == TokenSequence({1}));
     });
 
     suite.run("batch logits validate every row before committing tokens", [&] {

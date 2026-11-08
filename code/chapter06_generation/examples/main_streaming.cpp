@@ -12,7 +12,6 @@ int main() {
 
     GenerationConfig config;
     config.max_new_tokens = 2;
-    config.use_kv_cache = true;
 
     Embedding embedding(32);
     PositionEncoding position_encoding(16);

@@ -1,5 +1,6 @@
 // Chapter 06：实现 Request 词元历史的追加和清空。
-// 边界：该对象只用于观察生成进度，模型 K/V 的物理存储属于 Chapter 07。
+// 该对象只记录可观察 token ID，模型 K/V 的物理存储从 Chapter07 引入。
+// 验证入口：chapter06_token_history_test。
 #include "chapter06_generation/token_history.h"
 
 namespace chapter06_generation {

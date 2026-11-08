@@ -24,8 +24,6 @@ public:
     bool terminal() const;
     const TokenHistory& history() const;
     TokenHistory& history();
-    const TokenHistory& cache() const;
-    TokenHistory& cache();
     const TokenSequence& token_history() const;
     std::size_t token_history_size() const;
     bool prefilled() const;

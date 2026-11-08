@@ -38,10 +38,8 @@ std::size_t Runtime::prefill(Request& request) {
     const Logits logits = transformer_->prefill(request);
     (void)logits;
 
-    if (config_.use_kv_cache) {
-        for (TokenId token : request.prompt()) {
-            request.history().append(token);
-        }
+    for (TokenId token : request.prompt()) {
+        request.history().append(token);
     }
 
     request.mark_prefilled();
@@ -88,10 +86,8 @@ BatchPrefillResult Runtime::prefill_batch(const std::vector<Request*>& requests)
     }
     result.model_calls = 1;
     for (Request* request : runnable) {
-        if (config_.use_kv_cache) {
-            for (TokenId token : request->prompt()) {
+        for (TokenId token : request->prompt()) {
             request->history().append(token);
-            }
         }
         request->mark_prefilled();
         ++result.prefilled_requests;
@@ -182,7 +178,7 @@ BatchDecodeResult Runtime::commit_batch_logits(
         request.mark_decoding();
         const TokenId token = items[index].sampler->sample(logits[index]);
         request.append_generated_token(token);
-        if (config_.use_kv_cache) request.history().append(token);
+        request.history().append(token);
         if (token == config_.eos_token_id ||
             request.generated_size() >= config_.max_new_tokens) {
             request.mark_finished();
@@ -209,9 +205,7 @@ std::size_t Runtime::decode_one(
     }
     const TokenId token = sampler.sample(logits);
     request.append_generated_token(token);
-    if (config_.use_kv_cache) {
-        request.history().append(token);
-    }
+    request.history().append(token);
     if (token == config_.eos_token_id ||
         request.generated_size() >= config_.max_new_tokens) {
         request.mark_finished();
@@ -255,7 +249,7 @@ std::size_t Runtime::decode_one(
     request.mark_decoding();
     const TokenId token = sampler.sample(logits);
     request.append_generated_token(token);
-    if (config_.use_kv_cache) request.history().append(token);
+    request.history().append(token);
     if (token == config_.eos_token_id ||
         request.generated_size() >= config_.max_new_tokens) {
         request.mark_finished();
@@ -313,16 +307,14 @@ PrefillChunkResult Runtime::prefill_chunk(
 
     request.advance_prefill(chunk_size);
     result.consumed_tokens = chunk_size;
-    if (config_.use_kv_cache) {
-        for (TokenId token : chunk) request.history().append(token);
-    }
+    for (TokenId token : chunk) request.history().append(token);
     if (!completes_prefill) return result;
 
     request.mark_prefilled();
     request.mark_decoding();
     const TokenId token = sampler.sample(logits);
     request.append_generated_token(token);
-    if (config_.use_kv_cache) request.history().append(token);
+    request.history().append(token);
     if (token == config_.eos_token_id ||
         request.generated_size() >= config_.max_new_tokens) {
         request.mark_finished();
@@ -376,9 +368,7 @@ std::size_t Runtime::generate(
         return 0;
     }
     if (!request.prefilled()) {
-        if (config_.use_kv_cache) {
-            for (TokenId token : request.prompt()) request.history().append(token);
-        }
+        for (TokenId token : request.prompt()) request.history().append(token);
         request.mark_prefilled();
     }
 
@@ -391,13 +381,12 @@ std::size_t Runtime::generate(
             break;
         }
         const TokenId token = sampler.sample(logits);
+        const std::size_t step = generated_steps;
         request.append_generated_token(token);
-        if (on_token) on_token(token, generated_steps);
-        if (config_.use_kv_cache) {
-            request.history().append(token);
-        }
+        request.history().append(token);
         ++generated_steps;
         if (token == config_.eos_token_id) request.mark_finished();
+        if (on_token) on_token(token, step);
     }
 
     if (!request.terminal()) request.mark_finished();

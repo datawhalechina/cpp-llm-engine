@@ -1,5 +1,6 @@
 // Chapter 06：实现 Request 状态转换和请求级词元历史访问。
 // 契约：终态保持幂等，Runtime 和上层调度可以安全跳过终态请求。
+// 验证入口：chapter06_request_contract_test。
 #include "chapter06_generation/request.h"
 
 #include <stdexcept>
@@ -44,14 +45,6 @@ const TokenHistory& Request::history() const {
 }
 
 TokenHistory& Request::history() {
-    return history_;
-}
-
-const TokenHistory& Request::cache() const {
-    return history_;
-}
-
-TokenHistory& Request::cache() {
     return history_;
 }
 
