@@ -2,7 +2,22 @@
 
 本目录把 GGUF、metadata、tokenizer metadata 和权重索引转换为教程自己的稳定对象。完整学习说明见 [`source/chapter01_tensor_loader`](../../source/chapter01_tensor_loader/intro.md)。
 
-## 本章资产总览
+## 代码架构
+
+`GgufReader` 只解析文件头、metadata 和 Tensor index，`GgufTensorLoader` 再按 index 读取 payload。`ModelMetadataAdapter` 与 `ModelSchema` 把外部字段转换为稳定的 `ModelConfig` 和 Llama shape 约束，`ModelBuilder` 最后生成供 Chapter04 消费的模型输入。解析或校验失败时不提交半成品模型；Tokenizer、Decoder 和执行后端通过独立适配器接入，不进入 GGUF Reader。
+
+```text
+GGUF bytes
+   -> GgufReader / Tensor index
+   -> GgufTensorLoader / payload
+   -> ModelMetadataAdapter + ModelSchema
+   -> ModelBuilder / LoadedModel + DecoderInput
+   -> Chapter04 Model / Context
+```
+
+## 阅读顺序与资产
+
+先读 `gguf_reader.*` 和 `gguf_tensor_loader.*`，区分索引解析与 payload 读取；再读 metadata/schema，确认外部字段如何变成模型契约；最后阅读 `model_builder.*`、Tokenizer adapter 和真实文件检查工具。
 
 | 资产 | 作用 |
 | --- | --- |
@@ -62,7 +77,7 @@ bash code/chapter01_tensor_loader/run.sh
 
 该工具只加载 `blk.0` 的九个 tensor，不执行 Attention/FFN forward；它先固定真实权重进入 CPU 计算层前的 shape、dtype 和 payload 边界。
 
-## 真实 tokenizer 对照
+## 扩展入口
 
 toy tokenizer 仍只用于接口测试。启用 llama.cpp reference adapter 后，使用真实 GGUF vocabulary：
 

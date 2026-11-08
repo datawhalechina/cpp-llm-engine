@@ -17,7 +17,7 @@ Chapter08 或 Chapter10 产生原始样本，迁移器把现有结果规范化�
 | 聚合 | 逐轮 `MeasurementSample` | `summarize()` | count、范围、均值和中位数 |
 | 比较 | baseline、experiment 与策略 | `compare()` | `KEEP`、`REJECT`、`NOT_COMPARABLE` 或 `INVALID` |
 
-## 资产总览
+## 阅读顺序与资产
 
 | 模块 | 学习内容 | 验证 |
 | --- | --- | --- |
@@ -29,8 +29,6 @@ Chapter08 或 Chapter10 产生原始样本，迁移器把现有结果规范化�
 | `results/profile/`、A/B decision | 保存带 workload 身份的阶段结果和独立决策记录 | `chapter09_versioned_evidence_test` |
 | `run_real_evidence.sh` | 生成服务实验、A/B 决策或 Profiling 附件 | `chapter09_real_evidence_bridge_test` |
 
-## 阅读顺序
-
 1. 阅读 `EvidenceRecord`，明确一份证据必须包含哪些环境、负载和正确性字段。
 2. 阅读 `summarize()`，理解统计值如何从逐轮样本得到，而不是从另一组聚合值推测。
 3. 阅读 `compare()`，区分 `INVALID`、`NOT_COMPARABLE`、`KEEP` 和 `REJECT`。
@@ -38,7 +36,7 @@ Chapter08 或 Chapter10 产生原始样本，迁移器把现有结果规范化�
 
 比较前必须同时满足两项条件：两份记录各自有效，并且模型、后端、设备、硬件、构建信息与工作负载一致。主指标改善只决定优化是否有收益；延迟、吞吐和内存保护阈值还会阻止以另一项明显退化换取单项提升。
 
-## 验证
+## 运行与验证
 
 默认脚本运行统计、证据格式、版本迁移和比较决策测试：
 
@@ -46,7 +44,7 @@ Chapter08 或 Chapter10 产生原始样本，迁移器把现有结果规范化�
 bash code/chapter09_performance/scripts/run.sh
 ```
 
-## 旧结果迁移
+### 旧结果迁移
 
 旧教学 benchmark 和真实 batch 文件保留了逐轮样本，可以转换为统一记录：
 
@@ -60,7 +58,7 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
 
 当前四组 TinyLlama scalar/AVX2、顺序/并行请求原始样本位于 `results/raw/`，转换后的统一证据位于 `results/evidence/`。重构前的实现和结果保存在 `legacy/` 与 `results/legacy/`，只用于追溯，不是默认学习入口。
 
-## 真实实验
+### 真实实验
 
 有本地模型时，运行一次不覆盖仓库基线的真实服务实验：
 
@@ -69,3 +67,7 @@ bash code/chapter09_performance/scripts/run_real_evidence.sh service
 ```
 
 需要阶段 Profiling 或顺序/并行请求 A/B 时，将模式改为 `profile`、`ab` 或 `all`。`profile` 产生用于热点归因的文本附件，不参与 A/B 决策；`service` 和 `ab` 才生成统一证据。
+
+## 扩展入口
+
+新增性能入口时先定义 workload 和正确性检查，再输出逐轮样本并转换为统一 evidence。CPU、CUDA、多模态和服务实验复用同一证据结构；平台专属 profiler 附件只负责归因，不替代 A/B 决策记录。

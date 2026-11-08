@@ -26,7 +26,7 @@ ContinuousBatchScheduler
 
 Planner 不修改请求和缓存；Scheduler 在执行前预留资源，模型失败时裁剪到原计数，成功后才提交 K/V 与请求结果。Runner 必须自行回滚模型 Context，因为 Scheduler 只拥有请求与外部缓存事务。`OverlapScheduler` 只保存计划和状态快照，不拥有 Request、Executor 或物理块。
 
-## 资产总览
+## 阅读顺序与资产
 
 | 模块 | 学习内容 | 验证 |
 | --- | --- | --- |
@@ -38,8 +38,6 @@ Planner 不修改请求和缓存；Scheduler 在执行前预留资源，模型�
 | Ragged Tensor Batch | Chapter06 教学 Transformer 的批量 Prefill 前置能力 | `chapter08_tensor_batch_test`（integration） |
 | `ExecutorBatchInput`、`ExecutorBatchRunner` | 把 Decode 候选交给真实模型批量执行 | `chapter08_cache_transaction_test`、真实模型测试 |
 
-## 阅读顺序
-
 1. 从 `scheduler.cpp` 对比 Round-robin 和 Tensor Batch，理解“选择请求”与“合并执行”的区别。
 2. 阅读 `StepBatchPlanner::build()`，观察请求数预算、词元预算和 Chunked Prefill 如何共同决定批次。
 3. 阅读 `ExecutorBatchInput` 和 `ContinuousBatchScheduler::run_step()`，跟踪缓存预留、批输入、模型执行、请求推进和缓存提交。
@@ -48,7 +46,7 @@ Planner 不修改请求和缓存；Scheduler 在执行前预留资源，模型�
 
 一次调度步遵循“计划、预留、执行、提交”顺序。计划不修改请求；容量不足时请求留到下一轮；执行失败时缓存裁剪到执行前词元数；只有模型与请求都推进后才提交新的缓存长度。
 
-## 验证
+## 运行与验证
 
 默认脚本运行本章六组测试：
 
@@ -62,6 +60,6 @@ bash code/chapter08_scheduling/scripts/run.sh
 bash code/chapter08_scheduling/scripts/run_real_batch.sh
 ```
 
-## 扩展位置
+## 扩展入口
 
 当前实现包含同步 CPU 调度、优先级老化、真实 Decode batch 和 overlap 计划校验。真实多请求 Prefill Tensor batch、Deadline、抢占和设备事件重叠仍待扩展；网络准入由 Chapter10 负责，前缀缓存复用建立在 Chapter07 的块管理之上。
