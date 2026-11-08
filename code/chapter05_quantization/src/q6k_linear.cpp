@@ -1,4 +1,6 @@
-// 中文：实现 Q6_K Linear 的 reference/fused 入口和 core backend 适配。
+// Chapter 05：实现 Q6_K Linear 的 reference、fused 入口和 Core backend 适配。
+// backend 负责统一请求校验，数值计算委托给对应实现。
+// 验证入口：chapter05_quantization_test。
 #include "chapter05_quantization/q6k_linear.h"
 
 #include <limits>

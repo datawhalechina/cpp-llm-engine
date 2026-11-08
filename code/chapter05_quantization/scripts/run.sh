@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Chapter 05 默认入口：隔离构建量化示例并运行本章及依赖契约测试。
+# 不需要真实模型文件；构建目录默认在 /tmp，退出时自动清理。
+# 验证入口：bash code/chapter05_quantization/scripts/run.sh。
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,4 +1,6 @@
-// 中文：声明 Q6_K block 的 CPU reference 反量化接口；输入输出契约由 Chapter05 测试验证。
+// Chapter 05：声明 Q6_K block 的 CPU reference 反量化接口。
+// 输入必须符合 GGUF Q6_K block 大小，输出按 Float32 元素展开。
+// 验证入口：chapter05_quantization_test。
 #pragma once
 
 #include "cpp_llm_engine/core/quantization_contract.h"

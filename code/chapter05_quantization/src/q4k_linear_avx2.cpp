@@ -1,6 +1,6 @@
 // Chapter 05：Q4_K fused AVX2/FMA Linear 实现。
 // 职责：直接从 block 解码 4-bit 权重，并按 8 个值累加 W * input。
-// 验证：与 scalar reference 对照，并由真实 Decoder golden 和 A/B 检查。
+// 验证：与 scalar reference 对照，并由真实 Decoder 的 llama.cpp 数值指标检查。
 #include "chapter05_quantization/q4k_linear.h"
 
 #include "chapter05_quantization/q4k_dequantize.h"

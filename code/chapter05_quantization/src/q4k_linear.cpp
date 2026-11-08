@@ -1,4 +1,6 @@
-// 中文：实现 Q4_K Linear 的 reference/scalar fused 入口和 CPU 能力探测。
+// Chapter 05：实现 Q4_K Linear 的 reference、scalar fused 和 CPU 能力探测。
+// backend 先校验统一 LinearRequest，再进入对应数值实现。
+// 验证入口：chapter05_quantization_test。
 #include "chapter05_quantization/q4k_linear.h"
 #include "chapter05_quantization/q4k_kernel.h"
 #include "chapter05_quantization/q4k_dequantize.h"

@@ -1,5 +1,6 @@
 // Chapter 05：声明浮点 Linear correctness baseline。
 // 职责：提供与量化 Linear 共享形状语义的教学参考实现。
+// 验证入口：chapter05_quantization_test。
 #pragma once
 
 #include "chapter05_quantization/tensor.h"

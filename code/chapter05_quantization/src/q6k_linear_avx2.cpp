@@ -1,6 +1,6 @@
 // Chapter 05：Q6_K fused AVX2/FMA Linear 实现。
 // 职责：按 8 个元素解码 Q6_K 位布局，并直接累加 W * input。
-// 验证：与 scalar fused 输出对照，并由真实 Decoder golden token 和 A/B 检查。
+// 验证：与 scalar fused 输出对照，并由真实 Decoder 的 llama.cpp 数值指标检查。
 #include "chapter05_quantization/q6k_linear.h"
 
 #include "chapter05_quantization/q6k_dequantize.h"

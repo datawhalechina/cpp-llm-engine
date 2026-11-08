@@ -1,4 +1,6 @@
-// 中文：提供 Q6_K Linear 的 reference、fused 和 backend 适配接口。
+// Chapter 05：声明 Q6_K Linear 的 reference、fused 和 backend 适配接口。
+// backend 通过统一 LinearRequest 接收 packed 权重和 Float32 激活。
+// 验证入口：chapter05_quantization_test。
 #pragma once
 
 #include <cstddef>

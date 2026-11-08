@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Chapter 05：验证量化后端接入 22 层 TinyLlama Decoder，不运行 Generation 或 batch。
+# Chapter 05：验证量化后端接入 22 层 TinyLlama Decoder。
+# 同轮 llama.cpp 输出提供 logits 数值指标和 greedy 序列基线。
+# 运行范围不包含 Generation Runtime 和请求调度。
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"

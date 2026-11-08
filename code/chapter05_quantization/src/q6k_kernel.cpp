@@ -1,4 +1,6 @@
-// 中文：实现 Q6_K fused CPU Linear，保持与 reference dequant 相同的位解码顺序。
+// Chapter 05：实现 Q6_K fused CPU Linear。
+// 位解码顺序与 reference dequant 保持一致，结果直接累加到输出。
+// 验证入口：chapter05_quantization_test。
 #include "chapter05_quantization/q6k_kernel.h"
 
 #include <algorithm>

@@ -1,4 +1,6 @@
-// 中文：提供 Q4_K Linear 的 reference、scalar fused 和 AVX2 backend 接口。
+// Chapter 05：声明 Q4_K Linear 的 reference、scalar fused 和 AVX2 接口。
+// 三种实现共享相同的权重布局和输入输出形状契约。
+// 验证入口：chapter05_quantization_test。
 #pragma once
 
 #include <cstddef>

@@ -1,5 +1,6 @@
 // Chapter 05：测量 Q4_K reference、scalar fused 与 AVX2 Linear。
 // 约束：结果只用于同一机器、构建和 workload 下的实现对照。
+// 性能结论由 Chapter09 结合环境、warmup 和多轮统计登记。
 #include "chapter05_quantization/q4k_dequantize.h"
 #include "chapter05_quantization/q4k_linear.h"
 

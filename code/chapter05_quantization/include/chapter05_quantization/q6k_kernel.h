@@ -1,4 +1,6 @@
-// 中文：声明 Q6_K fused CPU kernel；直接从 block payload 累加 Linear 结果。
+// Chapter 05：声明 Q6_K fused CPU kernel。
+// 实现直接从 block payload 累加 Linear 结果，不创建完整浮点权重。
+// 验证入口：chapter05_quantization_test。
 #pragma once
 
 #include "cpp_llm_engine/core/linear_contract.h"

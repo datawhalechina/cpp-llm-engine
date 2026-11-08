@@ -1,4 +1,6 @@
-// 中文：按 llama.cpp Q6_K 布局解码 GGUF payload，提供后续 Linear 接入的正确性基线。
+// Chapter 05：按 llama.cpp Q6_K 布局解码 GGUF payload。
+// CPU reference 为 fused 与 AVX2 Linear 提供数值基线。
+// 验证入口：chapter05_quantization_test。
 #include "chapter05_quantization/q6k_dequantize.h"
 
 #include <cstring>

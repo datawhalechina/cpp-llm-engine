@@ -1,5 +1,6 @@
 // Chapter 05：实现 Q4_K scalar fused decode-and-dot kernel。
 // 职责：校验 Linear contract 后直接从 packed block 累加输出。
+// 验证入口：chapter05_quantization_test。
 #include "chapter05_quantization/q4k_kernel.h"
 
 #include "chapter05_quantization/q4k_dequantize.h"

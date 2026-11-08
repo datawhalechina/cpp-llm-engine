@@ -1,5 +1,6 @@
 // Chapter 05：实现 GGML Q4_K super-block 的 CPU reference 解码。
 // 约束：严格遵循 256 个值、144 字节的 block 布局。
+// 验证入口：chapter05_quantization_test 与真实 TinyLlama 对照。
 #include "chapter05_quantization/q4k_dequantize.h"
 
 #include <cstring>

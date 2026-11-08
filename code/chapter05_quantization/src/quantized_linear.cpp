@@ -1,5 +1,6 @@
 // Chapter 05：实现教学 INT8 weight-only Linear。
 // 路径：构造量化权重，反量化为 F32，再执行矩阵乘和 bias。
+// 验证入口：chapter05_quantization_test。
 #include "chapter05_quantization/quantized_linear.h"
 
 #include <vector>
