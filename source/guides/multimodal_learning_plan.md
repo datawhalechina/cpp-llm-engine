@@ -1,10 +1,25 @@
-# 多模态推理输入链路
+# 多模态六任务学习计划
 
-多模态推理在文本输入旁增加图片路径。图片经过解码、动态切图、视觉编码器（Vision Encoder）和投影层（Projector）后形成视觉嵌入，再与文本嵌入组成统一序列；后续继续使用已有语言模型解码器、生成运行时和服务层。
+多模态路线在 CPU 语言模型主线上增加图片输入。图片经过解码、动态切图、视觉编码器（Vision Encoder）和投影层（Projector）后形成视觉嵌入，再与文本嵌入组成统一序列；后续继续使用已有语言模型解码器、生成运行时和服务层。
 
 SmolVLM 500M 的 IDEFICS3 图片路径用于说明图片进入模型前发生的变化。可运行代码和验证命令位于 `code/multimodal`。
 
-多模态路线在解码器前增加图片输入处理。CPU 与 GPU 如何在统一算子和解码器契约下切换执行后端，见 [CPU 主线与 GPU 扩展架构](../reference/architecture.md#cpu-主线与-gpu-扩展)。当前多模态实现使用 CPU，后续 GPU 化仍在统一嵌入序列处交接。
+建议先完成 [CPU 六任务](./cpu_learning_plan.md)中的输入、算子和解码器部分。当前多模态实现使用 CPU；未来接入 GPU 时，图片管线仍在统一嵌入序列处与语言模型交接，执行后端关系见[系统与执行架构](../reference/architecture.md#cpu-主线与-gpu-扩展)。
+
+![多模态六任务学习路线](../assets/diagrams/multimodal-six-task-learning-route.svg)
+
+## 总体顺序
+
+| 顺序 | 任务 | 主要对象 | 完成后的可验证产物 |
+| --- | --- | --- | --- |
+| 1 | 固定模型与图片基线 | SmolVLM、mmproj、固定 JPEG | 模型、图片和外部输出身份可复现 |
+| 2 | 完成图片预处理 | 解码、缩放、切图、Patch | 图片变成形状和顺序确定的视觉输入 |
+| 3 | 读取视觉模型 | mmproj、配置、视觉权重 | 字段模式、张量布局和量化数据通过检查 |
+| 4 | 执行视觉编码器 | SigLIP Attention、MLP、12 层权重 | 视觉隐藏状态与独立参考结果一致 |
+| 5 | 拼接统一嵌入 | Projector、文本/视觉 Embedding、Decoder | 图片占位被视觉向量替换并进入语言模型 |
+| 6 | 接入服务与性能证据 | Runtime、ServiceCore、阶段指标 | 同步/SSE 输出、终态释放和重复测量通过 |
+
+六项任务共用 `bash code/multimodal/scripts/run.sh` 作为默认入口；需要真实模型、图片或性能实验时，再按各节给出的环境变量和专用脚本运行。
 
 ![IDEFICS3 动态切图与视觉输入链路](../assets/diagrams/idefics3-image-tiling.svg)
 

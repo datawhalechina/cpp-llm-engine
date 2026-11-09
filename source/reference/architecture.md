@@ -133,4 +133,4 @@ CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
 | 性能下降 | 工作负载、阶段计时、热点 | [Chapter09 性能剖析](../chapter09_performance/next/05_profiling_tools.md) |
 | HTTP/SSE 行为异常 | Adapter、Writer、终态回调 | [Chapter10 Transport](../chapter10_serving/next/04_transport.md) |
 
-成熟框架怎样实现这些对象，按问题进入[推理生态项目索引](./ecosystem/README.md)。图片输入怎样接入同一执行路径，见[多模态学习指南](../guides/multimodal_inference.md)。
+成熟框架怎样实现这些对象，按问题进入[推理生态项目索引](./ecosystem/README.md)。图片输入怎样接入同一执行路径，见[多模态学习计划](../guides/multimodal_learning_plan.md)。

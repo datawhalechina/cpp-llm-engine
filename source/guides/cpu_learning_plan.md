@@ -1,12 +1,12 @@
 # CPU 六任务学习计划
 
-这组任务用于完成一条可运行、可解释、可验证的 CPU 纵向链路。六个必做任务从真实推理基线开始，经过输入、Tensor、算子、Decoder 和 Generation Runtime，最终落到最小推理服务；任务 7 提供可选 GPU 初探。
+这组任务用于完成一条可运行、可解释、可验证的 CPU 纵向链路。六个任务从真实推理基线开始，经过输入、Tensor、算子、Decoder 和 Generation Runtime，最终落到最小推理服务。
 
 任务按可验证产物组织正文、代码和练习，每项任务对应一份可保存的学习记录。
 
 每项任务指定一个主阅读入口和一条主验证命令；其他命令用于拆解和排错。每次结果按本文末尾的学习验收记录模板保存，记录 Git commit、环境、输入、关键输出和适用范围。
 
-![CPU 与 GPU 学习路线](../assets/diagrams/cpu-gpu-learning-route.svg)
+![CPU 六任务学习路线](../assets/diagrams/cpu-six-task-learning-route.svg)
 
 ## 总体顺序
 
@@ -20,7 +20,6 @@
 | 4 | 完成真实 Decoder CPU 前向 | Chapter04、Chapter05、Engine | TinyLlama 22 层 prefill/decode 与 llama.cpp golden 对齐 | GGUF；AVX2 实验需要 CPU 支持 |
 | 5 | 完成生成、K/V 与调度链 | Chapter06、Chapter07、Chapter08 | 单请求生成、分页 K/V、chunked prefill 和多请求批次可运行 | 默认路径只需 CPU；真实回归需要 GGUF |
 | 6 | 完成性能证据与最小 CPU 服务 | Chapter09、Chapter10 | 可比较的性能证据、ServiceCore、HTTP/SSE 和 metrics 闭环 | CPU；真实模型路径需要 GGUF |
-| 7 | GPU 初探，可选 | Foundation GPU、Chapter00、Chapter03、Chapter05 | CUDA 环境、llama.cpp GPU 基线和自研 CPU/CUDA backend 对照 | NVIDIA GPU、驱动和 CUDA Toolkit |
 
 ## 首轮与进阶范围
 
@@ -28,11 +27,11 @@
 
 | 章节 | 首轮必读 | 第二轮进阶 / 按需选读 |
 | --- | --- | --- |
-| Chapter00 | 00.1-00.4 环境、构建、模型、首次推理 | 00.5 排错按需；00.6 vLLM baseline 选读 |
+| Chapter00 | 00.1-00.4 环境、构建、模型、首次推理 | 00.5 排错按需 |
 | Chapter01 | 01.1、01.3-01.5 Tensor、Loader、Tokenizer、GGUF | 01.2 教学格式；01.6 框架对照 |
 | Chapter02 | 02.1-02.4 Storage、reshape、slice、测试 | 02.5 框架 Tensor/View 对照 |
 | Chapter03 | 03.1-03.3 Operator、MatMul、CPU reference | 03.5-03.7 数值/复杂度/真实 backend；03.4 cuBLAS 留到 GPU 阶段 |
-| Chapter04 | 04.1-04.5 Attention、Norm/FFN、Decoder、首层接线 | 04.6 成熟框架对照 |
+| Chapter04 | 04.1-04.6 Attention、Norm/FFN、Decoder、首层接线和真实 TinyLlama | 04.7 成熟框架对照 |
 | Chapter05 | 05.1、05.4-05.6 原理、反量化、Linear、精度 | 05.2-05.3 dtype/loader 深入；05.7-05.8 框架与 serving 对照 |
 | Chapter06 | 06.1-06.8 请求、Prefill/Decode、生成循环和真实单请求 | 06.9 框架生成核心对照 |
 | Chapter07 | 07.1-07.5 连续基线、分页映射、事务、Attention 和真实模型迁移 | 07.6 前缀复用与成熟框架扩展 |
@@ -133,28 +132,13 @@
 | 真实模型服务 | 双请求 golden、chunked prefill、Context 隔离和 block 释放检查通过 |
 | Benchmark/Profiling | 保存固定环境的 JSON，完成一次 correctness-first 单变量 A/B 并解释结论 |
 
-## 可选任务 7：GPU 初探
-
-任务 7 建立 CPU/GPU 对照方法，并运行当前 GPU 基础层。先确认驱动和 Toolkit，用 llama.cpp 的 `GGML_CUDA=ON` 路径固定外部基线，再运行 `code/cuda` 的 DeviceBuffer、stream/event、Vector Add、cuBLAS MatMul、Q4_K/Q6_K 融合 GEMV、RoPE、连续/分页 device KV Cache 和 causal GQA Attention。Chapter03 解释 MatMul backend 语义，Chapter04 解释 RoPE、KV 与 Attention，Chapter05 解释量化格式，设备实现集中在 `code/cuda`。
-
-| 任务卡 | 内容 |
-| --- | --- |
-| 主阅读入口 | [`CUDA 环境基础`](../foundation/03_cuda_environment_basics.md) |
-| 主验证命令 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` |
-| 学习记录 | `gpu-baseline.md`：GPU、驱动、Toolkit、offload 参数、输出和耗时 |
-| 环境 | `nvidia-smi` 和 `nvcc --version` 输出正常 |
-| CUDA 小题 | FQ10 的 CPU reference 与 CUDA 结果在允许误差内一致 |
-| 外部基线 | llama.cpp CUDA 路径加载同一 GGUF 并生成文本 |
-| 自研 backend | Vector Add、cuBLAS MatMul、量化 Linear、RoPE、连续 device KV 与 GQA 通过真实 GPU 测试 |
-| 下一里程碑 | 在已验证的真实单层基础上组装多层 GPU Model/Context 与 Generation Runtime |
-
 ## 学习验收记录模板
 
 每完成一项任务，保存一份可复查记录。文件可以保存在个人学习目录，不要求提交到仓库；建议名称包含日期和主题，例如 `2026-10-19-real-decoder.md`。
 
 | 类别 | 需要记录的内容 |
 | --- | --- |
-| 环境 | 日期、Git commit、操作系统、CPU/GPU、编译器、CMake 和 CUDA |
+| 环境 | 日期、Git commit、操作系统、CPU 型号、线程数、编译器和 CMake |
 | 输入 | 学习主题、模型文件、量化格式和主阅读入口 |
 | 执行 | 主命令、退出状态和关键输出 |
 | 证据 | correctness、容差、性能数据及单位 |

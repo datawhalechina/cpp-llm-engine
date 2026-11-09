@@ -19,7 +19,7 @@ npm run test:regression
 1. 运行 `bash code/chapter00_quickstart/run.sh`，确认 C++、CMake 和仓库入口可用。
 2. 按 [Chapter00](source/chapter00_quickstart/intro.md) 准备 llama.cpp 与 TinyLlama，运行 `bash code/chapter00_quickstart/run_real_inference.sh` 建立真实推理基线。
 3. C++、CMake 或测试基础不足时，按需学习 [Foundation](source/foundation/intro.md)。
-4. 按 Chapter01–10 完成 CPU 主线；需要按阶段产物推进时，使用 [CPU 六任务学习计划](source/guides/phase1_cpu_learning_plan.md)。
+4. 按 Chapter01–10 完成 CPU 主线；需要按阶段产物推进时，使用 [CPU 六任务学习计划](source/guides/cpu_learning_plan.md)。
 5. CPU 基线稳定后，再选择 CUDA 或多模态扩展。
 
 ## 选择学习路线
@@ -34,9 +34,9 @@ A 教学基线 → B 真实主线
 
 | 路线 | 学习内容 | 建议起点 | 完成标志 |
 | --- | --- | --- | --- |
-| CPU 主线 | 从模型输入到单机推理服务 | Foundation（按需）→ Chapter00 → Chapter01–10 | 默认回归通过，能解释权重到服务的完整链路 |
-| GPU 扩展 | 将算子、工作区和 K/V 存储迁移到 CUDA | 完成 Chapter00–06 后进入 [`code/cuda`](code/cuda/README.md) | CPU/CUDA 数值对照和真实设备测试通过 |
-| 多模态扩展 | 增加图片预处理、Vision Encoder 和 Projector | 完成 Chapter04–06 后进入 [`code/multimodal`](code/multimodal/README.md) | 图片形成 embedding 序列并进入现有 LLM Runtime |
+| CPU 主线 | 从模型输入到单机推理服务 | [CPU 六任务学习计划](source/guides/cpu_learning_plan.md) | 默认回归通过，能解释权重到服务的完整链路 |
+| GPU 扩展 | 将算子、工作区和 K/V 存储迁移到 CUDA | [GPU 六任务学习计划](source/guides/gpu_learning_plan.md) | CPU/CUDA 数值对照和真实设备测试通过 |
+| 多模态扩展 | 增加图片预处理、Vision Encoder 和 Projector | [多模态六任务学习计划](source/guides/multimodal_learning_plan.md) | 图片形成 embedding 序列并进入现有 LLM Runtime |
 
 A 建立可观察的小尺寸闭环，B 连接真实 CPU 结构；G 和 M 是选做扩展，不是排在 B 之后的必修章节。只学习执行核心时可先完成 Chapter00–06，继续学习缓存、调度和服务时再进入 Chapter07–10。
 
@@ -75,7 +75,7 @@ bash code/engine/scripts/run_real_cuda_runtime.sh
 bash code/engine/scripts/run_real_cuda_serving.sh
 ```
 
-脚本默认读取 `llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf`，也可通过 `CPP_LLM_ENGINE_MODEL_PATH` 指定模型。各阶段的详细入口、成功条件和当前限制见 [`code/engine/README.md`](code/engine/README.md)；环境准备见 [CUDA 指南](source/guides/setup_cuda.md)，多模态顺序见[多模态学习指南](source/guides/multimodal_inference.md)。
+脚本默认读取 `llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf`，也可通过 `CPP_LLM_ENGINE_MODEL_PATH` 指定模型。各阶段的详细入口、成功条件和当前限制见 [`code/engine/README.md`](code/engine/README.md)；环境准备见 [CUDA 指南](source/guides/setup_cuda.md)，学习顺序见 [GPU 六任务学习计划](source/guides/gpu_learning_plan.md)。
 
 ## 判断验证结果
 

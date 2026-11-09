@@ -27,7 +27,7 @@
 | 深入缓存、调度与服务 | Chapter06–10 | vLLM、Mini-SGLang、SGLang |
 | 继续做性能优化 | Chapter09 的 workload、Profiling 和 A/B | TensorRT-LLM、DeepInfer |
 | 扩展模型格式或本地交付 | Chapter00–01、模型支持表 | llama.cpp、Ollama |
-| 扩展多模态输入 | [多模态学习指南](../../guides/multimodal_inference.md) | llama.cpp、DeepInfer |
+| 扩展多模态输入 | [多模态学习计划](../../guides/multimodal_learning_plan.md) | llama.cpp、DeepInfer |
 
 ## 项目类型
 

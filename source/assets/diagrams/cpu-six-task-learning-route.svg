@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 285" role="img" aria-labelledby="title desc">
+  <title id="title">CPU 六任务学习路线</title>
+  <desc id="desc">从真实推理基线开始，依次完成输入与加载、张量与算子、真实解码器、生成缓存调度和最小 CPU 推理服务。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#334155"/>
+    </marker>
+    <style>
+      .title { font-family: "Noto Sans CJK SC", sans-serif; font-size: 28px; font-weight: 700; fill: #0f172a; }
+      .task { font-family: "Noto Sans CJK SC", sans-serif; font-size: 16px; font-weight: 700; fill: #0f172a; }
+      .chapter { font-family: "Noto Sans CJK SC", sans-serif; font-size: 13px; fill: #334155; }
+      .result { font-family: "Noto Sans CJK SC", sans-serif; font-size: 13px; fill: #475569; }
+      .number { font-family: "Noto Sans CJK SC", sans-serif; font-size: 18px; font-weight: 700; fill: #ffffff; }
+      .line { stroke: #334155; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .node { fill: #2563eb; stroke: #1e3a8a; stroke-width: 2; }
+      .card { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.5; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="285" rx="24" fill="#f8fafc"/>
+  <text x="52" y="54" class="title">CPU 六任务：从真实基线到推理服务</text>
+
+  <path d="M138 170 H278" class="line"/>
+  <path d="M334 170 H474" class="line"/>
+  <path d="M530 170 H670" class="line"/>
+  <path d="M726 170 H866" class="line"/>
+  <path d="M922 170 H1062" class="line"/>
+
+  <g transform="translate(110 170)">
+    <rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/>
+    <text x="0" y="-60" text-anchor="middle" class="task">真实推理基线</text>
+    <text x="0" y="-40" text-anchor="middle" class="chapter">Foundation / Chapter00</text>
+    <circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">1</text>
+    <text x="0" y="56" text-anchor="middle" class="result">TinyLlama CPU 输出</text>
+  </g>
+
+  <g transform="translate(306 170)">
+    <rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/>
+    <text x="0" y="-60" text-anchor="middle" class="task">输入与模型加载</text>
+    <text x="0" y="-40" text-anchor="middle" class="chapter">Chapter01</text>
+    <circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">2</text>
+    <text x="0" y="56" text-anchor="middle" class="result">Tokenizer / GGUF / 权重</text>
+  </g>
+
+  <g transform="translate(502 170)">
+    <rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/>
+    <text x="0" y="-60" text-anchor="middle" class="task">张量与算子底座</text>
+    <text x="0" y="-40" text-anchor="middle" class="chapter">Chapter02–03</text>
+    <circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">3</text>
+    <text x="0" y="56" text-anchor="middle" class="result">View / MatMul / Backend</text>
+  </g>
+
+  <g transform="translate(698 170)">
+    <rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/>
+    <text x="0" y="-60" text-anchor="middle" class="task">真实解码器前向</text>
+    <text x="0" y="-40" text-anchor="middle" class="chapter">Chapter04–05</text>
+    <circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">4</text>
+    <text x="0" y="56" text-anchor="middle" class="result">22 层 Decoder / 量化</text>
+  </g>
+
+  <g transform="translate(894 170)">
+    <rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/>
+    <text x="0" y="-60" text-anchor="middle" class="task">生成、缓存与调度</text>
+    <text x="0" y="-40" text-anchor="middle" class="chapter">Chapter06–08</text>
+    <circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">5</text>
+    <text x="0" y="56" text-anchor="middle" class="result">Runtime / K/V / Batch</text>
+  </g>
+
+  <g transform="translate(1090 170)">
+    <rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/>
+    <text x="0" y="-60" text-anchor="middle" class="task">性能证据与服务</text>
+    <text x="0" y="-40" text-anchor="middle" class="chapter">Chapter09–10</text>
+    <circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">6</text>
+    <text x="0" y="56" text-anchor="middle" class="result">Evidence / HTTP / SSE</text>
+  </g>
+
+</svg>

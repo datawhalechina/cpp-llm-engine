@@ -124,7 +124,7 @@
 
 | 中文术语 | 英文或缩写 | 定义 | 首次学习 | 相关公式 |
 | --- | --- | --- | --- | --- |
-| 多模态推理 | multimodal inference | 同一请求联合处理文本、图片或其他模态 | [多模态学习指南](../guides/multimodal_inference.md) | [F-MM-01](./formulas.md#f-mm-01) |
+| 多模态推理 | multimodal inference | 同一请求联合处理文本、图片或其他模态 | [多模态学习计划](../guides/multimodal_learning_plan.md) | [F-MM-01](./formulas.md#f-mm-01) |
 | 图像块 | image patch | Vision Transformer 输入的固定大小局部像素块 | 多模态输入链路 | [F-MM-02](./formulas.md#f-mm-02) |
 | 全局概览图 | overview image | 动态切图时保留整图关系的固定大小输入 | 多模态输入链路 | [F-MM-02](./formulas.md#f-mm-02) |
 | 局部切片 | local tile | 从 refined image 裁出的固定大小高分辨率输入 | 多模态输入链路 | [F-MM-02](./formulas.md#f-mm-02) |

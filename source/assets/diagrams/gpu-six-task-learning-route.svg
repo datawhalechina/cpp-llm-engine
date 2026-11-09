@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 285" role="img" aria-labelledby="title desc">
+  <title id="title">GPU 六任务学习路线</title>
+  <desc id="desc">在 CPU 正确性基线上，依次学习 CUDA 环境、设备资源、核心算子、真实解码器、生成缓存和推理服务。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#334155"/></marker>
+    <style>
+      .title { font-family: "Noto Sans CJK SC", sans-serif; font-size: 28px; font-weight: 700; fill: #0f172a; }
+      .task { font-family: "Noto Sans CJK SC", sans-serif; font-size: 16px; font-weight: 700; fill: #0f172a; }
+      .chapter { font-family: "Noto Sans CJK SC", sans-serif; font-size: 13px; fill: #334155; }
+      .result { font-family: "Noto Sans CJK SC", sans-serif; font-size: 13px; fill: #475569; }
+      .number { font-family: "Noto Sans CJK SC", sans-serif; font-size: 18px; font-weight: 700; fill: #ffffff; }
+      .line { stroke: #334155; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .node { fill: #2563eb; stroke: #1e3a8a; stroke-width: 2; }
+      .card { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.5; }
+    </style>
+  </defs>
+  <rect width="1200" height="285" rx="24" fill="#f8fafc"/>
+  <text x="52" y="54" class="title">GPU 六任务：从 CPU 基线到设备服务</text>
+  <path d="M138 170 H278" class="line"/><path d="M334 170 H474" class="line"/><path d="M530 170 H670" class="line"/><path d="M726 170 H866" class="line"/><path d="M922 170 H1062" class="line"/>
+  <g transform="translate(110 170)"><rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/><text x="0" y="-60" text-anchor="middle" class="task">固定 CUDA 环境</text><text x="0" y="-40" text-anchor="middle" class="chapter">驱动 / Toolkit</text><circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">1</text><text x="0" y="56" text-anchor="middle" class="result">可记录的设备身份</text></g>
+  <g transform="translate(306 170)"><rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/><text x="0" y="-60" text-anchor="middle" class="task">设备资源</text><text x="0" y="-40" text-anchor="middle" class="chapter">Buffer / Stream / Event</text><circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">2</text><text x="0" y="56" text-anchor="middle" class="result">RAII / Workspace</text></g>
+  <g transform="translate(502 170)"><rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/><text x="0" y="-60" text-anchor="middle" class="task">迁移核心算子</text><text x="0" y="-40" text-anchor="middle" class="chapter">Chapter03–05</text><circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">3</text><text x="0" y="56" text-anchor="middle" class="result">MatMul / GEMV / GQA</text></g>
+  <g transform="translate(698 170)"><rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/><text x="0" y="-60" text-anchor="middle" class="task">真实解码器</text><text x="0" y="-40" text-anchor="middle" class="chapter">单层 → 22 层</text><circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">4</text><text x="0" y="56" text-anchor="middle" class="result">CPU / CUDA 对照</text></g>
+  <g transform="translate(894 170)"><rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/><text x="0" y="-60" text-anchor="middle" class="task">生成与分页缓存</text><text x="0" y="-40" text-anchor="middle" class="chapter">Chapter06–08</text><circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">5</text><text x="0" y="56" text-anchor="middle" class="result">Runtime / Batch / K/V</text></g>
+  <g transform="translate(1090 170)"><rect x="-82" y="-82" width="164" height="54" rx="12" class="card"/><text x="0" y="-60" text-anchor="middle" class="task">服务与性能证据</text><text x="0" y="-40" text-anchor="middle" class="chapter">Chapter09–10</text><circle r="28" class="node"/><text x="0" y="6" text-anchor="middle" class="number">6</text><text x="0" y="56" text-anchor="middle" class="result">HTTP / SSE / A/B</text></g>
+</svg>

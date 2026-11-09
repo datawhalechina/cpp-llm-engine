@@ -19,9 +19,9 @@ Complete the CPU path first, then choose CUDA or multimodal extensions. For each
 
 | Path | Prerequisite | Entry |
 | --- | --- | --- |
-| CPU main line | C++17, CMake 3.20+, and Git | [Chapter00](/chapter00_quickstart/intro) |
-| GPU extension | Stable CPU contracts, NVIDIA Driver, and CUDA Toolkit | [CUDA setup](/guides/setup_cuda) |
-| Multimodal extension | Decoder and Runtime baseline | [Multimodal guide](/guides/multimodal_inference) |
+| CPU main line | C++17, CMake 3.20+, and Git | [CPU six-task plan](/guides/cpu_learning_plan) |
+| GPU extension | Stable CPU contracts, NVIDIA Driver, and CUDA Toolkit | [GPU six-task plan](/guides/gpu_learning_plan) |
+| Multimodal extension | Decoder and Runtime baseline | [Multimodal six-task plan](/guides/multimodal_learning_plan) |
 
 Linux is the default environment. On Windows, use WSL2 Ubuntu. CUDA is optional and is not required for the CPU path.
 

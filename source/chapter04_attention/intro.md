@@ -32,7 +32,7 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | 2 | A | [`04.2 层归一化与激活函数`](./02_layernorm_and_activation.md)、[`04.3 前馈网络`](./03_feedforward.md)、[`04.4 解码器层`](./04_decoder_layer.md) | <a href="../_code/chapter04_attention/src/decoder_layer.cpp"><code>decoder_layer.cpp</code></a>、<a href="../_code/chapter04_attention/src/decoder_context.cpp"><code>decoder_context.cpp</code></a> | 归一化、注意力、残差和 FFN 组成可执行解码器层，请求上下文连接预填充与解码 |
 | 3 | B | [`04.5 接入首层权重`](./05_load_first_layer.md)、[`04.6 连接真实 TinyLlama 解码器`](./06_real_tinyllama_decoder.md) | <a href="../_code/model/src/real_llama_cpu_decoder.cpp"><code>real_llama_cpu_decoder.cpp</code></a> | Chapter01 权重怎样映射到 22 层 Model 与请求 Context |
 | 4 | B | [`04.7 解码器成熟框架对照`](./07_framework_comparison.md) | [`解码器数据流图`](./04_decoder_layer.md) | 将教学层和真实模型映射到成熟执行器与 GPU 计算后端 |
-| 5 | G/M | [`CUDA 路线`](../guides/setup_cuda.md)、[`多模态推理`](../guides/multimodal_inference.md) | <a href="../_code/cuda/src/cuda_decoder_layer.cpp"><code>cuda_decoder_layer.cpp</code></a>、<a href="../_code/multimodal/src/vision_encoder.cpp"><code>vision_encoder.cpp</code></a> | 同一解码器骨架怎样替换计算后端或接收视觉输入 |
+| 5 | G/M | [`GPU 学习计划`](../guides/gpu_learning_plan.md)、[`多模态学习计划`](../guides/multimodal_learning_plan.md) | <a href="../_code/cuda/src/cuda_decoder_layer.cpp"><code>cuda_decoder_layer.cpp</code></a>、<a href="../_code/multimodal/src/vision_encoder.cpp"><code>vision_encoder.cpp</code></a> | 同一解码器骨架怎样替换计算后端或接收视觉输入 |
 
 ## 验证与下一步
 

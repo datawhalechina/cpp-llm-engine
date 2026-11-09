@@ -2,6 +2,8 @@
 
 CPU 主线可以完成 Chapter00–10 的默认学习与验证。准备运行 `code/cuda`、真实 CUDA 模型或 GPU 性能实验时，再按本指南配置 NVIDIA 环境。
 
+CUDA 指南只处理安装、版本选择和故障定位。环境可用后，按 [GPU 六任务学习计划](./gpu_learning_plan.md)从设备资源逐步进入真实模型服务。
+
 ## CPU 与 GPU 环境分别支持什么
 
 | 学习目标 | 所需环境 | 入口 |
@@ -66,7 +68,7 @@ bash code/engine/scripts/run_real_cuda_serving.sh
 
 第一条验证设备内存、Stream/Event、cuBLAS、量化 Linear、RoPE、K/V 和 Decoder；后两条验证 TinyLlama 22 层生成、分页缓存、同步 Completion、SSE 和资源释放。模型路径默认为 `llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf`，也可设置 `CPP_LLM_ENGINE_MODEL_PATH`。
 
-只学习单个 CUDA 概念时，先阅读 [Foundation CUDA 环境基础](../foundation/03_cuda_environment_basics.md)；CPU/GPU 对象怎样共享上层契约见 [CPU/GPU 架构](../reference/architecture.md#cpu-主线与-gpu-扩展)。
+只学习单个 CUDA 概念时，先阅读 [Foundation CUDA 环境基础](../foundation/03_cuda_environment_basics.md)；完整学习顺序见 [GPU 六任务学习计划](./gpu_learning_plan.md)，CPU/GPU 对象怎样共享上层契约见 [CPU/GPU 架构](../reference/architecture.md#cpu-主线与-gpu-扩展)。
 
 ## 常见故障
 

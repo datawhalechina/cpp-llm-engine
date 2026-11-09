@@ -144,7 +144,9 @@ function createSidebar() {
         items: [
           { text: '主入口', link: '/README' },
           { text: '使用文档', link: '/guide' },
-          { text: 'CPU 六任务学习计划', link: '/guides/phase1_cpu_learning_plan' },
+          { text: 'CPU 六任务学习计划', link: '/guides/cpu_learning_plan' },
+          { text: 'GPU 六任务学习计划', link: '/guides/gpu_learning_plan' },
+          { text: '多模态六任务学习计划', link: '/guides/multimodal_learning_plan' },
           { text: 'Foundation 题库', link: '/exercises/foundation/README' },
           chapterGroup('00', '第 00 章 起跑线', '/chapter00_quickstart', [
             { text: '环境准备', file: '01_environment_setup.md' },
@@ -283,14 +285,15 @@ function createSidebar() {
         collapsed: true,
         items: [
           { text: '学习与复现指南', link: '/guides/README' },
-          { text: 'CPU 六任务学习计划', link: '/guides/phase1_cpu_learning_plan' },
+          { text: 'CPU 六任务学习计划', link: '/guides/cpu_learning_plan' },
+          { text: 'GPU 六任务学习计划', link: '/guides/gpu_learning_plan' },
+          { text: '多模态六任务学习计划', link: '/guides/multimodal_learning_plan' },
           { text: 'CUDA 安装与配置', link: '/guides/setup_cuda' },
           { text: 'Foundation 题库', link: '/exercises/foundation/README' },
           { text: '参考资料总入口', link: '/reference/README' },
           { text: '教程资产索引', link: '/reference/tutorial_assets' },
           { text: '实验与验证资产', link: '/reference/experiment_assets' },
           { text: '系统与执行架构', link: '/reference/architecture' },
-          { text: '多模态学习指南', link: '/guides/multimodal_inference' },
           { text: '模型基线与扩展顺序', link: '/reference/model_support' },
           { text: '公式索引', link: '/reference/formulas' },
           { text: '术语表', link: '/reference/glossary' },
