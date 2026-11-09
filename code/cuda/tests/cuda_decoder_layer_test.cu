@@ -305,6 +305,78 @@ int main() {
         paged_after_failure.size() * sizeof(float)).is_ok());
     CHECK(paged_prefill_context.synchronize().is_ok());
     CHECK(close(paged_after_failure, paged_prefill_output));
+
+    // Qwen 类布局让 Q 宽度大于 hidden，并由输出投影收回 hidden。
+    CudaExecutionContext asymmetric_context;
+    CudaDecoderLayer asymmetric_layer;
+    CudaKvCache asymmetric_cache;
+    const CudaDecoderLayerConfig asymmetric_config{
+        4, 6, 2, 1, 4, 4, 1.0e-5F, 1000000.0F,
+        cpp_llm_engine::core::RotaryPairing::SplitHalf};
+    CHECK(CudaExecutionContext::create(&asymmetric_context).is_ok());
+    CHECK(CudaDecoderLayer::create(asymmetric_config, &asymmetric_layer).is_ok());
+    CHECK(CudaKvCache::create(2, 1, 4, &asymmetric_cache).is_ok());
+    std::vector<CudaTensor> asymmetric_tensors(11);
+    const std::vector<std::vector<std::size_t>> asymmetric_shapes{
+        {4}, {4,8}, {4,4}, {4,4}, {8,4}, {4}, {4,6}, {4,6}, {6,4},
+        {4}, {4}};
+    std::vector<std::vector<float>> asymmetric_host;
+    for (const auto& shape : asymmetric_shapes) {
+        std::size_t count = 1;
+        for (const std::size_t dimension : shape) count *= dimension;
+        asymmetric_host.emplace_back(count, 0.0F);
+    }
+    asymmetric_host[0].assign(4, 1.0F);
+    asymmetric_host[5].assign(4, 1.0F);
+    asymmetric_host[9].assign(4, 1.0F);
+    asymmetric_host[10].assign(4, 1.0F);
+    for (std::size_t index = 0; index < 4; ++index) {
+        asymmetric_host[1][index * 8 + index] = 1.0F;
+        asymmetric_host[1][index * 8 + 4 + index] = 1.0F;
+        asymmetric_host[2][index * 4 + index] = 1.0F;
+        asymmetric_host[3][index * 4 + index] = 1.0F;
+        asymmetric_host[4][index * 4 + index] = 0.5F;
+        asymmetric_host[4][(4 + index) * 4 + index] = 0.5F;
+    }
+    for (std::size_t index = 0; index < asymmetric_tensors.size(); ++index) {
+        CHECK(CudaTensor::create_contiguous(
+            asymmetric_shapes[index], DType::Float32,
+            &asymmetric_tensors[index]).is_ok());
+        CHECK(asymmetric_context.upload(
+            &asymmetric_tensors[index], asymmetric_host[index].data(),
+            asymmetric_host[index].size() * sizeof(float)).is_ok());
+    }
+    const CudaDecoderLayerWeights asymmetric_weights{
+        &asymmetric_tensors[0], CudaLinearWeight::float32(&asymmetric_tensors[1]),
+        CudaLinearWeight::float32(&asymmetric_tensors[2]),
+        CudaLinearWeight::float32(&asymmetric_tensors[3]),
+        CudaLinearWeight::float32(&asymmetric_tensors[4]), &asymmetric_tensors[5],
+        CudaLinearWeight::float32(&asymmetric_tensors[6]),
+        CudaLinearWeight::float32(&asymmetric_tensors[7]),
+        CudaLinearWeight::float32(&asymmetric_tensors[8]),
+        &asymmetric_tensors[9], &asymmetric_tensors[10]};
+    const std::vector<float> asymmetric_input{0.25F, -0.5F, 0.75F, -1.0F};
+    CudaTensor asymmetric_hidden;
+    CHECK(CudaTensor::create_contiguous(
+        {4}, DType::Float32, &asymmetric_hidden).is_ok());
+    CHECK(asymmetric_context.upload(
+        &asymmetric_hidden, asymmetric_input.data(),
+        asymmetric_input.size() * sizeof(float)).is_ok());
+    CHECK(asymmetric_layer.forward(
+        &asymmetric_context, asymmetric_weights, &asymmetric_cache,
+        &asymmetric_hidden, 0).is_ok());
+    const std::vector<float> asymmetric_norm = rms(asymmetric_input);
+    std::vector<float> asymmetric_expected(4);
+    for (std::size_t index = 0; index < 4; ++index) {
+        asymmetric_expected[index] = asymmetric_input[index] + asymmetric_norm[index];
+    }
+    std::vector<float> asymmetric_output(4);
+    CHECK(asymmetric_context.download(
+        asymmetric_hidden, asymmetric_output.data(),
+        asymmetric_output.size() * sizeof(float)).is_ok());
+    CHECK(asymmetric_context.synchronize().is_ok());
+    CHECK(close(asymmetric_output, asymmetric_expected));
+    CHECK(asymmetric_cache.size_tokens() == 1);
     return 0;
 }
 

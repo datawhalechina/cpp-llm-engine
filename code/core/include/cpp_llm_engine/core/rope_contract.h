@@ -8,9 +8,15 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 
 namespace cpp_llm_engine::core {
+
+enum class RotaryPairing : std::uint8_t {
+    Adjacent,
+    SplitHalf,
+};
 
 struct RotaryEmbeddingRequest final {
     float* values = nullptr;
@@ -20,6 +26,7 @@ struct RotaryEmbeddingRequest final {
     std::size_t rotary_dimension = 0;
     std::size_t position_offset = 0;
     float frequency_base = 10000.0F;
+    RotaryPairing pairing = RotaryPairing::Adjacent;
 
     Status validate() const {
         if (token_count == 0) return Status::ok();
@@ -30,6 +37,10 @@ struct RotaryEmbeddingRequest final {
         }
         if (!std::isfinite(frequency_base) || frequency_base <= 0.0F) {
             return Status::error("RoPE frequency base must be finite and positive");
+        }
+        if (pairing != RotaryPairing::Adjacent &&
+            pairing != RotaryPairing::SplitHalf) {
+            return Status::error("RoPE pairing is invalid");
         }
         if (position_offset > std::numeric_limits<std::size_t>::max() -
                                   (token_count - 1)) {
@@ -52,6 +63,7 @@ struct RotaryEmbeddingBatchRequest final {
     std::size_t head_dimension = 0;
     std::size_t rotary_dimension = 0;
     float frequency_base = 10000.0F;
+    RotaryPairing pairing = RotaryPairing::Adjacent;
 
     Status validate() const {
         if (values == nullptr || positions == nullptr || batch_size == 0 ||
@@ -61,6 +73,10 @@ struct RotaryEmbeddingBatchRequest final {
         }
         if (!std::isfinite(frequency_base) || frequency_base <= 0.0F) {
             return Status::error("batch RoPE frequency base must be finite and positive");
+        }
+        if (pairing != RotaryPairing::Adjacent &&
+            pairing != RotaryPairing::SplitHalf) {
+            return Status::error("batch RoPE pairing is invalid");
         }
         if (head_count > std::numeric_limits<std::size_t>::max() / head_dimension ||
             batch_size > std::numeric_limits<std::size_t>::max() /

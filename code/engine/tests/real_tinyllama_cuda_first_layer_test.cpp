@@ -1,4 +1,4 @@
-// Engine CUDA：验证真实 TinyLlama layer-0 的单 token 前向。
+// Engine CUDA：验证真实 Llama/Qwen3 layer-0 的单 token 前向。
 // 职责：用 Chapter05 CPU fused 路径生成独立参考，再核对 CUDA hidden 与 K/V。
 // 通过条件：真实权重上传、首层执行、缓存增长和 CPU/CUDA 数值误差均符合契约。
 #include "cpp_llm_engine/model/real_llama_cuda_model.h"
@@ -87,6 +87,32 @@ std::vector<float> rms_norm(
     return output;
 }
 
+bool rms_norm_heads(
+    std::vector<float>* values,
+    std::size_t head_count,
+    std::size_t head_dimension,
+    const std::vector<float>& weight,
+    float epsilon) {
+    if (values == nullptr || values->size() != head_count * head_dimension ||
+        weight.size() != head_dimension) {
+        return false;
+    }
+    for (std::size_t head = 0; head < head_count; ++head) {
+        float square_sum = 0.0F;
+        const std::size_t offset = head * head_dimension;
+        for (std::size_t index = 0; index < head_dimension; ++index) {
+            const float value = (*values)[offset + index];
+            square_sum += value * value;
+        }
+        const float inverse = 1.0F / std::sqrt(
+            square_sum / static_cast<float>(head_dimension) + epsilon);
+        for (std::size_t index = 0; index < head_dimension; ++index) {
+            (*values)[offset + index] *= inverse * weight[index];
+        }
+    }
+    return true;
+}
+
 bool close(
     const std::vector<float>& actual,
     const std::vector<float>& expected,
@@ -110,7 +136,7 @@ bool close(
 
 int main(int argc, char** argv) {
     if (argc != 2) {
-        std::cerr << "usage: real_tinyllama_cuda_first_layer_test <model.gguf>\n";
+        std::cerr << "usage: real_tinyllama_cuda_first_layer_test <dense-model.gguf>\n";
         return 2;
     }
     int devices = 0;
@@ -158,8 +184,21 @@ int main(int argc, char** argv) {
     const std::size_t query_heads = metadata.attention_head_count;
     const std::size_t kv_heads = metadata.attention_head_count_kv;
     CHECK(query_heads > 0 && kv_heads > 0 && query_heads % kv_heads == 0);
-    const std::size_t head_dimension = metadata.hidden_size / query_heads;
-    std::vector<float> attention(metadata.hidden_size, 0.0F);
+    const std::size_t head_dimension = metadata.attention_key_length == 0
+        ? metadata.hidden_size / query_heads : metadata.attention_key_length;
+    CHECK(metadata.attention_value_length == 0 ||
+          metadata.attention_value_length == head_dimension);
+    if (host_weights.attn_q_norm.bytes() > 0) {
+        CHECK(rms_norm_heads(
+            &query, query_heads, head_dimension,
+            host_weights.attn_q_norm.to_vector<float>(),
+            metadata.rms_norm_epsilon));
+        CHECK(rms_norm_heads(
+            &key, kv_heads, head_dimension,
+            host_weights.attn_k_norm.to_vector<float>(),
+            metadata.rms_norm_epsilon));
+    }
+    std::vector<float> attention(query_heads * head_dimension, 0.0F);
     for (std::size_t query_head = 0; query_head < query_heads; ++query_head) {
         const std::size_t kv_head = query_head / (query_heads / kv_heads);
         std::copy_n(

@@ -80,6 +80,7 @@ core::Status CudaDecoderBatchLayer::forward(
     if (context == nullptr || hidden == nullptr || caches.size() != batch_size_ ||
         positions.size() != batch_size_ ||
         weights.attention_norm == nullptr || weights.ffn_norm == nullptr ||
+        (weights.query_norm == nullptr) != (weights.key_norm == nullptr) ||
         !weights.query.valid() || !weights.key.valid() || !weights.value.valid() ||
         !weights.attention_output.valid() || !weights.gate.valid() ||
         !weights.up.valid() || !weights.down.valid() ||
@@ -114,10 +115,18 @@ core::Status CudaDecoderBatchLayer::forward(
     RETURN_IF_ERROR(context->linear_batch(attention_normalized_, weights.query, &query_));
     RETURN_IF_ERROR(context->linear_batch(attention_normalized_, weights.key, &key_));
     RETURN_IF_ERROR(context->linear_batch(attention_normalized_, weights.value, &value_));
+    if (weights.query_norm != nullptr) {
+        RETURN_IF_ERROR(context->rms_norm_batch(
+            query_, *weights.query_norm, &query_, config_.rms_epsilon));
+        RETURN_IF_ERROR(context->rms_norm_batch(
+            key_, *weights.key_norm, &key_, config_.rms_epsilon));
+    }
     RETURN_IF_ERROR(context->rope_batch(
-        &query_, positions, config_.rotary_dimension, config_.rope_frequency_base));
+        &query_, positions, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
     RETURN_IF_ERROR(context->rope_batch(
-        &key_, positions, config_.rotary_dimension, config_.rope_frequency_base));
+        &key_, positions, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
 
     std::vector<CudaTensor*> query_rows;
     std::vector<CudaTensor*> key_rows;
@@ -164,6 +173,7 @@ core::Status CudaDecoderBatchLayer::prefill_sequence(
         cache->kv_head_count() != config_.kv_heads ||
         cache->head_dimension() != config_.head_dimension ||
         weights.attention_norm == nullptr || weights.ffn_norm == nullptr ||
+        (weights.query_norm == nullptr) != (weights.key_norm == nullptr) ||
         !weights.query.valid() || !weights.key.valid() || !weights.value.valid() ||
         !weights.attention_output.valid() || !weights.gate.valid() ||
         !weights.up.valid() || !weights.down.valid() ||
@@ -194,10 +204,18 @@ core::Status CudaDecoderBatchLayer::prefill_sequence(
         attention_normalized_, weights.key, &key_));
     RETURN_IF_PREFILL_ERROR(context->linear_batch(
         attention_normalized_, weights.value, &value_));
+    if (weights.query_norm != nullptr) {
+        RETURN_IF_PREFILL_ERROR(context->rms_norm_batch(
+            query_, *weights.query_norm, &query_, config_.rms_epsilon));
+        RETURN_IF_PREFILL_ERROR(context->rms_norm_batch(
+            key_, *weights.key_norm, &key_, config_.rms_epsilon));
+    }
     RETURN_IF_PREFILL_ERROR(context->rope_batch(
-        &query_, positions, config_.rotary_dimension, config_.rope_frequency_base));
+        &query_, positions, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
     RETURN_IF_PREFILL_ERROR(context->rope_batch(
-        &key_, positions, config_.rotary_dimension, config_.rope_frequency_base));
+        &key_, positions, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
     RETURN_IF_PREFILL_ERROR(context->append_kv(cache, key_, value_));
     RETURN_IF_PREFILL_ERROR(context->gqa_attention(
         query_, *cache, &attention_context_, position_offset));
@@ -236,6 +254,7 @@ core::Status CudaDecoderBatchLayer::prefill_sequence_paged(
         position_offset + batch_size_ >
             physical_blocks.size() * cache->block_size() ||
         weights.attention_norm == nullptr || weights.ffn_norm == nullptr ||
+        (weights.query_norm == nullptr) != (weights.key_norm == nullptr) ||
         !weights.query.valid() || !weights.key.valid() || !weights.value.valid() ||
         !weights.attention_output.valid() || !weights.gate.valid() ||
         !weights.up.valid() || !weights.down.valid() ||
@@ -269,10 +288,18 @@ core::Status CudaDecoderBatchLayer::prefill_sequence_paged(
         attention_normalized_, weights.key, &key_));
     RETURN_IF_PAGED_PREFILL_ERROR(context->linear_batch(
         attention_normalized_, weights.value, &value_));
+    if (weights.query_norm != nullptr) {
+        RETURN_IF_PAGED_PREFILL_ERROR(context->rms_norm_batch(
+            query_, *weights.query_norm, &query_, config_.rms_epsilon));
+        RETURN_IF_PAGED_PREFILL_ERROR(context->rms_norm_batch(
+            key_, *weights.key_norm, &key_, config_.rms_epsilon));
+    }
     RETURN_IF_PAGED_PREFILL_ERROR(context->rope_batch(
-        &query_, positions, config_.rotary_dimension, config_.rope_frequency_base));
+        &query_, positions, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
     RETURN_IF_PAGED_PREFILL_ERROR(context->rope_batch(
-        &key_, positions, config_.rotary_dimension, config_.rope_frequency_base));
+        &key_, positions, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
 
     std::vector<CudaTensor*> key_rows;
     std::vector<CudaTensor*> value_rows;
@@ -325,6 +352,7 @@ core::Status CudaDecoderBatchLayer::forward_paged(
         cache->head_dimension() != config_.head_dimension ||
         physical_blocks.size() != batch_size_ || positions.size() != batch_size_ ||
         weights.attention_norm == nullptr || weights.ffn_norm == nullptr ||
+        (weights.query_norm == nullptr) != (weights.key_norm == nullptr) ||
         !weights.query.valid() || !weights.key.valid() || !weights.value.valid() ||
         !weights.attention_output.valid() || !weights.gate.valid() ||
         !weights.up.valid() || !weights.down.valid() ||
@@ -366,10 +394,18 @@ core::Status CudaDecoderBatchLayer::forward_paged(
         attention_normalized_, weights.key, &key_));
     RETURN_IF_PAGED_BATCH_ERROR(context->linear_batch(
         attention_normalized_, weights.value, &value_));
+    if (weights.query_norm != nullptr) {
+        RETURN_IF_PAGED_BATCH_ERROR(context->rms_norm_batch(
+            query_, *weights.query_norm, &query_, config_.rms_epsilon));
+        RETURN_IF_PAGED_BATCH_ERROR(context->rms_norm_batch(
+            key_, *weights.key_norm, &key_, config_.rms_epsilon));
+    }
     RETURN_IF_PAGED_BATCH_ERROR(context->rope_batch(
-        &query_, positions, config_.rotary_dimension, config_.rope_frequency_base));
+        &query_, positions, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
     RETURN_IF_PAGED_BATCH_ERROR(context->rope_batch(
-        &key_, positions, config_.rotary_dimension, config_.rope_frequency_base));
+        &key_, positions, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
 
     std::vector<CudaTensor*> query_rows;
     std::vector<CudaTensor*> key_rows;

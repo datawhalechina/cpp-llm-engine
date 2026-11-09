@@ -9,6 +9,7 @@
 #include "cpp_llm_engine/cuda/cuda_paged_kv_cache.h"
 
 #include <cmath>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -40,6 +41,14 @@ bool linear_weight_matches(
         matrix->rows() == output_width;
 }
 
+bool qk_norm_weights_match(
+    const CudaDecoderLayerWeights& weights,
+    std::size_t head_dimension) {
+    if (weights.query_norm == nullptr && weights.key_norm == nullptr) return true;
+    return tensor_matches(weights.query_norm, head_dimension) &&
+        tensor_matches(weights.key_norm, head_dimension);
+}
+
 }  // namespace
 
 core::Status CudaDecoderLayer::create(
@@ -47,10 +56,13 @@ core::Status CudaDecoderLayer::create(
     if (output == nullptr || config.hidden_size == 0 || config.ffn_size == 0 ||
         config.query_heads == 0 || config.kv_heads == 0 ||
         config.query_heads % config.kv_heads != 0 || config.head_dimension == 0 ||
-        config.query_heads * config.head_dimension != config.hidden_size ||
+        config.query_heads > std::numeric_limits<std::size_t>::max() /
+                                 config.head_dimension ||
         config.rotary_dimension == 0 || config.rotary_dimension > config.head_dimension ||
         config.rotary_dimension % 2 != 0 || config.rms_epsilon <= 0.0F ||
-        !std::isfinite(config.rms_epsilon) || config.rope_frequency_base <= 0.0F) {
+        !std::isfinite(config.rms_epsilon) || config.rope_frequency_base <= 0.0F ||
+        (config.rotary_pairing != core::RotaryPairing::Adjacent &&
+         config.rotary_pairing != core::RotaryPairing::SplitHalf)) {
         return core::Status::error("CudaDecoderLayer config is invalid");
     }
     CudaDecoderLayer replacement;
@@ -84,15 +96,17 @@ core::Status CudaDecoderLayer::forward(
         return core::Status::error("CudaDecoderLayer forward input is null");
     }
     const std::size_t kv_width = config_.kv_heads * config_.head_dimension;
+    const std::size_t query_width = config_.query_heads * config_.head_dimension;
     if (!tensor_matches(hidden, config_.hidden_size) ||
         !tensor_matches(weights.attention_norm, config_.hidden_size) ||
         !tensor_matches(weights.ffn_norm, config_.hidden_size) ||
+        !qk_norm_weights_match(weights, config_.head_dimension) ||
         !linear_weight_matches(
-            weights.query, config_.hidden_size, config_.hidden_size) ||
+            weights.query, config_.hidden_size, query_width) ||
         !linear_weight_matches(weights.key, config_.hidden_size, kv_width) ||
         !linear_weight_matches(weights.value, config_.hidden_size, kv_width) ||
         !linear_weight_matches(
-            weights.attention_output, config_.hidden_size, config_.hidden_size) ||
+            weights.attention_output, query_width, config_.hidden_size) ||
         !linear_weight_matches(weights.gate, config_.hidden_size, config_.ffn_size) ||
         !linear_weight_matches(weights.up, config_.hidden_size, config_.ffn_size) ||
         !linear_weight_matches(weights.down, config_.ffn_size, config_.hidden_size)) {
@@ -120,10 +134,18 @@ core::Status CudaDecoderLayer::forward(
     RETURN_IF_ERROR(context->linear(attention_normalized_, weights.query, &query_));
     RETURN_IF_ERROR(context->linear(attention_normalized_, weights.key, &key_));
     RETURN_IF_ERROR(context->linear(attention_normalized_, weights.value, &value_));
+    if (weights.query_norm != nullptr) {
+        RETURN_IF_ERROR(context->rms_norm_batch(
+            query_, *weights.query_norm, &query_, config_.rms_epsilon));
+        RETURN_IF_ERROR(context->rms_norm_batch(
+            key_, *weights.key_norm, &key_, config_.rms_epsilon));
+    }
     RETURN_IF_ERROR(context->rope(
-        &query_, position, config_.rotary_dimension, config_.rope_frequency_base));
+        &query_, position, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
     RETURN_IF_ERROR(context->rope(
-        &key_, position, config_.rotary_dimension, config_.rope_frequency_base));
+        &key_, position, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
     RETURN_IF_ERROR(context->append_kv(cache, key_, value_));
     RETURN_IF_ERROR(context->gqa_attention(
         query_, *cache, &attention_context_, position));
@@ -157,14 +179,16 @@ core::Status CudaDecoderLayer::forward_paged(
         return core::Status::error("CudaDecoderLayer paged input is invalid");
     }
     const std::size_t kv_width = config_.kv_heads * config_.head_dimension;
+    const std::size_t query_width = config_.query_heads * config_.head_dimension;
     if (!tensor_matches(hidden, config_.hidden_size) ||
         !tensor_matches(weights.attention_norm, config_.hidden_size) ||
         !tensor_matches(weights.ffn_norm, config_.hidden_size) ||
-        !linear_weight_matches(weights.query, config_.hidden_size, config_.hidden_size) ||
+        !qk_norm_weights_match(weights, config_.head_dimension) ||
+        !linear_weight_matches(weights.query, config_.hidden_size, query_width) ||
         !linear_weight_matches(weights.key, config_.hidden_size, kv_width) ||
         !linear_weight_matches(weights.value, config_.hidden_size, kv_width) ||
         !linear_weight_matches(
-            weights.attention_output, config_.hidden_size, config_.hidden_size) ||
+            weights.attention_output, query_width, config_.hidden_size) ||
         !linear_weight_matches(weights.gate, config_.hidden_size, config_.ffn_size) ||
         !linear_weight_matches(weights.up, config_.hidden_size, config_.ffn_size) ||
         !linear_weight_matches(weights.down, config_.ffn_size, config_.hidden_size)) {
@@ -183,10 +207,18 @@ core::Status CudaDecoderLayer::forward_paged(
     RETURN_IF_PAGED_ERROR(context->linear(attention_normalized_, weights.query, &query_));
     RETURN_IF_PAGED_ERROR(context->linear(attention_normalized_, weights.key, &key_));
     RETURN_IF_PAGED_ERROR(context->linear(attention_normalized_, weights.value, &value_));
+    if (weights.query_norm != nullptr) {
+        RETURN_IF_PAGED_ERROR(context->rms_norm_batch(
+            query_, *weights.query_norm, &query_, config_.rms_epsilon));
+        RETURN_IF_PAGED_ERROR(context->rms_norm_batch(
+            key_, *weights.key_norm, &key_, config_.rms_epsilon));
+    }
     RETURN_IF_PAGED_ERROR(context->rope(
-        &query_, position, config_.rotary_dimension, config_.rope_frequency_base));
+        &query_, position, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
     RETURN_IF_PAGED_ERROR(context->rope(
-        &key_, position, config_.rotary_dimension, config_.rope_frequency_base));
+        &key_, position, config_.rotary_dimension, config_.rope_frequency_base,
+        config_.rotary_pairing));
     const std::size_t physical_block = physical_blocks[position / cache->block_size()];
     const std::size_t slot = position % cache->block_size();
     RETURN_IF_PAGED_ERROR(context->write_paged_kv(

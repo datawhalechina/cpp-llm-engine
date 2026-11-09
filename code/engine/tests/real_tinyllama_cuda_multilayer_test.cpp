@@ -1,4 +1,4 @@
-// Engine CUDA：验证真实 TinyLlama 多层 CPU/CUDA 前向。
+// Engine CUDA：验证真实 Llama/Qwen3 多层 CPU/CUDA 前向。
 // 职责：复用 CPU Model 生成 embedding 与 golden，核对指定层数的 hidden 和分层 K/V。
 // 通过条件：两个独立 Context 均提交一个位置，全部层数值保持在量化 CUDA 容差内。
 #include "cpp_llm_engine/model/real_llama_cpu_decoder.h"
@@ -42,7 +42,7 @@ bool close(
 
 int main(int argc, char** argv) {
     if (argc != 3) {
-        std::cerr << "usage: real_tinyllama_cuda_multilayer_test <model.gguf> <layers>\n";
+        std::cerr << "usage: real_tinyllama_cuda_multilayer_test <dense-model.gguf> <layers>\n";
         return 2;
     }
     int devices = 0;

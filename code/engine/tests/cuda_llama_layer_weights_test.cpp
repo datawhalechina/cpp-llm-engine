@@ -1,6 +1,6 @@
 // Engine CUDA：验证 Chapter01 layer 权重到 CUDA Model 权重的上传边界。
 // 职责：检查 F32 norm、Q4_K/Q6_K 格式、矩阵方向、payload bytes 和失败路径。
-// 通过条件：九个权重上传后视图有效，host 销毁不影响 device 所有权。
+// 通过条件：基础权重与可选 Q/K Norm 上传后视图有效，host 销毁不影响设备所有权。
 #include "cpp_llm_engine/model/cuda_llama_layer_weights.h"
 
 #include "cpp_llm_engine/cuda/cuda_execution_context.h"
@@ -85,6 +85,8 @@ int main() {
     CHECK(weights.ffn_norm != nullptr);
     CHECK(weights.ffn_norm->contract().shape.dimensions ==
           std::vector<std::size_t>{256});
+    CHECK(weights.query_norm == nullptr);
+    CHECK(weights.key_norm == nullptr);
     CHECK(matrix_matches(weights.query, 256, 256,
         cpp_llm_engine::core::WeightFormat::Q4K, 256 * 144));
     CHECK(matrix_matches(weights.key, 64, 256,
@@ -109,6 +111,22 @@ int main() {
     CHECK(context.synchronize().is_ok());
     CHECK(attention_norm.front() == 1.0F && attention_norm.back() == 1.0F);
     CHECK(ffn_norm.front() == 2.0F && ffn_norm.back() == 2.0F);
+
+    chapter01::RealDenseLayerWeights qwen_host = make_layer();
+    qwen_host.attn_q_norm = chapter01::Tensor::from_vector<float>(
+        "attn_q_norm", {64}, std::vector<float>(64, 0.5F));
+    qwen_host.attn_k_norm = chapter01::Tensor::from_vector<float>(
+        "attn_k_norm", {64}, std::vector<float>(64, 0.75F));
+    cpp_llm_engine::model::CudaLlamaLayerWeights qwen_device;
+    CHECK(cpp_llm_engine::model::CudaLlamaLayerWeights::upload(
+        &context, qwen_host, &qwen_device).is_ok());
+    const auto qwen_weights = qwen_device.decoder_weights();
+    CHECK(qwen_weights.query_norm != nullptr);
+    CHECK(qwen_weights.key_norm != nullptr);
+    CHECK(qwen_weights.query_norm->contract().shape.dimensions ==
+          std::vector<std::size_t>{64});
+    CHECK(qwen_weights.key_norm->contract().shape.dimensions ==
+          std::vector<std::size_t>{64});
 
     host = {};
     CHECK(device.valid());

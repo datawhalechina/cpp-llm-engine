@@ -1,6 +1,6 @@
 // CUDA Backend：实现原地 RoPE pair kernel 与 launch 参数检查。
-// 契约：每个线程旋转一个相邻分量对，rotary dimension 之外保持不变。
-// 验证：cpp_llm_engine_cuda_rope_test 与 TinyLlama CPU 公式逐元素对照。
+// 契约：每个线程旋转一个分量对，支持相邻维和 NeoX 半维配对。
+// 验证：cpp_llm_engine_cuda_rope_test 与两种 CPU 公式逐元素对照。
 #include "cpp_llm_engine/cuda/rope_backend.h"
 
 #include "cpp_llm_engine/cuda/cuda_stream.h"
@@ -21,7 +21,8 @@ __global__ void rope_kernel(
     std::size_t head_dimension,
     std::size_t rotary_dimension,
     std::size_t position_offset,
-    float frequency_base) {
+    float frequency_base,
+    core::RotaryPairing pairing) {
     const std::size_t index =
         static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= pair_count) return;
@@ -31,8 +32,12 @@ __global__ void rope_kernel(
     const std::size_t token_head = index / pairs_per_head;
     const std::size_t head = token_head % head_count;
     const std::size_t token = token_head / head_count;
-    const std::size_t base =
-        (token * head_count + head) * head_dimension + pair * 2;
+    const std::size_t vector_base =
+        (token * head_count + head) * head_dimension;
+    const std::size_t first = pairing == core::RotaryPairing::SplitHalf
+        ? pair : pair * 2;
+    const std::size_t second = pairing == core::RotaryPairing::SplitHalf
+        ? pair + pairs_per_head : pair * 2 + 1;
     const float exponent =
         -2.0F * static_cast<float>(pair) / static_cast<float>(rotary_dimension);
     const float angle = static_cast<float>(position_offset + token) *
@@ -40,10 +45,10 @@ __global__ void rope_kernel(
     float sine = 0.0F;
     float cosine = 0.0F;
     sincosf(angle, &sine, &cosine);
-    const float x = values[base];
-    const float y = values[base + 1];
-    values[base] = x * cosine - y * sine;
-    values[base + 1] = x * sine + y * cosine;
+    const float x = values[vector_base + first];
+    const float y = values[vector_base + second];
+    values[vector_base + first] = x * cosine - y * sine;
+    values[vector_base + second] = x * sine + y * cosine;
 }
 
 __global__ void rope_batch_kernel(
@@ -53,7 +58,8 @@ __global__ void rope_batch_kernel(
     std::size_t head_count,
     std::size_t head_dimension,
     std::size_t rotary_dimension,
-    float frequency_base) {
+    float frequency_base,
+    core::RotaryPairing pairing) {
     const std::size_t index =
         static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= pair_count) return;
@@ -63,8 +69,12 @@ __global__ void rope_batch_kernel(
     const std::size_t row_head = index / pairs_per_head;
     const std::size_t head = row_head % head_count;
     const std::size_t row = row_head / head_count;
-    const std::size_t base =
-        (row * head_count + head) * head_dimension + pair * 2;
+    const std::size_t vector_base =
+        (row * head_count + head) * head_dimension;
+    const std::size_t first = pairing == core::RotaryPairing::SplitHalf
+        ? pair : pair * 2;
+    const std::size_t second = pairing == core::RotaryPairing::SplitHalf
+        ? pair + pairs_per_head : pair * 2 + 1;
     const float exponent =
         -2.0F * static_cast<float>(pair) / static_cast<float>(rotary_dimension);
     const float angle = static_cast<float>(positions[row]) *
@@ -72,10 +82,10 @@ __global__ void rope_batch_kernel(
     float sine = 0.0F;
     float cosine = 0.0F;
     sincosf(angle, &sine, &cosine);
-    const float x = values[base];
-    const float y = values[base + 1];
-    values[base] = x * cosine - y * sine;
-    values[base + 1] = x * sine + y * cosine;
+    const float x = values[vector_base + first];
+    const float y = values[vector_base + second];
+    values[vector_base + first] = x * cosine - y * sine;
+    values[vector_base + second] = x * sine + y * cosine;
 }
 
 }  // namespace
@@ -127,7 +137,8 @@ CudaStatus CudaRopeBackend::apply(
             request.head_dimension,
             request.rotary_dimension,
             request.position_offset,
-            request.frequency_base);
+            request.frequency_base,
+            request.pairing);
     return check_last_cuda_error("rope_kernel launch");
 }
 
@@ -169,7 +180,8 @@ CudaStatus CudaRopeBackend::apply_batch(
             request.head_count,
             request.head_dimension,
             request.rotary_dimension,
-            request.frequency_base);
+            request.frequency_base,
+            request.pairing);
     return check_last_cuda_error("rope_batch_kernel launch");
 }
 

@@ -72,6 +72,7 @@ public:
     std::size_t vocab_size() const;
     std::size_t max_context_tokens() const;
     std::int32_t eos_token_id() const;
+    const std::string& architecture() const;
 
 private:
     friend class RealLlamaCudaContext;

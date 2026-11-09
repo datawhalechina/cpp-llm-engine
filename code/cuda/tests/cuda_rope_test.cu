@@ -30,6 +30,7 @@
 namespace {
 
 using cpp_llm_engine::core::DType;
+using cpp_llm_engine::core::RotaryPairing;
 using cpp_llm_engine::core::RotaryEmbeddingRequest;
 using cpp_llm_engine::cuda::CudaEvent;
 using cpp_llm_engine::cuda::CudaExecutionContext;
@@ -44,7 +45,8 @@ void apply_cpu_rope(
     std::size_t head_dimension,
     std::size_t rotary_dimension,
     std::size_t position_offset,
-    float frequency_base) {
+    float frequency_base,
+    RotaryPairing pairing) {
     for (std::size_t token = 0; token < tokens; ++token) {
         for (std::size_t head = 0; head < heads; ++head) {
             float* vector = values->data() +
@@ -57,10 +59,14 @@ void apply_cpu_rope(
                                     std::pow(frequency_base, exponent);
                 const float cosine = std::cos(angle);
                 const float sine = std::sin(angle);
-                const float x = vector[pair * 2];
-                const float y = vector[pair * 2 + 1];
-                vector[pair * 2] = x * cosine - y * sine;
-                vector[pair * 2 + 1] = x * sine + y * cosine;
+                const std::size_t first = pairing == RotaryPairing::SplitHalf
+                    ? pair : pair * 2;
+                const std::size_t second = pairing == RotaryPairing::SplitHalf
+                    ? pair + rotary_dimension / 2 : pair * 2 + 1;
+                const float x = vector[first];
+                const float y = vector[second];
+                vector[first] = x * cosine - y * sine;
+                vector[second] = x * sine + y * cosine;
             }
         }
     }
@@ -72,7 +78,8 @@ void apply_cpu_rope_positions(
     std::size_t heads,
     std::size_t head_dimension,
     std::size_t rotary_dimension,
-    float frequency_base) {
+    float frequency_base,
+    RotaryPairing pairing) {
     for (std::size_t row = 0; row < positions.size(); ++row) {
         for (std::size_t head = 0; head < heads; ++head) {
             float* vector = values->data() +
@@ -85,10 +92,14 @@ void apply_cpu_rope_positions(
                     std::pow(frequency_base, exponent);
                 const float cosine = std::cos(angle);
                 const float sine = std::sin(angle);
-                const float x = vector[pair * 2];
-                const float y = vector[pair * 2 + 1];
-                vector[pair * 2] = x * cosine - y * sine;
-                vector[pair * 2 + 1] = x * sine + y * cosine;
+                const std::size_t first = pairing == RotaryPairing::SplitHalf
+                    ? pair : pair * 2;
+                const std::size_t second = pairing == RotaryPairing::SplitHalf
+                    ? pair + rotary_dimension / 2 : pair * 2 + 1;
+                const float x = vector[first];
+                const float y = vector[second];
+                vector[first] = x * cosine - y * sine;
+                vector[second] = x * sine + y * cosine;
             }
         }
     }
@@ -99,7 +110,8 @@ bool run_correctness_case(
     std::size_t heads,
     std::size_t head_dimension,
     std::size_t rotary_dimension,
-    std::size_t position_offset) {
+    std::size_t position_offset,
+    RotaryPairing pairing = RotaryPairing::Adjacent) {
     const std::size_t elements = tokens * heads * head_dimension;
     std::vector<float> input(elements);
     for (std::size_t index = 0; index < elements; ++index) {
@@ -108,7 +120,7 @@ bool run_correctness_case(
     std::vector<float> golden = input;
     apply_cpu_rope(
         &golden, tokens, heads, head_dimension, rotary_dimension,
-        position_offset, 10000.0F);
+        position_offset, 10000.0F, pairing);
 
     CudaExecutionContext context;
     CudaTensor tensor;
@@ -117,7 +129,7 @@ bool run_correctness_case(
         {tokens, heads, head_dimension}, DType::Float32, &tensor).is_ok());
     CHECK(context.upload(&tensor, input.data(), input.size() * sizeof(float)).is_ok());
     CHECK(context.rope(
-        &tensor, position_offset, rotary_dimension, 10000.0F).is_ok());
+        &tensor, position_offset, rotary_dimension, 10000.0F, pairing).is_ok());
     std::vector<float> output(elements);
     CHECK(context.download(
         tensor, output.data(), output.size() * sizeof(float)).is_ok());
@@ -128,7 +140,8 @@ bool run_correctness_case(
     return true;
 }
 
-bool run_batch_position_case() {
+bool run_batch_position_case(
+    RotaryPairing pairing = RotaryPairing::Adjacent) {
     constexpr std::size_t heads = 3;
     constexpr std::size_t head_dimension = 10;
     constexpr std::size_t rotary_dimension = 8;
@@ -140,7 +153,8 @@ bool run_batch_position_case() {
     }
     std::vector<float> golden = input;
     apply_cpu_rope_positions(
-        &golden, positions, heads, head_dimension, rotary_dimension, 10000.0F);
+        &golden, positions, heads, head_dimension, rotary_dimension, 10000.0F,
+        pairing);
 
     CudaExecutionContext context;
     CudaTensor tensor;
@@ -149,7 +163,7 @@ bool run_batch_position_case() {
         {positions.size(), heads, head_dimension}, DType::Float32, &tensor).is_ok());
     CHECK(context.upload(&tensor, input.data(), input.size() * sizeof(float)).is_ok());
     CHECK(context.rope_batch(
-        &tensor, positions, rotary_dimension, 10000.0F).is_ok());
+        &tensor, positions, rotary_dimension, 10000.0F, pairing).is_ok());
     std::vector<float> output(elements);
     CHECK(context.download(
         tensor, output.data(), output.size() * sizeof(float)).is_ok());
@@ -266,7 +280,10 @@ int main() {
     if (!run_correctness_case(1, 1, 8, 8, 0)) return 1;
     if (!run_correctness_case(3, 2, 8, 6, 5)) return 1;
     if (!run_correctness_case(257, 3, 10, 8, 31)) return 1;
+    if (!run_correctness_case(
+            3, 2, 128, 128, 5, RotaryPairing::SplitHalf)) return 1;
     if (!run_batch_position_case()) return 1;
+    if (!run_batch_position_case(RotaryPairing::SplitHalf)) return 1;
     if (!run_benchmark()) return 1;
     return 0;
 }

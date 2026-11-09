@@ -54,7 +54,7 @@ core::Status upload_linear(
 
 core::Status CudaLlamaLayerWeights::upload(
     cuda::CudaExecutionContext* context,
-    const chapter01::RealLlamaLayerWeights& host,
+    const chapter01::RealDenseLayerWeights& host,
     CudaLlamaLayerWeights* output) {
     if (context == nullptr || output == nullptr || !host.valid()) {
         return core::Status::error("CUDA Llama layer upload input is invalid");
@@ -64,6 +64,10 @@ core::Status CudaLlamaLayerWeights::upload(
     const auto status = function(context, source, &destination); \
     if (!status.is_ok()) return status; } while (false)
     UPLOAD(replacement.attention_norm_, host.attn_norm, upload_norm);
+    if (host.attn_q_norm.bytes() > 0) {
+        UPLOAD(replacement.query_norm_, host.attn_q_norm, upload_norm);
+        UPLOAD(replacement.key_norm_, host.attn_k_norm, upload_norm);
+    }
     UPLOAD(replacement.query_, host.attn_q, upload_linear);
     UPLOAD(replacement.key_, host.attn_k, upload_linear);
     UPLOAD(replacement.value_, host.attn_v, upload_linear);
@@ -84,12 +88,16 @@ cuda::CudaDecoderLayerWeights CudaLlamaLayerWeights::decoder_weights() const {
         cuda::CudaLinearWeight::quantized(&key_), cuda::CudaLinearWeight::quantized(&value_),
         cuda::CudaLinearWeight::quantized(&attention_output_), &ffn_norm_,
         cuda::CudaLinearWeight::quantized(&gate_), cuda::CudaLinearWeight::quantized(&up_),
-        cuda::CudaLinearWeight::quantized(&down_)};
+        cuda::CudaLinearWeight::quantized(&down_),
+        query_norm_.empty() ? nullptr : &query_norm_,
+        key_norm_.empty() ? nullptr : &key_norm_};
 }
 
 bool CudaLlamaLayerWeights::valid() const {
     const auto weights = decoder_weights();
-    return !attention_norm_.empty() && !ffn_norm_.empty() && weights.query.valid() &&
+    const bool qk_norms_match = query_norm_.empty() == key_norm_.empty();
+    return qk_norms_match && !attention_norm_.empty() && !ffn_norm_.empty() &&
+        weights.query.valid() &&
         weights.key.valid() && weights.value.valid() && weights.attention_output.valid() &&
         weights.gate.valid() && weights.up.valid() && weights.down.valid();
 }

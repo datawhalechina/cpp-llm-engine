@@ -250,19 +250,30 @@ core::Status CudaExecutionContext::rms_norm_batch(
     if (!valid() || output == nullptr) {
         return core::Status::error("batch RMSNorm context/output invalid");
     }
+    const core::Status input_status = validate_tensor(input, "batch RMSNorm input");
+    if (!input_status.is_ok()) return input_status;
+    const core::Status weight_status = validate_tensor(weight, "batch RMSNorm weight");
+    if (!weight_status.is_ok()) return weight_status;
+    const core::Status output_status = validate_tensor(*output, "batch RMSNorm output");
+    if (!output_status.is_ok()) return output_status;
     const auto& input_shape = input.contract().shape.dimensions;
     const auto& weight_shape = weight.contract().shape.dimensions;
-    if (input_shape.size() != 2 || weight_shape.size() != 1 ||
+    if (input_shape.size() < 2 || weight_shape.size() != 1 ||
         output->contract().shape.dimensions != input_shape ||
-        input_shape[1] != weight_shape[0]) {
+        input_shape.back() != weight_shape[0]) {
         return core::Status::error(
-            "batch RMSNorm requires input/output[B,D] and weight[D]");
+            "batch RMSNorm requires input/output[...,D] and weight[D]");
+    }
+    std::size_t elements = 0;
+    if (!input.contract().shape.checked_numel(&elements).is_ok() ||
+        elements % input_shape.back() != 0) {
+        return core::Status::error("batch RMSNorm element count is invalid");
     }
     const core::RmsNormBatchRequest request{
         static_cast<const float*>(input.data()),
         static_cast<const float*>(weight.data()),
         static_cast<float*>(output->data()),
-        input_shape[0], input_shape[1], epsilon};
+        elements / input_shape.back(), input_shape.back(), epsilon};
     return cuda_decoder_elementwise_backend().rms_norm_batch(
         request, stream_).to_core_status();
 }
@@ -480,7 +491,8 @@ core::Status CudaExecutionContext::rope(
     CudaTensor* values,
     std::size_t position_offset,
     std::size_t rotary_dimension,
-    float frequency_base) const {
+    float frequency_base,
+    core::RotaryPairing pairing) const {
     if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
     if (values == nullptr) return core::Status::error("RoPE tensor is null");
     const core::Status tensor_status = validate_tensor(*values, "RoPE tensor");
@@ -496,7 +508,8 @@ core::Status CudaExecutionContext::rope(
         shape[2],
         rotary_dimension,
         position_offset,
-        frequency_base};
+        frequency_base,
+        pairing};
     return cuda_rope_backend().apply(request, stream_).to_core_status();
 }
 
@@ -504,7 +517,8 @@ core::Status CudaExecutionContext::rope_batch(
     CudaTensor* values,
     const std::vector<std::size_t>& positions,
     std::size_t rotary_dimension,
-    float frequency_base) {
+    float frequency_base,
+    core::RotaryPairing pairing) {
     if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
     if (values == nullptr || positions.empty()) {
         return core::Status::error("batch RoPE values or positions are empty");
@@ -532,7 +546,7 @@ core::Status CudaExecutionContext::rope_batch(
     const core::RotaryEmbeddingBatchRequest request{
         static_cast<float*>(values->data()),
         static_cast<const std::size_t*>(workspace_.data()),
-        shape[0], shape[1], shape[2], rotary_dimension, frequency_base};
+        shape[0], shape[1], shape[2], rotary_dimension, frequency_base, pairing};
     return cuda_rope_backend().apply_batch(request, stream_).to_core_status();
 }
 

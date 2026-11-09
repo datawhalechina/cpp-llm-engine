@@ -4,6 +4,7 @@
 // 验证：合成小维度 CPU 逐阶段 golden。
 #pragma once
 
+#include "cpp_llm_engine/core/rope_contract.h"
 #include "cpp_llm_engine/core/status.h"
 #include "cpp_llm_engine/cuda/cuda_tensor.h"
 #include "cpp_llm_engine/cuda/cuda_linear_weight.h"
@@ -26,6 +27,7 @@ struct CudaDecoderLayerConfig final {
     std::size_t rotary_dimension = 0;
     float rms_epsilon = 1.0e-5F;
     float rope_frequency_base = 10000.0F;
+    core::RotaryPairing rotary_pairing = core::RotaryPairing::Adjacent;
 };
 
 struct CudaDecoderLayerWeights final {
@@ -38,6 +40,8 @@ struct CudaDecoderLayerWeights final {
     CudaLinearWeight gate;
     CudaLinearWeight up;
     CudaLinearWeight down;
+    const CudaTensor* query_norm = nullptr;
+    const CudaTensor* key_norm = nullptr;
 };
 
 class CudaDecoderLayer final {

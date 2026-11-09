@@ -3,6 +3,7 @@
 // 验证：真实 GPU CTest 覆盖复制、workspace、RoPE、KV 和 GQA 错误路径。
 #pragma once
 
+#include "cpp_llm_engine/core/rope_contract.h"
 #include "cpp_llm_engine/core/status.h"
 #include "cpp_llm_engine/cuda/cublas_matmul_backend.h"
 #include "cpp_llm_engine/cuda/cuda_quantized_matrix.h"
@@ -105,12 +106,14 @@ public:
         CudaTensor* values,
         std::size_t position_offset,
         std::size_t rotary_dimension,
-        float frequency_base) const;
+        float frequency_base,
+        core::RotaryPairing pairing = core::RotaryPairing::Adjacent) const;
     core::Status rope_batch(
         CudaTensor* values,
         const std::vector<std::size_t>& positions,
         std::size_t rotary_dimension,
-        float frequency_base);
+        float frequency_base,
+        core::RotaryPairing pairing = core::RotaryPairing::Adjacent);
     core::Status append_kv(
         CudaKvCache* cache,
         const CudaTensor& key,

@@ -185,6 +185,12 @@ int main() {
         const RotaryEmbeddingRequest rope_request{
             rope_values, 1, 2, 8, 8, 0, 10000.0F};
         CPP_LLM_CHECK(suite, rope_request.validate().is_ok());
+        auto split_half_rope = rope_request;
+        split_half_rope.pairing = RotaryPairing::SplitHalf;
+        CPP_LLM_CHECK(suite, split_half_rope.validate().is_ok());
+        auto invalid_pairing = rope_request;
+        invalid_pairing.pairing = static_cast<RotaryPairing>(255);
+        CPP_LLM_CHECK(suite, !invalid_pairing.validate().is_ok());
         auto odd_rope = rope_request;
         odd_rope.rotary_dimension = 7;
         CPP_LLM_CHECK(suite, !odd_rope.validate().is_ok());

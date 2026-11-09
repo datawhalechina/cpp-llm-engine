@@ -1,5 +1,5 @@
 // CUDA Decoder：验证 RMSNorm 与 SwiGLU 的数值和错误路径。
-// 职责：使用 257/2048 宽度 CPU golden 覆盖非整除 grid 与 TinyLlama hidden size。
+// 职责：用 257/2048 宽度和 Qwen3 [B,H,128] CPU golden 覆盖批量归一化。
 // 通过条件：逐元素误差通过，shape、epsilon 和空输出错误被拒绝。
 #include "cpp_llm_engine/core/tensor_contract.h"
 #include "cpp_llm_engine/cuda/cuda_execution_context.h"
@@ -72,7 +72,13 @@ bool run_case(std::size_t elements) {
     return true;
 }
 
-bool run_batch_case(std::size_t rows, std::size_t width) {
+bool run_batch_case(const std::vector<std::size_t>& shape) {
+    CHECK(shape.size() >= 2);
+    const std::size_t width = shape.back();
+    std::size_t rows = 1;
+    for (std::size_t index = 0; index + 1 < shape.size(); ++index) {
+        rows *= shape[index];
+    }
     CudaExecutionContext context;
     CHECK(CudaExecutionContext::create(&context).is_ok());
     std::vector<float> input(rows * width);
@@ -87,11 +93,11 @@ bool run_batch_case(std::size_t rows, std::size_t width) {
     CudaTensor weight_tensor;
     CudaTensor output_tensor;
     CHECK(CudaTensor::create_contiguous(
-        {rows, width}, DType::Float32, &input_tensor).is_ok());
+        shape, DType::Float32, &input_tensor).is_ok());
     CHECK(CudaTensor::create_contiguous(
         {width}, DType::Float32, &weight_tensor).is_ok());
     CHECK(CudaTensor::create_contiguous(
-        {rows, width}, DType::Float32, &output_tensor).is_ok());
+        shape, DType::Float32, &output_tensor).is_ok());
     CHECK(context.upload(
         &input_tensor, input.data(), input.size() * sizeof(float)).is_ok());
     CHECK(context.upload(
@@ -133,8 +139,9 @@ int main() {
     if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count <= 0) return 1;
     if (!run_case(257)) return 1;
     if (!run_case(2048)) return 1;
-    if (!run_batch_case(3, 257)) return 1;
-    if (!run_batch_case(4, 2048)) return 1;
+    if (!run_batch_case({3, 257})) return 1;
+    if (!run_batch_case({4, 2048})) return 1;
+    if (!run_batch_case({2, 3, 128})) return 1;
     return 0;
 }
 

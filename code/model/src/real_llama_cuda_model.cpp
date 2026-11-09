@@ -220,8 +220,11 @@ std::unique_ptr<RealLlamaCudaModel> RealLlamaCudaModel::load(
             index.metadata, &data->metadata, error)) {
         return nullptr;
     }
-    if (data->metadata.architecture != "llama") {
-        if (error != nullptr) *error = "Llama CUDA model requires llama architecture";
+    if (data->metadata.architecture != "llama" &&
+        data->metadata.architecture != "qwen3") {
+        if (error != nullptr) {
+            *error = "dense CUDA model supports llama and qwen3 architectures";
+        }
         return nullptr;
     }
     if (!chapter01::ModelSchema::validate_gguf(
@@ -235,12 +238,27 @@ std::unique_ptr<RealLlamaCudaModel> RealLlamaCudaModel::load(
     }
     const std::size_t query_heads = data->metadata.attention_head_count;
     const std::size_t kv_heads = data->metadata.attention_head_count_kv;
-    if (query_heads == 0 || kv_heads == 0 || query_heads % kv_heads != 0 ||
-        data->metadata.hidden_size % query_heads != 0) {
+    if (query_heads == 0 || kv_heads == 0 || query_heads % kv_heads != 0) {
         if (error != nullptr) *error = "CUDA attention head metadata is invalid";
         return nullptr;
     }
-    const std::size_t head_dimension = data->metadata.hidden_size / query_heads;
+    std::size_t head_dimension = data->metadata.attention_key_length;
+    if (head_dimension != 0) {
+        if (data->metadata.attention_value_length != head_dimension) {
+            if (error != nullptr) {
+                *error = "CUDA decoder requires equal key/value head lengths";
+            }
+            return nullptr;
+        }
+    } else {
+        if (data->metadata.hidden_size % query_heads != 0) {
+            if (error != nullptr) {
+                *error = "CUDA hidden size is not divisible by query heads";
+            }
+            return nullptr;
+        }
+        head_dimension = data->metadata.hidden_size / query_heads;
+    }
     const std::size_t rotary_dimension = data->metadata.rope_dimension_count == 0
         ? head_dimension : data->metadata.rope_dimension_count;
     data->layer_config = {
@@ -252,6 +270,9 @@ std::unique_ptr<RealLlamaCudaModel> RealLlamaCudaModel::load(
         rotary_dimension,
         data->metadata.rms_norm_epsilon,
         data->metadata.rope_freq_base,
+        data->metadata.architecture == "qwen3"
+            ? core::RotaryPairing::SplitHalf
+            : core::RotaryPairing::Adjacent,
     };
 
     cuda::CudaExecutionContext upload_context;
@@ -623,6 +644,10 @@ std::size_t RealLlamaCudaModel::max_context_tokens() const {
 }
 std::int32_t RealLlamaCudaModel::eos_token_id() const {
     return impl_->metadata.eos_token_id;
+}
+
+const std::string& RealLlamaCudaModel::architecture() const {
+    return impl_->metadata.architecture;
 }
 
 RealLlamaCudaContext::RealLlamaCudaContext(std::unique_ptr<Impl> impl)
