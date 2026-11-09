@@ -32,7 +32,7 @@ def linear_fused(packed_weight, input_vector):
 
 ## CUDA 融合 GEMV 怎样访问内存和归约
 
-Decode 每次只提交一个激活向量，Linear 计算的是矩阵向量乘法。对于权重矩阵 `W[N,K]` 和输入 `x[K]`，第 `r` 个输出为：
+GEMV 是通用矩阵向量乘法（General Matrix-Vector Multiplication）。Decode 每次只提交一个激活向量，Linear 因而呈现 GEMV 形状。对于权重矩阵 `W[N,K]` 和输入 `x[K]`，第 `r` 个输出为：
 
 ```text
 y[r] = sum(W[r,k] * x[k]), k = 0 ... K-1
@@ -40,7 +40,9 @@ y[r] = sum(W[r,k] * x[k]), k = 0 ... K-1
 
 基线路径先把整个 packed 权重矩阵写成 Float32 workspace，再由 cuBLAS 重新读取；融合路径让一个 CUDA block 负责一个输出行。线程从该行的 Q4_K/Q6_K block 读取量化值，在寄存器中完成解码和乘加，只把最终的 `y[r]` 写回显存。
 
-批量 Decode 的输入是 `[B,K]`。批量融合路径把最多 4 个输入行组成一个 tile，一个 block 负责同一输出行在该 tile 内的多个结果。同一线程解码一个 packed 权重后，连续更新各输入行的累加器；这样既省去完整 Float32 权重副本和后续 SGEMM，也避免在相邻请求之间重复读取和解码权重。这是面向小批量 Decode 的 batched GEMV，不是面向大批量训练负载的通用量化 GEMM。
+批量 Decode 的输入是 `[B,K]`，数学上已经是矩阵矩阵乘法。这里仍称 batched GEMV，是因为代码从单向量 kernel 扩展而来，只让少量输入行共享权重读取与解码；它没有采用面向大矩阵的通用 GEMM 分块策略。批量融合路径把最多 4 个输入行组成一个 tile，一个 block 负责同一输出行在该 tile 内的多个结果。同一线程解码一个 packed 权重后，连续更新各输入行的累加器；这样既省去完整 Float32 权重副本和后续 SGEMM，也避免在相邻请求之间重复读取和解码权重。
+
+固定 4 行 tile 在 batch=4 时能完整复用一次权重解码，但 batch=1/2 仍会为 4 行准备累加器、共享归约空间和条件判断。自适应路径在运行期只选择已经编译好的 `tile=1/2/4` kernel：batch=1 用 1 行，batch=2 用 2 行，其余小批量用 4 行。它没有在 kernel 内动态改变数组大小，而是在提交 kernel 前按 batch 形状分派模板实例。
 
 Q4_K 和 Q6_K 的一个 super-block 都表示 256 个权重。当前映射使用 256 个线程，每个线程负责 super-block 中一个固定列位置，并跨该行的多个 super-block 累加局部和。相邻线程读取相邻输入位置；packed 权重则按各格式的 nibble、high-bit 和 scale 布局解码。
 
@@ -49,6 +51,8 @@ Q4_K 和 Q6_K 的一个 super-block 都表示 256 个权重。当前映射使用
 批量输入按最多 4 行组成一个 tile。同一线程解码一个权重后，分别与 tile 中各行对应的激活相乘，随后对每行独立做 Warp 归约。这样 batch=2 时同一 packed 权重只读取和解码一次；代价是每个线程持有多个累加器，因此 tile 继续增大前需要用 Nsight Compute 检查寄存器压力和占用率。
 
 EXP-GPU-08 后的 NCU 基线显示：Q4_K kernel 的 Compute/L1 吞吐约为 `72.1%/76.5%`，DRAM 吞吐仅 `4.7%`，40 个寄存器/线程，实际 occupancy 约 `90.9%`。Warp 平均约 `32.8%` 的指令间周期在等待 L1TEX scoreboard。元数据广播、shared payload 和显式 FMA 三个候选分别回退约 `10.1%`、`1.6%` 和 `4.3%` cycles，均未保留。EXP-GPU-12 用 CUDA 原生 half 指令替换手写 FP16 位解码后，cycles 从 `140,093` 降至 `99,725`，约减少 `28.8%`；瓶颈随之转移到 L1/TEX，下一轮才适合继续研究 payload 布局。
+
+EXP-GPU-14 继续检查 batch 形状造成的无效工作。自适应 tile 将 batch=1/2 的共享内存从 `128 B` 降为 `32/64 B`，执行指令减少约 `21%`～`37%`。L1 命中率基本不变，占用率只小幅提高，说明 cycles 下降主要来自不再为不存在的输入行执行展开后的累加与归约。EXP-GPU-15 随后确认真实双请求 Tensor Batch Decode 两轮均改善且 logits 不变，因此默认执行路径采用自适应 tile；固定 4 行实现只用于 A/B 基线。
 
 | 阶段 | 数据位置 | 发生的动作 | 避免的成本 |
 | --- | --- | --- | --- |

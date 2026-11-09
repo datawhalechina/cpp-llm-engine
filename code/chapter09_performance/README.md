@@ -32,6 +32,9 @@ Chapter08 或 Chapter10 产生原始样本，迁移器把现有结果规范化�
 | `run_cuda_attention_ab.sh` | 比较三阶段与融合在线 Attention 的真实 Tensor Prefill/Decode | 两轮独立运行、逐轮样本、logits 与 greedy token 闸门 |
 | `run_cuda_paged_prefill_ab.sh` | 比较分页逐 Token 与 Tensor Prefill | 两轮独立运行、跨页写入、logits 与 greedy token 闸门 |
 | `run_cuda_batch_ab.sh` | 比较双请求分页顺序 Decode 与 Tensor Batch | 两轮独立运行、逐请求 logits 与 greedy token 闸门 |
+| `run_cuda_adaptive_gemv_ab.sh` | 比较固定 4 行与自适应 1/2/4 行 tile | 微基准、CPU reference、NCU 原始 CSV 与原因摘要 |
+| `run_cuda_adaptive_gemv_runtime_ab.sh` | 在真实 TinyLlama Decode 中复核自适应 tile | 两轮交错执行、顺序路径保护指标与自动 `KEEP/REJECT/INCONCLUSIVE` 决策 |
+| `run_cuda_adaptive_gemv_runtime_matrix.sh` | 扩展 batch、上下文长度和 Decode 步数 | 一次模型加载、两轮反向路径顺序、逐单元 logits 闸门与 JSON 摘要 |
 | `run_cuda_paged_attention_ab.sh` | 比较分页三阶段与融合在线 Attention | 交替执行顺序、两轮样本、logits 与 greedy token 闸门 |
 
 1. 阅读 `EvidenceRecord`，明确一份证据必须包含哪些环境、负载和正确性字段。
@@ -130,6 +133,29 @@ bash code/chapter09_performance/scripts/run_cuda_quantized_gemv_matrix.sh
 ```
 
 EXP-GPU-13 固定 Q4_K/Q6_K、`2048 x 2048` 权重和 `batch=1/2/4/8`，输出相对重复单行调用的加速比，并让每个 batch 行与单行路径比较。Q4_K 的 batch 2/4/8 加速约为 `2.00x/3.98x/4.07x`，Q6_K 约为 `2.00x/4.00x/4.15x`；batch=8 时间约为 batch=4 的两倍，说明固定 4 行 tile 已把单次权重解码复用上限暴露出来。需要 NCU 定位某个点时，直接运行构建产物的 `--batch`、`--format` 和 `--iterations` 参数；这些参数选择 workload，不代表切换实现。
+
+EXP-GPU-14 比较固定 4 行 tile 与按 batch=1/2/其他选择 1/2/4 行的自适应实现。两轮微基准、8 份 NCU CSV 和 CPU reference 均通过；详细 NCU 显示执行指令减少约 `21%`～`37%`、静态共享内存减少 `50%`～`75%`，Q4_K batch 1/2 的 cycles 约下降 `17%/19%`，Q6_K 约下降 `33%/30%`。L1 命中率基本不变，占用率只提高约 2.5～3.1 个百分点，因此主因是模板不再展开不存在的 tile 行，而不是缓存命中率改善。EXP-GPU-15 再进入真实 TinyLlama 分页 Decode：Tensor Batch 两轮分别改善约 `16.3%/19.1%`，顺序 Decode 没有稳定回退，logits 最大误差为 `0`。代码据此默认选择 `Adaptive`，并保留 `FixedTile4` 复现实验基线。
+
+EXP-GPU-16 检查默认策略的适用范围。最终矩阵对 `batch=1/2`、上下文 `16/128` 和 Decode `1/8` 步执行两轮反向顺序实验，每轮预热 2 次、测量 5 次。batch 1 的 Tensor Batch 延迟降低约 `18.4%`～`23.1%`，batch 2 降低约 `12.9%`～`14.7%`，所有单元的 logits 最大误差为 `0`。前置探索矩阵中的 batch 4/8 继续使用 4 行 kernel，长上下文下变化在约 `±0.7%` 内，作为噪声控制而不计入优化收益。
+
+两个脚本现在分开报告三种状态：`execution_status` 说明命令是否完整执行，`correctness` 说明数值闸门是否通过，`decision` 才说明候选应当 `KEEP`、`REJECT` 还是证据不足的 `INCONCLUSIVE`。真实 Decode 决策要求两轮 Tensor Batch 均至少改善 `5%`、每轮顺序 Decode 回退不超过 `5%`，并且 logits 最大误差不超过 `1e-3`。NCU 摘要保存 cycles、指令、Warp 调度、占用率和内存层级指标；缺失指标保持缺失，不用其他计数器推测。
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/chapter09_performance/scripts/run_cuda_adaptive_gemv_ab.sh
+
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/chapter09_performance/scripts/run_cuda_adaptive_gemv_runtime_ab.sh
+```
+
+默认路径确定后，再用独立矩阵检查适用范围：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/chapter09_performance/scripts/run_cuda_adaptive_gemv_runtime_matrix.sh
+```
+
+程序只加载一次模型，但每个测量样本重新创建并 Prefill 请求；计时区间只包含 Decode。两轮分别采用 `fixed-first` 与 `adaptive-first`，`summary.json` 按同一单元合并结果。环境变量可以调整 batch、上下文、Decode 步数、预热和采样次数；扩大到上下文 `512` 或 Decode `32` 步时应登记为新 workload，不与 EXP-GPU-16 直接合并。
 
 分页融合 Attention 使用独立 A/B 入口：
 

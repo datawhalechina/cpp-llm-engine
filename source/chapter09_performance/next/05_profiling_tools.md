@@ -40,6 +40,8 @@ bash code/chapter09_performance/scripts/run_cuda_paged_attention_ab.sh
 
 脚本使用 `nsys profile` 生成临时报告，再用 `nsys stats --report cuda_gpu_kern_sum` 导出 Kernel 总时间、实例数和分布。结果先判断热点是否值得继续；EXP-GPU-07 中量化 GEMV 占约 `99.2%`，采用批次权重复用和 Warp 归约后的 EXP-GPU-08 仍占约 `96.5%`。因此分页 Attention 即使局部加速，也不是当前端到端首要瓶颈。
 
+定位到 GEMV 后，再用 NCU 比较同一 kernel 的 cycles、共享内存、寄存器和 L1/TEX 指标。需要解释原因时继续采集 Compute、Instruction、Memory、Scheduler 和 Warp State section，核对指令数量、活跃与可调度 Warp、主要停顿和缓存事务。EXP-GPU-14 中固定 4 行与自适应 tile 采用相同矩阵、相同 launch 次数和独立进程；自适应实现的指令数减少约 `21%`～`37%`，共享内存减少 `50%`～`75%`，但 L1 命中率基本不变。这组指标把原因定位为减少无效 tile 行工作，而不是缓存策略改变。这个局部证据仍需 EXP-GPU-15 的真实 Decode A/B 才能决定默认路径。
+
 确定单个 Kernel 是热点后，再对最小可执行 workload 使用 `ncu`。下面的命令只展示调用结构；Kernel 名称和可用指标会随 CUDA、GPU 架构与 Nsight Compute 版本变化，运行前先用 `ncu --query-metrics` 核对本机支持项。
 
 ```bash

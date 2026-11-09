@@ -49,6 +49,8 @@
 | 张量索引 | tensor index | 记录权重名称、shape、dtype 和 payload offset 的目录 | Chapter01 | [F-LOAD-01](./formulas.md#f-load-01) |
 | 数据对齐 | alignment | 让 payload 起始位置满足固定字节倍数，便于映射和设备访问 | Chapter01 | [F-LOAD-01](./formulas.md#f-load-01) |
 | 矩阵乘法 | MatMul | 将 `[M,K]` 与 `[K,N]` 相乘得到 `[M,N]` | Chapter03 | [F-LINEAR-01](./formulas.md#f-linear-01) |
+| 通用矩阵向量乘法 | General Matrix-Vector Multiplication, GEMV | 矩阵与一个向量相乘；LLM 单 token Decode 的 Linear 常呈现为该形状 | [Chapter03 MatMul 设计](../chapter03_matmul/02_matmul_design.md) | [F-LINEAR-01](./formulas.md#f-linear-01) |
+| 通用矩阵矩阵乘法 | General Matrix-Matrix Multiplication, GEMM | 两个矩阵相乘；LLM Prefill 或较大 batch 的 Linear 通常采用该形状 | [Chapter03 MatMul 设计](../chapter03_matmul/02_matmul_design.md) | [F-LINEAR-01](./formulas.md#f-linear-01) |
 | 线性层 | Linear | MatMul 加可选 bias 的模型层 | Chapter03-04 | [F-LINEAR-01](./formulas.md#f-linear-01) |
 | 注意力 | Attention | 根据 Q/K 相关性对 V 加权聚合 | Chapter04 | [F-ATTN-02](./formulas.md#f-attn-02) |
 | 多头注意力 | Multi-head Attention, MHA | 将隐藏维度拆成多个 head 分别计算 Attention，再合并回原维度 | [Chapter04 Multi-head Attention](../chapter04_attention/01_multihead_attention.md) | [F-ATTN-02](./formulas.md#f-attn-02) |
@@ -83,11 +85,13 @@
 | 连续批处理 | continuous batching | 每个调度 step 按请求状态重新组成执行 batch | Chapter08 | [F-PERF-02](./formulas.md#f-perf-02) |
 | 词元预算 | token budget | 单个调度步允许处理的词元上限 | Chapter08 | [F-SCHED-01](./formulas.md#f-sched-01) |
 | KV 块池 | KV block pool | 按固定大小 block 分配、复用和回收 KV Cache 容量的资源池 | Chapter07 | [F-SCHED-01](./formulas.md#f-sched-01) |
+| K/V 块内槽位 | KV block slot | 一个物理 K/V 块中保存某个逻辑 token 的位置偏移；由 `token_index % block_size` 得到 | [Chapter07 块表映射](../chapter07_kv_cache/next/02_block_mapping.md) | [F-KV-01](./formulas.md#f-kv-01) |
 | 分页注意力 | PagedAttention | 通过逻辑 block 到物理 block 的映射读取非连续 KV Cache 的注意力方法 | Chapter07 | [F-KV-01](./formulas.md#f-kv-01) |
 | 采样器 | Sampler | 根据 logits 选择下一 token 的组件 | Chapter06 | [F-SAMPLE-01](./formulas.md#f-sample-01) |
 | 贪心采样 | Greedy Sampling | 每步选择最大 logit 对应 token | Chapter06 | [F-SAMPLE-01](./formulas.md#f-sample-01) |
 | 运行时 | Runtime | 组织模型执行、缓存、采样和请求状态推进的组件 | Chapter06 | - |
-| 调度器 | Scheduler | 根据 slot、token 和内存预算选择本 step 请求 | Chapter08 | - |
+| 请求调度槽位 | request scheduling slot | 一个调度步中可接纳一个活跃请求的执行名额，不表示 K/V 物理地址 | Chapter08 | [F-SCHED-01](./formulas.md#f-sched-01) |
+| 调度器 | Scheduler | 根据请求槽位、token 和内存预算选择本 step 请求 | Chapter08 | - |
 | 流式输出 | streaming | token 生成后立即向调用方持续返回事件 | Chapter06、Chapter10 | [F-PERF-01](./formulas.md#f-perf-01) |
 
 ## 量化、性能与服务

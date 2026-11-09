@@ -29,7 +29,11 @@ Benchmark 入口需要完成环境登记、预热、重复运行和结果落盘�
     -> 预热与测量
 ```
 
-`CHAPTER09_CUDA_EXPERIMENT_ID` 这类环境变量只标记实验身份，不能选择 kernel。当前 Attention A/B 入口支持 `--attention-path compare|three-stage|fused-online`；量化 GEMV 矩阵的 `--batch`、`--format` 和 `--iterations` 仍只选择 workload。只有通过正确性测试且继续维护的实现才进入运行期枚举，失败候选保留为证据而不是用户选项。
+`CHAPTER09_CUDA_EXPERIMENT_ID` 这类环境变量只标记实验身份，不能选择 kernel。Attention A/B 入口支持 `--attention-path compare|three-stage|fused-online`；量化 GEMV 矩阵用 `--batch`、`--format` 和 `--iterations` 选择 workload。EXP-GPU-14 通过正确性和 NCU 门禁后，固定 4 行与自适应 tile 才进入 `--path fixed-four|adaptive`；真实模型入口再用 `--gemv-path` 接收相同策略。失败候选仍只保留为证据，不进入运行期枚举。
+
+脚本末尾的 `PASS` 只能说明执行完成，不能代替性能结论。自动决策文件分别保存 `execution_status`、`correctness` 和 `decision`：前两项通过后，比较器才按主指标与保护指标给出 `KEEP`、`REJECT` 或 `INCONCLUSIVE`。原始样本、策略阈值和每轮变化率必须与决策一起落盘。
+
+单点 A/B 决定候选是否值得保留，矩阵实验再检查结论的适用范围。矩阵应先固定较小组合并保留控制组：Adaptive 在 batch=1/2 选择较小 tile，在 batch=4/8 与固定路径使用相同的 4 行 kernel；如果控制组也出现持续大幅差异，应先检查时钟、温度和执行顺序，而不是把差异归因于 kernel。
 
 ## CPU 与 GPU 需要固定的环境
 

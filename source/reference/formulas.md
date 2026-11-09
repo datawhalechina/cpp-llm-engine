@@ -222,14 +222,14 @@ bytes = elements × bytes_per_element
 <a id="f-sched-01"></a>
 ### F-SCHED-01 调度预算与 KV Block 数
 
-调度器必须同时满足 token、slot 和 KV block 三类容量。连续序列映射到固定大小 block 时，最后一个 block 可以只使用一部分。
+调度器必须同时满足 token、请求调度槽位和 KV block 三类容量。这里的请求槽位表示本 step 可接纳的活跃请求数，不是物理 K/V 块中的 token 槽位。连续序列映射到固定大小 block 时，最后一个 block 可以只使用一部分。
 
 ```text
 scheduled_tokens = sum(tokens_selected_for_request[i])
 required_blocks(tokens) = ceil(tokens / tokens_per_block)
 
 required: scheduled_tokens <= step_token_budget
-required: scheduled_requests <= available_slots
+required: scheduled_requests <= available_request_slots
 required: sum(required_blocks[i]) <= free_blocks
 ```
 

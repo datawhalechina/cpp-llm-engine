@@ -83,7 +83,11 @@ bash code/engine/scripts/run_real_cuda_serving.sh
 
 `RealLlamaCudaExecutorFactory::set_attention_mode()` 可在创建请求执行器前选择三阶段或融合在线 Attention。默认值保持三阶段；Chapter09 的 EXP-GPU-04 表明融合实现已通过端到端正确性，但两轮真实 Prefill/Decode 中位数没有稳定收益，因此该开关用于教学 A/B 和继续调优，不代表生产默认策略。
 
-Chapter09 的真实 Attention 入口将命令行 `--attention-path three-stage|fused-online` 转换为 `CudaAttentionMode`；`compare` 会在同一进程中依次运行两条路径并执行 logits/greedy token 正确性闸门。该入口是当前 CLI 到类型化策略的示例，后续服务参数沿用同一边界，不让字符串进入 Model 或 kernel。
+Chapter09 的真实 Attention 入口将命令行 `--attention-path three-stage|fused-online` 转换为 `CudaAttentionMode`；量化 GEMV 实验同样把 `--gemv-path fixed-four|adaptive` 转换为 `CudaQuantizedGemvMode`。Factory 把类型化策略下发给请求 Context 和持久化 batch workspace，字符串不会进入 Model 或 kernel。Attention 的 `compare` 会在同一进程中核对两条路径；GEMV 使用独立进程和交错执行顺序，避免时钟与热状态固定偏向其中一条路径。
+
+`real_tinyllama_cuda_adaptive_gemv_matrix` 复用同一个 Factory 和模型权重，按单元重新创建请求 Context。Prefill 后先通过 Chapter07 事务接口为完整 Decode 区间预留分页块，再开始计时；每次批量 Decode 成功后统一提交控制面的 token count，然后进入下一步。这与 Chapter08 调度器“先 reserve、执行成功后 commit”的契约一致，也能覆盖上下文恰好填满物理块的边界。多步 Decode 持续更新 token、position 和分页 K/V，最后比较顺序执行与 Tensor Batch 的 logits。命令行只定义 workload，路径仍通过 `CudaQuantizedGemvMode` 下发。
+
+EXP-GPU-16 使用该入口覆盖 batch 1/2、上下文 `16/128` 和 Decode `1/8` 步。Adaptive 在 batch 1 的 Tensor Batch 延迟降低约 `18.4%`～`23.1%`，在 batch 2 降低约 `12.9%`～`14.7%`；两轮反向执行顺序下全部 logits 最大误差为 `0`。该结果只支持当前小 batch、Q4_K TinyLlama 和 RTX 5070 Ti Laptop 环境，不直接外推其他模型或设备。
 
 执行器工厂按精确 batch size 缓存 `RealLlamaCudaBatchWorkspace`，复用 stream、cuBLAS handle、embedding rows、批量 hidden/logits 和 Decoder 中间 Tensor。同一工厂的批量调用由互斥锁串行保护；请求级位置和页表仍归各模型执行上下文所有，不进入 workspace。真实 Runtime 与 Service 测试覆盖双请求分页 batch、预留/提交分离、失败不推进和终态释放。融合 PagedAttention、跨 batch size 容量复用、并发 batch 和真实 socket server 尚未接入。
 

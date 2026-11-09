@@ -12,7 +12,7 @@ _A Practical Tutorial for Building a C++ LLM Inference Engine_
 
 ![cpp-llm-engine 教程主图](source/assets/diagrams/tutorial-concept-map.svg)
 
-## Quick Start
+## 快速开始
 
 第一次学习建议完成三个动作：在 Chapter00 看见一条完整的模型推理路径，在 Chapter01 读取模型配置和权重，再沿 [USAGE.md](USAGE.md) 进入 Tensor、算子、Decoder、Runtime 和服务章节。
 
@@ -24,15 +24,15 @@ c++ --version
 git --version
 ```
 
-如果 C++ 所有权、CMake 或 CTest 仍然陌生，可以先从 [Foundation](source/foundation/intro.md) 选择对应练习；已经掌握这些基础时直接继续 Chapter00。
+[Foundation](source/foundation/intro.md) 提供 C++ 所有权、CMake 和 CTest 练习。需要补充其中某项基础时先完成对应练习，工具链基础具备后从 Chapter00 开始主线。
 
-先运行不需要下载模型的 Chapter00 小实验。看到 CTest 显示测试通过，说明 C++ 编译和运行环境可以继续学习：
+先运行使用仓库内置示例的 Chapter00 环境实验。看到 CTest 显示测试通过，说明 C++ 编译和运行环境已经就绪：
 
 ```bash
 bash code/chapter00_quickstart/run.sh
 ```
 
-真实推理所需的模型下载和路径设置见 [Chapter00 导读](source/chapter00_quickstart/intro.md)。暂时没有模型可以跳过下一条命令；CUDA 不是 CPU 学习路径的前置条件。
+Chapter00 将工具链验证和真实模型推理分成两个步骤。按照 [Chapter00 导读](source/chapter00_quickstart/intro.md) 准备 `llama.cpp`、TinyLlama GGUF 和模型路径后，继续运行真实推理；CPU 环境可以完成教程主线，CUDA 环境用于后续可选加速实验。
 
 准备好 `llama.cpp` 和 TinyLlama GGUF 后，再运行一次真实模型推理，观察 prompt 怎样变成连续输出：
 
@@ -63,15 +63,19 @@ bash code/chapter01_tensor_loader/run.sh
 
 ## 建设进度
 
-更新时间：**2026-11-06**。详细实验条件与复现入口见[实验资产表](source/reference/experiment_assets.md)。
+更新时间：**2026-11-09**。下面按最新进展在前排列；详细实验条件与复现入口见[实验资产表](source/reference/experiment_assets.md)。
 
 | 时间 | 里程碑 | 状态 | 可验证产物 |
 | --- | --- | --- | --- |
-| 2026-08 | 教程骨架与 Foundation | 完成 | 章节主线、基础题库、benchmark trace |
-| 2026-10 | CPU 主线闭环 | 完成 | TinyLlama 22 层 Decoder、Runtime、HTTP/SSE 和真实模型验收 |
-| 2026-10 | 多模态输入闭环 | 完成 | SmolVLM Vision、Projector、Decoder、ServiceCore 和 profiling golden |
-| 2026-11 | CUDA 后端 | 建设中 | CUDA 资源、22 层 Model/Context、真实文本生成、Decode batch、单请求分页 Context/GQA 与 Chapter10 服务；下一步接分页 batch 事务 |
+| 2026-11-09 | Adaptive GEMV 适用范围矩阵 | 完成 | EXP-GPU-16 覆盖 `batch=1/2`、上下文 `16/128` 和 Decode `1/8` 步；Tensor Batch 延迟降低约 `12.9%`～`23.1%` |
+| 2026-11-09 | CUDA 量化性能证据 | 完成 | Adaptive GEMV 默认路径、自动 `KEEP/REJECT/INCONCLUSIVE` 决策、NCU 原因指标与 EXP-GPU-14/15 |
+| 2026-11-09 | 分页缓存与前缀复用 | 完成 | CUDA 分页 Prefill、分页 Decode batch、Radix Cache、共享块引用和缓存感知调度 |
+| 2026-11-09 | 学习入口与参考资产整合 | 完成 | CPU、CPU+GPU、多模态路线，术语/公式表，框架对照卡和实验资产表 |
+| 2026-11-08 | TinyLlama CUDA 纵向闭环 | 完成 | 22 层 Model/Context、真实生成、分页 GQA、Chapter06 Runtime 与 Chapter10 服务 |
 | 2026-11 | 工程验证体系 | 完成 | 默认回归、Release 契约、测试资产审计、文档检查和 GitHub Actions CI |
+| 2026-10 | 多模态输入闭环 | 完成 | SmolVLM Vision、Projector、Decoder、ServiceCore 和 profiling golden |
+| 2026-10 | CPU 主线闭环 | 完成 | TinyLlama 22 层 Decoder、Runtime、HTTP/SSE 和真实模型验收 |
+| 2026-08 | 教程骨架与 Foundation | 完成 | 章节主线、基础题库和 benchmark trace |
 
 ## 查阅与贡献
 

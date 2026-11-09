@@ -94,7 +94,11 @@ NCU 基线显示 Q4_K kernel 的 L1TEX 等待明显，而 DRAM 吞吐和 occupan
 
 EXP-GPU-06 记录初版批量融合路径：真实双请求分页 Decode 的两轮 Tensor Batch/顺序执行中位数比例为 `0.922/0.919`。EXP-GPU-08 将批次改为最多 4 行共享一次权重解码，并使用 Warp 归约；两轮比例为 `0.466/0.612`。EXP-GPU-12 再把手写 FP16 解码替换为 CUDA 原生 half 转换，顺序 Decode 降至 `35.12/30.54 ms`，Tensor Batch 降至 `19.80/17.02 ms`，logits 保持一致。这些结果支持当前小批量融合路径，不代表大 batch 量化 GEMM 已完成。
 
-批次扩展使用独立矩阵入口：`bash code/chapter09_performance/scripts/run_cuda_quantized_gemv_matrix.sh`。可执行程序默认测量 `batch=1/2/4/8`，也可用 `--batch N --format q4|q6 --iterations N` 缩小 workload。EXP-GPU-13 中 batch 1→4 的 Q4_K/Q6_K 时间基本不变，batch=8 约翻倍，符合固定 `tile=4` 会启动两个 y 方向 block 的设计。参数只选择实验输入，不切换 kernel 实现；CUDA GEMV 当前只有通过门禁的默认路径，失败候选保留为实验资产而不进入运行时枚举。
+批次扩展使用独立矩阵入口：`bash code/chapter09_performance/scripts/run_cuda_quantized_gemv_matrix.sh`。可执行程序默认测量 `batch=1/2/4/8`，也可用 `--batch N --format q4|q6 --iterations N` 缩小 workload。EXP-GPU-13 中 batch 1→4 的 Q4_K/Q6_K 时间基本不变，batch=8 约翻倍，说明固定 4 行 tile 在 batch=1/2 时会保留无效行状态，在 batch=8 时则需要两个 y 方向 block。
+
+EXP-GPU-14 为通过正确性门禁的两条实现增加 `CudaQuantizedGemvPath`：`FixedTile4` 始终实例化 4 行 tile，`Adaptive` 对 batch=1/2/其他分别选择 1/2/4 行。RTX 5070 Ti Laptop 上，自适应路径把共享内存从 `128 B` 降到 `32/64 B`，执行指令减少约 `21%`～`37%`，Q4_K batch 1/2 的 kernel cycles 约下降 `17%/19%`，Q6_K 约下降 `33%/30%`。L1 命中率基本不变，占用率仅提高约 2.5～3.1 个百分点，说明主要收益来自删除无效 tile 行对应的指令，而不是改变缓存局部性。EXP-GPU-15 的真实 TinyLlama 双请求 Decode 中，Tensor Batch 两轮中位数从 `15.758/16.096 ms` 降到 `13.195/13.028 ms`，顺序 Decode 平均基本持平，logits 最大误差为 `0`。
+
+EXP-GPU-16 进一步覆盖 batch 1/2、上下文 `16/128` 和 Decode `1/8` 步。batch 1 的 Tensor Batch 延迟降低约 `18.4%`～`23.1%`，batch 2 降低约 `12.9%`～`14.7%`，全部 logits 最大误差为 `0`。三层证据共同支持 `Adaptive` 作为默认路径，`FixedTile4` 只保留为实验基线。
 
 ## RoPE Kernel
 
