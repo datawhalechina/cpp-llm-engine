@@ -18,7 +18,7 @@
 
 <a href="../_code/chapter02_tensor_ops/tests/chapter02_nd_tensor_test.cpp"><code>chapter02_nd_tensor_test.cpp</code></a> 使用固定 1D、3D、4D 形状，验证 `[2,3,4]` 的连续步长为 `[12,4,1]`，交换轴后为 `[1,4,12]`，并检查物化前后的逻辑值一致。二维测试继续保证 Chapter03 使用的 `rows / cols / at(row,col)` 接口兼容。
 
-公共契约测试还会调用 `TensorContract::validate_element_view()`，检查视图的最大可达元素没有超过存储字节范围。二维测试通过切片的可写引用修改底层元素，再从父张量读取同一位置，证明写入遵循偏移且没有发生复制。
+公共接口测试还会调用 `TensorContract::validate_element_view()`，检查视图的最大可达元素没有超过存储字节范围。二维测试通过切片的可写引用修改底层元素，再从父张量读取同一位置，证明写入遵循偏移且没有发生复制。
 
 ## 正常路径与失败路径
 

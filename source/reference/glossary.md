@@ -19,8 +19,10 @@
 | 视图 | view | 共享 Storage、只改变 shape/stride/offset 的 Tensor | Chapter02 | [F-TENSOR-02](./formulas.md#f-tensor-02) |
 | 连续布局 | contiguous layout | 元素按约定维度顺序连续排列的内存布局 | Chapter02 | [F-TENSOR-02](./formulas.md#f-tensor-02) |
 | 工作区 | workspace | 算子执行期间复用的临时内存 | Chapter03、GPU 路线 | [F-TENSOR-01](./formulas.md#f-tensor-01) |
+| 接口约定 | contract | 两个组件协作时可检查的输入输出、数据格式、状态不变量和错误行为；代码类型和测试名中保留 `Contract` | Chapter01、Chapter06 | - |
+| 推理引擎 | inference engine, engine | 加载并执行模型，管理运行时状态、缓存、调度和设备后端的系统；普通叙述使用中文，代码类型名按源码拼写 | Chapter00 | - |
 | 算子 | Operator | 对调用方提供稳定输入输出约定、把具体计算交给后端执行的接口 | [Chapter03 Operator Base](../chapter03_matmul/01_operator_base.md) | [F-LINEAR-01](./formulas.md#f-linear-01) |
-| 后端 | Backend | 在 CPU、CUDA 或外部库上实现同一算子 contract 的执行组件 | Chapter03 | [F-LINEAR-01](./formulas.md#f-linear-01) |
+| 后端 | Backend | 在 CPU、CUDA 或外部库上实现同一算子接口约定的执行组件 | Chapter03 | [F-LINEAR-01](./formulas.md#f-linear-01) |
 | 内核 | Kernel | 完成具体数值循环或 GPU 并行计算的底层实现 | Chapter03、Foundation CUDA | [F-LINEAR-01](./formulas.md#f-linear-01) |
 | 执行上下文 | Execution Context | 持有请求状态或设备 stream、handle、workspace 的执行对象 | Chapter06、GPU 路线 | [F-KV-01](./formulas.md#f-kv-01) |
 | 主机内存 | host memory | CPU 可直接访问的内存；GPU kernel 通常不能把普通 host pointer 当作 device pointer 使用 | Foundation CUDA、GPU 路线 | - |
@@ -46,6 +48,7 @@
 | 词元编号 | token ID | 词元在模型词表中的整数编号，是模型实际接收和输出的离散值 | Chapter00-01 | - |
 | 词表 | vocabulary | token id、token 字节序列及分词属性的映射集合 | Chapter01 | - |
 | 模型元数据 | model metadata | 描述模型架构、shape、tokenizer 和量化参数的键值信息 | Chapter01 | [F-LOAD-01](./formulas.md#f-load-01) |
+| 模型结构约束 | model schema | 根据模型架构和元数据检查必需权重的名称、数量、形状与数据是否存在 | Chapter01 | - |
 | 张量索引 | tensor index | 记录权重名称、shape、dtype 和 payload offset 的目录 | Chapter01 | [F-LOAD-01](./formulas.md#f-load-01) |
 | 数据对齐 | alignment | 让 payload 起始位置满足固定字节倍数，便于映射和设备访问 | Chapter01 | [F-LOAD-01](./formulas.md#f-load-01) |
 | 矩阵乘法 | MatMul | 将 `[M,K]` 与 `[K,N]` 相乘得到 `[M,N]` | Chapter03 | [F-LINEAR-01](./formulas.md#f-linear-01) |
@@ -76,8 +79,8 @@
 | 请求 | Request | 保存 prompt、生成 token、执行阶段、停止原因和请求级资源的运行时对象 | [Chapter06 Request 生命周期](../chapter06_generation/next/04_request_lifecycle.md) | [F-SCHED-01](./formulas.md#f-sched-01) |
 | 上下文窗口 | context window | 模型一次请求最多能够处理的词元范围，描述容量限制，不是一个 C++ 状态对象 | Chapter00、Chapter06 | - |
 | 模型执行上下文 | model execution context, Context | 保存或绑定一个请求的当前位置、分层 K/V 和后端执行状态；不保存所有请求共享的模型权重 | [Chapter04 解码器层](../chapter04_attention/04_decoder_layer.md) | [F-KV-01](./formulas.md#f-kv-01) |
-| 请求模型执行器 | Request Model Executor, Executor | 接收一个请求的 prefill/decode 输入，使用该请求的 Context 返回 logits | [Chapter06 请求与执行契约](../chapter06_generation/next/01_request_contract.md) | - |
-| 执行器工厂 | Executor Factory, Factory | 集中持有共享模型和后端资源，并按统一规则创建请求执行器及其 Context 的长生命周期对象 | [Chapter06 请求与执行契约](../chapter06_generation/next/01_request_contract.md) | - |
+| 请求模型执行器 | Request Model Executor, Executor | Runtime 调用模型的请求级入口；使用该请求的 Context 执行 prefill/decode 并返回 logits，不表示线程或调度器 | [Chapter06 请求状态与模型调用](../chapter06_generation/next/01_request_contract.md) | - |
+| 执行器工厂 | Executor Factory, Factory | 集中持有共享模型和后端资源，并按统一规则创建请求执行器及其 Context 的长生命周期对象 | [Chapter06 请求状态与模型调用](../chapter06_generation/next/01_request_contract.md) | - |
 | 预填充 | prefill | 批量处理 prompt 并建立初始 KV Cache 的阶段 | Chapter06 | [F-KV-01](./formulas.md#f-kv-01) |
 | 逐词元解码 | decode | 利用已有 KV Cache 每步生成一个新词元的阶段 | Chapter06 | [F-KV-01](./formulas.md#f-kv-01) |
 | 键值缓存 | Key-Value Cache, KV Cache | 保存历史 token 的 Attention key/value tensor | Chapter04、Chapter07 | [F-KV-01](./formulas.md#f-kv-01) |
@@ -148,6 +151,7 @@
 | 基准结果 | golden result | 由可信来源或已审核基线产生、用于数值或输出序列比较的期望结果 | Chapter01、Chapter09 | - |
 | 参考实现 | reference implementation | 优先保证语义清晰和正确性、用于校验优化实现的实现路径 | Chapter03、Chapter05 | - |
 | 回归测试 | regression test | 防止已通过行为在后续修改中退化的自动化检查 | Chapter09 | - |
+| 运行时错误检测器 | Sanitizer | 由编译器插桩，在程序运行时发现越界、释放后使用、未定义行为等问题；`ASan` 检查内存，`UBSan` 检查未定义行为 | [Foundation 调试与测试](../foundation/04_debugging_testing_basics.md) | - |
 | A/B 实验 | A/B experiment | 固定 workload 和环境，只改变一个目标因素的对照测量 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
 | 墙钟时间 | wall-clock time, elapsed time | 从入口到结果可用按真实时钟经过的时间，包含计算、同步、搬运、调度和等待 | Chapter09 | - |
 
@@ -159,9 +163,9 @@
 | --- | --- | --- |
 | GGUF | 模型文件格式 | 保存 metadata、tokenizer、tensor index 和量化 payload |
 | llama.cpp | C/C++ 推理框架 | 本地 CPU/GPU、GGUF、Tokenizer 和多模态外部基线 |
-| vLLM | Python 前端与 GPU engine | continuous batching、PagedAttention 和 serving 对照 |
+| vLLM | Python 前端与 GPU 推理引擎 | continuous batching、PagedAttention 和 serving 对照 |
 | SGLang | 推理服务框架 | scheduler、prefix reuse 和应用编排对照 |
-| TensorRT-LLM | NVIDIA 推理框架 | GPU engine、量化 kernel 和部署优化对照 |
+| TensorRT-LLM | NVIDIA 推理框架 | GPU 推理引擎、量化 kernel 和部署优化对照 |
 | Ollama | 本地模型应用工具 | 模型打包、运行和交付体验对照 |
 
 ## 使用规则

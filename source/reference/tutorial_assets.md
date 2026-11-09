@@ -24,7 +24,7 @@
 
 | 对象 | 解决的问题 | 首次出现 | 代码入口 | 当前证据 |
 | --- | --- | --- | --- | --- |
-| `TokenSequence`、`TokenizerBackend` | 在文本、词元 ID 和嵌入之间传递输入 | Chapter01 | <a href="../_code/engine/include/cpp_llm_engine/tokenizer_backend.h"><code>tokenizer_backend.h</code></a> | 真实分词器已接入 Engine |
+| `TokenSequence`、`TokenizerBackend` | 在文本、词元 ID 和嵌入之间传递输入 | Chapter01 | <a href="../_code/engine/include/cpp_llm_engine/tokenizer_backend.h"><code>tokenizer_backend.h</code></a> | 真实分词器已接入推理引擎 |
 | GGUF 元数据、`ModelConfig` | 保存模型架构、维度和量化布局 | Chapter01 | <a href="../_code/chapter01_tensor_loader/src/gguf_reader.cpp"><code>gguf_reader.cpp</code></a> | 字段模式与真实模型检查 |
 | `Storage`、shape、stride、offset | 表达连续张量和共享存储视图 | Chapter02 | <a href="../_code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> | reshape、slice 与越界契约 |
 | `CudaTensor`、`CudaExecutionContext` | 绑定设备存储并复用 stream、handle 和工作区 | [CPU/GPU 架构](./architecture.md#cpu-主线与-gpu-扩展) | <a href="../_code/cuda/include/cpp_llm_engine/cuda/cuda_execution_context.h"><code>cuda_execution_context.h</code></a> | 真实 CUDA 资源与数值测试 |

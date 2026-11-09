@@ -371,7 +371,7 @@ closed-window required: inflight = 0
 resource required: released = terminal
 ```
 
-代码对应：Chapter10 `ServiceMetrics`、Engine 的 embedding request service 测试。验证重点：成功、异常、客户端断开、超时和 Context 生命周期释放。
+代码对应：Chapter10 `ServiceMetrics`、`code/engine` 的嵌入请求服务测试。验证重点：成功、异常、客户端断开、超时和 Context 生命周期释放。
 
 ## 多模态
 

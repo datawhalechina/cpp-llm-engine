@@ -9,6 +9,7 @@
 | 环境 | driver、toolkit、模型路径 | 命令退出码、设备枚举 |
 | 构建 | target、include、链接 | CMake 配置和编译日志 |
 | shape | rank、维度、offset | 断言、打印 shape |
+| 内存与未定义行为 | 越界、对象生命周期、整数与类型操作 | `ASan`、`UBSan` 报告 |
 | 数值 | 中间 Tensor 和参考结果 | 固定输入、误差阈值 |
 | 性能 | 测量方法和输入规模 | benchmark、profile |
 
@@ -37,6 +38,8 @@ int safe_read(const std::vector<int>& values, std::size_t index) {
 ```
 
 测试至少覆盖一个正常输入和一个失败输入；失败案例保留下来，避免后续重构重新引入同一错误。
+
+运行时错误检测器（Sanitizer）通过编译器插桩，在测试执行时发现普通断言不容易覆盖的底层错误。地址检测器（AddressSanitizer，`ASan`）重点检查越界、释放后使用和部分内存泄漏；未定义行为检测器（UndefinedBehaviorSanitizer，`UBSan`）重点检查整数溢出、错误移位、未对齐访问等未定义行为。它们会增加运行时间和内存占用，适合正确性检查，不用于性能测量。
 
 ## 验证与练习
 

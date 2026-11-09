@@ -40,7 +40,7 @@ SmolVLM 500M Instruct 的规模允许在单机 CPU 上逐阶段执行，IDEFICS3
 | 外部可对照 | `llama.cpp` mtmd 提供相同模型与图片的独立 CPU baseline |
 | 错误可定位 | 真实 JPEG 负责系统闭环；无损 PPM和合成 Tensor 负责局部精确回归 |
 
-## mmproj 怎样变成视觉模型契约
+## mmproj 怎样变成可执行的视觉模型
 
 mmproj 是独立于语言模型 GGUF 的视觉权重文件。Chapter01 的 `GgufReader` 先读取 metadata 和 tensor index；多模态 `MmprojSchema` 再把通用文件信息收敛为 IDEFICS3 配置和确定的 tensor 布局。完成 schema 校验后，权重加载器才可以按 offset 读取 payload。
 
@@ -105,13 +105,13 @@ mmproj 是独立于语言模型 GGUF 的视觉权重文件。Chapter01 的 `Gguf
 | Chapter03-04 | 实现 Vision Linear、Attention、Norm 和 FFN |
 | Chapter06 | 接收统一 embedding sequence 并推进生成 |
 | Chapter05 | 执行量化视觉权重和 Projector Linear |
-| Chapter07-08 | 复用 K/V 资源和多请求调度契约 |
+| Chapter07-08 | 复用 K/V 资源和多请求调度规则 |
 | Chapter09 | 验证视觉正确性、阶段耗时和性能证据 |
 | Chapter10 | 接入服务输入、同步/SSE 输出和终态释放 |
 
 ## 一个图文请求怎样进入现有运行时
 
-图片输入管线在统一 embedding sequence 处结束。Engine 的 `EmbeddingRequestExecutor` 持有该序列和独立 Decoder Context，并实现 Chapter06 已有的 `RequestModelExecutor`：prefill 消费整段 embedding，decode 消费上一步 token。Chapter06 继续负责 Request 状态和采样，Chapter07-08 提供 K/V 与调度契约，Chapter10 负责 admission、HTTP/SSE 与服务指标。
+图片输入管线在统一 embedding sequence 处结束。引擎适配层的 `EmbeddingRequestExecutor` 持有该序列和独立 Decoder Context，并实现 Chapter06 已有的 `RequestModelExecutor`：prefill 消费整段 embedding，decode 消费上一步 token。Chapter06 继续负责 Request 状态和采样，Chapter07-08 提供 K/V 管理与调度规则，Chapter10 负责 admission、HTTP/SSE 与服务指标。
 
 阶段指标把一次请求拆成图片解码、动态切图、prompt tokenize、Vision Encoder、Projector、embedding 组装和 LLM prefill。重复处理多个 tile 时，Vision Encoder 与 Projector 记录累计耗时和调用次数。内存指标只统计请求持有的中间数据估算，不等同于进程 RSS，也不包含共享模型权重。
 
@@ -124,7 +124,7 @@ mmproj 是独立于语言模型 GGUF 的视觉权重文件。Chapter01 的 `Gguf
 | 交接点 | 输入 | 输出 | 所有者 |
 | --- | --- | --- | --- |
 | 图片管线 | 图片、prompt、模型配置 | text/visual embedding | 多模态输入处理器 |
-| Engine 适配 | `DecoderEmbeddingSequence`、Context | `RequestModelExecutor` | 单个请求 |
+| 引擎适配 | `DecoderEmbeddingSequence`、Context | `RequestModelExecutor` | 单个请求 |
 | Chapter06 Runtime | position 数量、Executor | generated token、Request 终态 | Runtime / Request |
 | Chapter10 ServiceCore | 服务请求、Executor factory | 同步结果或 SSE event | 服务核心；合成 embedding 已验证 |
 

@@ -17,10 +17,10 @@
 
 | 层级 | 检查对象 | 典型证据 |
 | --- | --- | --- |
-| 对象与不变量 | 单个函数、状态转换、容量与所有权 | 单元测试、契约测试 |
+| 对象与不变量 | 单个函数、状态转换、容量与所有权 | 单元测试、接口与不变量测试 |
 | 组件协作 | Runtime、Cache、Scheduler 的提交与回滚 | 组件和跨章集成测试 |
-| 教学主线 | Chapter00–10、Engine 与多模态默认路径 | `npm run test:regression` |
-| 发布契约 | Release 构建中的关键 owner、label 和 target | `npm run test:release-contracts` |
+| 教学主线 | Chapter00–10、引擎集成与多模态默认路径 | `npm run test:regression` |
+| 发布验收 | Release 构建中的关键 owner、label 和 target | `npm run test:release-contracts` |
 | 真实模型 | GGUF、词元、logits、HTTP/SSE | TinyLlama CPU/CUDA golden |
 | 性能实验 | 固定模型、工作负载、环境和重复样本 | Chapter09 evidence 与 A/B 决策 |
 
@@ -46,4 +46,4 @@
 bash code/chapter09_performance/scripts/run.sh
 ```
 
-`chapter09_evidence_contract_test` 会接受完整记录，并拒绝正确性失败、样本数不等于测量轮数或不完整的变长 prompt。通过后再进入 `09.2`，把同一记录契约放进预热和重复测量流程。
+`chapter09_evidence_contract_test` 会接受完整记录，并拒绝正确性失败、样本数不等于测量轮数或不完整的变长 prompt。通过后再进入 `09.2`，把相同记录格式和校验规则放进预热与重复测量流程。

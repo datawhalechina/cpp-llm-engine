@@ -9,7 +9,7 @@ Chapter 01 已经建立模型形状、数据类型和底层存储概念；本章
 | A 教学闭环 | 用二维小数组观察共享存储、变形、切片、转置和显式连续化 | 可直接打印的形状、步长、偏移与共享关系 |
 | B 真实执行闭环 | 将同一地址公式扩展到 1–4 维，并通过 `TensorViewRef` 交给后续计算后端 | 3D/4D Q/K/V 布局、Chapter03/04 跨章测试 |
 | G GPU 扩展坐标 | 保留 shape、stride 和连续性语义，由 `CudaTensor` 管理设备存储 | 当前没有 Host Tensor 自动迁移；上传和设备生命周期由 CUDA 模块验证 |
-| M 多模态扩展坐标 | 用相同形状语言描述图像、patch 和 embedding 序列 | 当前多模态对象不直接依赖 Chapter02 Tensor 类型，只复用数据契约 |
+| M 多模态扩展坐标 | 用相同形状语言描述图像、patch 和 embedding 序列 | 当前多模态对象不直接依赖 Chapter02 Tensor 类型，只复用数据布局约定 |
 
 本章先用中文概念建立直觉，再在正文中对应到代码变量：
 
@@ -33,7 +33,7 @@ Chapter 01 已经建立模型形状、数据类型和底层存储概念；本章
 | --- | --- | --- | --- | --- |
 | 1 | A/B 公共 | [`02.1 共享底层存储`](./01_shared_ptr_memory.md) | <a href="../_code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> | 视图元数据与存储所有权分开 |
 | 2 | A | [`02.2 变形与转置`](./02_reshape.md)、[`02.3 切片`](./03_slice.md) | <a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> | 二维地址变化、共享和显式复制可以直接观察 |
-| 3 | B | [`02.4 单元测试`](./04_unit_tests.md) | <a href="../_code/chapter02_tensor_ops/tests/chapter02_nd_tensor_test.cpp"><code>chapter02_nd_tensor_test.cpp</code></a> | 1D、3D、4D 索引与公共视图契约成立 |
+| 3 | B | [`02.4 单元测试`](./04_unit_tests.md) | <a href="../_code/chapter02_tensor_ops/tests/chapter02_nd_tensor_test.cpp"><code>chapter02_nd_tensor_test.cpp</code></a> | 1D、3D、4D 索引与公共视图规则成立 |
 | 4 | B | [`02.5 张量与视图框架对照`](./05_framework_tensor_comparison.md) | [`教程资产索引`](../reference/tutorial_assets.md) | 在 ggml 和 vLLM 中定位视图与执行布局 |
 
 ## 验证与下一步

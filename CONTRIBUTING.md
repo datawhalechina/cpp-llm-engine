@@ -47,14 +47,14 @@ Pull Request 中的 CI 覆盖无模型、无网络服务和无 GPU 的默认路�
 | Markdown、SVG、导航或链接 | `npm run docs:check-structure`、`npm run docs:check-style`、`npm run docs:check-reference`、`npm run docs:check-links` |
 | 章节 C++ 代码 | 对应章节 `run.sh`、`npm run code:check-headers`、`npm run test:regression` |
 | Foundation 练习 | `bash exercises/foundation/run_all.sh`、`npm run test:regression` |
-| Engine / ServiceCore | 对应 CTest 或 `bash code/engine/scripts/run.sh`、`npm run test:regression` |
+| 引擎集成 / `ServiceCore` | 对应 CTest 或 `bash code/engine/scripts/run.sh`、`npm run test:regression` |
 | CUDA backend 或 kernel | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh`，并记录 GPU、驱动和 CUDA 版本 |
 | 真实 CUDA Runtime / Serving | [GPU 纵向验收](USAGE.md#gpu-纵向验收)中的三项命令和环境信息 |
 | 多模态 | `bash code/multimodal/scripts/run.sh`；真实模型结果另附 golden |
-| 测试注册或公共契约 | `npm run test:check-contracts`、`npm run test:release-contracts` |
+| 测试注册或公共接口约定 | `npm run test:check-contracts`、`npm run test:release-contracts` |
 | 发布或大范围重构 | 全部文档检查、`npm run test:regression`、`npm run test:release-contracts` |
 
-`test:regression` 验证默认开发路径；`test:release-contracts` 在全新 Release 构建目录中验证测试登记和发布契约。二者都不替代真实 GGUF、CUDA 设备、HTTP transport 或性能实验。
+`test:regression` 验证默认开发路径；`test:release-contracts` 在全新 Release 构建目录中验证测试登记和发布验收规则。二者都不替代真实 GGUF、CUDA 设备、HTTP transport 或性能实验。
 
 ## 结果与提交
 

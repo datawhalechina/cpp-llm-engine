@@ -1,10 +1,10 @@
 # 07.5 把真实模型迁移到分页缓存
 
-`RealLlamaCpuContext` 默认保留连续 K/V 作为单请求参考。Engine 可以为 Context 绑定 `RealLlamaKvDataPlane`，把真实 Decoder 的写入与 Attention 读取切换到 `CpuPagedKvCache`。权重、RoPE、Attention 公式和 Generation Runtime 契约保持不变。
+`RealLlamaCpuContext` 默认保留连续 K/V 作为单请求参考。引擎适配层可以为 Context 绑定 `RealLlamaKvDataPlane`，把真实 Decoder 的写入与 Attention 读取切换到 `CpuPagedKvCache`。权重、RoPE、Attention 公式和 Generation Runtime 接口保持不变。
 
 ## 迁移需要改动哪些连接
 
-Context 先绑定抽象 K/V 数据面，Engine 再适配请求 ID 和分页缓存。每层 Q/K/V 投影完成后写入预留槽位，全部层写完才提交；Attention 根据页表和有效词元数读取历史。请求进入终态后统一释放物理块。
+Context 先绑定抽象 K/V 数据面，引擎适配层再连接请求 ID 和分页缓存。每层 Q/K/V 投影完成后写入预留槽位，全部层写完才提交；Attention 根据页表和有效词元数读取历史。请求进入终态后统一释放物理块。
 
 | 迁移步骤 | 必须保持的证据 |
 | --- | --- |

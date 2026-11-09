@@ -48,7 +48,7 @@ Decode 每次只有一个 Query，位置就是已提交词元数。Prefill 会�
 
 测试使用同一组 query、key 和 value 计算两次：连续参考按 `[token, kv_head, head_dimension]` 读取；分页实现让多个 Query 和 K/V 跨越非连续物理块。两组输出逐元素接近，才能说明分页只改变地址，没有改变 Attention 语义。测试还要让 chunk 跨过块边界，并检查 Query `i` 看不到未来位置。
 
-`CpuPagedKvCache::attention()` 是便于阅读和核对的 CPU 参考实现。它逐词元查询页表并使用临时分数数组，不代表生产级融合内核；设备实现可以改变并行方式和数据布局，但必须保持相同输入契约与数值基线。
+`CpuPagedKvCache::attention()` 是便于阅读和核对的 CPU 参考实现。它逐词元查询页表并使用临时分数数组，不代表生产级融合内核；设备实现可以改变并行方式和数据布局，但必须保持相同输入要求与数值基线。
 
 ## 验证连续与分页等价
 

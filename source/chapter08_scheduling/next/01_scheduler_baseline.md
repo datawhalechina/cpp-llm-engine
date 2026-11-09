@@ -1,4 +1,4 @@
-# 08.1 从调度契约和固定轮转开始
+# 08.1 从调度规则和固定轮转开始
 
 Generation Core 能推进单个请求，Chapter07 能为请求提供可提交的 K/V 位置。Scheduler 决定当前执行机会交给谁，并把选择结果交给 Runtime；它不计算 logits，也不保存 K/V 数值。
 

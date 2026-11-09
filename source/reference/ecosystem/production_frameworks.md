@@ -74,7 +74,7 @@ Chapter03–05 对照 GPU 算子、Attention 和量化，Chapter06–08 对照�
 
 | 对象 | 官方入口 | 阅读问题 |
 | --- | --- | --- |
-| 项目实现 | [DeepInfer 仓库](https://github.com/deepseek-ai/DeepInfer) | Python Engine 与 C++ Scheduler、BlockManager 怎样分工 |
+| 项目实现 | [DeepInfer 仓库](https://github.com/deepseek-ai/DeepInfer) | Python 引擎与 C++ 调度器、块管理器怎样分工 |
 | 阶段执行 | [DeepInfer 仓库](https://github.com/deepseek-ai/DeepInfer) | 视觉编码、预填充和解码分离后怎样管理资源与指标 |
 
 ### 对应章节

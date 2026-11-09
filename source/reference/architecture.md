@@ -64,7 +64,7 @@ flowchart LR
 
 ## CPU 主线与 GPU 扩展
 
-教程先用 CPU 固定正确性和接口，再在同一套公共契约上接入 GPU。GPU 替换后端、计算核和内存执行路径，不建立第二套请求运行时。多模态则在解码器前增加图片处理，并把统一嵌入序列交给已有 CPU 或 GPU 路径。
+教程先用 CPU 固定正确性和接口，再在同一套公共接口上接入 GPU。GPU 替换后端、计算核和内存执行路径，不建立第二套请求运行时。多模态则在解码器前增加图片处理，并把统一嵌入序列交给已有 CPU 或 GPU 路径。
 
 ![推理引擎 CPU 主线与 GPU 扩展架构](../assets/diagrams/inference-engine-cpu-gpu-architecture.svg)
 
@@ -93,28 +93,28 @@ flowchart LR
 | MLA | 压缩 K/V 和位置编码分支的数值参考 | 矩阵计算与专用 Attention 计算核 | 随 DeepSeek 模型路线规划 |
 | Prefill/Decode 分离 | 实例角色、路由和 K/V 传输协议 | 各实例的阶段执行 | 集群级扩展参照 |
 
-## 公共契约与验证顺序
+## 公共接口与验证顺序
 
-`code/core` 提供跨章契约，各章保留自己的教学对象和正确性测试。新增后端按以下顺序进入主线：
+`code/core` 提供跨章共享的接口和数据规则，各章保留自己的教学对象和正确性测试。新增后端按以下顺序进入主线：
 
 ```text
 CPU 参考实现固定输入输出和错误行为
-  -> 章节实现适配公共契约
+  -> 章节实现适配公共接口
   -> 增加跨章集成测试
-  -> GPU 后端复用同一契约
+  -> GPU 后端复用同一接口
   -> 性能基准固定工作负载
   -> 性能剖析解释计算核、带宽和同步成本
 ```
 
-| 对象 | 公共契约与当前接入 |
+| 对象 | 公共接口与当前接入 |
 | --- | --- |
-| Tensor view | Chapter02 提供 shape、stride、storage offset、dtype 与 device contract |
+| Tensor view | Chapter02 提供 shape、stride、storage offset、dtype 与 device 布局约定 |
 | MatMul | Chapter03 通过 `MatmulRequest`、`MatmulBackend` 和 `Status` 接入 CPU 参考实现 |
 | Quantized Linear | Chapter05 通过 `LinearRequest` 和后端策略接入标量、AVX2 与 CUDA |
-| Decoder | Chapter04 教学层和 `code/model` 真实模型共同适配结构与执行契约 |
+| Decoder | Chapter04 教学层和 `code/model` 真实模型共同适配结构与执行接口 |
 | Runtime 资源 | Chapter07–10 通过事务、BatchRunner 和 ServiceCore 交接请求状态 |
 
-默认回归核对 CPU 章节、公共契约和可选资产声明；真实设备数值与性能实验使用 CUDA 和 Chapter09 专用入口。
+默认回归核对 CPU 章节、公共接口和可选资产声明；真实设备数值与性能实验使用 CUDA 和 Chapter09 专用入口。
 
 ```bash
 bash scripts/run_regression_baseline.sh
@@ -125,9 +125,9 @@ CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
 
 | 观察到的问题 | 先检查 | 阅读入口 |
 | --- | --- | --- |
-| 词元或模型配置错误 | 分词器、元数据、张量字段模式 | [Chapter01 输入契约](../chapter01_tensor_loader/04_input_contract_and_tokenizer.md) |
+| 词元或模型配置错误 | 分词器、元数据、张量字段模式 | [Chapter01 输入要求](../chapter01_tensor_loader/04_input_contract_and_tokenizer.md) |
 | shape 或局部数值错误 | Tensor view、Operator、CPU 参考实现 | Chapter02–04 |
-| CPU/CUDA 结果不同 | Operator 契约、Context 位置、Backend | Chapter03–06、[CPU 主线与 GPU 扩展](#cpu-主线与-gpu-扩展) |
+| CPU/CUDA 结果不同 | Operator 接口、Context 位置、Backend | Chapter03–06、[CPU 主线与 GPU 扩展](#cpu-主线与-gpu-扩展) |
 | 长上下文结果异常 | position、K/V append、BlockTable | [Chapter06 K/V 语义](../chapter06_generation/next/06_single_request_kv_semantics.md)、[Chapter07](../chapter07_kv_cache/next/intro.md) |
 | 多请求卡住或资源未释放 | Request 终态、Scheduler、ServiceCore | Chapter06–08、Chapter10 |
 | 性能下降 | 工作负载、阶段计时、热点 | [Chapter09 性能剖析](../chapter09_performance/next/05_profiling_tools.md) |

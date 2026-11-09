@@ -25,6 +25,6 @@
 | 修改范围与空白 | `git status --short`、`git diff --check`、`git diff --stat` |
 | 文档结构与站点 | `npm run docs:check-structure`、`npm run docs:check-style`、`npm run docs:check-reference`、`npm run docs:check-links` |
 | 默认无外部依赖回归 | `npm run test:regression` |
-| 测试 owner 与发布契约 | `npm run test:check-contracts`、`npm run test:release-contracts` |
+| 测试 owner 与发布验收 | `npm run test:check-contracts`、`npm run test:release-contracts` |
 
 新增维护文件前先判断内容能否合入现有四类规则。没有新的长期职责时，不为一次任务、一个章节或一轮审核创建永久文件。

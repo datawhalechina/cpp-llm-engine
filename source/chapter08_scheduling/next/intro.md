@@ -27,7 +27,7 @@ Chapter06 固定单请求生成语义，Chapter07 提供可提交和回滚的 K/
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
-| 1 | A | [`08.1 调度契约与基线`](./01_scheduler_baseline.md) | <a href="../../_code/chapter08_scheduling/src/scheduler.cpp"><code>scheduler.cpp</code></a> | Scheduler 读取哪些状态，固定轮转怎样建立比较基线 |
+| 1 | A | [`08.1 调度规则与基线`](./01_scheduler_baseline.md) | <a href="../../_code/chapter08_scheduling/src/scheduler.cpp"><code>scheduler.cpp</code></a> | Scheduler 读取哪些状态，固定轮转怎样建立比较基线 |
 | 2 | A | [`08.2 单步计划与连续批处理`](./02_step_batching.md) | <a href="../../_code/chapter08_scheduling/src/step_scheduler.cpp"><code>step_scheduler.cpp</code></a> | 请求、词元和缓存预算怎样形成一个可提交的 step |
 | 3 | A | [`08.3 长输入、优先级与公平性`](./03_chunked_priority.md) | <a href="../../_code/chapter08_scheduling/tests/priority_aging_test.cpp"><code>priority_aging_test.cpp</code></a> | 长输入怎样分块，等待时间怎样改变候选顺序 |
 | 4 | B | [`08.4 真实批量执行`](./04_tensor_batch.md) | <a href="../../_code/chapter08_scheduling/tests/cache_transaction_test.cpp"><code>cache_transaction_test.cpp</code></a>、<a href="../../_code/engine/examples/real_tinyllama_batch_smoke.cpp"><code>real_tinyllama_batch_smoke.cpp</code></a> | 计划怎样变成批量 Linear 和分页 K/V 事务 |
@@ -43,7 +43,7 @@ bash code/chapter08_scheduling/scripts/run.sh
 
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |
-| L1 调度契约 | `bash code/chapter08_scheduling/scripts/run.sh` | Round-robin、预算、混排、分块 Prefill、优先级老化和回滚通过 | 必做 |
+| L1 调度规则 | `bash code/chapter08_scheduling/scripts/run.sh` | Round-robin、预算、混排、分块 Prefill、优先级老化和回滚通过 | 必做 |
 | L2 教学 Ragged batch | 同 L1 入口中的 `chapter08_tensor_batch_test` | 批量 Prefill、偏移、重复输入和准入原子性通过 | 必做 |
 | L3 调度到 Decode batch | 同 L1 入口中的 `chapter08_cache_transaction_test` | 批输入校验、重复 ID 拒绝、失败回滚和分页计数一致 | 必做 |
 | L4 真实模型 batch | `bash code/chapter08_scheduling/scripts/run_real_batch.sh` | TinyLlama 顺序/批量 logits 与固定词元一致，错误位置不提交 | 有模型时必做 |

@@ -61,7 +61,7 @@ ctest --test-dir /tmp/cpp-llm-chapter08-step \
   -R '^chapter08_(step_scheduler|cache_transaction)_test$' --output-on-failure
 ```
 
-| 通过条件 | 对应契约 |
+| 通过条件 | 对应规则 |
 | --- | --- |
 | `build()` 前后 Request 和 BlockTable 不变 | 计划阶段只读 |
 | Prefill 与 Decode 可在同一步出现 | 混合负载进入同一预算 |

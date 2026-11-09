@@ -45,5 +45,5 @@
   <path d="M235 416 H255" class="line"/>
   <path d="M807 462 V490 H132 V462" class="dash"/>
   <text x="600" y="535" text-anchor="middle" class="small">Chapter01 输出模型资产；Chapter04 解释 Decoder；code/model 保存真实执行实现。</text>
-  <text x="600" y="562" text-anchor="middle" class="small">Engine 适配 Runtime；CUDA 替换 Backend；多模态复用 Model Context。</text>
+  <text x="600" y="562" text-anchor="middle" class="small">引擎适配运行时；CUDA 替换后端；多模态复用模型 Context。</text>
 </svg>

@@ -44,11 +44,11 @@
 
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |
-| L1 数据契约 | `bash code/chapter09_performance/scripts/run.sh` | 记录校验、统计聚合、不可比输入和回退策略测试通过 | 必做 |
+| L1 数据格式与校验 | `bash code/chapter09_performance/scripts/run.sh` | 记录校验、统计聚合、不可比输入和回退策略测试通过 | 必做 |
 | L2 旧证据迁移 | `node code/chapter09_performance/scripts/import_legacy_evidence.mjs ...` | 保留逐轮样本的旧结果转换成功，聚合历史结果被拒绝 | 迁移期间必做 |
 | L3 真实模型 | `bash code/chapter09_performance/scripts/run_real_evidence.sh service` | TinyLlama 原始样本转换为统一 evidence，正确性闸门通过 | 有模型时必做 |
 | L4 服务 A/B | `bash code/chapter09_performance/scripts/run_real_evidence.sh ab` | 保留顺序与并行原始样本、统一 evidence，并输出 `real-service-ab-decision.json` | 进入 Chapter10 后完成 |
 | L5 CUDA 热点 | `bash code/chapter09_performance/scripts/run_cuda_profile.sh` | 固定模型、词元和设备信息，保存 kernel/memory CSV 与 golden token | 有 Nsight Systems 时选做 |
 | L6 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 两轮独立 Prefill/Decode 样本和正确性检查完整；不稳定收益不会进入默认路径 | 调优融合 Attention 时必做 |
 
-L1 构建证据记录、统计和比较器，并运行六项测试；它证明数据契约与决策逻辑可用，不代表当前机器上的性能数字可以直接推广到其他环境。
+L1 构建证据记录、统计和比较器，并运行六项测试；它证明记录格式、校验规则与决策逻辑可用，不代表当前机器上的性能数字可以直接推广到其他环境。

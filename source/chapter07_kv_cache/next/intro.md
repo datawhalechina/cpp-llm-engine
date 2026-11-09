@@ -30,7 +30,7 @@ Chapter06 已经固定单请求的 Prefill、Decode 和停止语义。本章接�
 | 2 | A | [`07.2 块表与物理内存`](./02_block_mapping.md) | <a href="../../_code/chapter07_kv_cache/src/block_table.cpp"><code>block_table.cpp</code></a> | 逻辑词元怎样获得物理槽位 |
 | 3 | A | [`07.3 分页 K/V 事务`](./03_paged_transaction.md) | <a href="../../_code/chapter07_kv_cache/src/paged_kv_cache.cpp"><code>paged_kv_cache.cpp</code></a> | 写入、提交、回滚和释放怎样配合 |
 | 4 | A | [`07.4 分页 Attention`](./04_paged_attention.md) | <a href="../../_code/chapter07_kv_cache/tests/paged_kv_cache_test.cpp"><code>paged_kv_cache_test.cpp</code></a> | 离散物理块为什么仍得到连续基线结果 |
-| 5 | B | [`07.5 真实模型迁移`](./05_real_model_migration.md) | Engine 真实模型入口 | 真实 Decoder 怎样绑定分页数据面并保持连续路径结果 |
+| 5 | B | [`07.5 真实模型迁移`](./05_real_model_migration.md) | `code/engine` 真实模型入口 | 真实 Decoder 怎样绑定分页数据面并保持连续路径结果 |
 | 6 | A/G/M 扩展 | [`07.6 前缀复用与生产扩展`](./06_production_extensions.md) | `radix_prefix_cache.cpp`、生态卡 | CPU/CUDA 怎样共享前缀，K/V 量化与多模态怎样继承事务契约 |
 
 ## 验证与下一步
