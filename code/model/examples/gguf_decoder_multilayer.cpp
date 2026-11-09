@@ -1,4 +1,4 @@
-// Chapter 01/04/06：真实 TinyLlama 多层 Decoder 与 llama.cpp 对照入口。
+// Chapter 01/04/06：真实稠密 Decoder 与 llama.cpp 对照入口。
 // 职责：复用 RealLlamaCpuModel/Context 执行固定 prompt，只保留验证逻辑。
 // 验证：比较 logits、greedy sequence，并检查两个 Context 的 KV 状态隔离。
 #include "cpp_llm_engine/model/real_llama_cpu_decoder.h"
@@ -169,7 +169,10 @@ bool print_logits_comparison(const std::vector<float>& actual,
     }
     const double mean_abs_error = absolute_error_sum / count;
     const double rmse = std::sqrt(squared_error_sum / count);
-    const bool passed = cosine >= 0.999 && mean_abs_error <= 0.15 &&
+    // llama.cpp quantizes activations for K-quant dot products, while the teaching
+    // kernel keeps activations in float. Require close logits and stable ranking
+    // without pretending that the two numerical paths are bit-identical.
+    const bool passed = cosine >= 0.998 && mean_abs_error <= 0.15 &&
                         rmse <= 0.20 && top5_overlap >= 4;
     std::cout << "llama_max_abs_error: " << max_abs_error << '\n'
               << "llama_mean_abs_error: " << mean_abs_error << '\n'
@@ -187,13 +190,19 @@ bool print_logits_comparison(const std::vector<float>& actual,
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 2 || argc > 3) {
-        std::cerr << "usage: gguf_decoder_multilayer <model.gguf> [layer_count]\n";
+    if (argc < 2 || argc > 4) {
+        std::cerr << "usage: gguf_decoder_multilayer <model.gguf> [layer_count] "
+                     "[--single-token]\n";
         return 2;
     }
     const std::string model_path = argv[1];
-    const std::size_t layer_count = argc == 3
+    const std::size_t layer_count = argc >= 3
         ? static_cast<std::size_t>(std::stoul(argv[2])) : 2;
+    const bool single_token = argc == 4 && std::string(argv[3]) == "--single-token";
+    if (argc == 4 && !single_token) {
+        std::cerr << "unknown option: " << argv[3] << '\n';
+        return 2;
+    }
     std::string error;
     auto model = chapter01::RealLlamaCpuModel::load(model_path, layer_count, &error);
     if (model == nullptr) {
@@ -208,9 +217,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    const chapter01::TokenSequence token_ids = {
-        15043, 18439, 1460, 29931, 5288, 29874,
-    };
+    chapter01::TokenSequence token_ids = model->architecture() == "qwen3"
+        ? chapter01::TokenSequence{9707, 1207, 16948, 18}
+        : chapter01::TokenSequence{15043, 18439, 1460, 29931, 5288, 29874};
+    if (single_token) token_ids.resize(1);
     cpp_llm_engine::core::DecoderEmbeddingSequence prompt_embeddings;
     if (!model->embed_tokens(token_ids, &prompt_embeddings, &error)) {
         std::cerr << "token embedding failed: " << error << '\n';
@@ -258,7 +268,8 @@ int main(int argc, char** argv) {
         execution->token_count() == token_ids.size() &&
         logits == isolated_logits;
     const auto candidates = top_k(logits, 5);
-    std::cout << "model_layer_count: " << stats.model_layer_count << '\n'
+    std::cout << "architecture: " << model->architecture() << '\n'
+              << "model_layer_count: " << stats.model_layer_count << '\n'
               << "layer_count: " << stats.loaded_layer_count << '\n'
               << "token_count: " << stats.token_count << '\n'
               << "rope_dim: " << stats.rope_dimension << '\n'

@@ -217,8 +217,14 @@ std::unique_ptr<RealLlamaCudaModel> RealLlamaCudaModel::load(
     auto data = std::make_shared<Impl>();
     if (!chapter01::GgufReader::read_index(model_path, &index, error) ||
         !chapter01::ModelMetadataAdapter::from_gguf(
-            index.metadata, &data->metadata, error) ||
-        !chapter01::ModelSchema::validate_gguf(
+            index.metadata, &data->metadata, error)) {
+        return nullptr;
+    }
+    if (data->metadata.architecture != "llama") {
+        if (error != nullptr) *error = "Llama CUDA model requires llama architecture";
+        return nullptr;
+    }
+    if (!chapter01::ModelSchema::validate_gguf(
             data->metadata, index, &data->layout, error)) {
         return nullptr;
     }

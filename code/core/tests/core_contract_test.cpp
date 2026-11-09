@@ -154,6 +154,17 @@ int main() {
             DecoderPositionEncodingKind::Rotary,
             true, true};
         CPP_LLM_CHECK(suite, decoder_layer.validate().is_ok());
+        CPP_LLM_CHECK(suite, decoder_layer.query_width() == 2048);
+        CPP_LLM_CHECK(suite, decoder_layer.kv_width() == 256);
+        auto qwen_layer = decoder_layer;
+        qwen_layer.hidden_size = 1024;
+        qwen_layer.query_head_count = 16;
+        qwen_layer.kv_head_count = 8;
+        qwen_layer.head_dimension = 128;
+        qwen_layer.position_dimension = 128;
+        CPP_LLM_CHECK(suite, qwen_layer.validate().is_ok());
+        CPP_LLM_CHECK(suite, qwen_layer.query_width() == 2048);
+        CPP_LLM_CHECK(suite, qwen_layer.kv_width() == 1024);
         const DecoderModelContract decoder_model{32000, 22, 2048, decoder_layer};
         CPP_LLM_CHECK(suite, decoder_model.validate().is_ok());
         const DecoderEmbeddingSequence embeddings{

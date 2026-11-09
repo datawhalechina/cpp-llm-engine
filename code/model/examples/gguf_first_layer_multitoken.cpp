@@ -1,5 +1,5 @@
-// Chapter 04/05：真实 TinyLlama 首层多 token CPU forward。
-// 职责：验证 RoPE、causal attention score、GQA 和增量 KV Cache 的连接。
+// Chapter 04/05：真实稠密 Decoder 首层多 token CPU forward。
+// 职责：验证 Q/K Norm、RoPE、causal attention、GQA 和增量 KV Cache。
 // 限制：只执行 layer-0；这是结构 smoke，不代表完整模型或 llama.cpp 数值等价。
 #include "gguf_reader.h"
 #include "gguf_tensor_loader.h"
@@ -118,12 +118,34 @@ std::vector<float> rms_norm(const std::vector<float>& input,
     return output;
 }
 
+bool rms_norm_heads(std::vector<float>* values,
+                    std::size_t head_count,
+                    std::size_t head_dimension,
+                    const std::vector<float>& weight,
+                    float epsilon,
+                    std::string* error) {
+    if (values == nullptr || head_count == 0 || head_dimension == 0 ||
+        values->size() != head_count * head_dimension ||
+        weight.size() != head_dimension) {
+        *error = "per-head RMSNorm dimensions are invalid";
+        return false;
+    }
+    for (std::size_t head = 0; head < head_count; ++head) {
+        const auto begin = values->begin() + head * head_dimension;
+        const std::vector<float> input(begin, begin + head_dimension);
+        const auto output = rms_norm(input, weight, epsilon);
+        std::copy(output.begin(), output.end(), begin);
+    }
+    return true;
+}
+
 void apply_rope(std::vector<float>* values,
                 std::size_t head_count,
                 std::size_t head_dim,
                 std::size_t position,
                 std::size_t rope_dim,
-                float freq_base) {
+                float freq_base,
+                bool split_half_pairs) {
     const std::size_t applied_dim = std::min(head_dim, rope_dim);
     for (std::size_t head = 0; head < head_count; ++head) {
         float* vector = values->data() + head * head_dim;
@@ -133,10 +155,13 @@ void apply_rope(std::vector<float>* values,
             const float angle = static_cast<float>(position) * std::pow(freq_base, exponent);
             const float cosine = std::cos(angle);
             const float sine = std::sin(angle);
-            const float x = vector[2 * pair];
-            const float y = vector[2 * pair + 1];
-            vector[2 * pair] = x * cosine - y * sine;
-            vector[2 * pair + 1] = x * sine + y * cosine;
+            const std::size_t first = split_half_pairs ? pair : 2 * pair;
+            const std::size_t second = split_half_pairs
+                ? pair + applied_dim / 2 : 2 * pair + 1;
+            const float x = vector[first];
+            const float y = vector[second];
+            vector[first] = x * cosine - y * sine;
+            vector[second] = x * sine + y * cosine;
         }
     }
 }
@@ -210,7 +235,7 @@ int main(int argc, char** argv) {
         std::cerr << "metadata load failed: " << error << '\n';
         return 1;
     }
-    chapter01::LlamaTensorLayout layout;
+    chapter01::DenseDecoderTensorLayout layout;
     if (!chapter01::ModelSchema::validate_gguf(metadata, index, &layout, &error)) {
         std::cerr << "schema validation failed: " << error << '\n';
         return 1;
@@ -221,20 +246,32 @@ int main(int argc, char** argv) {
         std::cerr << "embedding load failed: " << error << '\n';
         return 1;
     }
-    chapter01::RealLlamaLayerWeights layer;
-    if (!chapter01::RealLlamaLayerLoader::load(model_path, index, layout, 0, &layer, &error)) {
+    chapter01::RealDenseLayerWeights layer;
+    if (!chapter01::RealDenseLayerLoader::load(model_path, index, layout, 0, &layer, &error)) {
         std::cerr << "layer load failed: " << error << '\n';
         return 1;
     }
 
-    constexpr std::size_t head_dim = 64;
-    constexpr std::size_t query_heads = 32;
-    constexpr std::size_t kv_heads = 4;
-    const std::vector<std::size_t> token_ids = {15043, 18439, 1460, 29931, 5288, 29874};
+    const std::size_t query_heads = metadata.attention_head_count;
+    const std::size_t kv_heads = metadata.attention_head_count_kv;
+    if (query_heads == 0 || kv_heads == 0 || query_heads % kv_heads != 0) {
+        std::cerr << "attention head counts are invalid\n";
+        return 1;
+    }
+    const std::size_t head_dim = metadata.attention_key_length == 0
+        ? metadata.hidden_size / query_heads : metadata.attention_key_length;
+    const std::vector<std::size_t> token_ids = metadata.architecture == "qwen3"
+        ? std::vector<std::size_t>{9707, 1207, 16948, 18}
+        : std::vector<std::size_t>{15043, 18439, 1460, 29931, 5288, 29874};
     const std::size_t rope_dim = metadata.rope_dimension_count == 0
         ? head_dim : metadata.rope_dimension_count;
     const auto norm1_weight = load_floating_vector(layer.attn_norm);
     const auto norm2_weight = load_floating_vector(layer.ffn_norm);
+    const bool uses_qk_norm = layer.attn_q_norm.bytes() > 0;
+    const auto q_norm_weight = uses_qk_norm
+        ? load_floating_vector(layer.attn_q_norm) : std::vector<float>{};
+    const auto k_norm_weight = uses_qk_norm
+        ? load_floating_vector(layer.attn_k_norm) : std::vector<float>{};
     std::vector<float> key_cache;
     std::vector<float> value_cache;
     key_cache.reserve(token_ids.size() * kv_heads * head_dim);
@@ -258,12 +295,28 @@ int main(int argc, char** argv) {
             std::cerr << "attention projection failed: " << error << '\n';
             return 1;
         }
-        apply_rope(&query, query_heads, head_dim, position, rope_dim, metadata.rope_freq_base);
-        apply_rope(&key, kv_heads, head_dim, position, rope_dim, metadata.rope_freq_base);
+        if (query.size() != query_heads * head_dim ||
+            key.size() != kv_heads * head_dim || value.size() != kv_heads * head_dim) {
+            std::cerr << "attention projection dimensions do not match metadata\n";
+            return 1;
+        }
+        if (uses_qk_norm &&
+            (!rms_norm_heads(&query, query_heads, head_dim, q_norm_weight,
+                             metadata.rms_norm_epsilon, &error) ||
+             !rms_norm_heads(&key, kv_heads, head_dim, k_norm_weight,
+                             metadata.rms_norm_epsilon, &error))) {
+            std::cerr << "Q/K normalization failed: " << error << '\n';
+            return 1;
+        }
+        const bool split_half_pairs = metadata.architecture == "qwen3";
+        apply_rope(&query, query_heads, head_dim, position, rope_dim,
+                   metadata.rope_freq_base, split_half_pairs);
+        apply_rope(&key, kv_heads, head_dim, position, rope_dim,
+                   metadata.rope_freq_base, split_half_pairs);
         key_cache.insert(key_cache.end(), key.begin(), key.end());
         value_cache.insert(value_cache.end(), value.begin(), value.end());
 
-        std::vector<float> attention_output(metadata.hidden_size, 0.0f);
+        std::vector<float> attention_output(query_heads * head_dim, 0.0f);
         const float scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
         for (std::size_t query_head = 0; query_head < query_heads; ++query_head) {
             const std::size_t kv_head = query_head / (query_heads / kv_heads);
@@ -314,7 +367,12 @@ int main(int argc, char** argv) {
         }
     }
 
-    std::cout << "token_count: " << token_ids.size() << '\n'
+    std::cout << "architecture: " << metadata.architecture << '\n'
+              << "token_count: " << token_ids.size() << '\n'
+              << "query_heads: " << query_heads << '\n'
+              << "kv_heads: " << kv_heads << '\n'
+              << "head_dimension: " << head_dim << '\n'
+              << "qk_norm: " << (uses_qk_norm ? "applied" : "not-required") << '\n'
               << "rope_dim: " << rope_dim << '\n'
               << "rope_freq_base: " << metadata.rope_freq_base << '\n'
               << "kv_cache_tokens: " << key_cache.size() / (kv_heads * head_dim) << '\n'

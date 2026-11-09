@@ -255,12 +255,40 @@ std::vector<float> rms_norm(const std::vector<float>& input,
     return output;
 }
 
+bool rms_norm_heads(std::vector<float>* values,
+                    std::size_t head_count,
+                    std::size_t head_dimension,
+                    const std::vector<float>& weight,
+                    float epsilon,
+                    std::string* error) {
+    if (values == nullptr || head_count == 0 || head_dimension == 0 ||
+        values->size() != head_count * head_dimension ||
+        weight.size() != head_dimension) {
+        if (error != nullptr) *error = "per-head RMSNorm dimensions are invalid";
+        return false;
+    }
+    for (std::size_t head = 0; head < head_count; ++head) {
+        float mean_square = 0.0f;
+        float* vector = values->data() + head * head_dimension;
+        for (std::size_t i = 0; i < head_dimension; ++i) {
+            mean_square += vector[i] * vector[i];
+        }
+        mean_square /= static_cast<float>(head_dimension);
+        const float inverse = 1.0f / std::sqrt(mean_square + epsilon);
+        for (std::size_t i = 0; i < head_dimension; ++i) {
+            vector[i] *= inverse * weight[i];
+        }
+    }
+    return true;
+}
+
 void apply_rope(std::vector<float>* values,
                 std::size_t head_count,
                 std::size_t head_dim,
                 std::size_t position,
                 std::size_t rope_dim,
-                float freq_base) {
+                float freq_base,
+                bool split_half_pairs) {
     const std::size_t applied_dim = std::min(head_dim, rope_dim);
     for (std::size_t head = 0; head < head_count; ++head) {
         float* vector = values->data() + head * head_dim;
@@ -270,10 +298,13 @@ void apply_rope(std::vector<float>* values,
             const float angle = static_cast<float>(position) * std::pow(freq_base, exponent);
             const float cosine = std::cos(angle);
             const float sine = std::sin(angle);
-            const float x = vector[2 * pair];
-            const float y = vector[2 * pair + 1];
-            vector[2 * pair] = x * cosine - y * sine;
-            vector[2 * pair + 1] = x * sine + y * cosine;
+            const std::size_t first = split_half_pairs ? pair : 2 * pair;
+            const std::size_t second = split_half_pairs
+                ? pair + applied_dim / 2 : 2 * pair + 1;
+            const float x = vector[first];
+            const float y = vector[second];
+            vector[first] = x * cosine - y * sine;
+            vector[second] = x * sine + y * cosine;
         }
     }
 }
@@ -297,6 +328,8 @@ void softmax(std::vector<float>* values) {
 struct ModelLayer {
     RealLlamaLayerWeights weights;
     std::vector<float> attention_norm;
+    std::vector<float> query_norm;
+    std::vector<float> key_norm;
     std::vector<float> ffn_norm;
 };
 
@@ -316,13 +349,16 @@ struct ModelData {
     std::size_t query_heads = 0;
     std::size_t kv_heads = 0;
     std::size_t rope_dim = 0;
+    bool rope_uses_split_half_pairs = false;
+    std::size_t attention_width = 0;
     std::size_t weight_payload_bytes = 0;
 };
 
 std::size_t layer_payload_bytes(const RealLlamaLayerWeights& weights) {
     return weights.attn_norm.bytes() + weights.attn_q.bytes() +
         weights.attn_k.bytes() + weights.attn_v.bytes() +
-        weights.attn_output.bytes() + weights.ffn_norm.bytes() +
+        weights.attn_output.bytes() + weights.attn_q_norm.bytes() +
+        weights.attn_k_norm.bytes() + weights.ffn_norm.bytes() +
         weights.ffn_gate.bytes() + weights.ffn_up.bytes() + weights.ffn_down.bytes();
 }
 
@@ -444,12 +480,24 @@ struct RealLlamaCpuContext::Impl {
         }
         {
             ProfileTimer timer(profiling_enabled ? &profile.rope_ms : nullptr);
+            if ((!weights.query_norm.empty() &&
+                 !rms_norm_heads(&query, model->query_heads, model->head_dim,
+                                 weights.query_norm, model->metadata.rms_norm_epsilon,
+                                 error)) ||
+                (!weights.key_norm.empty() &&
+                 !rms_norm_heads(&key, model->kv_heads, model->head_dim,
+                                 weights.key_norm, model->metadata.rms_norm_epsilon,
+                                 error))) {
+                return false;
+            }
             apply_rope(&query, model->query_heads, model->head_dim, position,
-                       model->rope_dim, model->metadata.rope_freq_base);
+                       model->rope_dim, model->metadata.rope_freq_base,
+                       model->rope_uses_split_half_pairs);
             apply_rope(&key, model->kv_heads, model->head_dim, position,
-                       model->rope_dim, model->metadata.rope_freq_base);
+                       model->rope_dim, model->metadata.rope_freq_base,
+                       model->rope_uses_split_half_pairs);
         }
-        std::vector<float> attention_output(model->metadata.hidden_size, 0.0f);
+        std::vector<float> attention_output(model->attention_width, 0.0f);
         {
             ProfileTimer timer(profiling_enabled ? &profile.attention_ms : nullptr);
             if (external_kv != nullptr) {
@@ -605,8 +653,17 @@ std::unique_ptr<RealLlamaCpuModel> RealLlamaCpuModel::load(
     GgufModelIndex index;
     if (!GgufReader::read_index(model_path, &index, error)) return nullptr;
     auto data = std::make_shared<ModelData>();
-    if (!ModelMetadataAdapter::from_gguf(index.metadata, &data->metadata, error) ||
-        !ModelSchema::validate_gguf(data->metadata, index, &data->layout, error)) {
+    if (!ModelMetadataAdapter::from_gguf(index.metadata, &data->metadata, error)) {
+        return nullptr;
+    }
+    if (data->metadata.architecture != "llama" &&
+        data->metadata.architecture != "qwen3") {
+        if (error != nullptr) {
+            *error = "dense CPU model supports llama and qwen3 architectures";
+        }
+        return nullptr;
+    }
+    if (!ModelSchema::validate_gguf(data->metadata, index, &data->layout, error)) {
         return nullptr;
     }
     if (layer_count == 0) layer_count = data->metadata.layer_count;
@@ -617,14 +674,28 @@ std::unique_ptr<RealLlamaCpuModel> RealLlamaCpuModel::load(
     data->query_heads = data->metadata.attention_head_count;
     data->kv_heads = data->metadata.attention_head_count_kv;
     if (data->query_heads == 0 || data->kv_heads == 0 ||
-        data->metadata.hidden_size % data->query_heads != 0 ||
         data->query_heads % data->kv_heads != 0) {
         if (error != nullptr) *error = "attention head metadata is invalid";
         return nullptr;
     }
-    data->head_dim = data->metadata.hidden_size / data->query_heads;
+    if (data->metadata.attention_key_length != 0) {
+        if (data->metadata.attention_value_length !=
+            data->metadata.attention_key_length) {
+            if (error != nullptr) *error = "CPU decoder requires equal key/value head lengths";
+            return nullptr;
+        }
+        data->head_dim = data->metadata.attention_key_length;
+    } else {
+        if (data->metadata.hidden_size % data->query_heads != 0) {
+            if (error != nullptr) *error = "hidden size is not divisible by query heads";
+            return nullptr;
+        }
+        data->head_dim = data->metadata.hidden_size / data->query_heads;
+    }
+    data->attention_width = data->query_heads * data->head_dim;
     data->rope_dim = data->metadata.rope_dimension_count == 0
         ? data->head_dim : data->metadata.rope_dimension_count;
+    data->rope_uses_split_half_pairs = data->metadata.architecture == "qwen3";
     if (!load_named(model_path, index, data->layout.embedding, &data->embedding, error) ||
         !load_named(model_path, index, data->layout.output, &data->output_weight, error)) {
         return nullptr;
@@ -643,6 +714,10 @@ std::unique_ptr<RealLlamaCpuModel> RealLlamaCpuModel::load(
                                         &layer.weights, error)) return nullptr;
         data->weight_payload_bytes += layer_payload_bytes(layer.weights);
         layer.attention_norm = floating_vector(layer.weights.attn_norm);
+        if (layer.weights.attn_q_norm.bytes() > 0) {
+            layer.query_norm = floating_vector(layer.weights.attn_q_norm);
+            layer.key_norm = floating_vector(layer.weights.attn_k_norm);
+        }
         layer.ffn_norm = floating_vector(layer.weights.ffn_norm);
     }
     auto impl = std::make_unique<Impl>();
@@ -669,6 +744,9 @@ std::unique_ptr<RealLlamaCpuContext> RealLlamaCpuModel::create_context() const {
 std::size_t RealLlamaCpuModel::layer_count() const { return impl_->data->layers.size(); }
 std::size_t RealLlamaCpuModel::model_layer_count() const {
     return impl_->data->metadata.layer_count;
+}
+const std::string& RealLlamaCpuModel::architecture() const {
+    return impl_->data->metadata.architecture;
 }
 std::size_t RealLlamaCpuModel::vocab_size() const { return impl_->data->metadata.vocab_size; }
 TokenId RealLlamaCpuModel::eos_token_id() const { return impl_->data->metadata.eos_token_id; }
@@ -864,18 +942,31 @@ bool RealLlamaCpuModel::decode_batch(
 
         stage_start = ProfileClock::now();
         for (std::size_t index = 0; index < items.size(); ++index) {
+            if ((!weights.query_norm.empty() &&
+                 !rms_norm_heads(&query[index], impl_->data->query_heads,
+                                 impl_->data->head_dim, weights.query_norm,
+                                 impl_->data->metadata.rms_norm_epsilon, error)) ||
+                (!weights.key_norm.empty() &&
+                 !rms_norm_heads(&key[index], impl_->data->kv_heads,
+                                 impl_->data->head_dim, weights.key_norm,
+                                 impl_->data->metadata.rms_norm_epsilon, error))) {
+                rollback();
+                return false;
+            }
             apply_rope(&query[index], impl_->data->query_heads, impl_->data->head_dim,
                        snapshots[index].context->position, impl_->data->rope_dim,
-                       impl_->data->metadata.rope_freq_base);
+                       impl_->data->metadata.rope_freq_base,
+                       impl_->data->rope_uses_split_half_pairs);
             apply_rope(&key[index], impl_->data->kv_heads, impl_->data->head_dim,
                        snapshots[index].context->position, impl_->data->rope_dim,
-                       impl_->data->metadata.rope_freq_base);
+                       impl_->data->metadata.rope_freq_base,
+                       impl_->data->rope_uses_split_half_pairs);
         }
         add_profile_time(&RealLlamaDecoderProfile::rope_ms, stage_start);
 
         stage_start = ProfileClock::now();
         std::vector<std::vector<float>> attention_output(
-            items.size(), std::vector<float>(impl_->data->metadata.hidden_size, 0.0f));
+            items.size(), std::vector<float>(impl_->data->attention_width, 0.0f));
         for (std::size_t index = 0; index < items.size(); ++index) {
             auto* context = snapshots[index].context;
             auto& cache = context->layers[layer];

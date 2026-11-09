@@ -1,4 +1,4 @@
-// Chapter 04/05：真实 TinyLlama 首层单 token CPU forward。
+// Chapter 04/05：真实稠密 Decoder 首层单 token CPU forward。
 // 职责：把 Chapter01 的 GGUF 权重、Chapter04 的层结构和 Chapter05 的量化 Linear 连接起来。
 // 限制：只执行 layer-0 的单 token，不代表完整模型生成或 llama.cpp 数值等价。
 #include "gguf_reader.h"
@@ -120,6 +120,20 @@ bool q6_linear(const chapter01::Tensor& weight,
         input, output, error);
 }
 
+bool quantized_linear(const chapter01::Tensor& weight,
+                      const std::vector<float>& input,
+                      std::vector<float>* output,
+                      std::string* error) {
+    if (weight.dtype() == chapter01::DType::Q4_K) {
+        return q4_linear(weight, input, output, error);
+    }
+    if (weight.dtype() == chapter01::DType::Q6_K) {
+        return q6_linear(weight, input, output, error);
+    }
+    *error = "expected Q4_K or Q6_K weight: " + weight.name();
+    return false;
+}
+
 std::vector<float> rms_norm(const std::vector<float>& input,
                             const std::vector<float>& weight,
                             float epsilon) {
@@ -130,6 +144,27 @@ std::vector<float> rms_norm(const std::vector<float>& input,
     std::vector<float> output(input.size(), 0.0f);
     for (std::size_t i = 0; i < input.size(); ++i) output[i] = input[i] * inverse * weight[i];
     return output;
+}
+
+bool rms_norm_heads(std::vector<float>* values,
+                    std::size_t head_count,
+                    std::size_t head_dimension,
+                    const std::vector<float>& weight,
+                    float epsilon,
+                    std::string* error) {
+    if (values == nullptr || head_count == 0 || head_dimension == 0 ||
+        values->size() != head_count * head_dimension ||
+        weight.size() != head_dimension) {
+        *error = "per-head RMSNorm dimensions are invalid";
+        return false;
+    }
+    for (std::size_t head = 0; head < head_count; ++head) {
+        const auto begin = values->begin() + head * head_dimension;
+        const std::vector<float> input(begin, begin + head_dimension);
+        const auto output = rms_norm(input, weight, epsilon);
+        std::copy(output.begin(), output.end(), begin);
+    }
+    return true;
 }
 
 float silu(float value) {
@@ -165,7 +200,7 @@ int main(int argc, char** argv) {
         std::cerr << "metadata load failed: " << error << '\n';
         return 1;
     }
-    chapter01::LlamaTensorLayout layout;
+    chapter01::DenseDecoderTensorLayout layout;
     if (!chapter01::ModelSchema::validate_gguf(metadata, index, &layout, &error)) {
         std::cerr << "schema validation failed: " << error << '\n';
         return 1;
@@ -176,13 +211,14 @@ int main(int argc, char** argv) {
         std::cerr << "embedding load failed: " << error << '\n';
         return 1;
     }
-    chapter01::RealLlamaLayerWeights layer;
-    if (!chapter01::RealLlamaLayerLoader::load(model_path, index, layout, 0, &layer, &error)) {
+    chapter01::RealDenseLayerWeights layer;
+    if (!chapter01::RealDenseLayerLoader::load(model_path, index, layout, 0, &layer, &error)) {
         std::cerr << "layer load failed: " << error << '\n';
         return 1;
     }
     const std::size_t hidden_size = metadata.hidden_size;
-    const std::size_t token_id = 15043;  // "Hello" under the TinyLlama reference tokenizer.
+    const std::size_t token_id = metadata.architecture == "qwen3"
+        ? 9707 : 15043;  // "Hello" under each fixed reference tokenizer.
     const std::size_t embedding_block_bytes = 144;
     const std::size_t embedding_row_bytes = hidden_size / 256 * embedding_block_bytes;
     const std::size_t embedding_offset = token_id * embedding_row_bytes;
@@ -204,24 +240,47 @@ int main(int argc, char** argv) {
     std::vector<float> query;
     std::vector<float> key;
     std::vector<float> value;
-    if (!q4_linear(layer.attn_q, norm1, &query, &error) ||
-        !q4_linear(layer.attn_k, norm1, &key, &error) ||
-        !q6_linear(layer.attn_v, norm1, &value, &error)) {
+    if (!quantized_linear(layer.attn_q, norm1, &query, &error) ||
+        !quantized_linear(layer.attn_k, norm1, &key, &error) ||
+        !quantized_linear(layer.attn_v, norm1, &value, &error)) {
         std::cerr << "attention projection failed: " << error << '\n';
         return 1;
     }
 
-    constexpr std::size_t head_dim = 64;
-    constexpr std::size_t query_heads = 32;
-    constexpr std::size_t kv_heads = 4;
-    std::vector<float> attention_output(hidden_size, 0.0f);
+    const std::size_t query_heads = metadata.attention_head_count;
+    const std::size_t kv_heads = metadata.attention_head_count_kv;
+    if (query_heads == 0 || kv_heads == 0 || query_heads % kv_heads != 0) {
+        std::cerr << "attention head counts are invalid\n";
+        return 1;
+    }
+    const std::size_t head_dim = metadata.attention_key_length == 0
+        ? hidden_size / query_heads : metadata.attention_key_length;
+    if (query.size() != query_heads * head_dim ||
+        key.size() != kv_heads * head_dim || value.size() != kv_heads * head_dim) {
+        std::cerr << "attention projection dimensions do not match metadata\n";
+        return 1;
+    }
+    const bool uses_qk_norm = layer.attn_q_norm.bytes() > 0;
+    if (uses_qk_norm) {
+        const auto q_norm = load_floating_vector(layer.attn_q_norm);
+        const auto k_norm = load_floating_vector(layer.attn_k_norm);
+        if (!rms_norm_heads(&query, query_heads, head_dim, q_norm,
+                            metadata.rms_norm_epsilon, &error) ||
+            !rms_norm_heads(&key, kv_heads, head_dim, k_norm,
+                            metadata.rms_norm_epsilon, &error)) {
+            std::cerr << "Q/K normalization failed: " << error << '\n';
+            return 1;
+        }
+    }
+    std::vector<float> attention_output(query_heads * head_dim, 0.0f);
     for (std::size_t query_head = 0; query_head < query_heads; ++query_head) {
         const std::size_t kv_head = query_head / (query_heads / kv_heads);
         std::copy_n(value.begin() + kv_head * head_dim, head_dim,
                     attention_output.begin() + query_head * head_dim);
     }
     std::vector<float> projected_attention;
-    if (!q4_linear(layer.attn_output, attention_output, &projected_attention, &error)) {
+    if (!quantized_linear(layer.attn_output, attention_output,
+                          &projected_attention, &error)) {
         std::cerr << "attention output projection failed: " << error << '\n';
         return 1;
     }
@@ -230,21 +289,26 @@ int main(int argc, char** argv) {
     const auto norm2 = rms_norm(hidden, norm2_weight, metadata.rms_norm_epsilon);
     std::vector<float> gate;
     std::vector<float> up;
-    if (!q4_linear(layer.ffn_gate, norm2, &gate, &error) ||
-        !q4_linear(layer.ffn_up, norm2, &up, &error)) {
+    if (!quantized_linear(layer.ffn_gate, norm2, &gate, &error) ||
+        !quantized_linear(layer.ffn_up, norm2, &up, &error)) {
         std::cerr << "FFN up projection failed: " << error << '\n';
         return 1;
     }
     for (std::size_t i = 0; i < gate.size(); ++i) gate[i] = silu(gate[i]) * up[i];
     std::vector<float> projected_ffn;
-    if (!q6_linear(layer.ffn_down, gate, &projected_ffn, &error)) {
+    if (!quantized_linear(layer.ffn_down, gate, &projected_ffn, &error)) {
         std::cerr << "FFN down projection failed: " << error << '\n';
         return 1;
     }
     for (std::size_t i = 0; i < hidden.size(); ++i) hidden[i] += projected_ffn[i];
 
-    std::cout << "token_id: " << token_id << '\n'
+    std::cout << "architecture: " << metadata.architecture << '\n'
+              << "token_id: " << token_id << '\n'
               << "hidden_size: " << hidden.size() << '\n'
+              << "query_heads: " << query_heads << '\n'
+              << "kv_heads: " << kv_heads << '\n'
+              << "head_dimension: " << head_dim << '\n'
+              << "qk_norm: " << (uses_qk_norm ? "applied" : "not-required") << '\n'
               << "query_size: " << query.size() << '\n'
               << "kv_size: " << key.size() << '\n'
               << "output_max_abs: " << max_abs(hidden) << '\n'

@@ -46,9 +46,8 @@ struct DecoderLayerContract final {
             kv_head_count == 0 || head_dimension == 0) {
             return Status::error("decoder dimensions and head counts must be non-zero");
         }
-        if (query_head_count > std::numeric_limits<std::size_t>::max() / head_dimension ||
-            query_head_count * head_dimension != hidden_size) {
-            return Status::error("decoder query heads do not match hidden size");
+        if (query_head_count > std::numeric_limits<std::size_t>::max() / head_dimension) {
+            return Status::error("decoder query projection width overflows host size");
         }
         if (query_head_count % kv_head_count != 0) {
             return Status::error("decoder query heads must be divisible by KV heads");
@@ -60,6 +59,14 @@ struct DecoderLayerContract final {
                 "decoder rotary dimension must be even and fit inside one head");
         }
         return Status::ok();
+    }
+
+    std::size_t query_width() const {
+        return query_head_count * head_dimension;
+    }
+
+    std::size_t kv_width() const {
+        return kv_head_count * head_dimension;
     }
 };
 

@@ -99,6 +99,7 @@ public:
     std::unique_ptr<RealLlamaCpuContext> create_context() const;
     std::size_t layer_count() const;
     std::size_t model_layer_count() const;
+    const std::string& architecture() const;
     std::size_t vocab_size() const;
     TokenId eos_token_id() const;
     std::size_t weight_payload_bytes() const;
