@@ -8,7 +8,7 @@ Chapter06 定义单请求生成，Chapter07 管理 K/V 资源，Chapter08 选择
 | --- | --- | --- |
 | A 服务生命周期 | 从 admission 进入 waiting/running，再处理取消、超时、失败和统一释放 | 固定状态转换、容量结果和资源归零 |
 | B 网络与并发 | 把 Completion/SSE 映射到 ServiceCore，再用 TinyLlama 和 Qwen3 验证模型切换 | HTTP 状态、词元顺序、请求级并发与指标契约 |
-| G GPU 扩展坐标 | 保持 ServiceCore 与 HTTP 契约不变，把 Executor 替换为设备后端 | TinyLlama CUDA 已通过分页 Decode batch、同步 Completion、SSE 和终态释放 |
+| G GPU 扩展坐标 | 保持 ServiceCore 与 HTTP 契约不变，把 Executor 替换为设备后端 | TinyLlama 与 Qwen3 均已通过 CUDA 服务闭环 |
 | M 多模态扩展坐标 | 在 Adapter 前构造图文 embedding Executor，再复用同一服务生命周期 | 已有引擎集成测试；图片 HTTP body 与多模态 Transport 尚未实现 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
@@ -41,5 +41,6 @@ Chapter06 定义单请求生成，Chapter07 管理 K/V 资源，Chapter08 选择
 | L4 真实模型 | `bash code/engine/scripts/run_real_http_server.sh --check` | TinyLlama golden、Context 隔离和资源释放通过 | 有模型时必做 |
 | L4 可选 Qwen3 | `bash code/chapter10_serving/scripts/run_qwen3_serving.sh` | Qwen3 Completion、SSE、双请求调度、Radix 命中和释放通过 | 扩展模型时执行 |
 | L5 CUDA 服务 | `bash code/engine/scripts/run_real_cuda_serving.sh` | CUDA golden、SSE 顺序、取消、超时和 inflight 归零 | 有 CUDA 时可选 |
+| L5 Qwen3 CUDA 服务 | `bash code/engine/scripts/run_qwen3_cuda_serving.sh` | Qwen3 Completion/SSE golden、Tensor Batch 和终态资源归零 | 完成 Qwen3 CUDA Generation 后执行 |
 
 L1 入口会构建 Chapter06–08 依赖与 `chapter10_serving`，再运行 ServiceCore、终态释放、HTTP/SSE 契约和请求 Worker 四个测试。

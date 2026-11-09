@@ -45,4 +45,5 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | L2 可选 Qwen3 首层 | `bash code/chapter04_attention/scripts/run_qwen3_first_layer.sh` | Q/K Norm、16/8 头、128 维头空间、NeoX RoPE、增量 K/V 和因果注意力通过 | 学习模型差异时执行 |
 | L3 可选 Qwen3 全层 | `bash code/chapter04_attention/scripts/run_qwen3_decoder.sh` | 28 层 CPU logits、前五候选和连续四步贪心词元通过 llama.cpp 对照 | 验收第二种稠密架构时执行 |
 | L3 可选 CUDA | `bash code/engine/scripts/run_real_cuda_decoder.sh` | TinyLlama 2 层与 22 层 hidden、分层 K/V 匹配 CPU 参考实现 | 有 NVIDIA GPU 和模型时选做 |
+| L3 可选 Qwen3 CUDA | `bash code/engine/scripts/run_qwen3_cuda_decoder.sh` | Qwen3 28 层 hidden、分层 K/V、logits、融合 Attention 与 Tensor Prefill匹配 CPU 参考实现 | 验收第二种 CUDA 稠密架构时执行 |
 | L4 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 三阶段与融合路径均通过 logits/greedy 检查，并保留两轮 Prefill/Decode 样本；收益不稳定时不切换默认路径 | 调优融合内核时必做 |

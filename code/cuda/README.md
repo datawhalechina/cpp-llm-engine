@@ -102,9 +102,9 @@ EXP-GPU-16 进一步覆盖 batch 1/2、上下文 `16/128` 和 Decode `1/8` 步�
 
 ## RoPE Kernel
 
-RoPE 请求使用连续 `[tokens, heads, head_dim]` 布局，在原 Tensor 上旋转前 `rotary_dimension` 个分量。相邻两个分量组成一对，每个 CUDA 线程负责一对；连续序列使用 `position_offset + token_index`。Decode batch 使用另一入口显式上传 `positions[B]`，让不同长度请求在 `[B,heads,head_dim]` 中保持各自位置。`rotary_dimension` 可以小于 `head_dim`，未参与旋转的尾部保持不变。
+RoPE 请求使用连续 `[tokens, heads, head_dim]` 布局，在原 Tensor 上旋转前 `rotary_dimension` 个分量。`RotaryPairing::Adjacent` 处理 Llama 的相邻维配对，`RotaryPairing::SplitHalf` 处理 Qwen3 的 NeoX 半维配对；每个 CUDA 线程负责一个分量对。连续序列使用 `position_offset + token_index`，Decode batch 使用另一入口显式上传 `positions[B]`，让不同长度请求在 `[B,heads,head_dim]` 中保持各自位置。`rotary_dimension` 可以小于 `head_dim`，未参与旋转的尾部保持不变。
 
-测试先用同构 CPU 公式生成 golden，再覆盖多 token、多 head、非整除 grid、局部旋转维度、非连续位置 `{0,7,31}`、非法参数和 `CudaExecutionContext` shape 检查。RTX 5070 Ti Laptop GPU / CUDA 12.8 上，`257 x 32 x 64`、warmup 1 次、测量 10 次的本次 kernel event 均值为 `0.0083808 ms`；该数字只用于确认计时闭环，不是跨设备性能基线。
+测试先用同构 CPU 公式生成 golden，再覆盖两种配对、多 token、多 head、Qwen3 的 128 维头空间、局部旋转维度、非连续位置 `{0,7,31}`、非法参数和 `CudaExecutionContext` shape 检查。RTX 5070 Ti Laptop GPU / CUDA 12.8 上，`257 x 32 x 64`、warmup 1 次、测量 10 次的本次 kernel event 均值为 `0.0083808 ms`；该数字只用于确认计时闭环，不是跨设备性能基线。
 
 ## 连续 Device KV Cache
 
@@ -144,7 +144,7 @@ Engine 的 CUDA Factory 用 `PrefixBlockStore` 把同一 `RadixPrefixCache` 算�
 
 ## Decoder 逐元素算子
 
-Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续复用 Vector Add。单向量 RMSNorm 用一个 block 分段归约；批量 RMSNorm 用一行一个 block 处理 `[B,D]`，共享同一 `[D]` 权重。SwiGLU 与 Residual 本身按总元素数执行，可直接处理连续批量 Tensor。测试覆盖非整除宽度 257、TinyLlama hidden size 2048 和多行 CPU golden，这些算子已由下一节的 `CudaDecoderLayer` 组装成合成单层 Decoder。
+Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续复用 Vector Add。单向量 RMSNorm 用一个 block 分段归约；批量 RMSNorm 把连续 `[...,D]` 的前导维展平成独立行，每行一个 block 并共享同一 `[D]` 权重。因此原有 `[B,D]` 和 Qwen3 Q/K 使用的 `[B,H,D]` 走同一个 kernel。SwiGLU 与 Residual 本身按总元素数执行，可直接处理连续批量 Tensor。测试覆盖非整除宽度 257、TinyLlama hidden size 2048、Qwen3 head size 128 和多行 CPU golden，这些算子已由下一节的 `CudaDecoderLayer` 组装成合成单层 Decoder。
 
 `CudaExecutionContext::pack_rows()` 与 `unpack_rows()` 在设备内把多个请求的 `[D]` Tensor 和 `[B,D]` 批量 Tensor 相互转换。接口先完成全部 shape 检查再排入 D2D copy；调用方必须先保证各请求 stream 的源数据已经完成。它为共享 RMSNorm/Linear 提供数据交接，不负责请求调度、K/V 所有权或失败回滚。模型创建 Batch Workspace 时按最大上下文预留三阶段 Attention score 和页表临时空间，避免 Decode 位置增长触发逐步扩容。
 
@@ -164,18 +164,25 @@ Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续�
 
 `cuda_llama_layer_weights_test` 检查权重方向、packed payload、移动语义和失败原子性。真实模型测试依次核对 layer-0、2/22 层 hidden 与 K/V、量化 embedding、final norm、LM Head 和 logits；Generation 测试继续验证真实 tokenizer、greedy decode、detokenizer 与请求隔离。`CudaDecoderBatchLayer` 合并无状态计算，并让每个请求通过连续缓存或页表读取自己的历史。真实 Runtime 和 Service 测试检查 logits、golden token、预留/提交、调度计数、整批回滚、终态释放和 workspace 复用。
 
-### Qwen3 进入 CUDA 路径前需要补什么
+### Qwen3 CUDA 分阶段接入
 
-Qwen3 CPU 路径已经证明 Loader、Tokenizer 和 Decoder 数学成立，但当前 CUDA 模型仍只接受 `llama`。这个限制不能通过删除架构检查解决，因为设备层还保留四项 TinyLlama 假设：
+Qwen3 CPU 路径已经证明 Loader、Tokenizer 和 Decoder 数学成立。CUDA 首层、28 层 Decoder、Runtime、真实文本 Generation 和 Serving 已通过真实 Qwen3 GGUF 验收：全层路径核对 hidden、逐层 K/V、logits、融合 Attention 与 Tensor Prefill，Runtime 路径继续检查请求级缓存、批次和前缀复用，文本与服务入口核对 BPE、反分词、HTTP/SSE 和终态释放。
 
-| 差异 | 当前 CUDA 假设 | Qwen3 需要的改动 | 首个验收 |
+| 差异 | 已实现 | 后续验收 | 首个验收 |
 | --- | --- | --- | --- |
-| Q 投影宽度 | `Q width == hidden_size` | 按 `query_heads * head_dim` 分配和校验 Q/Attention Context；输出投影接收该宽度并回到 hidden | 合成非对称 Q/KV 单层测试 |
-| Q/K Norm | 只有 Attention 前和 FFN 前 RMSNorm | 上传每层 `attn_q_norm`、`attn_k_norm`，按 Head 对 Q/K 归一化后再执行 RoPE | Q/K Norm CPU/CUDA golden |
-| RoPE 配对 | 相邻维 `(0,1)、(2,3)` | 在请求对象中显式选择相邻维或 NeoX 半维配对 | 两种布局的单/多位置测试 |
-| 模型准入 | `RealLlamaCudaModel` 只接受 `llama` | 前三项通过后允许 `qwen3`，继续由 GGUF 自动选择，不增加手工架构参数 | Qwen3 首层真实模型对照 |
+| Q 投影宽度 | Decoder 按 `query_heads * head_dim` 分配 Q/Attention Context，输出投影再回到 hidden | 在真实 Qwen 权重上核对 hidden | 合成非对称 Q/KV 单层测试 |
+| Q/K Norm | 设备权重上传可选 `attn_q_norm`、`attn_k_norm`，Q/K Linear 后按 Head 归一化 | 核对真实首层 K/V 与 hidden | Q/K Norm CPU/CUDA golden |
+| RoPE 配对 | 公共请求、kernel 和层配置支持相邻维与 NeoX 半维配对 | 核对非零位置 Prefill/Decode | 两种布局的单/多位置测试 |
+| 模型准入 | `RealLlamaCudaModel` 根据 GGUF 接受 `llama` 与 `qwen3`，并读取显式头维；Factory 暴露实际架构与层数 | 用同一入口执行 28 层和 Runtime | Qwen3 首层真实模型对照 |
 
-实施顺序是先扩展公共 RoPE 和按 Head RMSNorm，再让合成 Decoder 覆盖非对称 Q 宽度，随后上传 Q/K Norm 并运行 Qwen3 首层，最后才放宽模型准入。完整 28 层、Generation、分页 K/V 和服务沿用现有纵向测试逐级开启；任一下层数值检查失败时，不继续用端到端输出掩盖问题。
+运行 `bash code/engine/scripts/run_qwen3_cuda_first_layer.sh` 会加载真实 Qwen3 GGUF，并用 CPU 量化参考实现核对 CUDA hidden、K 和 V；RTX 5070 Ti Laptop / CUDA 12.8 的首层测试耗时约 `0.51 s`。同一环境下，28 层测试得到 `logits_max_error=4.95911e-05`，Runtime 验收耗时约 `0.77 s`，真实文本入口生成 `11 358 1366 311` 并还原为 `, I want to`，CUDA 服务组合验收耗时约 `0.80 s`。
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_qwen3_cuda_decoder.sh
+CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_qwen3_cuda_runtime.sh
+CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_qwen3_cuda_generation.sh
+CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_qwen3_cuda_serving.sh
+```
 
 ## 运行与验证
 

@@ -2,7 +2,7 @@
 
 GPU 路线在 CPU 已验证的算法和公共接口上替换设备内存、计算核与执行上下文。建议先完成 [CPU 六任务](./cpu_learning_plan.md)中的前四项；完整学习调度和服务前，再补齐 CPU 任务五、六。
 
-当前真实 GPU 基线是 TinyLlama：单层、22 层 Decoder、Generation、分页 K/V、批量执行和服务均有验证入口。Qwen3 已完成 CPU 主线，GPU 路径仍待适配 Q/K Norm、NeoX RoPE、非对称 Q/KV 投影宽度和 28 层结构；因此任务 4–6 当前只承诺 TinyLlama。
+TinyLlama 与 Qwen3 都已形成完整 GPU 基线：真实模型加载、完整 Decoder、Generation、分页 K/V、批量执行和服务均有验证入口。TinyLlama 用于学习 Llama 稠密架构，Qwen3 用于验证 Q/K Norm、NeoX RoPE 和非对称 Q/KV 投影不会改变上层 Runtime 与服务契约。
 
 环境安装与故障排查见 [CUDA 安装与配置](./setup_cuda.md)，代码对象与测试清单见 [`code/cuda/README.md`](/code/cuda)。
 

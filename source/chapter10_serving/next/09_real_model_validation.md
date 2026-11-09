@@ -48,4 +48,10 @@ bash code/chapter10_serving/scripts/run_qwen3_serving.sh
 bash code/engine/scripts/run_real_cuda_serving.sh
 ```
 
-该入口保持 `ServiceCore` 和 `HttpAdapter` 不变，只把每请求 Executor 换成 CUDA Context。验收覆盖正常 Completion、SSE、客户端取消和超时，并要求四个请求释放后 `inflight`、`waiting`、`running` 全部归零。
+Qwen3 使用相同 CUDA 服务入口，只替换模型与 golden：
+
+```bash
+bash code/engine/scripts/run_qwen3_cuda_serving.sh
+```
+
+两个入口都保持 `ServiceCore` 和 `HttpAdapter` 不变，只把每请求 Executor 换成 CUDA Context。TinyLlama 与 Qwen3 均已通过正常 Completion、SSE、客户端取消和超时验收，四个请求释放后 `inflight`、`waiting`、`running` 全部归零。

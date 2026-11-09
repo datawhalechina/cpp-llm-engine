@@ -16,7 +16,7 @@ CPU 类型暂时保留在 `chapter01` 命名空间，以兼容已有引擎和多
 
 首层示例和 CPU 模型同时接受 Llama 与 Qwen3 布局。Qwen3 路径根据元数据使用 16 个 Q 头、8 个 K/V 头和 128 维头空间，在 RoPE 前对每个 Q/K 头独立执行 RMSNorm，并使用前半维与后半维配对的 NeoX RoPE。运行 `bash code/chapter04_attention/scripts/run_qwen3_first_layer.sh` 可观察首层数据流；运行 `bash code/chapter04_attention/scripts/run_qwen3_decoder.sh` 可验证 28 层 logits 和连续四步贪心解码。
 
-CPU 类名暂时保留 `RealLlamaCpuModel` 以兼容引擎和多模态调用方，但加载时会读取 GGUF 的 `general.architecture`，只接受已经实现的 `llama` 与 `qwen3`。执行器工厂已复用该分派进入 Chapter06 单请求生成和 Chapter10 CPU 服务；Qwen3 CUDA 仍待接入。
+CPU 类名暂时保留 `RealLlamaCpuModel` 以兼容引擎和多模态调用方，但加载时会读取 GGUF 的 `general.architecture`，只接受已经实现的 `llama` 与 `qwen3`。执行器工厂已复用该分派进入 Chapter06 单请求生成和 Chapter10 CPU 服务。Qwen3 CUDA 首层已通过非对称投影、Q/K Norm、NeoX RoPE 与真实 K/V 验收；28 层 Decoder 使用同一模型对象继续验证。
 
 CUDA 模型持有量化 embedding、分层 Decoder 权重、final norm 和 LM Head；Context 从 token ID 开始执行，并保存请求级连续 K/V 或绑定 Chapter07 分页数据面。真实测试已完成 TinyLlama 2 层与 22 层 hidden/K/V/logits 数值对照，Chapter06–10 继续验证真实 Tokenizer、Prefill、贪心解码、分页 batch、服务调度和请求隔离。
 

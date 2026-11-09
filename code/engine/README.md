@@ -65,6 +65,18 @@ bash code/engine/scripts/run_real_cuda_decoder.sh
 bash code/engine/scripts/run_real_cuda_runtime.sh
 ```
 
+Qwen3 使用相同 Model、Factory、Executor 和 Runtime 接口，模型元数据会自动选择 28 层、Q/K Norm、NeoX RoPE 和非对称 Q/KV 投影。按首层、全层、Runtime 的顺序运行，便于把结构错误定位在最小阶段：
+
+```bash
+bash code/engine/scripts/run_qwen3_cuda_first_layer.sh
+bash code/engine/scripts/run_qwen3_cuda_decoder.sh
+bash code/engine/scripts/run_qwen3_cuda_runtime.sh
+bash code/engine/scripts/run_qwen3_cuda_generation.sh
+bash code/engine/scripts/run_qwen3_cuda_serving.sh
+```
+
+Qwen3 Runtime 入口同时检查确定性生成、双请求 Tensor Batch、持久化工作区、分页 K/V 和 Radix 前缀复用。真实文本入口继续接入 llama.cpp Tokenizer，并用 CPU 路径已经登记的 `11 358 1366 311` 核对 CUDA 输出。服务入口复用同一 Factory，并已通过 Completion、SSE、取消、超时、批量调度和终态资源归零验收。
+
 继续运行真实文本入口，会使用与 CPU Engine 相同的 llama.cpp tokenizer，并核对四个生成 token：
 
 ```bash
