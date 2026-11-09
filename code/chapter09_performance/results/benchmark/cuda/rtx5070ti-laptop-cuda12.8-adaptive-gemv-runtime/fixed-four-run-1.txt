@@ -1,0 +1,15 @@
+gemv_path: fixed-four
+requests: 2
+prompt_tokens: 1,2
+decode_steps: 1
+paged_kv: true
+block_size: 8
+warmup: 2
+iterations: 10
+statistic: median
+sequential_decode_median_ms: 29.3657
+tensor_batch_decode_median_ms: 15.758
+batch_over_sequential: 0.536613
+logits_max_error: 0
+sequential_decode_samples_ms: 28.6795 28.8302 28.8031 28.9788 39.7195 53.6432 38.7828 29.7299 29.4019 29.3295
+tensor_batch_decode_samples_ms: 15.5593 15.4676 15.6078 15.4427 29.3592 29.1963 19.6048 16.0481 15.9082 15.4247

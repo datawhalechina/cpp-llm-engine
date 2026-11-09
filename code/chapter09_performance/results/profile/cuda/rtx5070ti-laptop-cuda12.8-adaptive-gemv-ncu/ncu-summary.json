@@ -1,0 +1,582 @@
+{
+  "schema_version": 1,
+  "profiler": "Nsight Compute",
+  "comparisons": [
+    {
+      "format": "Q4",
+      "batch": 1,
+      "metrics": {
+        "Elapsed Cycles": {
+          "baseline": 100147,
+          "experiment": 82695,
+          "unit": "cycle",
+          "delta_percent": -17.426383216671493
+        },
+        "Duration": {
+          "baseline": 106048,
+          "experiment": 92032,
+          "unit": "ns",
+          "delta_percent": -13.216656608328304
+        },
+        "Registers Per Thread": {
+          "baseline": 40,
+          "experiment": 40,
+          "unit": "register/thread",
+          "delta_percent": 0
+        },
+        "Static Shared Memory Per Block": {
+          "baseline": 128,
+          "experiment": 32,
+          "unit": "byte/block",
+          "delta_percent": -75
+        },
+        "Achieved Occupancy": {
+          "baseline": 85.74,
+          "experiment": 88.34,
+          "unit": "%",
+          "delta_percent": 3.0324236062514682
+        },
+        "Executed Instructions": {
+          "baseline": 10006528,
+          "experiment": 6807552,
+          "unit": "inst",
+          "delta_percent": -31.968890708145725
+        },
+        "Issued Instructions": {
+          "baseline": 10006528,
+          "experiment": 6807552,
+          "unit": "inst",
+          "delta_percent": -31.968890708145725
+        },
+        "Executed Ipc Active": {
+          "baseline": 2.32,
+          "experiment": 2.01,
+          "unit": "inst/cycle",
+          "delta_percent": -13.362068965517246
+        },
+        "Active Warps Per Scheduler": {
+          "baseline": 10.31,
+          "experiment": 10.61,
+          "unit": "warp",
+          "delta_percent": 2.9097963142579912
+        },
+        "Eligible Warps Per Scheduler": {
+          "baseline": 2.93,
+          "experiment": 1.92,
+          "unit": "warp",
+          "delta_percent": -34.470989761092156
+        },
+        "Issued Warp Per Scheduler": {
+          "baseline": 0.58,
+          "experiment": 0.5,
+          "unit": "\"",
+          "delta_percent": -13.793103448275856
+        },
+        "Warp Cycles Per Issued Instruction": {
+          "baseline": 17.74,
+          "experiment": 21.09,
+          "unit": "cycle",
+          "delta_percent": 18.883878241262693
+        },
+        "Warp Cycles Per Executed Instruction": {
+          "baseline": 17.74,
+          "experiment": 21.09,
+          "unit": "cycle",
+          "delta_percent": 18.883878241262693
+        },
+        "Avg. Active Threads Per Warp": {
+          "baseline": 32,
+          "experiment": 31.87,
+          "unit": "\"",
+          "delta_percent": -0.4062499999999969
+        },
+        "Avg. Not Predicated Off Threads Per Warp": {
+          "baseline": 26.59,
+          "experiment": 26.6,
+          "unit": "\"",
+          "delta_percent": 0.03760812335465048
+        },
+        "Memory Throughput": {
+          "baseline": 22392275196.14,
+          "experiment": 25794158553.55,
+          "unit": "byte/s",
+          "delta_percent": 15.192218421808338
+        },
+        "Mem Busy": {
+          "baseline": 45.14,
+          "experiment": 44.3,
+          "unit": "%",
+          "delta_percent": -1.8608772707133439
+        },
+        "Mem Pipes Busy": {
+          "baseline": 89.54,
+          "experiment": 87.12,
+          "unit": "%",
+          "delta_percent": -2.7027027027027044
+        },
+        "L1/TEX Hit Rate": {
+          "baseline": 94.45,
+          "experiment": 94.45,
+          "unit": "%",
+          "delta_percent": 0
+        },
+        "L2 Hit Rate": {
+          "baseline": 16.6,
+          "experiment": 17.63,
+          "unit": "%",
+          "delta_percent": 6.2048192771084185
+        },
+        "DRAM Throughput": {
+          "baseline": 6.59,
+          "experiment": 7.6,
+          "unit": "%",
+          "delta_percent": 15.32625189681335
+        },
+        "L1/TEX Cache Throughput": {
+          "baseline": 95.09,
+          "experiment": 93.71,
+          "unit": "%",
+          "delta_percent": -1.4512567041750022
+        },
+        "L2 Cache Throughput": {
+          "baseline": 5.93,
+          "experiment": 5.1,
+          "unit": "%",
+          "delta_percent": -13.996627318718383
+        }
+      }
+    },
+    {
+      "format": "Q4",
+      "batch": 2,
+      "metrics": {
+        "Elapsed Cycles": {
+          "baseline": 100541,
+          "experiment": 81923,
+          "unit": "cycle",
+          "delta_percent": -18.517818601366606
+        },
+        "Duration": {
+          "baseline": 105408,
+          "experiment": 89312,
+          "unit": "ns",
+          "delta_percent": -15.270188221007894
+        },
+        "Registers Per Thread": {
+          "baseline": 40,
+          "experiment": 33,
+          "unit": "register/thread",
+          "delta_percent": -17.5
+        },
+        "Static Shared Memory Per Block": {
+          "baseline": 128,
+          "experiment": 64,
+          "unit": "byte/block",
+          "delta_percent": -50
+        },
+        "Achieved Occupancy": {
+          "baseline": 85.15,
+          "experiment": 87.93,
+          "unit": "%",
+          "delta_percent": 3.2648267762771592
+        },
+        "Executed Instructions": {
+          "baseline": 10027008,
+          "experiment": 7890944,
+          "unit": "inst",
+          "delta_percent": -21.3031045751634
+        },
+        "Issued Instructions": {
+          "baseline": 10027008,
+          "experiment": 7890944,
+          "unit": "inst",
+          "delta_percent": -21.3031045751634
+        },
+        "Executed Ipc Active": {
+          "baseline": 2.31,
+          "experiment": 2.3,
+          "unit": "inst/cycle",
+          "delta_percent": -0.4329004329004429
+        },
+        "Active Warps Per Scheduler": {
+          "baseline": 10.28,
+          "experiment": 10.53,
+          "unit": "warp",
+          "delta_percent": 2.4319066147859925
+        },
+        "Eligible Warps Per Scheduler": {
+          "baseline": 2.89,
+          "experiment": 2.07,
+          "unit": "warp",
+          "delta_percent": -28.373702422145335
+        },
+        "Issued Warp Per Scheduler": {
+          "baseline": 0.58,
+          "experiment": 0.58,
+          "unit": "\"",
+          "delta_percent": 0
+        },
+        "Warp Cycles Per Issued Instruction": {
+          "baseline": 17.7,
+          "experiment": 18.26,
+          "unit": "cycle",
+          "delta_percent": 3.1638418079096176
+        },
+        "Warp Cycles Per Executed Instruction": {
+          "baseline": 17.7,
+          "experiment": 18.26,
+          "unit": "cycle",
+          "delta_percent": 3.1638418079096176
+        },
+        "Avg. Active Threads Per Warp": {
+          "baseline": 31.94,
+          "experiment": 31.91,
+          "unit": "\"",
+          "delta_percent": -0.09392611145898916
+        },
+        "Avg. Not Predicated Off Threads Per Warp": {
+          "baseline": 27.37,
+          "experiment": 28.38,
+          "unit": "\"",
+          "delta_percent": 3.690171720862251
+        },
+        "Memory Throughput": {
+          "baseline": 23438979963.57,
+          "experiment": 28365460408.46,
+          "unit": "byte/s",
+          "delta_percent": 21.01832269385005
+        },
+        "Mem Busy": {
+          "baseline": 44.96,
+          "experiment": 43.84,
+          "unit": "%",
+          "delta_percent": -2.4911032028469693
+        },
+        "Mem Pipes Busy": {
+          "baseline": 89.13,
+          "experiment": 86.4,
+          "unit": "%",
+          "delta_percent": -3.062941770447649
+        },
+        "L1/TEX Hit Rate": {
+          "baseline": 95.18,
+          "experiment": 95.18,
+          "unit": "%",
+          "delta_percent": 0
+        },
+        "L2 Hit Rate": {
+          "baseline": 29.39,
+          "experiment": 27.89,
+          "unit": "%",
+          "delta_percent": -5.103776794828173
+        },
+        "DRAM Throughput": {
+          "baseline": 6.9,
+          "experiment": 8.35,
+          "unit": "%",
+          "delta_percent": 21.014492753623177
+        },
+        "L1/TEX Cache Throughput": {
+          "baseline": 94.45,
+          "experiment": 91.6,
+          "unit": "%",
+          "delta_percent": -3.0174695606140904
+        },
+        "L2 Cache Throughput": {
+          "baseline": 4.65,
+          "experiment": 5.58,
+          "unit": "%",
+          "delta_percent": 19.999999999999993
+        }
+      }
+    },
+    {
+      "format": "Q6",
+      "batch": 1,
+      "metrics": {
+        "Elapsed Cycles": {
+          "baseline": 87219,
+          "experiment": 58573,
+          "unit": "cycle",
+          "delta_percent": -32.843761107098224
+        },
+        "Duration": {
+          "baseline": 91392,
+          "experiment": 62176,
+          "unit": "ns",
+          "delta_percent": -31.967787114845937
+        },
+        "Registers Per Thread": {
+          "baseline": 40,
+          "experiment": 40,
+          "unit": "register/thread",
+          "delta_percent": 0
+        },
+        "Static Shared Memory Per Block": {
+          "baseline": 128,
+          "experiment": 32,
+          "unit": "byte/block",
+          "delta_percent": -75
+        },
+        "Achieved Occupancy": {
+          "baseline": 84.14,
+          "experiment": 87.23,
+          "unit": "%",
+          "delta_percent": 3.6724506774423618
+        },
+        "Executed Instructions": {
+          "baseline": 8417280,
+          "experiment": 5279744,
+          "unit": "inst",
+          "delta_percent": -37.27493917274939
+        },
+        "Issued Instructions": {
+          "baseline": 8417280,
+          "experiment": 5279744,
+          "unit": "inst",
+          "delta_percent": -37.27493917274939
+        },
+        "Executed Ipc Active": {
+          "baseline": 2.24,
+          "experiment": 2.14,
+          "unit": "inst/cycle",
+          "delta_percent": -4.464285714285718
+        },
+        "Active Warps Per Scheduler": {
+          "baseline": 10.1,
+          "experiment": 10.31,
+          "unit": "warp",
+          "delta_percent": 2.0792079207920877
+        },
+        "Eligible Warps Per Scheduler": {
+          "baseline": 2.91,
+          "experiment": 1.42,
+          "unit": "warp",
+          "delta_percent": -51.20274914089348
+        },
+        "Issued Warp Per Scheduler": {
+          "baseline": 0.56,
+          "experiment": 0.54,
+          "unit": "\"",
+          "delta_percent": -3.571428571428574
+        },
+        "Warp Cycles Per Issued Instruction": {
+          "baseline": 17.96,
+          "experiment": 18.97,
+          "unit": "cycle",
+          "delta_percent": 5.623608017817361
+        },
+        "Warp Cycles Per Executed Instruction": {
+          "baseline": 17.96,
+          "experiment": 18.97,
+          "unit": "cycle",
+          "delta_percent": 5.623608017817361
+        },
+        "Avg. Active Threads Per Warp": {
+          "baseline": 32,
+          "experiment": 31.83,
+          "unit": "\"",
+          "delta_percent": -0.5312500000000053
+        },
+        "Avg. Not Predicated Off Threads Per Warp": {
+          "baseline": 27.81,
+          "experiment": 29.8,
+          "unit": "\"",
+          "delta_percent": 7.155699388709105
+        },
+        "Memory Throughput": {
+          "baseline": 37812324929.97,
+          "experiment": 57651055069.48,
+          "unit": "byte/s",
+          "delta_percent": 52.466306095306635
+        },
+        "Mem Busy": {
+          "baseline": 45.37,
+          "experiment": 41.03,
+          "unit": "%",
+          "delta_percent": -9.56579237381529
+        },
+        "Mem Pipes Busy": {
+          "baseline": 89.6,
+          "experiment": 79.86,
+          "unit": "%",
+          "delta_percent": -10.870535714285708
+        },
+        "L1/TEX Hit Rate": {
+          "baseline": 91.43,
+          "experiment": 91.46,
+          "unit": "%",
+          "delta_percent": 0.032811987312683935
+        },
+        "L2 Hit Rate": {
+          "baseline": 13.94,
+          "experiment": 14.66,
+          "unit": "%",
+          "delta_percent": 5.164992826398858
+        },
+        "DRAM Throughput": {
+          "baseline": 11.14,
+          "experiment": 16.98,
+          "unit": "%",
+          "delta_percent": 52.42369838420108
+        },
+        "L1/TEX Cache Throughput": {
+          "baseline": 95.25,
+          "experiment": 86.2,
+          "unit": "%",
+          "delta_percent": -9.501312335958003
+        },
+        "L2 Cache Throughput": {
+          "baseline": 5.6,
+          "experiment": 8.66,
+          "unit": "%",
+          "delta_percent": 54.64285714285716
+        }
+      }
+    },
+    {
+      "format": "Q6",
+      "batch": 2,
+      "metrics": {
+        "Elapsed Cycles": {
+          "baseline": 92028,
+          "experiment": 64547,
+          "unit": "cycle",
+          "delta_percent": -29.861563871865084
+        },
+        "Duration": {
+          "baseline": 96960,
+          "experiment": 70112,
+          "unit": "ns",
+          "delta_percent": -27.68976897689769
+        },
+        "Registers Per Thread": {
+          "baseline": 40,
+          "experiment": 40,
+          "unit": "register/thread",
+          "delta_percent": 0
+        },
+        "Static Shared Memory Per Block": {
+          "baseline": 128,
+          "experiment": 64,
+          "unit": "byte/block",
+          "delta_percent": -50
+        },
+        "Achieved Occupancy": {
+          "baseline": 83.59,
+          "experiment": 86.08,
+          "unit": "%",
+          "delta_percent": 2.978825218327545
+        },
+        "Executed Instructions": {
+          "baseline": 8437760,
+          "experiment": 6547456,
+          "unit": "inst",
+          "delta_percent": -22.40291262135922
+        },
+        "Issued Instructions": {
+          "baseline": 8437760,
+          "experiment": 6547456,
+          "unit": "inst",
+          "delta_percent": -22.40291262135922
+        },
+        "Executed Ipc Active": {
+          "baseline": 2.24,
+          "experiment": 2.41,
+          "unit": "inst/cycle",
+          "delta_percent": 7.589285714285711
+        },
+        "Active Warps Per Scheduler": {
+          "baseline": 10.06,
+          "experiment": 10.34,
+          "unit": "warp",
+          "delta_percent": 2.7833001988071504
+        },
+        "Eligible Warps Per Scheduler": {
+          "baseline": 2.93,
+          "experiment": 3.23,
+          "unit": "warp",
+          "delta_percent": 10.238907849829344
+        },
+        "Issued Warp Per Scheduler": {
+          "baseline": 0.56,
+          "experiment": 0.61,
+          "unit": "\"",
+          "delta_percent": 8.928571428571416
+        },
+        "Warp Cycles Per Issued Instruction": {
+          "baseline": 17.85,
+          "experiment": 17.04,
+          "unit": "cycle",
+          "delta_percent": -4.5378151260504325
+        },
+        "Warp Cycles Per Executed Instruction": {
+          "baseline": 17.85,
+          "experiment": 17.04,
+          "unit": "cycle",
+          "delta_percent": -4.5378151260504325
+        },
+        "Avg. Active Threads Per Warp": {
+          "baseline": 31.92,
+          "experiment": 31.89,
+          "unit": "\"",
+          "delta_percent": -0.0939849624060186
+        },
+        "Avg. Not Predicated Off Threads Per Warp": {
+          "baseline": 28.73,
+          "experiment": 30.43,
+          "unit": "\"",
+          "delta_percent": 5.917159763313607
+        },
+        "Memory Throughput": {
+          "baseline": 35725412541.25,
+          "experiment": 49416704701.05,
+          "unit": "byte/s",
+          "delta_percent": 38.32367826121388
+        },
+        "Mem Busy": {
+          "baseline": 45.55,
+          "experiment": 46.22,
+          "unit": "%",
+          "delta_percent": 1.4709110867178963
+        },
+        "Mem Pipes Busy": {
+          "baseline": 89.88,
+          "experiment": 90.55,
+          "unit": "%",
+          "delta_percent": 0.7454383622607941
+        },
+        "L1/TEX Hit Rate": {
+          "baseline": 93.04,
+          "experiment": 93.04,
+          "unit": "%",
+          "delta_percent": 0
+        },
+        "L2 Hit Rate": {
+          "baseline": 22.38,
+          "experiment": 22.52,
+          "unit": "%",
+          "delta_percent": 0.625558534405722
+        },
+        "DRAM Throughput": {
+          "baseline": 10.52,
+          "experiment": 14.56,
+          "unit": "%",
+          "delta_percent": 38.403041825095066
+        },
+        "L1/TEX Cache Throughput": {
+          "baseline": 95.05,
+          "experiment": 96.21,
+          "unit": "%",
+          "delta_percent": 1.2204103103629633
+        },
+        "L2 Cache Throughput": {
+          "baseline": 7.61,
+          "experiment": 8.38,
+          "unit": "%",
+          "delta_percent": 10.118265440210255
+        }
+      }
+    }
+  ]
+}

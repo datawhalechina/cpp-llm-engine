@@ -1,0 +1,8 @@
+format=Q4_K path=fixed-four batch=1 rows=2048 cols=2048 iterations=100 mean_ms=0.0360697 speedup_vs_repeated_single=1 max_error=0
+format=Q4_K path=fixed-four batch=2 rows=2048 cols=2048 iterations=100 mean_ms=0.0368764 speedup_vs_repeated_single=1.95625 max_error=0
+format=Q4_K path=fixed-four batch=4 rows=2048 cols=2048 iterations=100 mean_ms=0.0368975 speedup_vs_repeated_single=3.91025 max_error=0
+format=Q4_K path=fixed-four batch=8 rows=2048 cols=2048 iterations=100 mean_ms=0.070448 speedup_vs_repeated_single=4.09603 max_error=0
+format=Q6_K path=fixed-four batch=1 rows=2048 cols=2048 iterations=100 mean_ms=0.0389718 speedup_vs_repeated_single=1 max_error=0
+format=Q6_K path=fixed-four batch=2 rows=2048 cols=2048 iterations=100 mean_ms=0.0392167 speedup_vs_repeated_single=1.98751 max_error=0
+format=Q6_K path=fixed-four batch=4 rows=2048 cols=2048 iterations=100 mean_ms=0.0409694 speedup_vs_repeated_single=3.80496 max_error=0
+format=Q6_K path=fixed-four batch=8 rows=2048 cols=2048 iterations=100 mean_ms=0.0781691 speedup_vs_repeated_single=3.98846 max_error=0

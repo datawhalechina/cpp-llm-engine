@@ -1,0 +1,23 @@
+experiment_id=EXP-GPU-15
+workload_id=WL-GPU-TINYLLAMA-ADAPTIVE-GEMV-DECODE-AB-V1
+model=TinyLlama-1.1B-Chat-v1.0.Q4_K_M
+backend=CUDA
+build_type=Release
+requests=2
+prompt_tokens=1,2
+decode_steps=1
+block_size=8
+warmup=2
+iterations=10
+independent_runs=2
+execution_order=fixed-adaptive,adaptive-fixed
+baseline=fixed-four
+experiment=adaptive-1-2-4
+timing_scope=excludes-model-load-context-create-request-bind-and-prefill
+correctness=PASS
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Fri_Feb_21_20:23:50_PST_2025
+Cuda compilation tools, release 12.8, V12.8.93
+Build cuda_12.8.r12.8/compiler.35583870_0
+NVIDIA GeForce RTX 5070 Ti Laptop GPU, 580.178.04, 12227 MiB

@@ -1,0 +1,2 @@
+quantized_format=Q4_K rows=256 cols=256 warmup=1 iterations=10 fused_gemv_host_mean_ms=0.0044843
+quantized_format=Q6_K rows=256 cols=256 warmup=1 iterations=10 fused_gemv_host_mean_ms=0.0044863

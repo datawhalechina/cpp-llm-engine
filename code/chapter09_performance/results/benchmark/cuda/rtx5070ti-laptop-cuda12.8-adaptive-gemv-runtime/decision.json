@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "execution_status": "PASS",
+  "correctness": "PASS",
+  "decision": "KEEP",
+  "reason": "both runs improved Tensor Batch and preserved sequential Decode",
+  "policy": {
+    "minimum_batch_improvement_percent": 5,
+    "maximum_sequential_regression_percent": 5,
+    "maximum_logits_error": 0.001
+  },
+  "runs": [
+    {
+      "run": 1,
+      "fixed": {
+        "sequential_decode_median_ms": 29.3657,
+        "tensor_batch_decode_median_ms": 15.758,
+        "logits_max_error": 0
+      },
+      "adaptive": {
+        "sequential_decode_median_ms": 29.6537,
+        "tensor_batch_decode_median_ms": 13.1949,
+        "logits_max_error": 0
+      },
+      "sequential_delta_percent": 0.9807360287682577,
+      "batch_delta_percent": -16.26538900875745
+    },
+    {
+      "run": 2,
+      "fixed": {
+        "sequential_decode_median_ms": 30.0867,
+        "tensor_batch_decode_median_ms": 16.0961,
+        "logits_max_error": 0
+      },
+      "adaptive": {
+        "sequential_decode_median_ms": 29.6084,
+        "tensor_batch_decode_median_ms": 13.0281,
+        "logits_max_error": 0
+      },
+      "sequential_delta_percent": -1.5897389876590018,
+      "batch_delta_percent": -19.06051776517293
+    }
+  ]
+}
