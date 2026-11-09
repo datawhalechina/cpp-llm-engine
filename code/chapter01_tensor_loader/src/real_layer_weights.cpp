@@ -1,4 +1,4 @@
-// Chapter 01：实现真实 Llama decoder layer 权重按需装配。
+// Chapter 01：实现真实稠密 decoder layer 权重按需装配。
 // 契约：层布局来自 ModelSchema，loader 只读取指定层，不执行模型计算。
 // 验证：gguf_first_layer_inspect 使用真实 TinyLlama 检查九个 layer-0 tensor。
 #include "real_layer_weights.h"
@@ -38,20 +38,31 @@ bool load_named(
     return GgufTensorLoader::load_tensor(model_path, index, *info, output, error);
 }
 
+bool load_optional_named(
+    const std::string& model_path,
+    const GgufModelIndex& index,
+    const std::string& name,
+    Tensor* output,
+    std::string* error) {
+    return name.empty() || load_named(model_path, index, name, output, error);
+}
+
 }  // namespace
 
-bool RealLlamaLayerWeights::valid() const {
-    return attn_norm.bytes() > 0 && attn_q.bytes() > 0 && attn_k.bytes() > 0 &&
+bool RealDenseLayerWeights::valid() const {
+    const bool qk_norms_match =
+        (attn_q_norm.bytes() == 0) == (attn_k_norm.bytes() == 0);
+    return qk_norms_match && attn_norm.bytes() > 0 && attn_q.bytes() > 0 && attn_k.bytes() > 0 &&
             attn_v.bytes() > 0 && attn_output.bytes() > 0 && ffn_norm.bytes() > 0 &&
             ffn_gate.bytes() > 0 && ffn_up.bytes() > 0 && ffn_down.bytes() > 0;
 }
 
-bool RealLlamaLayerLoader::load(
+bool RealDenseLayerLoader::load(
     const std::string& model_path,
     const GgufModelIndex& index,
-    const LlamaTensorLayout& layout,
+    const DenseDecoderTensorLayout& layout,
     std::size_t layer_index,
-    RealLlamaLayerWeights* output,
+    RealDenseLayerWeights* output,
     std::string* error) {
     if (output == nullptr) {
         set_error(error, "layer weights output must not be null");
@@ -63,13 +74,17 @@ bool RealLlamaLayerLoader::load(
     }
 
     const auto& names = layout.layers[layer_index];
-    RealLlamaLayerWeights loaded;
+    RealDenseLayerWeights loaded;
     loaded.index = layer_index;
     if (!load_named(model_path, index, names.attn_norm, &loaded.attn_norm, error) ||
         !load_named(model_path, index, names.attn_q, &loaded.attn_q, error) ||
         !load_named(model_path, index, names.attn_k, &loaded.attn_k, error) ||
         !load_named(model_path, index, names.attn_v, &loaded.attn_v, error) ||
         !load_named(model_path, index, names.attn_output, &loaded.attn_output, error) ||
+        !load_optional_named(model_path, index, names.attn_q_norm,
+                             &loaded.attn_q_norm, error) ||
+        !load_optional_named(model_path, index, names.attn_k_norm,
+                             &loaded.attn_k_norm, error) ||
         !load_named(model_path, index, names.ffn_norm, &loaded.ffn_norm, error) ||
         !load_named(model_path, index, names.ffn_gate, &loaded.ffn_gate, error) ||
         !load_named(model_path, index, names.ffn_up, &loaded.ffn_up, error) ||
@@ -77,7 +92,7 @@ bool RealLlamaLayerLoader::load(
         return false;
     }
     if (!loaded.valid()) {
-        set_error(error, "loaded Llama layer has an empty tensor payload");
+        set_error(error, "loaded dense decoder layer has an empty tensor payload");
         return false;
     }
     *output = std::move(loaded);

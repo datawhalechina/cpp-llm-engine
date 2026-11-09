@@ -32,6 +32,8 @@ using chapter01::ModelConfig;
 using chapter01::ModelMetadata;
 using chapter01::MetadataMap;
 using chapter01::ModelMetadataAdapter;
+using chapter01::ModelSchema;
+using chapter01::DenseDecoderTensorLayout;
 using chapter01::GgufReader;
 using chapter01::GgufModelIndex;
 using chapter01::GgufTensorLoader;
@@ -499,6 +501,101 @@ void test_gguf_metadata_adapter(TestSuite& suite) {
             signed_token_types, &tokenizer_metadata, &error));
 }
 
+void test_qwen3_metadata_and_schema(TestSuite& suite) {
+    const MetadataMap values = {
+        {"general.architecture", std::string("qwen3")},
+        {"tokenizer.ggml.vocab_size", std::uint64_t{128}},
+        {"qwen3.embedding_length", std::uint64_t{16}},
+        {"qwen3.context_length", std::uint64_t{4096}},
+        {"qwen3.block_count", std::uint64_t{2}},
+        {"qwen3.attention.head_count", std::uint64_t{4}},
+        {"qwen3.attention.head_count_kv", std::uint64_t{2}},
+        {"qwen3.attention.key_length", std::uint64_t{8}},
+        {"qwen3.attention.value_length", std::uint64_t{8}},
+        {"qwen3.rope.dimension_count", std::uint64_t{4}},
+        {"tokenizer.ggml.eos_token_id", std::int64_t{2}},
+    };
+
+    ModelMetadata metadata;
+    std::string error;
+    CPP_LLM_REQUIRE(suite, ModelMetadataAdapter::from_gguf(values, &metadata, &error));
+    CPP_LLM_CHECK(suite, metadata.architecture == "qwen3");
+    CPP_LLM_CHECK(suite, metadata.attention_head_count == 4);
+    CPP_LLM_CHECK(suite, metadata.attention_head_count_kv == 2);
+    CPP_LLM_CHECK(suite, metadata.attention_key_length == 8);
+    CPP_LLM_CHECK(suite, metadata.attention_value_length == 8);
+    CPP_LLM_CHECK(suite, metadata.bos_token_id == -1);
+
+    std::unordered_map<std::string, Tensor> tensors;
+    const auto add_tensor = [&tensors](const std::string& name,
+                                       std::vector<std::int64_t> shape) {
+        std::size_t elements = 1;
+        for (const auto dimension : shape) {
+            elements *= static_cast<std::size_t>(dimension);
+        }
+        tensors.emplace(
+            name,
+            Tensor::from_vector<float>(
+                name, std::move(shape), std::vector<float>(elements, 1.0F)));
+    };
+
+    add_tensor("token_embd.weight", {16, 128});
+    add_tensor("output_norm.weight", {16});
+    for (std::size_t layer = 0; layer < 2; ++layer) {
+        const std::string prefix = "blk." + std::to_string(layer) + ".";
+        add_tensor(prefix + "attn_norm.weight", {16});
+        add_tensor(prefix + "attn_q.weight", {16, 32});
+        add_tensor(prefix + "attn_k.weight", {16, 16});
+        add_tensor(prefix + "attn_v.weight", {16, 16});
+        add_tensor(prefix + "attn_output.weight", {32, 16});
+        add_tensor(prefix + "attn_q_norm.weight", {8});
+        add_tensor(prefix + "attn_k_norm.weight", {8});
+        add_tensor(prefix + "ffn_norm.weight", {16});
+        add_tensor(prefix + "ffn_gate.weight", {16, 32});
+        add_tensor(prefix + "ffn_up.weight", {16, 32});
+        add_tensor(prefix + "ffn_down.weight", {32, 16});
+    }
+
+    DenseDecoderTensorLayout layout;
+    CPP_LLM_REQUIRE(
+        suite, ModelSchema::validate_tensors(metadata, tensors, &layout, &error));
+    CPP_LLM_CHECK(suite, error.empty());
+    CPP_LLM_CHECK(suite, layout.architecture == "qwen3");
+    CPP_LLM_CHECK(suite, layout.output == "token_embd.weight");
+    CPP_LLM_CHECK(suite, layout.output_tied_to_embedding);
+    CPP_LLM_REQUIRE(suite, layout.layers.size() == 2);
+    CPP_LLM_CHECK(suite, layout.layers[0].attn_q_norm ==
+                                   "blk.0.attn_q_norm.weight");
+    CPP_LLM_CHECK(suite, layout.layers[1].attn_k_norm ==
+                                   "blk.1.attn_k_norm.weight");
+
+    auto wrong_q_shape = tensors;
+    wrong_q_shape["blk.0.attn_q.weight"] = Tensor::from_vector<float>(
+        "blk.0.attn_q.weight", {16, 16}, std::vector<float>(16 * 16, 1.0F));
+    CPP_LLM_CHECK(
+        suite,
+        !ModelSchema::validate_tensors(metadata, wrong_q_shape, &layout, &error));
+    CPP_LLM_CHECK(suite, error.find("blk.0.attn_q.weight") != std::string::npos);
+
+    auto missing_q_norm = tensors;
+    missing_q_norm.erase("blk.0.attn_q_norm.weight");
+    CPP_LLM_CHECK(
+        suite,
+        !ModelSchema::validate_tensors(metadata, missing_q_norm, &layout, &error));
+    CPP_LLM_CHECK(suite, error.find("attn_q_norm.weight") != std::string::npos);
+
+    MetadataMap missing_head_length = values;
+    missing_head_length.erase("qwen3.attention.key_length");
+    CPP_LLM_REQUIRE(
+        suite,
+        ModelMetadataAdapter::from_gguf(
+            missing_head_length, &metadata, &error));
+    CPP_LLM_CHECK(
+        suite,
+        !ModelSchema::validate_tensors(metadata, tensors, &layout, &error));
+    CPP_LLM_CHECK(suite, error.find("head length metadata") != std::string::npos);
+}
+
 void test_gguf_reader(TestSuite& suite) {
     const auto path = std::filesystem::temp_directory_path() / "chapter01_mock.gguf";
     std::filesystem::remove(path);
@@ -793,6 +890,9 @@ int run_chapter01_test_group(const std::string& group) {
         });
         suite.run("GGUF metadata adapter reports missing fields", [&] {
             test_gguf_metadata_adapter(suite);
+        });
+        suite.run("Qwen3 metadata and dense tensor schema are explicit", [&] {
+            test_qwen3_metadata_and_schema(suite);
         });
         suite.run("GGUF reader builds tokenizer tensors and decoder schema", [&] {
             test_gguf_reader(suite);

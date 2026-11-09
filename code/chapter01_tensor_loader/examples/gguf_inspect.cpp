@@ -1,6 +1,6 @@
 // Chapter 01：GGUF inspection example
 // 职责：读取 GGUF index、metadata、tokenizer 和 Llama tensor schema。
-// 运行：gguf_inspect <model.gguf> [--load-first-q4|--validate-schema]。
+// 运行：gguf_inspect <model.gguf> [--load-first-q4|--validate-schema|--tensor <name>]。
 // 验证：真实 TinyLlama schema 输出 decoder input: ready。
 #include "gguf_reader.h"
 #include "gguf_tensor_loader.h"
@@ -34,8 +34,9 @@ void print_tensor_anchor(const chapter01::GgufModelIndex& index,
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 2 || argc > 3) {
-        std::cerr << "usage: gguf_inspect <model.gguf> [--load-first-q4|--validate-schema]\n";
+    if (argc < 2 || argc > 4 || (argc == 4 && std::string(argv[2]) != "--tensor")) {
+        std::cerr << "usage: gguf_inspect <model.gguf> "
+                     "[--load-first-q4|--validate-schema|--tensor <name>]\n";
         return 2;
     }
 
@@ -63,20 +64,40 @@ int main(int argc, char** argv) {
               << "hidden size: " << metadata.hidden_size << "\n"
               << "context length: " << metadata.max_position << "\n"
               << "layers: " << metadata.layer_count << "\n"
+              << "attention heads: " << metadata.attention_head_count << "\n"
+              << "attention kv heads: " << metadata.attention_head_count_kv << "\n"
+              << "attention key/value length: " << metadata.attention_key_length
+              << "/" << metadata.attention_value_length << "\n"
+              << "special token ids: bos=" << metadata.bos_token_id
+              << " eos=" << metadata.eos_token_id << "\n"
+              << "chat template: "
+              << (tokenizer.chat_template.empty() ? "no" : "yes") << "\n"
               << "tokenizer tokens: " << tokenizer.tokens.size() << "\n"
               << "tensors: " << index.tensors.size() << "\n"
               << "data offset: " << index.data_offset << "\n";
 
+    if (argc == 4) {
+        const std::string name = argv[3];
+        if (find_tensor(index, name) == nullptr) {
+            std::cerr << "tensor not found: " << name << "\n";
+            return 1;
+        }
+        print_tensor_anchor(index, name);
+        return 0;
+    }
+
     if (argc == 3 && std::string(argv[2]) == "--validate-schema") {
-        chapter01::LlamaTensorLayout layout;
+        chapter01::DenseDecoderTensorLayout layout;
         if (!chapter01::ModelSchema::validate_gguf(metadata, index, &layout, &error)) {
             std::cerr << "schema validation failed: " << error << "\n";
             return 1;
         }
-        std::cout << "schema: llama tensors valid\n"
+        std::cout << "schema: " << metadata.architecture << " tensors valid\n"
                   << "decoder layers: " << layout.layers.size() << "\n"
                   << "intermediate size: " << layout.intermediate_size << "\n"
-                  << "key/value size: " << layout.key_value_size << "\n";
+                  << "key/value size: " << layout.key_value_size << "\n"
+                  << "output tied to embedding: "
+                  << (layout.output_tied_to_embedding ? "yes" : "no") << "\n";
         const auto decoder = chapter01::DecoderInput::from_layout(layout);
         if (!decoder.valid()) {
             std::cerr << "decoder input assembly failed\n";

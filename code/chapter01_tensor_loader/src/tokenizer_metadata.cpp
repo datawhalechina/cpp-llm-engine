@@ -43,6 +43,17 @@ bool read_token_id(const MetadataMap& values,
     return true;
 }
 
+bool read_optional_token_id(const MetadataMap& values,
+                            const std::string& key,
+                            TokenId* output,
+                            std::string* error) {
+    if (values.find(key) == values.end()) {
+        *output = -1;
+        return true;
+    }
+    return read_token_id(values, key, output, error);
+}
+
 }  // namespace
 
 bool TokenizerMetadata::valid() const {
@@ -103,7 +114,8 @@ bool TokenizerMetadataAdapter::from_gguf(const MetadataMap& values,
         }
         parsed.chat_template = *chat_template;
     }
-    if (!read_token_id(values, "tokenizer.ggml.bos_token_id", &parsed.bos_token_id, error) ||
+    if (!read_optional_token_id(values, "tokenizer.ggml.bos_token_id",
+                                &parsed.bos_token_id, error) ||
         !read_token_id(values, "tokenizer.ggml.eos_token_id", &parsed.eos_token_id, error) ||
         !parsed.valid()) {
         if (error != nullptr && error->empty()) {

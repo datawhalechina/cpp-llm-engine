@@ -39,6 +39,10 @@ int main(int argc, char** argv) {
         std::cerr << "metadata failed: " << error << '\n';
         return 1;
     }
+    if (metadata.architecture != "llama") {
+        std::cerr << "first-layer inspector requires llama architecture\n";
+        return 1;
+    }
     chapter01::LlamaTensorLayout layout;
     if (!chapter01::ModelSchema::validate_gguf(metadata, index, &layout, &error)) {
         std::cerr << "schema failed: " << error << '\n';

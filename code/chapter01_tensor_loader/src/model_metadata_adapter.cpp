@@ -103,6 +103,17 @@ bool read_token_id(const MetadataMap& values,
     return true;
 }
 
+bool read_optional_token_id(const MetadataMap& values,
+                            const std::string& key,
+                            TokenId* output,
+                            std::string* error) {
+    if (find_value(values, key) == nullptr) {
+        *output = -1;
+        return true;
+    }
+    return read_token_id(values, key, output, error);
+}
+
 bool read_optional_positive_float(const MetadataMap& values,
                                   const std::string& key,
                                   float* output,
@@ -191,13 +202,18 @@ bool ModelMetadataAdapter::from_gguf(const MetadataMap& values,
                                      &parsed.attention_head_count, error) ||
         !read_optional_positive_size(values, prefix + "attention.head_count_kv",
                                      &parsed.attention_head_count_kv, error) ||
+        !read_optional_positive_size(values, prefix + "attention.key_length",
+                                     &parsed.attention_key_length, error) ||
+        !read_optional_positive_size(values, prefix + "attention.value_length",
+                                     &parsed.attention_value_length, error) ||
         !read_optional_positive_size(values, prefix + "rope.dimension_count",
                                      &parsed.rope_dimension_count, error) ||
         !read_optional_positive_float(values, prefix + "rope.freq_base",
                                       &parsed.rope_freq_base, error) ||
         !read_optional_positive_float(values, prefix + "attention.layer_norm_rms_epsilon",
                                       &parsed.rms_norm_epsilon, error) ||
-        !read_token_id(values, "tokenizer.ggml.bos_token_id", &parsed.bos_token_id, error) ||
+        !read_optional_token_id(values, "tokenizer.ggml.bos_token_id",
+                                &parsed.bos_token_id, error) ||
         !read_token_id(values, "tokenizer.ggml.eos_token_id", &parsed.eos_token_id, error)) {
         return false;
     }

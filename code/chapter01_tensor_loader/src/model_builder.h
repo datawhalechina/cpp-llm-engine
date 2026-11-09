@@ -21,6 +21,8 @@ struct DecoderLayerInput {
     std::string attn_k;
     std::string attn_v;
     std::string attn_output;
+    std::string attn_q_norm;
+    std::string attn_k_norm;
     std::string ffn_norm;
     std::string ffn_gate;
     std::string ffn_up;
@@ -28,6 +30,7 @@ struct DecoderLayerInput {
 };
 
 struct DecoderInput {
+    std::string architecture;
     std::string embedding;
     std::string output;
     std::string output_norm;
@@ -35,14 +38,16 @@ struct DecoderInput {
     std::size_t key_value_size = 0;
     std::vector<DecoderLayerInput> layers;
 
-    static DecoderInput from_layout(const LlamaTensorLayout& layout);
+    bool output_tied_to_embedding = false;
+
+    static DecoderInput from_layout(const DenseDecoderTensorLayout& layout);
     bool valid() const;
 };
 
 struct LoadedModel {
     ModelConfig config;
     TokenizerMetadata tokenizer;
-    LlamaTensorLayout layout;
+    DenseDecoderTensorLayout layout;
     DecoderInput decoder;
     std::unordered_map<std::string, Tensor> tensors;
 };

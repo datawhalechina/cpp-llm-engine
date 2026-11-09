@@ -1,5 +1,5 @@
 // Chapter 01：Decoder 输入装配实现
-// 职责：将已验证的 Llama tensor layout 组装成稳定的 DecoderInput 映射。
+// 职责：将已验证的稠密 Decoder tensor layout 组装成稳定映射。
 // 契约：缺失权重或层级映射不完整时返回失败，不执行 Transformer 计算。
 // 验证：chapter01_tensor_loader_test.cpp 与 gguf_inspect --validate-schema。
 #include "model_builder.h"
@@ -14,11 +14,13 @@ bool set_error(std::string* error, const std::string& message) {
 
 }  // namespace
 
-DecoderInput DecoderInput::from_layout(const LlamaTensorLayout& layout) {
+DecoderInput DecoderInput::from_layout(const DenseDecoderTensorLayout& layout) {
     DecoderInput input;
+    input.architecture = layout.architecture;
     input.embedding = layout.embedding;
     input.output = layout.output;
     input.output_norm = layout.output_norm;
+    input.output_tied_to_embedding = layout.output_tied_to_embedding;
     input.intermediate_size = layout.intermediate_size;
     input.key_value_size = layout.key_value_size;
     input.layers.reserve(layout.layers.size());
@@ -30,6 +32,8 @@ DecoderInput DecoderInput::from_layout(const LlamaTensorLayout& layout) {
             layer.attn_k,
             layer.attn_v,
             layer.attn_output,
+            layer.attn_q_norm,
+            layer.attn_k_norm,
             layer.ffn_norm,
             layer.ffn_gate,
             layer.ffn_up,
@@ -40,7 +44,7 @@ DecoderInput DecoderInput::from_layout(const LlamaTensorLayout& layout) {
 }
 
 bool DecoderInput::valid() const {
-    if (embedding.empty() || output.empty() || output_norm.empty() ||
+    if (architecture.empty() || embedding.empty() || output.empty() || output_norm.empty() ||
         intermediate_size == 0 || key_value_size == 0 || layers.empty()) {
         return false;
     }
@@ -66,7 +70,7 @@ bool ModelBuilder::build(const ModelMetadata& metadata,
         return set_error(error, "tokenizer vocabulary size does not match model metadata");
     }
 
-    LlamaTensorLayout layout;
+    DenseDecoderTensorLayout layout;
     if (!ModelSchema::validate_tensors(metadata, tensors, &layout, error)) return false;
 
     LoadedModel built;
