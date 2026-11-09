@@ -2,7 +2,7 @@
 
 SSE 在 headers 发出后持续写入词元事件。<a href="../../_code/chapter10_serving/include/chapter10_serving/response_writer.h"><code>ResponseWriter</code></a> 把正常写入、客户端断开和背压返回为显式结果。此时 HTTP 状态码已经确定，后续断连、超时或模型失败只能通过连接关闭、最终事件和服务指标表达。
 
-## Writer 契约
+## Writer 必须保证什么
 
 | 方法或结果 | 含义 | ServiceCore 动作 |
 | --- | --- | --- |
@@ -32,4 +32,4 @@ SSE 在 headers 发出后持续写入词元事件。<a href="../../_code/chapter
 
 ## 验证事件顺序和断连
 
-运行 `bash code/chapter10_serving/scripts/run.sh`。`chapter10_http_contract_test` 应检查 headers 只写一次、token step 单调、终止事件唯一，以及 ClientClosed/Backpressure 转换为取消和释放。该测试证明当前同步契约，不证明暂停恢复已实现。`10.7` 继续区分连接、请求和模型批次的并发。
+运行 `bash code/chapter10_serving/scripts/run.sh`。`chapter10_http_contract_test` 应检查 headers 只写一次、token step 单调、终止事件唯一，以及 ClientClosed/Backpressure 转换为取消和释放。该测试证明当前同步写出规则，不证明暂停恢复已实现。`10.7` 继续区分连接、请求和模型批次的并发。

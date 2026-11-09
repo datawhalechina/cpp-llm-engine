@@ -183,7 +183,7 @@ function createSidebar() {
             { text: 'Tensor 对象', file: '01_tensor_object.md' },
             { text: '选读：教学权重格式', file: '02_teaching_weight_format.md' },
             { text: '模型加载与验证', file: '03_model_loader_validation.md' },
-            { text: '输入契约与 Tokenizer', file: '04_input_contract_and_tokenizer.md' },
+            { text: '输入要求与 Tokenizer', file: '04_input_contract_and_tokenizer.md' },
             { text: '模型元数据与 GGUF', file: '05_model_metadata_and_gguf.md' },
             { text: '进阶：Loader 框架对照', file: '06_framework_loader_comparison.md' },
           ]),
@@ -223,7 +223,7 @@ function createSidebar() {
             { text: '量化在生成运行时中的位置', file: '08_quantization_in_serving_runtime.md' },
           ]),
           chapterGroup('06', '第 06 章 Generation Core', '/chapter06_generation/next', [
-            { text: '请求与执行契约', file: '01_request_contract.md' },
+            { text: '请求状态与模型调用', file: '01_request_contract.md' },
             { text: 'Prefill 与 Decode', file: '02_prefill_decode.md' },
             { text: '单请求生成循环', file: '03_single_request_loop.md' },
             { text: '请求生命周期', file: '04_request_lifecycle.md' },

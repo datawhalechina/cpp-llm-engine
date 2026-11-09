@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | Linux | Ubuntu 22.04 或兼容发行版 | Bash、GCC/Clang、CMake、Git | 主要开发与 CI 路径 |
 | Windows + WSL2 | WSL2 中安装 Ubuntu，在 Linux 文件系统内克隆仓库 | 开启虚拟化；所有工具都安装在 WSL 内 | Windows 推荐路径，复用 Linux 命令 |
-| Windows 原生 | Visual Studio C++、CMake、Git 符号链接和 PowerShell 脚本适配 | 需要替换 Bash、`/tmp` 和 Linux 路径假设 | 尚未纳入 CI，不作为当前发布契约 |
+| Windows 原生 | Visual Studio C++、CMake、Git 符号链接和 PowerShell 脚本适配 | 需要替换 Bash、`/tmp` 和 Linux 路径假设 | 尚未纳入 CI，不作为当前发布验收环境 |
 
 Windows 上首次安装 WSL2 时，在管理员 PowerShell 中执行：
 
@@ -29,7 +29,7 @@ wsl --install -d Ubuntu-22.04
 | 磁盘 | 至少 3 GiB 可用空间 | 保存源码、构建产物和 638 MiB GGUF |
 | 内存 | 建议至少 4 GiB 可用内存 | 加载 TinyLlama Q4_K_M 并执行 CPU 推理 |
 
-C++17 是项目构建契约，不是可选建议。各模块 CMake target 都要求 `cxx_std_17`，代码使用了 `std::string_view`、`std::optional`、`std::variant`、`std::filesystem` 和 `std::byte` 等 C++17 能力。C++11 或 C++14 可以用来学习部分 Foundation 语法题，但不能构建完整仓库。
+C++17 是项目的最低构建要求，不是可选建议。各模块 CMake target 都要求 `cxx_std_17`，代码使用了 `std::string_view`、`std::optional`、`std::variant`、`std::filesystem` 和 `std::byte` 等 C++17 能力。C++11 或 C++14 可以用来学习部分 Foundation 语法题，但不能构建完整仓库。
 
 在 Ubuntu 22.04 或兼容 Debian 系统上，可先安装 CPU 主线工具：
 

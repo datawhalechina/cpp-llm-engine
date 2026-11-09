@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 590" role="img" aria-labelledby="title desc" font-family="Noto Sans CJK JP">
+  <title id="title">TinyLlama 与 Qwen3 注意力组件对比</title>
+  <desc id="desc">两种模型共享前置 RMSNorm、QKV 投影和分组查询注意力，Qwen3 额外增加逐头 QK RMSNorm，并使用 NeoX RoPE 的半维配对。</desc>
+  <defs>
+    <style>text { font-family: "Noto Sans CJK JP", "Droid Sans Fallback", sans-serif; }</style>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#536273"/></marker>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f8fafc"/><stop offset="1" stop-color="#f1f8f6"/></linearGradient>
+  </defs>
+  <rect width="1200" height="590" rx="24" fill="url(#bg)"/>
+  <text x="54" y="54" font-size="27" font-weight="700" fill="#172033">一个注意力块：共同骨架与两个关键差异</text>
+  <text x="54" y="84" font-size="15" fill="#536273">先看相同的数据流，再定位 Q/K 归一化和 RoPE 配对方式</text>
+
+  <rect x="440" y="110" width="320" height="58" rx="14" fill="#e8f1f7" stroke="#7aa6bd"/>
+  <text x="600" y="136" text-anchor="middle" font-size="15" font-weight="700" fill="#28536b">隐藏状态 → 前置 RMSNorm → Q/K/V 投影</text>
+  <text x="600" y="157" text-anchor="middle" font-size="12" fill="#536273">两种模型共享</text>
+  <path d="M600 168V200M600 200H303V224M600 200H897V224" fill="none" stroke="#536273" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="54" y="224" width="498" height="292" rx="18" fill="#fff" stroke="#e7a15d" stroke-width="2"/>
+  <text x="82" y="259" font-size="20" font-weight="700" fill="#9a4d13">TinyLlama / Llama</text>
+  <text x="82" y="284" font-size="13" fill="#536273">Q 头 32 · K/V 头 4 · 头维度 64</text>
+  <rect x="90" y="315" width="426" height="54" rx="12" fill="#fff3e3"/>
+  <text x="303" y="347" text-anchor="middle" font-size="15" fill="#7c4317">Q/K 直接进入位置编码</text>
+  <path d="M303 369V395" stroke="#536273" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="90" y="397" width="426" height="72" rx="12" fill="#f6e4ce" stroke="#e7a15d"/>
+  <text x="303" y="425" text-anchor="middle" font-size="15" font-weight="700" fill="#9a4d13">相邻维 RoPE</text>
+  <text x="303" y="450" text-anchor="middle" font-size="13" fill="#536273">(0,1) · (2,3) · (4,5) ...</text>
+
+  <rect x="648" y="224" width="498" height="292" rx="18" fill="#fff" stroke="#2f8b83" stroke-width="2"/>
+  <text x="676" y="259" font-size="20" font-weight="700" fill="#0f5f59">Qwen3-0.6B</text>
+  <text x="676" y="284" font-size="13" fill="#536273">Q 头 16 · K/V 头 8 · 头维度 128</text>
+  <rect x="684" y="315" width="426" height="54" rx="12" fill="#e7f6f3"/>
+  <text x="897" y="338" text-anchor="middle" font-size="15" font-weight="700" fill="#0f5f59">逐头 Q/K RMSNorm</text>
+  <text x="897" y="357" text-anchor="middle" font-size="12" fill="#536273">每个 128 维头独立归一化</text>
+  <path d="M897 369V395" stroke="#536273" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="684" y="397" width="426" height="72" rx="12" fill="#d9efeb" stroke="#2f8b83"/>
+  <text x="897" y="425" text-anchor="middle" font-size="15" font-weight="700" fill="#0f5f59">NeoX RoPE</text>
+  <text x="897" y="450" text-anchor="middle" font-size="13" fill="#536273">(0,64) · (1,65) · (2,66) ...</text>
+
+  <path d="M303 469V540M897 469V540" stroke="#536273" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="394" y="520" width="412" height="48" rx="13" fill="#e8f1f7" stroke="#7aa6bd"/>
+  <text x="600" y="550" text-anchor="middle" font-size="15" font-weight="700" fill="#28536b">因果 GQA → 输出投影 → 残差</text>
+</svg>

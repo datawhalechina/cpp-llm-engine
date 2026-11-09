@@ -67,20 +67,21 @@ bash code/chapter01_tensor_loader/run.sh
 
 | 时间 | 里程碑 | 状态 | 可验证产物 |
 | --- | --- | --- | --- |
+| 2026-11-09 | Qwen3 CPU 推理服务闭环 | 完成 | Qwen3-0.6B Loader、Tokenizer、28 层 Decoder、Generation、分页 K/V、Radix 命中与 HTTP/SSE 验收 |
 | 2026-11-09 | Adaptive GEMV 适用范围矩阵 | 完成 | EXP-GPU-16 覆盖 `batch=1/2`、上下文 `16/128` 和 Decode `1/8` 步；Tensor Batch 延迟降低约 `12.9%`～`23.1%` |
 | 2026-11-09 | CUDA 量化性能证据 | 完成 | Adaptive GEMV 默认路径、自动 `KEEP/REJECT/INCONCLUSIVE` 决策、NCU 原因指标与 EXP-GPU-14/15 |
 | 2026-11-09 | 分页缓存与前缀复用 | 完成 | CUDA 分页 Prefill、分页 Decode batch、Radix Cache、共享块引用和缓存感知调度 |
 | 2026-11-09 | 学习入口与参考资产整合 | 完成 | CPU、CPU+GPU、多模态路线，术语/公式表，框架对照卡和实验资产表 |
 | 2026-11-08 | TinyLlama CUDA 纵向闭环 | 完成 | 22 层 Model/Context、真实生成、分页 GQA、Chapter06 Runtime 与 Chapter10 服务 |
-| 2026-11 | 工程验证体系 | 完成 | 默认回归、Release 契约、测试资产审计、文档检查和 GitHub Actions CI |
+| 2026-11 | 工程验证体系 | 完成 | 默认回归、Release 发布验收、测试资产审计、文档检查和 GitHub Actions CI |
 | 2026-10 | 多模态输入闭环 | 完成 | SmolVLM Vision、Projector、Decoder、ServiceCore 和 profiling golden |
 | 2026-10 | CPU 主线闭环 | 完成 | TinyLlama 22 层 Decoder、Runtime、HTTP/SSE 和真实模型验收 |
 | 2026-08 | 教程骨架与 Foundation | 完成 | 章节主线、基础题库和 benchmark trace |
 
 ## 查阅与贡献
 
-学习路线、章节命令和验证层级见 [USAGE.md](USAGE.md)；术语、公式、实验和框架源码坐标见 [Reference](source/reference/README.md)；修改、测试和提交方法见 [CONTRIBUTING.md](CONTRIBUTING.md)。GitHub Actions 持续检查文档、默认回归和发布契约。
+学习路线、章节命令和验证层级见 [USAGE.md](USAGE.md)；术语、公式、实验和框架源码坐标见 [Reference](source/reference/README.md)；修改、测试和提交方法见 [CONTRIBUTING.md](CONTRIBUTING.md)。GitHub Actions 持续检查文档、默认回归和发布验收规则。
 
-测试从对象契约逐步扩展到组件协作、跨章主线和真实模型；性能实验建立在正确性验证通过之后。
+测试从对象规则逐步扩展到组件协作、跨章主线和真实模型；性能实验建立在正确性验证通过之后。
 
 ![教程验证证据图](source/assets/diagrams/test-pipeline.svg)

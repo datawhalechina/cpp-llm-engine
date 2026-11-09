@@ -35,7 +35,7 @@ bash code/chapter00_quickstart/run.sh
 
 ## 验证与下一步
 
-真实模型基线建立后，进入 [`Chapter 01`](../chapter01_tensor_loader/intro.md)，开始实现教程自己的张量对象、模型加载器、元数据适配器和分词器契约。
+真实模型基线建立后，进入 [`Chapter 01`](../chapter01_tensor_loader/intro.md)，开始实现教程自己的张量对象、模型加载器、元数据适配器和分词器接口。
 
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |

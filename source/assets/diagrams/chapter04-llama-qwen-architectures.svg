@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc" font-family="Noto Sans CJK JP">
+  <title id="title">TinyLlama 与 Qwen3 全模型架构对比</title>
+  <desc id="desc">TinyLlama 和 Qwen3 具有不同词表、层数、隐藏宽度和注意力结构，但都从分词、嵌入、解码器块、最终归一化和语言模型头进入同一生成与服务运行时。</desc>
+  <defs>
+    <style>text { font-family: "Noto Sans CJK JP", "Droid Sans Fallback", sans-serif; }</style>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#536273"/></marker>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffaf3"/><stop offset="1" stop-color="#f1f8f6"/></linearGradient>
+  </defs>
+  <rect width="1200" height="650" rx="24" fill="url(#bg)"/>
+  <text x="54" y="54" font-size="27" font-weight="700" fill="#172033">两种模型骨架，不复制两套 Runtime</text>
+  <text x="54" y="84" font-size="15" fill="#536273">Loader 根据 GGUF 选择模型数学；Generation、缓存、调度和 Serving 复用相同契约</text>
+
+  <rect x="54" y="112" width="500" height="410" rx="18" fill="#fff" stroke="#e7a15d" stroke-width="2"/>
+  <text x="82" y="149" font-size="21" font-weight="700" fill="#9a4d13">TinyLlama 1.1B</text>
+  <text x="82" y="175" font-size="13" fill="#536273">Llama 稠密解码器 · 默认 CPU 基线</text>
+  <g text-anchor="middle">
+    <rect x="112" y="203" width="384" height="48" rx="11" fill="#fff3e3"/><text x="304" y="233" font-size="14" fill="#7c4317">SentencePiece 分词 · 32,000 词表</text>
+    <path d="M304 251V270" stroke="#536273" stroke-width="2" marker-end="url(#arrow)"/>
+    <rect x="112" y="272" width="384" height="48" rx="11" fill="#fff3e3"/><text x="304" y="302" font-size="14" fill="#7c4317">词元嵌入 · 隐藏维度 2,048</text>
+    <path d="M304 320V339" stroke="#536273" stroke-width="2" marker-end="url(#arrow)"/>
+    <rect x="92" y="341" width="424" height="94" rx="13" fill="#f6e4ce" stroke="#e7a15d"/>
+    <text x="304" y="373" font-size="16" font-weight="700" fill="#9a4d13">22 个 Decoder Block</text>
+    <text x="304" y="399" font-size="13" fill="#536273">32 Q 头 / 4 K/V 头 · 64 维头</text>
+    <text x="304" y="421" font-size="12" fill="#536273">RMSNorm · 相邻维 RoPE · GQA · SwiGLU</text>
+    <path d="M304 435V454" stroke="#536273" stroke-width="2" marker-end="url(#arrow)"/>
+    <rect x="112" y="456" width="384" height="44" rx="11" fill="#fff3e3"/><text x="304" y="484" font-size="14" fill="#7c4317">最终 RMSNorm → LM Head</text>
+  </g>
+
+  <rect x="646" y="112" width="500" height="410" rx="18" fill="#fff" stroke="#2f8b83" stroke-width="2"/>
+  <text x="674" y="149" font-size="21" font-weight="700" fill="#0f5f59">Qwen3-0.6B</text>
+  <text x="674" y="175" font-size="13" fill="#536273">Qwen3 稠密解码器 · 第二种 CPU 架构基线</text>
+  <g text-anchor="middle">
+    <rect x="704" y="203" width="384" height="48" rx="11" fill="#e7f6f3"/><text x="896" y="233" font-size="14" fill="#0f5f59">BPE 分词 · 151,936 词表</text>
+    <path d="M896 251V270" stroke="#536273" stroke-width="2" marker-end="url(#arrow)"/>
+    <rect x="704" y="272" width="384" height="48" rx="11" fill="#e7f6f3"/><text x="896" y="302" font-size="14" fill="#0f5f59">词元嵌入 · 隐藏维度 1,024</text>
+    <path d="M896 320V339" stroke="#536273" stroke-width="2" marker-end="url(#arrow)"/>
+    <rect x="684" y="341" width="424" height="94" rx="13" fill="#d9efeb" stroke="#2f8b83"/>
+    <text x="896" y="373" font-size="16" font-weight="700" fill="#0f5f59">28 个 Decoder Block</text>
+    <text x="896" y="399" font-size="13" fill="#536273">16 Q 头 / 8 K/V 头 · 128 维头</text>
+    <text x="896" y="421" font-size="12" fill="#536273">RMSNorm · Q/K Norm · NeoX RoPE · GQA · SwiGLU</text>
+    <path d="M896 435V454" stroke="#536273" stroke-width="2" marker-end="url(#arrow)"/>
+    <rect x="704" y="456" width="384" height="44" rx="11" fill="#e7f6f3"/><text x="896" y="484" font-size="14" fill="#0f5f59">最终 RMSNorm → LM Head</text>
+  </g>
+
+  <path d="M304 522V553H600M896 522V553H600M600 553V574" fill="none" stroke="#536273" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="244" y="576" width="712" height="50" rx="14" fill="#28536b"/>
+  <text x="600" y="607" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">共同接口：Executor / Context → Generation → K/V → Scheduler → Serving</text>
+</svg>

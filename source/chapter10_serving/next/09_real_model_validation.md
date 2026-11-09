@@ -1,6 +1,6 @@
 # 10.9 用真实模型验证服务闭环
 
-确定性 Executor 适合覆盖状态机，真实 TinyLlama 用于验证 Model 共享、Context 隔离、Tokenizer、K/V 增长和 HTTP 输出。<a href="../../_code/engine/scripts/run_real_http_server.sh"><code>run_real_http_server.sh</code></a> 组装这些对象；真实模型检查仍先通过 correctness，再记录性能。
+确定性 Executor 适合覆盖状态机，真实 TinyLlama 和 Qwen3 用于验证 Model 共享、Context 隔离、Tokenizer、K/V 增长和 HTTP 输出。两种模型复用同一组 ServiceCore、Scheduler、分页缓存与 Adapter；GGUF 路径决定 Factory 加载哪种 CPU Decoder。
 
 ## 真实对象怎样组装
 
@@ -28,13 +28,19 @@
 
 ## 验证真实服务闭环
 
-确认 TinyLlama GGUF 已存在后运行：
+确认 TinyLlama GGUF 已存在后运行默认 socket 闭环：
 
 ```bash
 bash code/engine/scripts/run_real_http_server.sh --check
 ```
 
-通过条件是 health、同步 Completion、SSE、metrics 和固定 token golden 全部成功，两个请求的 Context/K/V 不串扰，终态后服务条目和分页块归零。`10.10` 将这个单进程闭环映射到成熟服务架构。
+Qwen3 使用同一服务对象，但固定模型、prompt 和 golden 不同：
+
+```bash
+bash code/chapter10_serving/scripts/run_qwen3_serving.sh
+```
+
+两条 CPU 路径都要求同步 Completion、SSE、metrics 和固定 token golden 成立，两个请求的 Context/K/V 不串扰，Radix 前缀在调度提升时命中，终态后服务条目和请求块释放。`10.10` 将这个单进程闭环映射到成熟服务架构。
 
 有 NVIDIA GPU 时再运行：
 

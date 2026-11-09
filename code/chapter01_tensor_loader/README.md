@@ -9,7 +9,7 @@
 ```text
 CIE1 bytes -> ModelLoader -----------------------> Tensor map
 
-GGUF bytes -> GgufReader ------> metadata/index
+GGUF bytes -> GgufReader ------> 元数据/索引
                           |              |
                           |              +-> Metadata/Tokenizer adapters
                           |              +-> GgufTensorLoader -> Tensor map
@@ -29,10 +29,10 @@ Reader 只解释外部格式，Adapter 把外部字段转换为稳定配置，Lo
 | --- | --- |
 | `src/tensor.*` | 保存名称、shape、dtype、storage 和 payload |
 | `src/model_loader.*` | 加载 CIE1 教学格式并验证记录完整性 |
-| `src/gguf_reader.*` | 读取 GGUF header、metadata 和张量索引 |
+| `src/gguf_reader.*` | 读取 GGUF 文件头、模型元数据和张量索引 |
 | `src/model_metadata*`、`src/tokenizer_metadata*` | 把 GGUF 字段转换为内部配置 |
 | `src/gguf_tensor_loader.*` | 按索引读取 F32/F16/I8/Q8_0/Q4_K/Q6_K payload |
-| `src/model_schema.*` | 检查 Llama 权重名称与 shape |
+| `src/model_schema.*` | 根据 Llama/Qwen3 架构检查权重名称与形状 |
 | `src/model_builder.*` | 装配 `LoadedModel` 和 `DecoderInput` |
 | `src/real_layer_weights.*` | 按层取得后续 Decoder 使用的权重 |
 | `examples/gguf_inspect.cpp` | 检查真实 GGUF 配置、索引和 schema |
@@ -47,7 +47,7 @@ Reader 只解释外部格式，Adapter 把外部字段转换为稳定配置，Lo
 bash code/chapter01_tensor_loader/run.sh
 ```
 
-脚本隔离构建并运行三个 Chapter01 测试组，覆盖合法加载、非法输入、失败原子性、GGUF fixture、模型 schema 和量化 payload。设置 `CHAPTER01_BUILD_DIR` 可以保留检查工具：
+脚本隔离构建并运行三个 Chapter01 测试组，覆盖合法加载、非法输入、失败原子性、GGUF 测试文件、模型结构约束和量化 payload。Qwen3 合成用例还检查 Q/K Norm、共享输出权重和可选 BOS。设置 `CHAPTER01_BUILD_DIR` 可以保留检查工具：
 
 ```bash
 export CHAPTER01_BUILD_DIR=/tmp/cpp-llm-engine-chapter01-build
@@ -59,15 +59,36 @@ bash code/chapter01_tensor_loader/run.sh
   llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
 ```
 
+同一个结构检查工具也用于 Qwen3，并可按名称查看单个权重：
+
+```bash
+"$CHAPTER01_BUILD_DIR/gguf_inspect" \
+  llama.cpp/models/qwen3-0.6b/Qwen3-0.6B-Q4_K_M.gguf \
+  --validate-schema
+"$CHAPTER01_BUILD_DIR/gguf_inspect" \
+  llama.cpp/models/qwen3-0.6b/Qwen3-0.6B-Q4_K_M.gguf \
+  --tensor blk.0.attn_q.weight
+```
+
 启用 llama.cpp reference adapter 后，可同时验证真实分词结果与 TinyLlama 模型结构：
 
 ```bash
 bash code/chapter01_tensor_loader/run_real_tokenizer.sh
 ```
 
+Qwen3 使用独立固定资产建立第二套真实 Loader 基线：
+
+```bash
+bash code/chapter01_tensor_loader/run_qwen3_baseline.sh
+```
+
+该脚本验证文件 SHA-256、`Hello Qwen3` 的固定词元、聊天模板、28 层元数据和 311 个张量。它不调用 Qwen Decoder，因此通过条件只表示 Chapter01 输入契约成立。
+
 ## 扩展入口
 
 本章在 `LoadedModel` 和 `DecoderInput` 处结束。后续扩展从以下位置继续：
+
+`DenseDecoderTensorLayout` 是新代码使用的公共名称；`LlamaTensorLayout` 暂时作为兼容别名保留。Llama 与 Qwen3 都已进入完整 CPU Decoder、Generation 和服务验证；Qwen3 CUDA 仍待后续设备适配。
 
 | 方向 | 后续入口 |
 | --- | --- |

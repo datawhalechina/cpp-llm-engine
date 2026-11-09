@@ -27,7 +27,7 @@ bash code/chapter00_quickstart/run_real_inference.sh
 
 第一条失败时检查 C++/CMake；第二条失败时重做 llama.cpp 构建；前两条通过而第三条失败时，检查 GGUF 和运行参数。
 
-Chapter00 使用已经成熟的 llama.cpp 可执行文件；Chapter01 开始构建本教程自己的 Loader、Tokenizer 和模型契约。因此 Chapter00 能推理但 Chapter01 测试失败，通常说明自研代码、编译环境或输入契约尚未通过，不能用外部基线成功替代对应章节测试。
+Chapter00 使用已经成熟的 llama.cpp 可执行文件；Chapter01 开始构建本教程自己的 Loader、Tokenizer 和模型接口。因此 Chapter00 能推理但 Chapter01 测试失败，通常说明自研代码、编译环境或输入校验尚未通过，不能用外部基线成功替代对应章节测试。
 
 ## 验证与衔接
 

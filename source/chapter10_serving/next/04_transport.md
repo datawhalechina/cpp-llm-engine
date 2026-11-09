@@ -20,7 +20,7 @@ Transport 负责监听、HTTP 解析、响应写出和连接事件；<a href="..
 
 `ResponseWriter` 是 Transport 与 Adapter 之间的窄接口，只暴露 headers、event、finish 和连接状态。网络库对象不应穿过该接口进入 ServiceCore。
 
-服务进程的模型路径、监听地址、端口、后端和实现策略适合由命令行或部署环境提供。Transport 在启动时完成解析，再把类型化配置交给 Engine Factory 和 `ServiceCore`；请求处理期间不再读取 `argv`。推荐保持如下优先级：显式命令行参数覆盖环境默认值，环境默认值覆盖程序内安全默认值，并在启动日志打印最终配置。请求自身的生成参数仍由 `HttpAdapter` 校验，不能与进程级 backend 配置混用。
+服务进程的模型路径、监听地址、端口、后端和实现策略适合由命令行或部署环境提供。Transport 在启动时完成解析，再把类型化配置交给执行器工厂和 `ServiceCore`；请求处理期间不再读取 `argv`。推荐保持如下优先级：显式命令行参数覆盖环境默认值，环境默认值覆盖程序内安全默认值，并在启动日志打印最终配置。请求自身的生成参数仍由 `HttpAdapter` 校验，不能与进程级 backend 配置混用。
 
 cpp-httplib 可以并发接收连接，但当前 `ServiceCore` 是单线程状态机。`CppHttplibServer` 因此在调用 `HttpAdapter` 前持有同一把互斥锁；同步 Completion 或 SSE 生命周期结束后，下一个请求才进入 Adapter。这个边界先保证状态和资源安全，不代表已经实现多个 HTTP 请求共同进入 StepBatchPlan。后续异步 Transport 需要把连接事件与 ServiceCore 的单线程事件循环分开，而不是简单移除互斥锁。
 

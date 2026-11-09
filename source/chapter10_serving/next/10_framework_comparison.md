@@ -17,7 +17,7 @@
 
 | 问题 | 成熟系统增加的对象 | 工程影响 |
 | --- | --- | --- |
-| API 与 Engine 分进程 | IPC、序列化、Engine client | 取消和流式事件跨进程传递 |
+| API 与推理引擎分进程 | IPC、序列化、引擎客户端 | 取消和流式事件跨进程传递 |
 | 多 GPU/多节点执行 | distributed executor、worker group | 资源与失败域扩大 |
 | 多租户和优先级 | policy、quota、preemption | admission 与 Scheduler 策略分离 |
 | 前缀与分层缓存 | prefix index、host/remote cache | 生命周期不再等同单请求 |
@@ -25,7 +25,7 @@
 
 ## 继续阅读源码
 
-阅读时先跟踪一条请求如何进入 Engine、获得 K/V、产生首词元并在取消后释放资源，再观察 API 进程和模型 Worker 分开后这些事件如何跨进程传递。
+阅读时先跟踪一条请求如何进入推理引擎、获得 K/V、产生首词元并在取消后释放资源，再观察 API 进程和模型 Worker 分开后这些事件如何跨进程传递。
 
 | 项目卡 | 本章使用它回答什么 |
 | --- | --- |

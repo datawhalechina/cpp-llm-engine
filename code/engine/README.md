@@ -24,7 +24,7 @@ Factory 的名称表示它负责按统一规则创建和装配 Executor，而不
 
 | 资产 | 作用 |
 | --- | --- |
-| `include/` | toy Engine、真实 TinyLlama Engine、Tokenizer 和执行器工厂接口 |
+| `include/` | toy Engine、真实 Llama/Qwen3 CPU Engine、Tokenizer 和执行器工厂接口 |
 | `src/` | prompt、Tokenizer backend、教学 decoder 与真实 CPU Model/Context 适配 |
 | `tests/` | core contract、engine、embedding Runtime 与 ServiceCore 集成测试 |
 | `EmbeddingRequestExecutor` | 预计算 text/visual embedding -> Chapter06 每请求执行器 |
@@ -128,11 +128,11 @@ ctest --test-dir /tmp/cpp-llm-engine-real-generation \
 
 设置 `CPP_LLM_ENGINE_REAL_MODEL` 后才会注册标记为 `real_model;slow` 的真实模型 CTest，默认无模型构建仍只运行轻量测试。当前基线输出 6 个 prompt token，并生成 `29892 306 29915 29885`，解码文本为 `, I'm`。CTest 在同一 Engine 上连续生成两次，断言 `golden_tokens_match: true` 和 `context_isolation_match: true`。
 
-`RealLlamaExecutorFactory` 长期持有只读 `RealLlamaCpuModel`，每次 `create_executor()` 创建一个独立 `RealLlamaCpuContext`。Context 独占 position 和 22 层连续 K/V。`decode_batch()` 校验 position 后，在每层合并多个 Context 的 Q/K/V、输出投影、FFN 和 LM Head Linear；scalar Q4_K/Q6_K/Q8_0 backend 一次遍历权重并累加多个输入行。真实 batch CTest 证明不同长度 prompt 的 logits 和固定输出与顺序执行一致，错误 position 或 token 不会提交状态。AVX2 batch 仍使用逐行兼容路径，KV 也未写入分页 payload，因此尚不宣称批量吞吐收益。
+`RealLlamaExecutorFactory` 长期持有只读 CPU Model，每次 `create_executor()` 创建一个独立 Context。Model 从 GGUF 自动识别 `llama` 或 `qwen3`；Context 独占 position 和每层连续或分页 K/V。`decode_batch()` 校验 position 后，在每层合并多个 Context 的 Q/K/V、输出投影、FFN 和 LM Head Linear；scalar Q4_K/Q6_K/Q8_0 backend 一次遍历权重并累加多个输入行。真实 batch 测试证明不同长度 prompt 的 logits 和固定输出与顺序执行一致，错误 position 或 token 不会提交状态。AVX2 batch 仍使用逐行兼容路径，因此尚不宣称批量吞吐收益。
 
 启用分页 K/V 后，CPU 和 CUDA Factory 都持有 `RadixPrefixCache`。请求结束时，完整物理块在释放请求页表前发布到前缀索引；新请求准入只估算可复用长度，获得运行槽时才重新查询并同步共享 `BlockTable`、Request 的 Prefill 进度和 CPU/CUDA Context 位置。`PrefixBlockStore` 让索引共用匹配和淘汰算法，同时保留两种 payload 的清理时序。容量不足时，数据面先回收最久未使用的索引独占叶端块，再重试预留；真实 CPU 和 CUDA 测试都使用相同四词元前缀比较冷启动与缓存命中路径，验证 logits 或首个生成词元一致。
 
-真实服务 smoke 用同一 Factory 为 `Hello TinyLlama` 和 `Hi` 创建两个 Executor；长 prompt 分块追加到同一 Context，中间 chunk 不产生 logits，固定输出仍分别为 `29892 306 29915 29885` 与 `839 744 29892 263`。测试还会先发布一组真实 K/V 前缀，再让冷请求与命中请求依次入队，检查后者先执行。terminal release 后 Executor/Context 和请求 block table 被释放，Radix 索引可继续持有可复用物理块。`real_serving_match: true` 是该测试的唯一总通过标记。
+真实服务 smoke 根据 Factory 报告的架构选择 TinyLlama 或 Qwen3 固定 prompt 与 golden，并为两个请求创建独立 Executor。长 prompt 分块追加到同一 Context，中间 chunk 不产生 logits；测试还会先发布一组真实 K/V 前缀，再让冷请求与命中请求依次入队，检查后者先执行。terminal release 后 Executor/Context 和请求 block table 被释放，Radix 索引可继续持有可复用物理块。HTTP 组合测试用同一配置验证同步 Completion、SSE 和 metrics；`real_serving_match: true` 是 ServiceCore 闭环的总通过标记。
 
 `real_tinyllama_http_adapter_smoke` 把同一 Factory 注入 Chapter10 `HttpAdapter`，验证同步 JSON 返回第一组 token、SSE 按顺序返回第二组 token，并核对两个请求的 accepted/completed/released/generated metrics。需要继续验证真实 socket 时运行 `bash code/engine/scripts/run_real_http_server.sh --check`；去掉 `--check` 会保留服务供手工 curl。transport 只处理 HTTP/SSE，并用互斥锁串行调用当前单线程 ServiceCore。
 

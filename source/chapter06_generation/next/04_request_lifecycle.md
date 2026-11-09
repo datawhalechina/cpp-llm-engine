@@ -36,7 +36,7 @@
 
 状态不可恢复不等于资源已经释放。请求专属模型 Context 和物理 KV Block 的释放分别由其所有者执行；Chapter06 只保证终态对象不会再次产生模型工作。
 
-## 验证终态契约
+## 验证终态规则
 
 ```bash
 cmake -S code/chapter06_generation -B /tmp/cpp-llm-chapter06-state \

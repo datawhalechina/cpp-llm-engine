@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
-  <title id="title">Chapter 04 从解码器块走到真实 TinyLlama</title>
-  <desc id="desc">Chapter 04 把归一化、注意力、残差和前馈网络组装为解码器块；教学 CPU、真实 TinyLlama、CUDA 后端和多模态输入沿共同骨架形成四条学习路线。</desc>
+  <title id="title">Chapter 04 从解码器块走到真实稠密模型</title>
+  <desc id="desc">Chapter 04 把归一化、注意力、残差和前馈网络组装为解码器块；教学 CPU、真实 TinyLlama 与 Qwen3、CUDA 后端和多模态输入沿共同骨架形成四条学习路线。</desc>
   <defs>
     <style>text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif !important; }</style>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
@@ -19,7 +19,7 @@
   </defs>
 
   <rect width="1200" height="610" rx="24" fill="url(#background)"/>
-  <text x="54" y="55" font-size="27" font-weight="700" fill="#172033">Chapter 04：从解码器块走到真实 TinyLlama</text>
+  <text x="54" y="55" font-size="27" font-weight="700" fill="#172033">Chapter 04：从解码器块走到真实稠密模型</text>
   <text x="54" y="84" font-size="15" fill="#52606d">前三章提供模型材料、张量视图和矩阵乘法语义；本章组装解码器，Chapter 05 再接入真实量化线性层</text>
 
   <!-- Position in the learning path -->
@@ -107,7 +107,7 @@
     <rect x="330" y="488" width="258" height="94" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
     <text x="352" y="518" font-size="14" font-weight="700" fill="#9a4d13">B 真实 CPU</text>
     <text x="352" y="544" font-size="12" fill="#52606d">RMSNorm · GQA · SwiGLU</text>
-    <text x="352" y="566" font-size="11" fill="#708090">TinyLlama 22 层与请求状态</text>
+    <text x="352" y="566" font-size="11" fill="#708090">TinyLlama 22 层 · Qwen3 28 层</text>
 
     <rect x="606" y="488" width="258" height="94" rx="16" fill="#ffffff" stroke="#d8e2e8"/>
     <text x="628" y="518" font-size="14" font-weight="700" fill="#1d4ed8">G GPU 后端</text>

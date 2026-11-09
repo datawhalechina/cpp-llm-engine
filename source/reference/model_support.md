@@ -7,7 +7,7 @@
 | 模型 | 架构 | 在教程中的角色 | 当前状态 |
 | --- | --- | --- | --- |
 | TinyLlama 1.1B Chat Q4_K_M | Llama 稠密解码器 | 默认 CPU 基线；固定 GGUF、分词器、22 层解码器、运行时和服务结果 | 已接入默认主线 |
-| Qwen3-0.6B | Qwen3 稠密解码器 | 第二种小模型兼容目标；暴露 Llama 专用假设 | 规划：新增 Qwen 配置、权重映射和解码器 |
+| Qwen3-0.6B | Qwen3 稠密解码器 | 第二种小模型兼容目标；暴露 Llama 专用假设 | Loader、分词、28 层 CPU Decoder、Generation 与 CPU Serving 已通过；CUDA 待接入 |
 | DeepSeek-R1-Distill-Qwen-1.5B | Qwen2.5 稠密解码器 | 验证 Qwen2.5 分词器、聊天模板和模型配置变化 | 规划：复用 Qwen 稠密模型适配路径 |
 | Gemma | Gemma 稠密解码器 | 比较另一种模型家族的元数据、权重命名、归一化和 FFN 差异 | 外部兼容性参照 |
 | Qwen3-30B-A3B | Qwen3 MoE | 对照路由器（Router）、Top-K 专家选择与专家执行 | 外部框架对照；总权重超出当前单卡目标 |
@@ -17,7 +17,11 @@ TinyLlama 继续作为默认模型，因为当前 Llama GGUF 字段模式、权�
 
 ## 接入新稠密模型需要改什么
 
-Qwen3-0.6B 同样使用 RMSNorm、RoPE、分组查询注意力和 SwiGLU，但层数、隐藏维度、词表、特殊词元、聊天模板、RoPE 参数及权重命名与 TinyLlama 不同。兼容工作按数据流进入已有章节：
+Qwen3-0.6B 同样使用 RMSNorm、RoPE、分组查询注意力和 SwiGLU，但层数、隐藏维度、词表、特殊词元、聊天模板和 RoPE 参数与 TinyLlama 不同。它还为每层 Q/K 增加独立 RMSNorm，并允许 LM Head 与词嵌入共享权重。兼容工作按数据流进入已有章节：
+
+当前固定 Qwen3 GGUF 包含 28 个解码器块、1024 维隐藏状态、16 个查询头、8 个 K/V 头和 128 维头空间。Chapter01 已验证 311 个张量、`Hello Qwen3` 的固定词元和聊天模板；Chapter04 已执行首层 Q/K Norm、NeoX RoPE、GQA、增量 K/V 和完整 28 层 CPU Decoder。默认四词元输入的 logits 与 llama.cpp 对照满足误差门槛，前五候选完全重合，连续四步贪心词元一致。
+
+教程量化 Linear 保留 Float32 激活，llama.cpp 的 K-quant 点积会量化激活，因此两条路径不要求逐位相等。验收同时约束平均绝对误差、RMSE、余弦相似度、Top-5 重合和贪心序列；Chapter06 进一步验证真实 Tokenizer、Prefill、Decode、停止和请求隔离；Chapter10 验证 Completion、SSE、双请求调度、分页 K/V、Radix 命中和终态释放。Qwen3 当前获得 CPU 推理服务支持，CUDA 仍待接入。
 
 | 章节 | 需要增加的兼容证据 |
 | --- | --- |

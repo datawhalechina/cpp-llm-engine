@@ -1,6 +1,8 @@
 # GPU 六任务学习计划
 
-GPU 路线在 CPU 已验证的算法和公共契约上替换设备内存、计算核与执行上下文。建议先完成 [CPU 六任务](./cpu_learning_plan.md)中的前四项；完整学习调度和服务前，再补齐 CPU 任务五、六。
+GPU 路线在 CPU 已验证的算法和公共接口上替换设备内存、计算核与执行上下文。建议先完成 [CPU 六任务](./cpu_learning_plan.md)中的前四项；完整学习调度和服务前，再补齐 CPU 任务五、六。
+
+当前真实 GPU 基线是 TinyLlama：单层、22 层 Decoder、Generation、分页 K/V、批量执行和服务均有验证入口。Qwen3 已完成 CPU 主线，GPU 路径仍待适配 Q/K Norm、NeoX RoPE、非对称 Q/KV 投影宽度和 28 层结构；因此任务 4–6 当前只承诺 TinyLlama。
 
 环境安装与故障排查见 [CUDA 安装与配置](./setup_cuda.md)，代码对象与测试清单见 [`code/cuda/README.md`](/code/cuda)。
 
@@ -54,7 +56,7 @@ CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
 
 ## 任务 4：运行真实 GPU Decoder
 
-核心算子通过后，把真实 TinyLlama 权重上传到 GPU，依次验证首层、短 Decoder 和完整 22 层。Model 保存共享权重，Context 保存请求位置与 K/V，两者的生命周期继续沿用 CPU 契约。
+核心算子通过后，把真实 TinyLlama 权重上传到 GPU，依次验证首层、短 Decoder 和完整 22 层。模型保存共享权重，Context 保存请求位置与 K/V，两者的生命周期继续沿用 CPU 接口和状态规则。
 
 ```bash
 bash code/engine/scripts/run_real_cuda_first_layer.sh

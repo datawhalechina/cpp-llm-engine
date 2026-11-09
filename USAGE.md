@@ -24,7 +24,7 @@ npm run test:regression
 
 ## 选择学习路线
 
-CPU、GPU 和多模态共享同一套模型、执行和服务契约。章节导读中的 A/B 表示章内递进，G/M 表示在稳定契约上的横向扩展：
+CPU、GPU 和多模态共享同一套模型接口、执行规则和服务行为。章节导读中的 A/B 表示章内递进，G/M 表示在稳定接口上的横向扩展：
 
 ```text
 A 教学基线 → B 真实主线
@@ -85,10 +85,10 @@ CMake 选项决定编译哪些 backend，运行参数只选择已经编译的能
 | 扩展 | 入口 | 当前范围 |
 | --- | --- | --- |
 | CUDA backend | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备资源、量化 Linear、K/V、GQA 和 Decoder |
-| 真实模型集成 | [`code/engine/README.md`](code/engine/README.md) | TinyLlama CPU/CUDA Model、Runtime、Generation 和 Serving |
+| 真实模型集成 | [`code/engine/README.md`](code/engine/README.md) | TinyLlama CPU/CUDA 模型、运行时、生成和服务 |
 | 多模态 | `bash code/multimodal/scripts/run.sh` | SmolVLM CPU 输入、Vision、Projector 和 Decoder golden |
 
-修改 CUDA backend、真实 CUDA Model/Context 或服务接入后，依次运行纵向验收：
+修改 CUDA 后端、真实 CUDA 模型/Context 或服务接入后，依次运行纵向验收：
 
 ```bash
 CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
@@ -104,9 +104,9 @@ bash code/engine/scripts/run_real_cuda_serving.sh
 | --- | --- | --- |
 | 章节测试 | 对应章节 `run.sh` | 当前章节可以独立构建并通过测试 |
 | 默认回归 | `npm run test:regression` | 无外部模型、网络和 GPU 时，主线资产与代码没有退化 |
-| 发布契约 | `npm run test:release-contracts` | 全新 Release 构建中的测试登记、label 和跨章契约成立 |
+| 发布验收 | `npm run test:release-contracts` | 全新 Release 构建中的测试登记、label 和跨章接口约定成立 |
 | 文档检查 | `npm run docs:check-links` | 链接有效且 VitePress 站点可以完整构建 |
-| 真实环境 | Engine、CUDA 或多模态对应脚本 | 指定模型、设备或输入路径真实运行通过 |
+| 真实环境 | 引擎集成、CUDA 或多模态对应脚本 | 指定模型、设备或输入路径真实运行通过 |
 
 benchmark 只能比较固定环境和 workload 下的性能，不能替代正确性测试。实验条件与结果入口见[实验资产表](source/reference/experiment_assets.md)。
 

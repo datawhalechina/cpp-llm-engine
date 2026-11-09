@@ -7,9 +7,9 @@ Chapter06 定义单请求生成，Chapter07 管理 K/V 资源，Chapter08 选择
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
 | A 服务生命周期 | 从 admission 进入 waiting/running，再处理取消、超时、失败和统一释放 | 固定状态转换、容量结果和资源归零 |
-| B 网络与并发 | 把 Completion/SSE 映射到 ServiceCore，再验证 Worker、断连和请求隔离 | HTTP 状态、词元顺序、请求级并发与指标契约 |
+| B 网络与并发 | 把 Completion/SSE 映射到 ServiceCore，再用 TinyLlama 和 Qwen3 验证模型切换 | HTTP 状态、词元顺序、请求级并发与指标契约 |
 | G GPU 扩展坐标 | 保持 ServiceCore 与 HTTP 契约不变，把 Executor 替换为设备后端 | TinyLlama CUDA 已通过分页 Decode batch、同步 Completion、SSE 和终态释放 |
-| M 多模态扩展坐标 | 在 Adapter 前构造图文 embedding Executor，再复用同一服务生命周期 | 已有 Engine 集成测试；图片 HTTP body 与多模态 Transport 尚未实现 |
+| M 多模态扩展坐标 | 在 Adapter 前构造图文 embedding Executor，再复用同一服务生命周期 | 已有引擎集成测试；图片 HTTP body 与多模态 Transport 尚未实现 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
@@ -29,7 +29,7 @@ Chapter06 定义单请求生成，Chapter07 管理 K/V 资源，Chapter08 选择
 | 1 | A | [`10.1 ServiceCore`](./01_service_core.md)–[`10.3 终态释放`](./03_terminal_release.md) | <a href="../../_code/chapter10_serving/src/service_core.cpp"><code>service_core.cpp</code></a> | 请求怎样进入、停止并释放所有权 |
 | 2 | B | [`10.4 Transport`](./04_transport.md)–[`10.6 SSE`](./06_sse_disconnect.md) | <a href="../../_code/chapter10_serving/src/http_adapter.cpp"><code>http_adapter.cpp</code></a>、<a href="../../_code/chapter10_serving/include/chapter10_serving/response_writer.h"><code>response_writer.h</code></a> | 请求、断连和写回失败怎样映射为服务终态 |
 | 3 | B | [`10.7 并发`](./07_concurrency_workers.md)、[`10.8 可观测性`](./08_observability.md) | <a href="../../_code/chapter10_serving/tests/request_worker_test.cpp"><code>request_worker_test.cpp</code></a> | 请求线程并发、Tensor batch 和指标口径的区别 |
-| 4 | A/B | [`10.9 真实模型验证`](./09_real_model_validation.md)、[`10.10 框架对照`](./10_framework_comparison.md) | Engine 真实模型入口、生态卡 | 教学闭环怎样连接生产服务架构 |
+| 4 | A/B | [`10.9 真实模型验证`](./09_real_model_validation.md)、[`10.10 框架对照`](./10_framework_comparison.md) | `code/engine` 真实模型入口、生态卡 | 教学闭环怎样连接生产服务架构 |
 
 ## 验证与下一步
 
@@ -39,6 +39,7 @@ Chapter06 定义单请求生成，Chapter07 管理 K/V 资源，Chapter08 选择
 | L2 HTTP/SSE | 同一入口的 adapter/writer 测试 | 状态码和词元顺序正确，断连或背压后取消并释放 | 必做 |
 | L3 Socket 回环 | `bash code/chapter10_serving/scripts/run_cpp_httplib_loopback.sh` | health、metrics、Completion 和 SSE 通过 | 可选 |
 | L4 真实模型 | `bash code/engine/scripts/run_real_http_server.sh --check` | TinyLlama golden、Context 隔离和资源释放通过 | 有模型时必做 |
+| L4 可选 Qwen3 | `bash code/chapter10_serving/scripts/run_qwen3_serving.sh` | Qwen3 Completion、SSE、双请求调度、Radix 命中和释放通过 | 扩展模型时执行 |
 | L5 CUDA 服务 | `bash code/engine/scripts/run_real_cuda_serving.sh` | CUDA golden、SSE 顺序、取消、超时和 inflight 归零 | 有 CUDA 时可选 |
 
 L1 入口会构建 Chapter06–08 依赖与 `chapter10_serving`，再运行 ServiceCore、终态释放、HTTP/SSE 契约和请求 Worker 四个测试。

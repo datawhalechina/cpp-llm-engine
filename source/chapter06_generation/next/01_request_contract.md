@@ -1,6 +1,6 @@
-# 06.1 建立请求与模型执行契约
+# 06.1 确定请求状态与模型调用规则
 
-模型已经能接收词元并产生 logits，但生成过程会跨越多次模型调用。代码需要保存输入、已生成词元、当前位置和结束状态，同时把模型计算与生成控制流分开。Chapter06 用请求（`Request`）、生成配置（`GenerationConfig`）和模型执行器（`RequestModelExecutor`）固定这组交接数据。
+模型已经能接收词元并产生 logits，但生成过程会跨越多次模型调用。代码需要保存输入、已生成词元、当前位置和结束状态，同时把模型计算与生成控制流分开。Chapter06 用请求（`Request`）、生成配置（`GenerationConfig`）和模型执行器（`RequestModelExecutor`）固定输入输出、状态变化和失败行为。这组可检查的协作规则在代码中称为接口约定（contract）。
 
 ## 请求保存哪些状态
 
@@ -23,7 +23,7 @@ Chapter07 命中共享 K/V 前缀时，`adopt_prefilled_prefix()` 会把同一�
 
 生成配置定义停止和准入条件，位于 <a href="/_code/chapter06_generation/include/chapter06_generation/generation_types.h"><code>generation_types.h</code></a>。`max_new_tokens` 限制输出长度，`max_context_tokens` 限制 prompt 与计划输出的总长度，`eos_token_id` 提供提前停止条件。
 
-模型执行器只回答“给定输入后 logits 是什么”，不选择下一个词元，也不改变请求终态。接口位于 <a href="/_code/chapter06_generation/include/chapter06_generation/model_executor.h"><code>model_executor.h</code></a>。
+模型执行器（Executor）是 Runtime 调用模型的请求级入口：它持有或引用一个请求的模型 Context，把 Prefill/Decode 输入交给 CPU 或 CUDA 模型，再返回 logits。它不是操作系统线程，不选择下一个词元，也不决定多个请求的先后顺序。接口位于 <a href="/_code/chapter06_generation/include/chapter06_generation/model_executor.h"><code>model_executor.h</code></a>。
 
 | 调用 | 输入 | 输出 | 模型侧状态 |
 | --- | --- | --- | --- |
@@ -59,7 +59,7 @@ Chapter07 命中共享 K/V 前缀时，`adopt_prefilled_prefix()` 会把同一�
 
 ## 验证请求状态
 
-从仓库根目录执行 Request 契约测试：
+从仓库根目录执行 Request 状态规则测试：
 
 ```bash
 cmake -S code/chapter06_generation -B /tmp/cpp-llm-chapter06-contract \
@@ -70,4 +70,4 @@ ctest --test-dir /tmp/cpp-llm-chapter06-contract \
   -R '^chapter06_request_contract_test$' --output-on-failure
 ```
 
-通过时可以观察到 prompt 与词元历史分别保存、缓存前缀同步推进两者、Prefill 游标单调递增且不越界、五种终态都拒绝后续状态变化。下一篇使用这组契约区分 Prefill 与 Decode。
+通过时可以观察到 prompt 与词元历史分别保存、缓存前缀同步推进两者、Prefill 游标单调递增且不越界、五种终态都拒绝后续状态变化。下一篇使用这些规则区分 Prefill 与 Decode。

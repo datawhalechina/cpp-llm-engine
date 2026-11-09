@@ -40,7 +40,7 @@
 
 ## 验证增长语义
 
-默认 Generation 测试检查三个 prompt 加三个输出后，教学词元历史长度为六。真实模型执行状态可通过 Engine 的执行器测试观察：
+默认 Generation 测试检查三个 prompt 加三个输出后，教学词元历史长度为六。真实模型执行状态可通过 `code/engine` 的执行器测试观察：
 
 ```bash
 cmake -S code/engine -B /tmp/cpp-llm-engine-contract \

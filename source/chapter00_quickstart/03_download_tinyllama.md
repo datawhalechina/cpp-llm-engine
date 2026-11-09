@@ -15,12 +15,12 @@ TinyLlama 用于验证执行链，不用于代表更大模型的生成质量。
 
 ## 不同模型在教程中的角色
 
-Chapter00 使用 llama.cpp 建立外部基线，模型能被 llama.cpp 运行，不等于它已经接入教程自己的 C++ Decoder。当前自研真实执行链只支持 TinyLlama 对应的 Llama 稠密架构；Qwen 和 DeepSeek 用来逐步验证模型适配能力，MoE 则在稠密模型兼容稳定后再学习 Router 与专家执行。具体接入改动、资源限制和建设顺序见[模型基线与扩展顺序](../reference/model_support.md)。
+Chapter00 使用 llama.cpp 建立外部基线，模型能被 llama.cpp 运行，不等于它已经接入教程自己的 C++ Decoder。当前自研 CPU 执行链支持 TinyLlama 对应的 Llama 稠密架构和 Qwen3-0.6B；TinyLlama 继续承担默认主线，Qwen3 用于验证第二种模型家族。DeepSeek 稠密模型排在 Qwen3 CUDA 之后，MoE 则在稠密模型兼容稳定后再学习 Router 与专家执行。具体接入改动、资源限制和建设顺序见[模型基线与扩展顺序](../reference/model_support.md)。
 
 | 模型 | 适合学习什么 | 教程当前状态 |
 | --- | --- | --- |
 | TinyLlama 1.1B Chat Q4_K_M | 从 GGUF、Decoder、生成到服务的完整主线 | 默认模型，CPU/CUDA 真实链路已接通 |
-| Qwen3-0.6B | 权重命名、Tokenizer、聊天模板和 Decoder 配置适配 | 下一种稠密模型兼容目标 |
+| Qwen3-0.6B | 权重命名、Tokenizer、聊天模板、Q/K Norm、NeoX RoPE 和 Decoder 配置适配 | CPU Loader、28 层 Decoder、Generation 与服务已接通；CUDA 待接入 |
 | DeepSeek-R1-Distill-Qwen-1.5B | 检查 Qwen 架构适配能否复用于另一套模型配置 | 排在 Qwen3-0.6B 之后；它不是 MoE |
 | Qwen3-30B-A3B、DeepSeek-V2-Lite | Router、Top-K 专家、负载分布，以及 MoE/MLA 工程差异 | 当前作为框架对照，不属于单卡自研运行承诺 |
 

@@ -124,7 +124,7 @@ RoPE 请求使用连续 `[tokens, heads, head_dim]` 布局，在原 Tensor 上�
 
 `CudaExecutionContext` 通过 `CudaAttentionPath` 显式选择三阶段或融合路径，默认仍为三阶段。真实 TinyLlama 2 层与 22 层双步对照均通过；22 层 hidden 和 logits 最大差异分别为 `7.63e-06` 和 `9.18e-06`，greedy token 保持 `3561`。这项双步对照固定真实单-query Decode 数值，再由后续 Tensor Prefill 和端到端实验补齐多-query 证据。
 
-CUDA 库只接收 `CudaAttentionPath` 等类型化策略，不读取命令行或环境变量。进程入口负责把 `--attention-path three-stage|fused-online` 转成枚举，再经 Engine Factory 写入请求 Context。CMake 选项决定 CUDA 代码是否参与构建，运行期参数选择已编译实现，benchmark 的 `--batch` 等参数只改变 workload；三者不能互相替代。
+CUDA 库只接收 `CudaAttentionPath` 等类型化策略，不读取命令行或环境变量。进程入口负责把 `--attention-path three-stage|fused-online` 转成枚举，再经执行器工厂写入请求 Context。CMake 选项决定 CUDA 代码是否参与构建，运行期参数选择已编译实现，benchmark 的 `--batch` 等参数只改变 workload；三者不能互相替代。
 
 随后增加的 `prefill_sequence()` 复用 `[T,D]` 批量算子，并让融合 Attention 一次处理多个 query；TinyLlama 22 层、2-token embedding Prefill 与逐 token 顺序执行的最大误差为 `3.05e-05`。`RealLlamaCudaContext::prefill_tokens()` 再接入批量 embedding、最终 logits 和按 shape 复用的持久 workspace，22 层 logits 最大误差为 `1.19e-05`。连续与分页 CUDA Executor 都使用 Tensor Prefill，真实 Runtime 保持 golden token `3561 12053`。
 
@@ -163,6 +163,19 @@ Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续�
 `RealLlamaCudaModel` 共享各层 device 权重，`RealLlamaCudaContext` 为每个请求创建 stream、层中间张量，并持有连续 K/V 或绑定分页数据面。一次多层前向只有在所有层成功后才推进 position；失败时已追加的状态会回退到原位置。
 
 `cuda_llama_layer_weights_test` 检查权重方向、packed payload、移动语义和失败原子性。真实模型测试依次核对 layer-0、2/22 层 hidden 与 K/V、量化 embedding、final norm、LM Head 和 logits；Generation 测试继续验证真实 tokenizer、greedy decode、detokenizer 与请求隔离。`CudaDecoderBatchLayer` 合并无状态计算，并让每个请求通过连续缓存或页表读取自己的历史。真实 Runtime 和 Service 测试检查 logits、golden token、预留/提交、调度计数、整批回滚、终态释放和 workspace 复用。
+
+### Qwen3 进入 CUDA 路径前需要补什么
+
+Qwen3 CPU 路径已经证明 Loader、Tokenizer 和 Decoder 数学成立，但当前 CUDA 模型仍只接受 `llama`。这个限制不能通过删除架构检查解决，因为设备层还保留四项 TinyLlama 假设：
+
+| 差异 | 当前 CUDA 假设 | Qwen3 需要的改动 | 首个验收 |
+| --- | --- | --- | --- |
+| Q 投影宽度 | `Q width == hidden_size` | 按 `query_heads * head_dim` 分配和校验 Q/Attention Context；输出投影接收该宽度并回到 hidden | 合成非对称 Q/KV 单层测试 |
+| Q/K Norm | 只有 Attention 前和 FFN 前 RMSNorm | 上传每层 `attn_q_norm`、`attn_k_norm`，按 Head 对 Q/K 归一化后再执行 RoPE | Q/K Norm CPU/CUDA golden |
+| RoPE 配对 | 相邻维 `(0,1)、(2,3)` | 在请求对象中显式选择相邻维或 NeoX 半维配对 | 两种布局的单/多位置测试 |
+| 模型准入 | `RealLlamaCudaModel` 只接受 `llama` | 前三项通过后允许 `qwen3`，继续由 GGUF 自动选择，不增加手工架构参数 | Qwen3 首层真实模型对照 |
+
+实施顺序是先扩展公共 RoPE 和按 Head RMSNorm，再让合成 Decoder 覆盖非对称 Q 宽度，随后上传 Q/K Norm 并运行 Qwen3 首层，最后才放宽模型准入。完整 28 层、Generation、分页 K/V 和服务沿用现有纵向测试逐级开启；任一下层数值检查失败时，不继续用端到端输出掩盖问题。
 
 ## 运行与验证
 

@@ -17,7 +17,7 @@
 | 1 | 建立真实 CPU 推理基线 | Foundation、Chapter00 | TinyLlama GGUF 能由 llama.cpp 在 CPU 上生成文本 | C++ 工具链、llama.cpp 和 GGUF |
 | 2 | 打通输入、Tokenizer 与模型加载 | Chapter01 | 能检查 GGUF、真实 tokenizer、模型结构和权重映射 | 轻量测试只需 CPU；真实验证需要 GGUF |
 | 3 | 建立 Tensor、View、Operator 与 MatMul 底座 | Chapter02、Chapter03 | 共享 Storage 的 view 与正确的 CPU MatMul backend | C++ 工具链 |
-| 4 | 完成真实 Decoder CPU 前向 | Chapter04、Chapter05、Engine | TinyLlama 22 层 prefill/decode 与 llama.cpp golden 对齐 | GGUF；AVX2 实验需要 CPU 支持 |
+| 4 | 完成真实 Decoder CPU 前向 | Chapter04、Chapter05、`code/engine` | TinyLlama 22 层 prefill/decode 与 llama.cpp golden 对齐 | GGUF；AVX2 实验需要 CPU 支持 |
 | 5 | 完成生成、K/V 与调度链 | Chapter06、Chapter07、Chapter08 | 单请求生成、分页 K/V、chunked prefill 和多请求批次可运行 | 默认路径只需 CPU；真实回归需要 GGUF |
 | 6 | 完成性能证据与最小 CPU 服务 | Chapter09、Chapter10 | 可比较的性能证据、ServiceCore、HTTP/SSE 和 metrics 闭环 | CPU；真实模型路径需要 GGUF |
 
@@ -35,7 +35,7 @@
 | Chapter05 | 05.1、05.4-05.6 原理、反量化、Linear、精度 | 05.2-05.3 dtype/loader 深入；05.7-05.8 框架与 serving 对照 |
 | Chapter06 | 06.1-06.8 请求、Prefill/Decode、生成循环和真实单请求 | 06.9 框架生成核心对照 |
 | Chapter07 | 07.1-07.5 连续基线、分页映射、事务、Attention 和真实模型迁移 | 07.6 前缀复用与成熟框架扩展 |
-| Chapter08 | 08.1-08.4 调度契约、连续批处理、chunked prefill 和真实批量执行 | 08.5-08.6 重叠调度与框架对照 |
+| Chapter08 | 08.1-08.4 调度规则、连续批处理、chunked prefill 和真实批量执行 | 08.5-08.6 重叠调度与框架对照 |
 | Chapter09 | 09.1-09.4 correctness、workload、样本与统计 | 09.5-09.9 工具、热点、A/B 和框架对照 |
 | Chapter10 | 10.1-10.5 生命周期、准入、释放和同步 Completion | 10.6-10.10 SSE、并发、指标、真实模型和框架对照 |
 
@@ -59,7 +59,7 @@
 
 本任务处理“外部资产怎样变成稳定的程序对象”，先确认 token ID、metadata、Tensor 索引、shape、dtype 和权重 payload 能被可靠读取。完整 Decoder 数学从 Chapter04 开始。
 
-阅读 [`Chapter01 导读`](../chapter01_tensor_loader/intro.md)，按“输入契约与 tokenizer → GGUF metadata → Tensor index/payload → ModelConfig/ModelBuilder”推进。练习选择 `FQ02`、`FQ08` 和 `FQ17`。
+阅读 [`Chapter01 导读`](../chapter01_tensor_loader/intro.md)，按“输入要求与 tokenizer → GGUF metadata → Tensor index/payload → ModelConfig/ModelBuilder”推进。练习选择 `FQ02`、`FQ08` 和 `FQ17`。
 
 | 任务卡 | 内容 |
 | --- | --- |
@@ -83,13 +83,13 @@
 | 主验证命令 | `bash scripts/run_tensor_operator_learning.sh` |
 | 学习记录 | `tensor-and-operator.md`：storage/view contract、错误输入和 MatMul 输出 |
 | Tensor view | reshape、slice、共享 Storage、stride、offset 和越界测试通过 |
-| 公共契约 | 能说明 `TensorContract`、`Status`、`Operator` 和 `Backend` 的调用关系 |
+| 公共接口 | 能说明 `TensorContract`、`Status`、`Operator` 和 `Backend` 的调用关系 |
 | CPU MatMul | reference kernel 数值正确，非法 shape 被明确拒绝 |
 | 学习练习 | 完成 view、Mini Tensor、CPU MatMul 和 RAII Workspace 对应练习 |
 
 ## 任务 4：完成真实 Decoder CPU 前向
 
-先用 Chapter04 理解 Attention、残差和 FFN 的结构，再用 Chapter05 理解 TinyLlama Q4_K/Q6_K 权重如何进入 Linear，最后通过 Engine/Chapter01 的真实 Model/Context 路径运行 22 层 Decoder。教学 Decoder 用 LayerNorm/ReLU 拆解结构，真实 TinyLlama 路径使用 RMSNorm、RoPE、GQA 和 SwiGLU，两者通过公共结构契约对照。
+先用 Chapter04 理解 Attention、残差和 FFN 的结构，再用 Chapter05 理解 TinyLlama Q4_K/Q6_K 权重如何进入 Linear，最后通过 `code/engine` 与 Chapter01 的真实模型和 Context 路径运行 22 层 Decoder。教学 Decoder 用 LayerNorm/ReLU 拆解结构，真实 TinyLlama 路径使用 RMSNorm、RoPE、GQA 和 SwiGLU，两者通过公共结构规则对照。
 
 | 任务卡 | 内容 |
 | --- | --- |
