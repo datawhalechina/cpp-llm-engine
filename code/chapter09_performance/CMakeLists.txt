@@ -73,6 +73,16 @@ if(CHAPTER09_NODE_EXECUTABLE)
         "integration;performance;comparison;evidence")
     cpp_llm_set_test_contract(chapter09_real_evidence_bridge_test
         OWNER 09 LEVEL integration STATUS active)
+
+    add_test(
+        NAME chapter09_adaptive_gemv_evidence_test
+        COMMAND ${CHAPTER09_NODE_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/adaptive_gemv_evidence_test.mjs
+    )
+    cpp_llm_set_test_labels(chapter09_adaptive_gemv_evidence_test
+        "contract;performance;evidence;cuda")
+    cpp_llm_set_test_contract(chapter09_adaptive_gemv_evidence_test
+        OWNER 09 LEVEL contract STATUS active)
 endif()
 add_chapter09_test(
     chapter09_evidence_contract_test

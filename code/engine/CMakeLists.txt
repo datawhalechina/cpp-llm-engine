@@ -100,6 +100,9 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
         add_executable(real_tinyllama_cuda_batch_benchmark
             examples/real_tinyllama_cuda_batch_benchmark.cpp
         )
+        add_executable(real_tinyllama_cuda_adaptive_gemv_matrix
+            examples/real_tinyllama_cuda_adaptive_gemv_matrix.cpp
+        )
         add_executable(real_tinyllama_cuda_paged_attention_benchmark
             examples/real_tinyllama_cuda_paged_attention_benchmark.cpp
         )
@@ -114,6 +117,8 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
         target_link_libraries(real_tinyllama_cuda_paged_prefill_benchmark
             PRIVATE cpp_llm_engine_cuda_runtime)
         target_link_libraries(real_tinyllama_cuda_batch_benchmark
+            PRIVATE cpp_llm_engine_cuda_runtime)
+        target_link_libraries(real_tinyllama_cuda_adaptive_gemv_matrix
             PRIVATE cpp_llm_engine_cuda_runtime)
         target_link_libraries(real_tinyllama_cuda_paged_attention_benchmark
             PRIVATE cpp_llm_engine_cuda_runtime)
