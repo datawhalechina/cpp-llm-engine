@@ -47,6 +47,18 @@ int main(int argc, char** argv) {
     };
 
     CHECK(factory->attention_mode() == cpp_llm_engine::CudaAttentionMode::ThreeStage);
+    CHECK(factory->quantized_gemv_mode() ==
+          cpp_llm_engine::CudaQuantizedGemvMode::Adaptive);
+    factory->set_quantized_gemv_mode(
+        cpp_llm_engine::CudaQuantizedGemvMode::Adaptive);
+    CHECK(factory->quantized_gemv_mode() ==
+          cpp_llm_engine::CudaQuantizedGemvMode::Adaptive);
+    factory->set_quantized_gemv_mode(
+        cpp_llm_engine::CudaQuantizedGemvMode::FixedTile4);
+    CHECK(factory->quantized_gemv_mode() ==
+          cpp_llm_engine::CudaQuantizedGemvMode::FixedTile4);
+    factory->set_quantized_gemv_mode(
+        cpp_llm_engine::CudaQuantizedGemvMode::Adaptive);
     auto attention_baseline = factory->create_executor();
     factory->set_attention_mode(cpp_llm_engine::CudaAttentionMode::FusedOnline);
     auto attention_fused = factory->create_executor();

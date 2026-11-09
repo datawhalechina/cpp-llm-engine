@@ -19,7 +19,6 @@ namespace {
 constexpr unsigned int kThreads = 256;
 constexpr unsigned int kWarpSize = 32;
 constexpr unsigned int kWarpsPerBlock = kThreads / kWarpSize;
-constexpr std::size_t kBatchTile = 4;
 
 __device__ float half_bits_to_float(std::uint16_t bits) {
     return __half2float(__ushort_as_half(bits));
@@ -84,7 +83,7 @@ __device__ float decode_q6k(
     return d * static_cast<float>(scale * quant);
 }
 
-template <bool Q4K>
+template <bool Q4K, std::size_t BatchTile>
 __global__ void quantized_gemv_kernel(
     const std::uint8_t* weights,
     const float* input,
@@ -92,14 +91,14 @@ __global__ void quantized_gemv_kernel(
     std::size_t cols,
     std::size_t batch_size) {
     const std::size_t row = blockIdx.x;
-    const std::size_t batch_begin = blockIdx.y * kBatchTile;
+    const std::size_t batch_begin = blockIdx.y * BatchTile;
     const std::size_t blocks_per_row = cols / core::kQuantizedBlockElements;
     constexpr std::size_t block_bytes =
         Q4K ? core::kQ4KBlockBytes : core::kQ6KBlockBytes;
     const std::uint8_t* row_weights =
         weights + row * blocks_per_row * block_bytes;
 
-    float sums[kBatchTile] = {0.0F, 0.0F, 0.0F, 0.0F};
+    float sums[BatchTile] = {};
     for (std::size_t block = 0; block < blocks_per_row; ++block) {
         const std::uint8_t* packed = row_weights + block * block_bytes;
         const std::size_t local = threadIdx.x;
@@ -108,7 +107,7 @@ __global__ void quantized_gemv_kernel(
             : decode_q6k(packed, local);
         const std::size_t input_col =
             block * core::kQuantizedBlockElements + local;
-        for (std::size_t tile_row = 0; tile_row < kBatchTile; ++tile_row) {
+        for (std::size_t tile_row = 0; tile_row < BatchTile; ++tile_row) {
             const std::size_t batch = batch_begin + tile_row;
             if (batch < batch_size) {
                 sums[tile_row] += weight * input[batch * cols + input_col];
@@ -118,8 +117,8 @@ __global__ void quantized_gemv_kernel(
 
     const unsigned int lane = threadIdx.x % kWarpSize;
     const unsigned int warp = threadIdx.x / kWarpSize;
-    __shared__ float warp_sums[kBatchTile][kWarpsPerBlock];
-    for (std::size_t tile_row = 0; tile_row < kBatchTile; ++tile_row) {
+    __shared__ float warp_sums[BatchTile][kWarpsPerBlock];
+    for (std::size_t tile_row = 0; tile_row < BatchTile; ++tile_row) {
         for (unsigned int offset = kWarpSize / 2; offset > 0; offset /= 2) {
             sums[tile_row] += __shfl_down_sync(
                 0xFFFFFFFFU, sums[tile_row], offset);
@@ -128,7 +127,7 @@ __global__ void quantized_gemv_kernel(
     }
     __syncthreads();
     if (warp == 0) {
-        for (std::size_t tile_row = 0; tile_row < kBatchTile; ++tile_row) {
+        for (std::size_t tile_row = 0; tile_row < BatchTile; ++tile_row) {
             float total = lane < kWarpsPerBlock ? warp_sums[tile_row][lane] : 0.0F;
             for (unsigned int offset = kWarpSize / 2; offset > 0; offset /= 2) {
                 total += __shfl_down_sync(0xFFFFFFFFU, total, offset);
@@ -138,6 +137,45 @@ __global__ void quantized_gemv_kernel(
                 output[batch * gridDim.x + row] = total;
             }
         }
+    }
+}
+
+template <bool Q4K, std::size_t BatchTile>
+void launch_quantized_gemv(
+    const std::uint8_t* packed,
+    const float* input,
+    float* output,
+    std::size_t rows,
+    std::size_t cols,
+    std::size_t batch_size,
+    cudaStream_t stream) {
+    const dim3 grid(
+        static_cast<unsigned int>(rows),
+        static_cast<unsigned int>(
+            batch_size / BatchTile + (batch_size % BatchTile != 0 ? 1 : 0)));
+    quantized_gemv_kernel<Q4K, BatchTile><<<grid, kThreads, 0, stream>>>(
+        packed, input, output, cols, batch_size);
+}
+
+template <bool Q4K>
+void launch_quantized_gemv_path(
+    CudaQuantizedGemvPath path,
+    const std::uint8_t* packed,
+    const float* input,
+    float* output,
+    std::size_t rows,
+    std::size_t cols,
+    std::size_t batch_size,
+    cudaStream_t stream) {
+    if (path == CudaQuantizedGemvPath::Adaptive && batch_size == 1) {
+        launch_quantized_gemv<Q4K, 1>(
+            packed, input, output, rows, cols, batch_size, stream);
+    } else if (path == CudaQuantizedGemvPath::Adaptive && batch_size == 2) {
+        launch_quantized_gemv<Q4K, 2>(
+            packed, input, output, rows, cols, batch_size, stream);
+    } else {
+        launch_quantized_gemv<Q4K, 4>(
+            packed, input, output, rows, cols, batch_size, stream);
     }
 }
 
@@ -169,7 +207,8 @@ CudaStatus CudaQuantizedGemvBackend::compute_batch(
     std::size_t input_width,
     float* output,
     std::size_t output_width,
-    const CudaStream& stream) const {
+    const CudaStream& stream,
+    CudaQuantizedGemvPath path) const {
     if (weights.empty() || input == nullptr || output == nullptr) {
         return CudaStatus::from(
             cudaErrorInvalidDevicePointer,
@@ -190,16 +229,14 @@ CudaStatus CudaQuantizedGemvBackend::compute_batch(
     }
 
     const auto* packed = static_cast<const std::uint8_t*>(weights.data());
-    const dim3 grid(
-        static_cast<unsigned int>(weights.rows()),
-        static_cast<unsigned int>(
-            batch_size / kBatchTile + (batch_size % kBatchTile != 0 ? 1 : 0)));
     if (weights.format() == core::WeightFormat::Q4K) {
-        quantized_gemv_kernel<true><<<grid, kThreads, 0, stream.native_handle()>>>(
-            packed, input, output, weights.cols(), batch_size);
+        launch_quantized_gemv_path<true>(
+            path, packed, input, output, weights.rows(), weights.cols(),
+            batch_size, stream.native_handle());
     } else if (weights.format() == core::WeightFormat::Q6K) {
-        quantized_gemv_kernel<false><<<grid, kThreads, 0, stream.native_handle()>>>(
-            packed, input, output, weights.cols(), batch_size);
+        launch_quantized_gemv_path<false>(
+            path, packed, input, output, weights.rows(), weights.cols(),
+            batch_size, stream.native_handle());
     } else {
         return CudaStatus::from(
             cudaErrorInvalidValue,

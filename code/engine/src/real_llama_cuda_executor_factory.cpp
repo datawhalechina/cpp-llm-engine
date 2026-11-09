@@ -228,6 +228,8 @@ struct RealLlamaCudaExecutorFactory::Impl final {
     std::unique_ptr<CudaPrefixBlockStore> prefix_store;
     std::unique_ptr<chapter07_kv_cache::RadixPrefixCache> radix_cache;
     CudaAttentionMode attention_mode = CudaAttentionMode::ThreeStage;
+    CudaQuantizedGemvMode quantized_gemv_mode =
+        CudaQuantizedGemvMode::Adaptive;
 };
 
 std::unique_ptr<RealLlamaCudaExecutorFactory>
@@ -269,6 +271,10 @@ RealLlamaCudaExecutorFactory::create_executor() const {
         impl_->attention_mode == CudaAttentionMode::FusedOnline
             ? cuda::CudaAttentionPath::FusedOnline
             : cuda::CudaAttentionPath::ThreeStage);
+    context->set_quantized_gemv_path(
+        impl_->quantized_gemv_mode == CudaQuantizedGemvMode::Adaptive
+            ? cuda::CudaQuantizedGemvPath::Adaptive
+            : cuda::CudaQuantizedGemvPath::FixedTile4);
     return std::make_shared<RealLlamaCudaRequestExecutor>(
         std::move(context), impl_->model->layer_count());
 }
@@ -279,6 +285,16 @@ void RealLlamaCudaExecutorFactory::set_attention_mode(CudaAttentionMode mode) {
 
 CudaAttentionMode RealLlamaCudaExecutorFactory::attention_mode() const {
     return impl_->attention_mode;
+}
+
+void RealLlamaCudaExecutorFactory::set_quantized_gemv_mode(
+    CudaQuantizedGemvMode mode) {
+    impl_->quantized_gemv_mode = mode;
+}
+
+CudaQuantizedGemvMode
+RealLlamaCudaExecutorFactory::quantized_gemv_mode() const {
+    return impl_->quantized_gemv_mode;
 }
 
 bool RealLlamaCudaExecutorFactory::configure_paged_kv_cache(
@@ -491,6 +507,10 @@ bool RealLlamaCudaExecutorFactory::decode_batch(
             items.size(), std::move(workspace)).first;
         ++impl_->batch_workspace_creation_count;
     }
+    found->second->set_quantized_gemv_path(
+        impl_->quantized_gemv_mode == CudaQuantizedGemvMode::Adaptive
+            ? cuda::CudaQuantizedGemvPath::Adaptive
+            : cuda::CudaQuantizedGemvPath::FixedTile4);
     return impl_->model->decode_batch(items, found->second.get(), logits, error);
 }
 

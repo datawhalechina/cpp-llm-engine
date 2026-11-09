@@ -14,6 +14,11 @@ namespace cpp_llm_engine::cuda {
 class CudaQuantizedMatrix;
 class CudaStream;
 
+enum class CudaQuantizedGemvPath {
+    FixedTile4,
+    Adaptive,
+};
+
 class CudaQuantizedGemvBackend final : public core::Backend {
 public:
     core::BackendKind kind() const override;
@@ -32,7 +37,8 @@ public:
         std::size_t input_width,
         float* output,
         std::size_t output_width,
-        const CudaStream& stream) const;
+        const CudaStream& stream,
+        CudaQuantizedGemvPath path = CudaQuantizedGemvPath::Adaptive) const;
 };
 
 const CudaQuantizedGemvBackend& cuda_quantized_gemv_backend();

@@ -14,6 +14,7 @@
 namespace cpp_llm_engine::cuda {
 class CudaPagedKvCache;
 enum class CudaAttentionPath;
+enum class CudaQuantizedGemvPath;
 }
 
 namespace cpp_llm_engine::model {
@@ -93,6 +94,7 @@ public:
     std::size_t use_count() const;
     std::size_t device_bytes() const;
     std::size_t dynamic_allocation_count() const;
+    void set_quantized_gemv_path(cuda::CudaQuantizedGemvPath path);
 
 private:
     friend class RealLlamaCudaModel;
@@ -128,6 +130,7 @@ public:
         std::vector<float>* key,
         std::vector<float>* value);
     void set_attention_path(cuda::CudaAttentionPath path);
+    void set_quantized_gemv_path(cuda::CudaQuantizedGemvPath path);
     void reset();
     bool attach_kv_data_plane(
         std::shared_ptr<RealLlamaCudaKvDataPlane> data_plane,

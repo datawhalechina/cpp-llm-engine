@@ -21,6 +21,11 @@ enum class CudaAttentionMode {
     FusedOnline,
 };
 
+enum class CudaQuantizedGemvMode {
+    FixedTile4,
+    Adaptive,
+};
+
 struct RealLlamaCudaPrefixCacheStats {
     std::size_t queries = 0;
     std::size_t hits = 0;
@@ -49,6 +54,8 @@ public:
     create_executor() const;
     void set_attention_mode(CudaAttentionMode mode);
     CudaAttentionMode attention_mode() const;
+    void set_quantized_gemv_mode(CudaQuantizedGemvMode mode);
+    CudaQuantizedGemvMode quantized_gemv_mode() const;
     bool configure_paged_kv_cache(
         std::size_t total_blocks,
         std::size_t block_size,

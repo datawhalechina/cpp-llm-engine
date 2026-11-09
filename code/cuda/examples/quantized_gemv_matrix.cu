@@ -23,6 +23,7 @@ using Clock = std::chrono::steady_clock;
 using cpp_llm_engine::core::DType;
 using cpp_llm_engine::core::WeightFormat;
 using cpp_llm_engine::cuda::CudaExecutionContext;
+using cpp_llm_engine::cuda::CudaQuantizedGemvPath;
 using cpp_llm_engine::cuda::CudaQuantizedMatrix;
 using cpp_llm_engine::cuda::CudaTensor;
 
@@ -35,6 +36,7 @@ constexpr std::size_t kQ6KBlockBytes = 210;
 struct Options final {
     std::vector<std::size_t> batches{1, 2, 4, 8};
     std::string format = "all";
+    std::string path = "fixed-four";
     std::size_t iterations = 50;
 };
 
@@ -70,6 +72,11 @@ bool parse_options(int argc, char** argv, Options* options) {
             }
         } else if (option == "--iterations" && index + 1 < argc) {
             if (!parse_positive(argv[++index], &options->iterations)) return false;
+        } else if (option == "--path" && index + 1 < argc) {
+            options->path = argv[++index];
+            if (options->path != "fixed-four" && options->path != "adaptive") {
+                return false;
+            }
         } else {
             return false;
         }
@@ -125,6 +132,9 @@ bool run_format(
     if (!check_status(CudaExecutionContext::create(&context), "create context")) {
         return false;
     }
+    context.set_quantized_gemv_path(
+        options.path == "adaptive" ? CudaQuantizedGemvPath::Adaptive
+                                   : CudaQuantizedGemvPath::FixedTile4);
     CudaQuantizedMatrix weights;
     if (!check_status(
             CudaQuantizedMatrix::create(kRows, kCols, format, &weights),
@@ -230,6 +240,7 @@ bool run_format(
             }
         }
         std::cout << "format=" << format_name
+                  << " path=" << options.path
                   << " batch=" << batch
                   << " rows=" << kRows
                   << " cols=" << kCols
@@ -252,7 +263,8 @@ int main(int argc, char** argv) {
     Options options;
     if (!parse_options(argc, argv, &options)) {
         std::cerr << "usage: cpp_llm_engine_cuda_quantized_gemv_matrix "
-                     "[--batch N] [--format q4|q6|all] [--iterations N]\n";
+                     "[--batch N] [--format q4|q6|all] [--iterations N] "
+                     "[--path fixed-four|adaptive]\n";
         return 2;
     }
     if ((options.format == "q4" || options.format == "all") &&

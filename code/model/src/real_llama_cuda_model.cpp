@@ -204,6 +204,11 @@ void RealLlamaCudaContext::set_attention_path(cuda::CudaAttentionPath path) {
     impl_->execution.set_attention_path(path);
 }
 
+void RealLlamaCudaContext::set_quantized_gemv_path(
+    cuda::CudaQuantizedGemvPath path) {
+    impl_->execution.set_quantized_gemv_path(path);
+}
+
 std::unique_ptr<RealLlamaCudaModel> RealLlamaCudaModel::load(
     const std::string& model_path,
     std::size_t layer_count,
@@ -584,6 +589,11 @@ std::size_t RealLlamaCudaBatchWorkspace::device_bytes() const {
 
 std::size_t RealLlamaCudaBatchWorkspace::dynamic_allocation_count() const {
     return impl_->execution.workspace_allocation_count();
+}
+
+void RealLlamaCudaBatchWorkspace::set_quantized_gemv_path(
+    cuda::CudaQuantizedGemvPath path) {
+    impl_->execution.set_quantized_gemv_path(path);
 }
 
 std::size_t RealLlamaCudaModel::layer_count() const { return impl_->layers.size(); }

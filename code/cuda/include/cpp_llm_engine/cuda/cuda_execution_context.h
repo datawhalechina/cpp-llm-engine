@@ -10,6 +10,7 @@
 #include "cpp_llm_engine/cuda/cuda_stream.h"
 #include "cpp_llm_engine/cuda/cuda_tensor.h"
 #include "cpp_llm_engine/cuda/cuda_workspace.h"
+#include "cpp_llm_engine/cuda/quantized_gemv_backend.h"
 
 #include <cstddef>
 #include <vector>
@@ -148,6 +149,8 @@ public:
 
     void set_attention_path(CudaAttentionPath path);
     CudaAttentionPath attention_path() const;
+    void set_quantized_gemv_path(CudaQuantizedGemvPath path);
+    CudaQuantizedGemvPath quantized_gemv_path() const;
 
     std::size_t workspace_capacity_bytes() const;
     std::size_t workspace_allocation_count() const;
@@ -158,6 +161,8 @@ private:
     CublasMatmulBackend matmul_backend_;
     CudaWorkspace workspace_;
     CudaAttentionPath attention_path_ = CudaAttentionPath::ThreeStage;
+    CudaQuantizedGemvPath quantized_gemv_path_ =
+        CudaQuantizedGemvPath::Adaptive;
 };
 
 }  // namespace cpp_llm_engine::cuda

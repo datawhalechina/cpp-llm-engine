@@ -141,8 +141,14 @@ void print_samples(const char* name, const std::vector<double>& samples) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::cerr << "usage: real_tinyllama_cuda_batch_benchmark <model.gguf>\n";
+    if (argc != 4 || std::string(argv[2]) != "--gemv-path") {
+        std::cerr << "usage: real_tinyllama_cuda_batch_benchmark <model.gguf> "
+                     "--gemv-path fixed-four|adaptive\n";
+        return 2;
+    }
+    const std::string gemv_path = argv[3];
+    if (gemv_path != "fixed-four" && gemv_path != "adaptive") {
+        std::cerr << "unsupported GEMV path: " << gemv_path << '\n';
         return 2;
     }
     std::string error;
@@ -152,6 +158,10 @@ int main(int argc, char** argv) {
         std::cerr << error << '\n';
         return 1;
     }
+    factory->set_quantized_gemv_mode(
+        gemv_path == "adaptive"
+            ? cpp_llm_engine::CudaQuantizedGemvMode::Adaptive
+            : cpp_llm_engine::CudaQuantizedGemvMode::FixedTile4);
 
     constexpr std::size_t warmup = 2;
     constexpr std::size_t iterations = 10;
@@ -174,7 +184,8 @@ int main(int argc, char** argv) {
     }
     const double sequential_median = median(sequential_samples);
     const double batch_median = median(batch_samples);
-    std::cout << "requests: 2\nprompt_tokens: 1,2\ndecode_steps: 1\n"
+    std::cout << "gemv_path: " << gemv_path
+              << "\nrequests: 2\nprompt_tokens: 1,2\ndecode_steps: 1\n"
               << "paged_kv: true\nblock_size: 8\nwarmup: " << warmup
               << "\niterations: " << iterations << "\nstatistic: median\n"
               << "sequential_decode_median_ms: " << sequential_median << '\n'

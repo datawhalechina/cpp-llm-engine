@@ -450,7 +450,8 @@ core::Status CudaExecutionContext::quantized_linear_batch(
         weights.cols(),
         static_cast<float*>(output->data()),
         weights.rows(),
-        stream_).to_core_status();
+        stream_,
+        quantized_gemv_path_).to_core_status();
 }
 
 core::Status CudaExecutionContext::embedding_lookup(
@@ -597,6 +598,15 @@ void CudaExecutionContext::set_attention_path(CudaAttentionPath path) {
 
 CudaAttentionPath CudaExecutionContext::attention_path() const {
     return attention_path_;
+}
+
+void CudaExecutionContext::set_quantized_gemv_path(
+    CudaQuantizedGemvPath path) {
+    quantized_gemv_path_ = path;
+}
+
+CudaQuantizedGemvPath CudaExecutionContext::quantized_gemv_path() const {
+    return quantized_gemv_path_;
 }
 
 core::Status CudaExecutionContext::paged_gqa_attention(

@@ -228,6 +228,44 @@ int main() {
     for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
         CHECK(close_enough(batch_output_host[index], batch_expected[index]));
     }
+    context.set_quantized_gemv_path(
+        cpp_llm_engine::cuda::CudaQuantizedGemvPath::Adaptive);
+    CHECK(context.quantized_gemv_path() ==
+        cpp_llm_engine::cuda::CudaQuantizedGemvPath::Adaptive);
+    CHECK(context.quantized_linear(q4k_weights, input, &output).is_ok());
+    CHECK(context.quantized_linear_batch(
+        q4k_weights, batch_input, &batch_output).is_ok());
+    CHECK(context.download(
+        batch_output,
+        batch_output_host.data(),
+        batch_output_host.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
+        CHECK(close_enough(batch_output_host[index], batch_expected[index]));
+    }
+    CudaTensor batch_two_input;
+    CudaTensor batch_two_output;
+    CHECK(CudaTensor::create_contiguous(
+        {2, 256}, DType::Float32, &batch_two_input).is_ok());
+    CHECK(CudaTensor::create_contiguous(
+        {2, 2}, DType::Float32, &batch_two_output).is_ok());
+    CHECK(context.upload(
+        &batch_two_input,
+        batch_input_host.data(),
+        2 * 256 * sizeof(float)).is_ok());
+    CHECK(context.quantized_linear_batch(
+        q4k_weights, batch_two_input, &batch_two_output).is_ok());
+    std::vector<float> batch_two_host(4);
+    CHECK(context.download(
+        batch_two_output,
+        batch_two_host.data(),
+        batch_two_host.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    for (std::size_t index = 0; index < batch_two_host.size(); ++index) {
+        CHECK(close_enough(batch_two_host[index], batch_expected[index]));
+    }
+    context.set_quantized_gemv_path(
+        cpp_llm_engine::cuda::CudaQuantizedGemvPath::FixedTile4);
     CHECK(context.workspace_capacity_bytes() == 0);
     CHECK(context.workspace_allocation_count() == 0);
 
