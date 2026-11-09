@@ -1,0 +1,12 @@
+experiment_id=EXP-GPU-07
+profiler=Nsight Systems 2024.6.2
+trace=cuda,nvtx,osrt
+q4k_q6k_quantized_gemv_time_percent=99.2
+fused_paged_attention_total_ms=25.384383
+three_stage_paged_attention_total_ms=37.476914
+fused_over_three_stage_kernel_time=0.6773
+kernel_level_attention_reduction_percent=32.27
+gpu_state_before=graphics_180_MHz,memory_810_MHz,power_14.31_W,temp_45_C,util_0_percent
+gpu_state_after=graphics_450_MHz,memory_9001_MHz,power_15.83_W,temp_47_C,util_6_percent
+decision=ATTENTION_KERNEL_IMPROVES_BUT_END_TO_END_IS_LINEAR_BOUND
+note=three_stage total is paged score plus softmax plus paged value kernel time

@@ -1,0 +1,13 @@
+Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+77.6,1452260820,11256,129021.0,84462.5,8576,1796517,167677.1,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(bool)1>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+18.9,353584340,1764,200444.6,181549.0,9919,3003507,359721.9,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(bool)0>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+1.0,18840900,2652,7104.4,6688.0,5152,304988,5853.5,"cpp_llm_engine::cuda::<unnamed>::rms_norm_batch_kernel(const float *, const float *, float *, unsigned long, unsigned long, float)"
+0.7,13043507,2112,6175.9,6336.0,3424,10592,1373.0,"cpp_llm_engine::cuda::<unnamed>::paged_gqa_score_kernel(cpp_llm_engine::cuda::CudaPagedGqaAttentionRequest, float *, unsigned long, float)"
+0.5,8562213,1128,7590.6,6848.0,5632,273980,9393.1,"cpp_llm_engine::cuda::<unnamed>::rms_norm_kernel(const float *, const float *, float *, unsigned long, float)"
+0.3,5702658,2112,2700.1,2560.0,1344,5120,685.6,"cpp_llm_engine::cuda::<unnamed>::paged_gqa_value_kernel(cpp_llm_engine::cuda::CudaPagedGqaAttentionRequest, const float *, unsigned long)"
+0.3,5276162,2640,1998.5,1888.0,1248,3456,366.7,"cpp_llm_engine::cuda::<unnamed>::rope_batch_kernel(float *, const unsigned long *, unsigned long, unsigned long, unsigned long, unsigned long, float)"
+0.2,4567864,3696,1235.9,1152.0,768,3072,227.1,"cpp_llm_engine::cuda::<unnamed>::vector_add_kernel(const float *, const float *, float *, unsigned long)"
+0.2,4386209,2112,2076.8,1984.0,1151,4096,467.3,"cpp_llm_engine::cuda::<unnamed>::stable_softmax_kernel(float *, unsigned long, unsigned long)"
+0.1,2765401,1848,1496.4,1408.0,928,3008,275.2,"cpp_llm_engine::cuda::<unnamed>::swiglu_kernel(const float *, const float *, float *, unsigned long)"
+0.1,2129759,1056,2016.8,1888.0,1600,3136,341.3,"cpp_llm_engine::cuda::<unnamed>::rope_kernel(float *, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, float)"
+0.0,259385,120,2161.5,2048.0,1632,2976,343.2,"cpp_llm_engine::cuda::<unnamed>::dequantize_q4k_kernel(const unsigned char *, float *, unsigned long)"

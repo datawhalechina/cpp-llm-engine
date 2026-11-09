@@ -1,0 +1,14 @@
+requests: 2
+prompt_tokens: 1,2
+decode_steps: 1
+paged_kv: true
+block_size: 8
+warmup: 2
+iterations: 10
+statistic: median
+sequential_decode_median_ms: 38.7482
+tensor_batch_decode_median_ms: 35.6217
+batch_over_sequential: 0.919313
+logits_max_error: 0
+sequential_decode_samples_ms: 37.2123 30.6992 50.4348 45.5929 30.4632 29.8685 33.4456 40.5886 49.2575 40.284
+tensor_batch_decode_samples_ms: 27.1219 27.1476 51.5886 36.5166 35.2451 33.2157 36.5738 35.9983 42.8349 30.2055

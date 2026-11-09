@@ -1,0 +1,16 @@
+experiment_id=EXP-GPU-13
+workload_id=WL-GPU-QUANTIZED-GEMV-BATCH-MATRIX-V1
+formats=Q4_K,Q6_K
+batches=1,2,4,8
+rows=2048
+cols=2048
+warmup=5
+iterations=50
+timing_scope=kernel-submit-and-final-synchronize
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Fri_Feb_21_20:23:50_PST_2025
+Cuda compilation tools, release 12.8, V12.8.93
+Build cuda_12.8.r12.8/compiler.35583870_0
+NVIDIA GeForce RTX 5070 Ti Laptop GPU, 580.178.04, 12227 MiB
+correctness=PASS

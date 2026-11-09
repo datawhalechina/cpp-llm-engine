@@ -1,0 +1,8 @@
+format=Q4_K batch=1 rows=2048 cols=2048 iterations=50 mean_ms=0.0655857 speedup_vs_repeated_single=1 max_error=0
+format=Q4_K batch=2 rows=2048 cols=2048 iterations=50 mean_ms=0.0656019 speedup_vs_repeated_single=1.99951 max_error=0
+format=Q4_K batch=4 rows=2048 cols=2048 iterations=50 mean_ms=0.0659928 speedup_vs_repeated_single=3.97532 max_error=0
+format=Q4_K batch=8 rows=2048 cols=2048 iterations=50 mean_ms=0.129027 speedup_vs_repeated_single=4.06649 max_error=0
+format=Q6_K batch=1 rows=2048 cols=2048 iterations=50 mean_ms=0.0573885 speedup_vs_repeated_single=1 max_error=0
+format=Q6_K batch=2 rows=2048 cols=2048 iterations=50 mean_ms=0.0573759 speedup_vs_repeated_single=2.00044 max_error=0
+format=Q6_K batch=4 rows=2048 cols=2048 iterations=50 mean_ms=0.0574049 speedup_vs_repeated_single=3.99885 max_error=0
+format=Q6_K batch=8 rows=2048 cols=2048 iterations=50 mean_ms=0.110605 speedup_vs_repeated_single=4.15088 max_error=0

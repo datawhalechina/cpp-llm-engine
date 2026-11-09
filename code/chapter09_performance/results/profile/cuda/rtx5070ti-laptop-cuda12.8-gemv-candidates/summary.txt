@@ -1,0 +1,15 @@
+workload=real_tinyllama_cuda_batch_benchmark
+kernel=Q4_K quantized_gemv_kernel
+baseline_cycles=140093
+baseline_duration_ns=148480
+baseline_sm_frequency_hz=926732219.83
+metadata_broadcast_cycles=154987
+metadata_broadcast_decision=REJECT
+shared_payload_cycles=142857
+shared_payload_decision=REJECT
+explicit_fma_cycles=146061
+explicit_fma_decision=REJECT
+native_half_cycles=99725
+native_half_duration_ns=105312
+native_half_sm_frequency_hz=933232680.04
+native_half_decision=KEEP

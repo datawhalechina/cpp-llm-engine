@@ -1,0 +1,10 @@
+prompt_tokens: 32
+warmup: 2
+iterations: 10
+statistic: median
+sequential_prefill_median_ms: 692.319
+tensor_prefill_median_ms: 54.2007
+tensor_over_sequential: 0.0782887
+logits_max_error: 4.81606e-05
+sequential_prefill_samples_ms: 700.68 634.435 692.319 672.263 602.403 672.66 695.769 707.057 702.374 645.47
+tensor_prefill_samples_ms: 56.4319 51.8937 54.2007 50.218 47.3822 56.8917 46.9785 55.7661 47.2966 60.3736

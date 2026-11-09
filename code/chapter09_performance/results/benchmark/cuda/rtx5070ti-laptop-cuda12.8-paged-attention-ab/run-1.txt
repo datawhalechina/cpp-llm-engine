@@ -1,0 +1,18 @@
+prompt_tokens: 32
+paged_kv: true
+block_size: 8
+warmup: 2
+iterations: 10
+statistic: median
+three_stage_prefill_median_ms: 507.761
+fused_online_prefill_median_ms: 534.239
+prefill_fused_over_three_stage: 1.05215
+three_stage_decode_median_ms: 20.1549
+fused_online_decode_median_ms: 24.5257
+decode_fused_over_three_stage: 1.21686
+prefill_max_error: 1.33514e-05
+decode_max_error: 1.04904e-05
+three_stage_prefill_samples_ms: 522.49 548.633 499.585 529.855 493.891 514.761 500.761 499.07 565.909 492.357
+fused_online_prefill_samples_ms: 518.244 579.495 499.319 527.779 592.17 542.635 513.857 540.699 563.877 521.591
+three_stage_decode_samples_ms: 20.1428 28.3966 20.1491 20.1313 26.0748 20.139 20.1608 20.1401 26.932 26.8869
+fused_online_decode_samples_ms: 27.5736 25.9691 19.8217 26.1205 25.5823 23.8473 19.821 21.07 19.9641 25.2041

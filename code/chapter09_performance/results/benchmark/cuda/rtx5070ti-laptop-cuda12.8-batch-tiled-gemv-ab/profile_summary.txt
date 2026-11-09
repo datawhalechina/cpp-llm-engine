@@ -1,0 +1,11 @@
+tool=Nsight Systems 2024.6.2
+workload=real_tinyllama_cuda_batch_benchmark
+q4k_quantized_gemv_total_ms=1452.260820
+q4k_quantized_gemv_time_percent=77.6
+q6k_quantized_gemv_total_ms=353.584340
+q6k_quantized_gemv_time_percent=18.9
+quantized_gemv_total_ms=1805.845160
+quantized_gemv_time_percent=96.5
+ncu_status=unavailable
+ncu_reason=ERR_NVGPUCTRPERM
+decision=KEEP batch-tile4-warp-reduction; continue optimizing quantized GEMV
