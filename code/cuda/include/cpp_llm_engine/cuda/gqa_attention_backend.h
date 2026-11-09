@@ -56,6 +56,9 @@ public:
         float* score_workspace,
         std::size_t workspace_elements,
         const CudaStream& stream) const;
+    CudaStatus compute_paged_online(
+        const CudaPagedGqaAttentionRequest& request,
+        const CudaStream& stream) const;
 };
 
 const CudaGqaAttentionBackend& cuda_gqa_attention_backend();

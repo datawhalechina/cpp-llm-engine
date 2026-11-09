@@ -91,6 +91,12 @@ target_include_directories(cpp_llm_engine_cuda_quantized_linear_test
 target_link_libraries(
     cpp_llm_engine_cuda_quantized_linear_test PRIVATE cpp_llm_engine_cuda)
 
+add_executable(cpp_llm_engine_cuda_quantized_gemv_matrix
+    examples/quantized_gemv_matrix.cu
+)
+target_link_libraries(
+    cpp_llm_engine_cuda_quantized_gemv_matrix PRIVATE cpp_llm_engine_cuda)
+
 add_executable(cpp_llm_engine_cuda_rope_test
     tests/cuda_rope_test.cu
 )

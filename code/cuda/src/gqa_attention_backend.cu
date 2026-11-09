@@ -222,6 +222,110 @@ __device__ std::size_t paged_kv_index(
              kv_head_count + kv_head) * head_dimension + dimension);
 }
 
+__global__ void fused_online_paged_gqa_kernel(
+    CudaPagedGqaAttentionRequest request,
+    float scale) {
+    const std::size_t row = blockIdx.x;
+    const std::size_t query_head = row % request.query_head_count;
+    const std::size_t query_token = row / request.query_head_count;
+    const std::size_t group_size = request.query_head_count / request.kv_head_count;
+    const std::size_t kv_head = query_head / group_size;
+    const std::size_t query_position = request.query_position_offset + query_token;
+    const std::size_t visible_keys = request.causal && query_position < request.key_tokens
+        ? query_position + 1
+        : request.key_tokens;
+    const float* query_vector = request.query +
+        (query_token * request.query_head_count + query_head) * request.head_dimension;
+
+    __shared__ float tile_scores[kOnlineKeyTile];
+    __shared__ float running_max;
+    __shared__ float running_denominator;
+    __shared__ float running_factor;
+    __shared__ float tile_factor;
+    if (threadIdx.x == 0) {
+        running_max = -CUDART_INF_F;
+        running_denominator = 0.0F;
+    }
+    __syncthreads();
+
+    float accumulator = 0.0F;
+    for (std::size_t tile_begin = 0; tile_begin < visible_keys;
+         tile_begin += kOnlineKeyTile) {
+        const std::size_t remaining = visible_keys - tile_begin;
+        const std::size_t tile_count =
+            remaining < kOnlineKeyTile ? remaining : kOnlineKeyTile;
+        constexpr unsigned int warp_size = 32;
+        constexpr unsigned int warps_per_block = kOnlineBlockSize / warp_size;
+        const unsigned int warp = threadIdx.x / warp_size;
+        const unsigned int lane = threadIdx.x % warp_size;
+        for (std::size_t group_begin = 0; group_begin < tile_count;
+             group_begin += warps_per_block) {
+            const std::size_t tile_index = group_begin + warp;
+            float partial = 0.0F;
+            if (tile_index < tile_count) {
+                const std::size_t key_token = tile_begin + tile_index;
+                for (std::size_t dimension = lane;
+                     dimension < request.head_dimension; dimension += warp_size) {
+                    const std::size_t key_index = paged_kv_index(
+                        key_token, kv_head, dimension, request.physical_blocks,
+                        request.layer, request.total_blocks, request.block_size,
+                        request.kv_head_count, request.head_dimension);
+                    partial += query_vector[dimension] * request.key[key_index];
+                }
+            }
+            for (unsigned int offset = warp_size / 2; offset > 0; offset /= 2) {
+                partial += __shfl_down_sync(0xFFFFFFFFU, partial, offset);
+            }
+            if (lane == 0 && tile_index < tile_count) {
+                tile_scores[tile_index] = partial * scale;
+            }
+            __syncthreads();
+        }
+
+        if (threadIdx.x == 0) {
+            float tile_maximum = -CUDART_INF_F;
+            for (std::size_t index = 0; index < tile_count; ++index) {
+                tile_maximum = fmaxf(tile_maximum, tile_scores[index]);
+            }
+            float tile_denominator = 0.0F;
+            for (std::size_t index = 0; index < tile_count; ++index) {
+                tile_scores[index] = expf(tile_scores[index] - tile_maximum);
+                tile_denominator += tile_scores[index];
+            }
+            const float merged_maximum = fmaxf(running_max, tile_maximum);
+            running_factor = running_denominator == 0.0F
+                ? 0.0F
+                : expf(running_max - merged_maximum);
+            tile_factor = expf(tile_maximum - merged_maximum);
+            running_denominator = running_factor * running_denominator +
+                tile_factor * tile_denominator;
+            running_max = merged_maximum;
+        }
+        __syncthreads();
+
+        if (threadIdx.x < request.head_dimension) {
+            float tile_output = 0.0F;
+            for (std::size_t index = 0; index < tile_count; ++index) {
+                const std::size_t value_index = paged_kv_index(
+                    tile_begin + index, kv_head, threadIdx.x,
+                    request.physical_blocks, request.layer, request.total_blocks,
+                    request.block_size, request.kv_head_count,
+                    request.head_dimension);
+                tile_output += tile_scores[index] * request.value[value_index];
+            }
+            accumulator = running_factor * accumulator + tile_factor * tile_output;
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x < request.head_dimension) {
+        const std::size_t output_index =
+            (query_token * request.query_head_count + query_head) *
+                request.head_dimension + threadIdx.x;
+        request.output[output_index] = accumulator / running_denominator;
+    }
+}
+
 __global__ void paged_gqa_score_kernel(
     CudaPagedGqaAttentionRequest request,
     float* scores,
@@ -430,6 +534,31 @@ CudaStatus CudaGqaAttentionBackend::compute_paged(
                               stream.native_handle()>>>(
         request, score_workspace, output_count);
     return launch_status("paged_gqa_value_kernel launch");
+}
+
+CudaStatus CudaGqaAttentionBackend::compute_paged_online(
+    const CudaPagedGqaAttentionRequest& request,
+    const CudaStream& stream) const {
+    if (!request.validate().is_ok() || request.head_dimension > kOnlineBlockSize) {
+        return CudaStatus::from(
+            cudaErrorInvalidValue, "CUDA online paged GQA request");
+    }
+    if (!stream.valid()) {
+        return CudaStatus::from(
+            cudaErrorInvalidResourceHandle, "CUDA online paged GQA stream");
+    }
+    const std::size_t rows = request.query_tokens * request.query_head_count;
+    if (rows > std::numeric_limits<unsigned int>::max()) {
+        return CudaStatus::from(
+            cudaErrorInvalidConfiguration, "CUDA online paged GQA grid");
+    }
+    const float scale = request.scale == 0.0F
+        ? 1.0F / sqrtf(static_cast<float>(request.head_dimension))
+        : request.scale;
+    fused_online_paged_gqa_kernel<<<
+        static_cast<unsigned int>(rows), kOnlineBlockSize, 0,
+        stream.native_handle()>>>(request, scale);
+    return launch_status("fused_online_paged_gqa_kernel launch");
 }
 
 const CudaGqaAttentionBackend& cuda_gqa_attention_backend() {

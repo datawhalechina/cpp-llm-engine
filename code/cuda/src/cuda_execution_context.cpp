@@ -443,24 +443,12 @@ core::Status CudaExecutionContext::quantized_linear_batch(
         return core::Status::error(
             "batch quantized linear row widths do not match weights");
     }
-    if (weights.rows() > std::numeric_limits<std::size_t>::max() / weights.cols()) {
-        return core::Status::error("batch quantized linear element count overflows");
-    }
-    const std::size_t elements = weights.rows() * weights.cols();
-    if (elements > std::numeric_limits<std::size_t>::max() / sizeof(float)) {
-        return core::Status::error("batch quantized linear workspace byte count overflows");
-    }
-    const core::Status workspace_status = reserve_workspace(elements * sizeof(float));
-    if (!workspace_status.is_ok()) return workspace_status;
-    const CudaStatus dequantize_status = cuda_quantized_dequantize_backend().dequantize(
-        weights, static_cast<float*>(workspace_.data()), elements, stream_);
-    if (!dequantize_status.is_ok()) return dequantize_status.to_core_status();
-    return matmul_backend_.compute_rhs_transposed(
+    return cuda_quantized_gemv_backend().compute_batch(
+        weights,
         static_cast<const float*>(input.data()),
-        static_cast<const float*>(workspace_.data()),
-        static_cast<float*>(output->data()),
         input_shape[0],
         weights.cols(),
+        static_cast<float*>(output->data()),
         weights.rows(),
         stream_).to_core_status();
 }
@@ -678,7 +666,11 @@ core::Status CudaExecutionContext::paged_gqa_attention(
     if (page_bytes > std::numeric_limits<std::size_t>::max() - score_bytes) {
         return core::Status::error("paged GQA total workspace overflows");
     }
-    const core::Status workspace_status = reserve_workspace(page_bytes + score_bytes);
+    const std::size_t required_workspace_bytes =
+        attention_path_ == CudaAttentionPath::FusedOnline
+        ? page_bytes
+        : page_bytes + score_bytes;
+    const core::Status workspace_status = reserve_workspace(required_workspace_bytes);
     if (!workspace_status.is_ok()) return workspace_status;
     auto* workspace_bytes = static_cast<unsigned char*>(workspace_.data());
     const CudaStatus copy_status = CudaStatus::from(
@@ -691,6 +683,11 @@ core::Status CudaExecutionContext::paged_gqa_attention(
         "paged GQA page table H2D");
     if (!copy_status.is_ok()) return copy_status.to_core_status();
     request.physical_blocks = reinterpret_cast<const std::size_t*>(workspace_bytes);
+    if (attention_path_ == CudaAttentionPath::FusedOnline) {
+        return cuda_gqa_attention_backend()
+            .compute_paged_online(request, stream_)
+            .to_core_status();
+    }
     auto* scores = reinterpret_cast<float*>(workspace_bytes + page_bytes);
     return cuda_gqa_attention_backend().compute_paged(
         request, scores, request.score_count(), stream_).to_core_status();

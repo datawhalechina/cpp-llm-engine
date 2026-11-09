@@ -1,5 +1,5 @@
 // CUDA Backend：实现 Q4_K/Q6_K 解码与 GEMV 融合 kernel。
-// 契约：一个 CUDA block 负责一个输出行，线程直接累加 packed 权重点积。
+// 契约：一个 CUDA block 负责同一输出行的一个批次 tile，线程直接累加 packed 权重点积。
 // 验证：cuda_quantized_linear_test.cu 与 Chapter05 CPU reference 对照。
 #include "cpp_llm_engine/cuda/quantized_gemv_backend.h"
 
@@ -7,6 +7,7 @@
 #include "cpp_llm_engine/cuda/cuda_quantized_matrix.h"
 #include "cpp_llm_engine/cuda/cuda_stream.h"
 
+#include <cuda_fp16.h>
 #include <cuda_runtime.h>
 
 #include <cstdint>
@@ -16,31 +17,12 @@ namespace cpp_llm_engine::cuda {
 namespace {
 
 constexpr unsigned int kThreads = 256;
+constexpr unsigned int kWarpSize = 32;
+constexpr unsigned int kWarpsPerBlock = kThreads / kWarpSize;
+constexpr std::size_t kBatchTile = 4;
 
 __device__ float half_bits_to_float(std::uint16_t bits) {
-    const std::uint32_t sign = (static_cast<std::uint32_t>(bits) & 0x8000u) << 16;
-    const std::uint32_t exponent = (bits >> 10) & 0x1fu;
-    const std::uint32_t mantissa = bits & 0x03ffu;
-    std::uint32_t result = 0;
-    if (exponent == 0) {
-        if (mantissa == 0) {
-            result = sign;
-        } else {
-            std::uint32_t normalized = mantissa;
-            std::uint32_t adjusted_exponent = 127 - 14;
-            while ((normalized & 0x0400u) == 0) {
-                normalized <<= 1;
-                --adjusted_exponent;
-            }
-            normalized &= 0x03ffu;
-            result = sign | (adjusted_exponent << 23) | (normalized << 13);
-        }
-    } else if (exponent == 0x1fu) {
-        result = sign | 0x7f800000u | (mantissa << 13);
-    } else {
-        result = sign | ((exponent + (127 - 15)) << 23) | (mantissa << 13);
-    }
-    return __uint_as_float(result);
+    return __half2float(__ushort_as_half(bits));
 }
 
 __device__ std::uint16_t load_u16(const std::uint8_t* data) {
@@ -107,32 +89,56 @@ __global__ void quantized_gemv_kernel(
     const std::uint8_t* weights,
     const float* input,
     float* output,
-    std::size_t cols) {
+    std::size_t cols,
+    std::size_t batch_size) {
     const std::size_t row = blockIdx.x;
+    const std::size_t batch_begin = blockIdx.y * kBatchTile;
     const std::size_t blocks_per_row = cols / core::kQuantizedBlockElements;
     constexpr std::size_t block_bytes =
         Q4K ? core::kQ4KBlockBytes : core::kQ6KBlockBytes;
     const std::uint8_t* row_weights =
         weights + row * blocks_per_row * block_bytes;
 
-    float sum = 0.0F;
+    float sums[kBatchTile] = {0.0F, 0.0F, 0.0F, 0.0F};
     for (std::size_t block = 0; block < blocks_per_row; ++block) {
         const std::uint8_t* packed = row_weights + block * block_bytes;
         const std::size_t local = threadIdx.x;
         const float weight = Q4K
             ? decode_q4k(packed, local)
             : decode_q6k(packed, local);
-        sum += weight * input[block * core::kQuantizedBlockElements + local];
+        const std::size_t input_col =
+            block * core::kQuantizedBlockElements + local;
+        for (std::size_t tile_row = 0; tile_row < kBatchTile; ++tile_row) {
+            const std::size_t batch = batch_begin + tile_row;
+            if (batch < batch_size) {
+                sums[tile_row] += weight * input[batch * cols + input_col];
+            }
+        }
     }
 
-    __shared__ float partial[kThreads];
-    partial[threadIdx.x] = sum;
-    __syncthreads();
-    for (unsigned int offset = kThreads / 2; offset > 0; offset /= 2) {
-        if (threadIdx.x < offset) partial[threadIdx.x] += partial[threadIdx.x + offset];
-        __syncthreads();
+    const unsigned int lane = threadIdx.x % kWarpSize;
+    const unsigned int warp = threadIdx.x / kWarpSize;
+    __shared__ float warp_sums[kBatchTile][kWarpsPerBlock];
+    for (std::size_t tile_row = 0; tile_row < kBatchTile; ++tile_row) {
+        for (unsigned int offset = kWarpSize / 2; offset > 0; offset /= 2) {
+            sums[tile_row] += __shfl_down_sync(
+                0xFFFFFFFFU, sums[tile_row], offset);
+        }
+        if (lane == 0) warp_sums[tile_row][warp] = sums[tile_row];
     }
-    if (threadIdx.x == 0) output[row] = partial[0];
+    __syncthreads();
+    if (warp == 0) {
+        for (std::size_t tile_row = 0; tile_row < kBatchTile; ++tile_row) {
+            float total = lane < kWarpsPerBlock ? warp_sums[tile_row][lane] : 0.0F;
+            for (unsigned int offset = kWarpSize / 2; offset > 0; offset /= 2) {
+                total += __shfl_down_sync(0xFFFFFFFFU, total, offset);
+            }
+            const std::size_t batch = batch_begin + tile_row;
+            if (lane == 0 && batch < batch_size) {
+                output[batch * gridDim.x + row] = total;
+            }
+        }
+    }
 }
 
 }  // namespace
@@ -152,38 +158,54 @@ CudaStatus CudaQuantizedGemvBackend::compute(
     float* output,
     std::size_t output_elements,
     const CudaStream& stream) const {
+    return compute_batch(
+        weights, input, 1, input_elements, output, output_elements, stream);
+}
+
+CudaStatus CudaQuantizedGemvBackend::compute_batch(
+    const CudaQuantizedMatrix& weights,
+    const float* input,
+    std::size_t batch_size,
+    std::size_t input_width,
+    float* output,
+    std::size_t output_width,
+    const CudaStream& stream) const {
     if (weights.empty() || input == nullptr || output == nullptr) {
         return CudaStatus::from(
             cudaErrorInvalidDevicePointer,
-            "CudaQuantizedGemvBackend::compute pointers");
+            "CudaQuantizedGemvBackend::compute_batch pointers");
     }
     if (!stream.valid()) {
         return CudaStatus::from(
             cudaErrorInvalidResourceHandle,
-            "CudaQuantizedGemvBackend::compute stream");
+            "CudaQuantizedGemvBackend::compute_batch stream");
     }
     if (weights.cols() % core::kQuantizedBlockElements != 0 ||
-        input_elements != weights.cols() || output_elements != weights.rows() ||
+        batch_size == 0 || batch_size > 65535 ||
+        input_width != weights.cols() || output_width != weights.rows() ||
         weights.rows() > std::numeric_limits<unsigned int>::max()) {
         return CudaStatus::from(
             cudaErrorInvalidValue,
-            "CudaQuantizedGemvBackend::compute shape");
+            "CudaQuantizedGemvBackend::compute_batch shape");
     }
 
     const auto* packed = static_cast<const std::uint8_t*>(weights.data());
-    const unsigned int grid = static_cast<unsigned int>(weights.rows());
+    const dim3 grid(
+        static_cast<unsigned int>(weights.rows()),
+        static_cast<unsigned int>(
+            batch_size / kBatchTile + (batch_size % kBatchTile != 0 ? 1 : 0)));
     if (weights.format() == core::WeightFormat::Q4K) {
         quantized_gemv_kernel<true><<<grid, kThreads, 0, stream.native_handle()>>>(
-            packed, input, output, weights.cols());
+            packed, input, output, weights.cols(), batch_size);
     } else if (weights.format() == core::WeightFormat::Q6K) {
         quantized_gemv_kernel<false><<<grid, kThreads, 0, stream.native_handle()>>>(
-            packed, input, output, weights.cols());
+            packed, input, output, weights.cols(), batch_size);
     } else {
         return CudaStatus::from(
             cudaErrorInvalidValue,
             "CudaQuantizedGemvBackend::compute format");
     }
-    return check_last_cuda_error("quantized fused GEMV kernel launch");
+    return check_last_cuda_error("quantized fused batch GEMV kernel launch");
 }
 
 const CudaQuantizedGemvBackend& cuda_quantized_gemv_backend() {

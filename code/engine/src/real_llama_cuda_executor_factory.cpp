@@ -179,26 +179,14 @@ public:
             }
             return false;
         }
-        if (start_new_sequence && produce_logits && !context_->uses_external_kv()) {
-            const auto status = context_->prefill_tokens(prompt, logits);
-            if (!status.is_ok()) {
-                if (error != nullptr) *error = status.message();
-                context_->reset();
-                return false;
-            }
-            if (error != nullptr) error->clear();
-            return true;
-        }
         chapter06_generation::Logits current;
-        for (const auto token : prompt) {
-            const auto status = context_->forward_token(token, &current);
-            if (!status.is_ok()) {
-                if (error != nullptr) *error = status.message();
-                context_->reset();
-                return false;
-            }
+        auto* output = produce_logits ? logits : &current;
+        const auto status = context_->prefill_tokens(prompt, output);
+        if (!status.is_ok()) {
+            if (error != nullptr) *error = status.message();
+            context_->reset();
+            return false;
         }
-        if (produce_logits) *logits = std::move(current);
         if (error != nullptr) error->clear();
         return true;
     }

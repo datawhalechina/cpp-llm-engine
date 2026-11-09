@@ -217,6 +217,100 @@ core::Status CudaDecoderBatchLayer::prefill_sequence(
     return core::Status::ok();
 }
 
+core::Status CudaDecoderBatchLayer::prefill_sequence_paged(
+    CudaExecutionContext* context,
+    const CudaDecoderLayerWeights& weights,
+    CudaPagedKvCache* cache,
+    std::size_t layer,
+    const std::vector<std::size_t>& physical_blocks,
+    CudaTensor* hidden,
+    std::size_t position_offset) {
+    if (context == nullptr || cache == nullptr || hidden == nullptr ||
+        !cache->valid() || layer >= cache->layer_count() ||
+        cache->kv_head_count() != config_.kv_heads ||
+        cache->head_dimension() != config_.head_dimension ||
+        physical_blocks.empty() ||
+        batch_size_ > std::numeric_limits<std::size_t>::max() - position_offset ||
+        physical_blocks.size() >
+            std::numeric_limits<std::size_t>::max() / cache->block_size() ||
+        position_offset + batch_size_ >
+            physical_blocks.size() * cache->block_size() ||
+        weights.attention_norm == nullptr || weights.ffn_norm == nullptr ||
+        !weights.query.valid() || !weights.key.valid() || !weights.value.valid() ||
+        !weights.attention_output.valid() || !weights.gate.valid() ||
+        !weights.up.valid() || !weights.down.valid() ||
+        hidden->contract().shape.dimensions !=
+            std::vector<std::size_t>{batch_size_, config_.hidden_size}) {
+        return core::Status::error("CUDA paged sequence prefill input is invalid");
+    }
+    for (const std::size_t block : physical_blocks) {
+        if (block >= cache->total_blocks()) {
+            return core::Status::error("CUDA paged sequence prefill block is invalid");
+        }
+    }
+
+    std::vector<std::size_t> positions(batch_size_);
+    for (std::size_t index = 0; index < batch_size_; ++index) {
+        positions[index] = position_offset + index;
+    }
+    core::Status status = context->copy(*hidden, &hidden_backup_);
+    if (!status.is_ok()) return status;
+    const auto rollback = [&](const core::Status& failure) {
+        const core::Status hidden_status = context->copy(hidden_backup_, hidden);
+        return hidden_status.is_ok() ? failure : hidden_status;
+    };
+#define RETURN_IF_PAGED_PREFILL_ERROR(expression) do { status = (expression); \
+    if (!status.is_ok()) return rollback(status); } while (false)
+    RETURN_IF_PAGED_PREFILL_ERROR(context->rms_norm_batch(
+        *hidden, *weights.attention_norm, &attention_normalized_, config_.rms_epsilon));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->linear_batch(
+        attention_normalized_, weights.query, &query_));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->linear_batch(
+        attention_normalized_, weights.key, &key_));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->linear_batch(
+        attention_normalized_, weights.value, &value_));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->rope_batch(
+        &query_, positions, config_.rotary_dimension, config_.rope_frequency_base));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->rope_batch(
+        &key_, positions, config_.rotary_dimension, config_.rope_frequency_base));
+
+    std::vector<CudaTensor*> key_rows;
+    std::vector<CudaTensor*> value_rows;
+    key_rows.reserve(batch_size_);
+    value_rows.reserve(batch_size_);
+    for (std::size_t index = 0; index < batch_size_; ++index) {
+        key_rows.push_back(&key_rows_[index]);
+        value_rows.push_back(&value_rows_[index]);
+    }
+    RETURN_IF_PAGED_PREFILL_ERROR(context->unpack_rows(key_, key_rows));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->unpack_rows(value_, value_rows));
+    for (std::size_t index = 0; index < batch_size_; ++index) {
+        const std::size_t position = positions[index];
+        const std::size_t physical_block =
+            physical_blocks[position / cache->block_size()];
+        RETURN_IF_PAGED_PREFILL_ERROR(context->write_paged_kv(
+            cache, layer, physical_block, position % cache->block_size(),
+            key_rows_[index], value_rows_[index]));
+    }
+    RETURN_IF_PAGED_PREFILL_ERROR(context->paged_gqa_attention(
+        query_, *cache, layer, physical_blocks, position_offset + batch_size_,
+        &attention_context_, position_offset));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->linear_batch(
+        attention_context_, weights.attention_output, &projection_));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->vector_add(*hidden, projection_, hidden));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->rms_norm_batch(
+        *hidden, *weights.ffn_norm, &ffn_normalized_, config_.rms_epsilon));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->linear_batch(
+        ffn_normalized_, weights.gate, &gate_));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->linear_batch(
+        ffn_normalized_, weights.up, &up_));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->swiglu(gate_, up_, &swiglu_));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->linear_batch(swiglu_, weights.down, &down_));
+    RETURN_IF_PAGED_PREFILL_ERROR(context->vector_add(*hidden, down_, hidden));
+#undef RETURN_IF_PAGED_PREFILL_ERROR
+    return core::Status::ok();
+}
+
 core::Status CudaDecoderBatchLayer::forward_paged(
     CudaExecutionContext* context,
     const CudaDecoderLayerWeights& weights,

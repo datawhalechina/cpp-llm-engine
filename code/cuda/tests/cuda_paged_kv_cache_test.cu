@@ -1,5 +1,5 @@
 // CUDA 分页 K/V：验证 Chapter07 非连续 BlockTable 到设备 payload 的真实映射。
-// 职责：覆盖双层写入/读回、非法位置、物理块清零和释放后复用。
+// 职责：覆盖双层写入/读回、三阶段/融合 Attention、物理块清零和复用。
 // 通过条件：逻辑 token 经 block/slot 定位后与 CPU golden 逐元素一致。
 #include "chapter07_kv_cache/block_table.h"
 #include "cpp_llm_engine/core/tensor_contract.h"
@@ -176,6 +176,18 @@ int main() {
         for (std::size_t index = 0; index < actual.size(); ++index) {
             CHECK(std::fabs(actual[index] - golden[index]) <= 3.0e-5F);
         }
+        context.set_attention_path(
+            cpp_llm_engine::cuda::CudaAttentionPath::FusedOnline);
+        CHECK(context.paged_gqa_attention(
+            query, cache, layer, blocks, 5, &output, 4).is_ok());
+        CHECK(context.download(
+            output, actual.data(), actual.size() * sizeof(float)).is_ok());
+        CHECK(context.synchronize().is_ok());
+        for (std::size_t index = 0; index < actual.size(); ++index) {
+            CHECK(std::fabs(actual[index] - golden[index]) <= 4.0e-5F);
+        }
+        context.set_attention_path(
+            cpp_llm_engine::cuda::CudaAttentionPath::ThreeStage);
     }
     CHECK(!context.paged_gqa_attention(
         query, cache, 0, {total_blocks}, 1, &output, 0).is_ok());
@@ -201,6 +213,7 @@ int main() {
     CHECK(!cache.valid());
     std::cout << "cuda_paged_kv_noncontiguous_blocks: true\n"
               << "cuda_paged_gqa_cpu_golden: true\n"
+              << "cuda_paged_gqa_fused_online: true\n"
               << "physical_blocks: " << blocks[0] << ' ' << blocks[1] << ' '
               << blocks[2] << '\n';
     return 0;

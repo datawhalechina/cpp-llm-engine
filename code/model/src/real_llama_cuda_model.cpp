@@ -388,6 +388,26 @@ RealLlamaCudaModel::create_batch_workspace(
         status = cuda::CudaDecoderBatchLayer::create(
             impl_->layer_config, batch_size, &workspace->decoder_layer);
     }
+    if (status.is_ok()) {
+        const std::size_t max_tokens = impl_->metadata.max_position;
+        const std::size_t query_heads = impl_->layer_config.query_heads;
+        const std::size_t maximum = std::numeric_limits<std::size_t>::max();
+        if (query_heads > maximum / batch_size ||
+            max_tokens > maximum / (batch_size * query_heads) ||
+            batch_size * query_heads * max_tokens > maximum / sizeof(float) ||
+            max_tokens > maximum / sizeof(std::size_t) ||
+            batch_size * query_heads * max_tokens * sizeof(float) >
+                maximum - max_tokens * sizeof(std::size_t)) {
+            status = core::Status::error(
+                "CUDA batch workspace attention capacity overflows");
+        } else {
+            const std::size_t score_bytes =
+                batch_size * query_heads * max_tokens * sizeof(float);
+            const std::size_t page_bytes = max_tokens * sizeof(std::size_t);
+            status = workspace->execution.reserve_workspace(
+                score_bytes + page_bytes);
+        }
+    }
     if (!status.is_ok()) {
         if (error != nullptr) *error = status.message();
         return nullptr;
@@ -638,8 +658,16 @@ core::Status RealLlamaCudaContext::forward_hidden_sequence(
     if (output == nullptr || token_count == 0 ||
         token_count > impl_->capacity_tokens - impl_->position ||
         hidden_size > std::numeric_limits<std::size_t>::max() / token_count ||
-        input.size() != token_count * hidden_size || impl_->external_kv != nullptr) {
+        input.size() != token_count * hidden_size) {
         return core::Status::error("CUDA hidden sequence input or output is invalid");
+    }
+    std::vector<std::size_t> physical_blocks;
+    if (impl_->external_kv != nullptr) {
+        std::string error;
+        if (!impl_->external_kv->reserve(impl_->position + token_count, &error)) {
+            return core::Status::error(error);
+        }
+        physical_blocks = impl_->external_kv->physical_blocks();
     }
     cuda::CudaTensor hidden;
     cuda::CudaDecoderBatchLayer layer;
@@ -654,10 +682,18 @@ core::Status RealLlamaCudaContext::forward_hidden_sequence(
             &hidden, input.data(), input.size() * sizeof(float));
     }
     for (std::size_t index = 0; status.is_ok() && index < impl_->layers.size(); ++index) {
-        status = layer.prefill_sequence(
-            &impl_->execution,
-            impl_->model->layers[index].decoder_weights(),
-            &impl_->caches[index], &hidden, impl_->position);
+        if (impl_->external_kv != nullptr) {
+            status = layer.prefill_sequence_paged(
+                &impl_->execution,
+                impl_->model->layers[index].decoder_weights(),
+                impl_->external_kv->payload(), index, physical_blocks,
+                &hidden, impl_->position);
+        } else {
+            status = layer.prefill_sequence(
+                &impl_->execution,
+                impl_->model->layers[index].decoder_weights(),
+                &impl_->caches[index], &hidden, impl_->position);
+        }
     }
     std::vector<float> result(input.size());
     if (status.is_ok()) {
@@ -668,6 +704,13 @@ core::Status RealLlamaCudaContext::forward_hidden_sequence(
     if (!status.is_ok()) {
         impl_->rollback_caches();
         return status;
+    }
+    if (impl_->external_kv != nullptr) {
+        std::string error;
+        if (!impl_->external_kv->commit(impl_->position + token_count, &error)) {
+            impl_->rollback_caches();
+            return core::Status::error(error);
+        }
     }
     impl_->position += token_count;
     *output = std::move(result);
@@ -729,7 +772,7 @@ core::Status RealLlamaCudaContext::forward_token(
 core::Status RealLlamaCudaContext::prefill_tokens(
     const std::vector<std::int32_t>& tokens,
     std::vector<float>* logits) {
-    if (logits == nullptr || tokens.empty() || impl_->external_kv != nullptr ||
+    if (logits == nullptr || tokens.empty() ||
         tokens.size() > impl_->capacity_tokens - impl_->position) {
         return core::Status::error("CUDA prefill tokens or output is invalid");
     }
@@ -754,11 +797,28 @@ core::Status RealLlamaCudaContext::prefill_tokens(
     if (status.is_ok()) {
         status = impl_->execution.pack_rows(row_inputs, &impl_->prefill_hidden);
     }
+    std::vector<std::size_t> physical_blocks;
+    if (status.is_ok() && impl_->external_kv != nullptr) {
+        std::string error;
+        if (!impl_->external_kv->reserve(impl_->position + tokens.size(), &error)) {
+            status = core::Status::error(error);
+        } else {
+            physical_blocks = impl_->external_kv->physical_blocks();
+        }
+    }
     for (std::size_t index = 0; status.is_ok() && index < impl_->layers.size(); ++index) {
-        status = impl_->prefill_layer.prefill_sequence(
-            &impl_->execution,
-            impl_->model->layers[index].decoder_weights(),
-            &impl_->caches[index], &impl_->prefill_hidden, impl_->position);
+        if (impl_->external_kv != nullptr) {
+            status = impl_->prefill_layer.prefill_sequence_paged(
+                &impl_->execution,
+                impl_->model->layers[index].decoder_weights(),
+                impl_->external_kv->payload(), index, physical_blocks,
+                &impl_->prefill_hidden, impl_->position);
+        } else {
+            status = impl_->prefill_layer.prefill_sequence(
+                &impl_->execution,
+                impl_->model->layers[index].decoder_weights(),
+                &impl_->caches[index], &impl_->prefill_hidden, impl_->position);
+        }
     }
     if (status.is_ok()) {
         status = impl_->execution.unpack_rows(impl_->prefill_hidden, row_outputs);
@@ -781,6 +841,13 @@ core::Status RealLlamaCudaContext::prefill_tokens(
     if (!status.is_ok()) {
         impl_->rollback_caches();
         return status;
+    }
+    if (impl_->external_kv != nullptr) {
+        std::string error;
+        if (!impl_->external_kv->commit(impl_->position + tokens.size(), &error)) {
+            impl_->rollback_caches();
+            return core::Status::error(error);
+        }
     }
     impl_->position += tokens.size();
     *logits = std::move(result);

@@ -228,8 +228,8 @@ int main() {
     for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
         CHECK(close_enough(batch_output_host[index], batch_expected[index]));
     }
-    CHECK(context.workspace_capacity_bytes() == 512 * sizeof(float));
-    CHECK(context.workspace_allocation_count() == 1);
+    CHECK(context.workspace_capacity_bytes() == 0);
+    CHECK(context.workspace_allocation_count() == 0);
 
     CudaTensor wrong_batch_output;
     CHECK(CudaTensor::create_contiguous(
@@ -259,8 +259,20 @@ int main() {
     CHECK(context.synchronize().is_ok());
     CHECK(close_enough(output_host[0], q6k_expected[0]));
     CHECK(close_enough(output_host[1], q6k_expected[1]));
-    CHECK(context.workspace_capacity_bytes() == 512 * sizeof(float));
-    CHECK(context.workspace_allocation_count() == 1);
+    const auto q6k_batch_expected = cpu_linear_batch(
+        q6k_decoded, 2, 256, batch_input_host, batch_size);
+    CHECK(context.quantized_linear_batch(
+        q6k_weights, batch_input, &batch_output).is_ok());
+    CHECK(context.download(
+        batch_output,
+        batch_output_host.data(),
+        batch_output_host.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
+        CHECK(close_enough(batch_output_host[index], q6k_batch_expected[index]));
+    }
+    CHECK(context.workspace_capacity_bytes() == 0);
+    CHECK(context.workspace_allocation_count() == 0);
 
     CudaTensor wrong_input;
     CudaTensor wrong_output;
@@ -336,8 +348,8 @@ int main() {
     };
     CHECK(run_benchmark(q4k_benchmark_weights, "Q4_K"));
     CHECK(run_benchmark(q6k_benchmark_weights, "Q6_K"));
-    CHECK(context.workspace_capacity_bytes() == 512 * sizeof(float));
-    CHECK(context.workspace_allocation_count() == 1);
+    CHECK(context.workspace_capacity_bytes() == 0);
+    CHECK(context.workspace_allocation_count() == 0);
     std::vector<float> benchmark_output_host(benchmark_rows, 0.0F);
     CHECK(context.download(
         benchmark_output,

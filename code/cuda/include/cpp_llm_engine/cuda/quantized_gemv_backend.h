@@ -1,6 +1,6 @@
 // CUDA Backend：声明直接读取 Q4_K/Q6_K packed 权重的融合 GEMV。
-// 职责：在一个 kernel 中完成反量化、点积和行归约。
-// 限制：当前只处理单输入向量；Tensor Batch 仍使用反量化加 SGEMM。
+// 职责：在一个 kernel 中完成单行或批量输入的反量化、点积和行归约。
+// 限制：批量路径最多让 4 个输入行复用一次权重解码，面向小批量 Decode。
 #pragma once
 
 #include "cpp_llm_engine/core/backend.h"
@@ -24,6 +24,14 @@ public:
         std::size_t input_elements,
         float* output,
         std::size_t output_elements,
+        const CudaStream& stream) const;
+    CudaStatus compute_batch(
+        const CudaQuantizedMatrix& weights,
+        const float* input,
+        std::size_t batch_size,
+        std::size_t input_width,
+        float* output,
+        std::size_t output_width,
         const CudaStream& stream) const;
 };
 

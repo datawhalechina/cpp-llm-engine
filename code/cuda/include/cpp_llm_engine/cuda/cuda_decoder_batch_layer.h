@@ -35,6 +35,14 @@ public:
         CudaKvCache* cache,
         CudaTensor* hidden,
         std::size_t position_offset);
+    core::Status prefill_sequence_paged(
+        CudaExecutionContext* context,
+        const CudaDecoderLayerWeights& weights,
+        CudaPagedKvCache* cache,
+        std::size_t layer,
+        const std::vector<std::size_t>& physical_blocks,
+        CudaTensor* hidden,
+        std::size_t position_offset);
     core::Status forward_paged(
         CudaExecutionContext* context,
         const CudaDecoderLayerWeights& weights,

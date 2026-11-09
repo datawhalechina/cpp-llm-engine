@@ -1,11 +1,12 @@
-// CUDA Decoder：验证单 token、多请求 Decode 与单序列 Tensor Prefill。
-// 职责：用小维度权重检查算子组装、因果 K/V 和事务回滚。
-// 通过条件：批量路径与顺序执行一致，KV 按 token 数推进。
+// CUDA Decoder：验证单 token、多请求 Decode 与连续/分页 Tensor Prefill。
+// 职责：用小维度权重检查算子组装、因果 K/V、页表寻址和事务回滚。
+// 通过条件：批量路径与顺序执行一致，分页 chunk 跨块后输出不变。
 #include "cpp_llm_engine/core/tensor_contract.h"
 #include "cpp_llm_engine/cuda/cuda_decoder_batch_layer.h"
 #include "cpp_llm_engine/cuda/cuda_decoder_layer.h"
 #include "cpp_llm_engine/cuda/cuda_execution_context.h"
 #include "cpp_llm_engine/cuda/cuda_kv_cache.h"
+#include "cpp_llm_engine/cuda/cuda_paged_kv_cache.h"
 
 #include <cuda_runtime_api.h>
 
@@ -267,6 +268,43 @@ int main() {
         prefill_after_failure.size() * sizeof(float)).is_ok());
     CHECK(prefill_context.synchronize().is_ok());
     CHECK(close(prefill_after_failure, prefill_output));
+
+    CudaExecutionContext paged_prefill_context;
+    CudaDecoderBatchLayer paged_prefill_layer;
+    CudaPagedKvCache paged_prefill_cache;
+    CudaTensor paged_prefill_hidden;
+    CHECK(CudaExecutionContext::create(&paged_prefill_context).is_ok());
+    CHECK(CudaDecoderBatchLayer::create(config, 2, &paged_prefill_layer).is_ok());
+    CHECK(CudaPagedKvCache::create(1, 2, 1, 2, 2, &paged_prefill_cache).is_ok());
+    CHECK(CudaTensor::create_contiguous(
+        {2, 8}, DType::Float32, &paged_prefill_hidden).is_ok());
+    CHECK(paged_prefill_context.upload(
+        &paged_prefill_hidden, batch_hidden_host.data(),
+        batch_hidden_host.size() * sizeof(float)).is_ok());
+    const std::vector<std::size_t> noncontiguous_blocks{1, 0};
+    CHECK(paged_prefill_layer.prefill_sequence_paged(
+        &paged_prefill_context, weights, &paged_prefill_cache, 0,
+        noncontiguous_blocks, &paged_prefill_hidden, 0).is_ok());
+    std::vector<float> paged_prefill_output(16);
+    CHECK(paged_prefill_context.download(
+        paged_prefill_hidden, paged_prefill_output.data(),
+        paged_prefill_output.size() * sizeof(float)).is_ok());
+    CHECK(paged_prefill_context.synchronize().is_ok());
+    CHECK(close(paged_prefill_output, sequential_prefill_output));
+
+    CHECK(!paged_prefill_layer.prefill_sequence_paged(
+        &paged_prefill_context, weights, &paged_prefill_cache, 0,
+        {2, 0}, &paged_prefill_hidden, 0).is_ok());
+    CHECK(!paged_prefill_layer.prefill_sequence_paged(
+        &paged_prefill_context, invalid_batch_weights, &paged_prefill_cache, 0,
+        noncontiguous_blocks, &paged_prefill_hidden, 0).is_ok());
+    CHECK(paged_prefill_context.synchronize().is_ok());
+    std::vector<float> paged_after_failure(16);
+    CHECK(paged_prefill_context.download(
+        paged_prefill_hidden, paged_after_failure.data(),
+        paged_after_failure.size() * sizeof(float)).is_ok());
+    CHECK(paged_prefill_context.synchronize().is_ok());
+    CHECK(close(paged_after_failure, paged_prefill_output));
     return 0;
 }
 
