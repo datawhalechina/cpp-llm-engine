@@ -59,6 +59,27 @@ A 建立可观察的小尺寸闭环，B 连接真实 CPU 结构；G 和 M 是选
 
 每章先读 `intro.md` 和正文，再从 `code/<chapter>/README.md` 进入实现、测试和运行脚本。
 
+## 修改运行参数
+
+示例程序和 benchmark 使用命令行参数改变请求、实验负载或已编译实现，不需要修改源码。先通过对应脚本完成构建，再在代码 README 中找到可执行程序和参数说明。
+
+| 参数类型 | 示例 | 改变内容 |
+| --- | --- | --- |
+| 请求参数 | `--prompt`、`--max-new-tokens` | 单次生成输入与停止条件 |
+| 负载参数 | `--batch`、`--iterations` | benchmark 的规模和采样次数 |
+| 实现参数 | `--attention-path three-stage` | 从已编译且通过正确性验证的实现中选择一条 |
+
+```bash
+code/engine/build/cpp_llm_engine_demo \
+  --prompt "hello" --max-new-tokens 4
+
+/tmp/cpp-llm-chapter09-cuda-attention-build/real_tinyllama_cuda_attention_benchmark \
+  llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
+  --attention-path fused-online
+```
+
+CMake 选项决定编译哪些 backend，运行参数只选择已经编译的能力。实验编号和结果目录只用于保存证据，不会切换 kernel；未知参数会打印用法并退出。
+
 ## 可选扩展
 
 | 扩展 | 入口 | 当前范围 |

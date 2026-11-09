@@ -20,7 +20,7 @@
 
 | 执行部分 | 当前方式 | 还需要什么 |
 | --- | --- | --- |
-| 量化 Linear | 多行激活共同遍历权重 | AVX2 专用批量内核和更少打包开销 |
+| 量化 Linear | CPU 多行共同遍历权重；CUDA 用二维网格直接读取 packed 权重 | AVX2 专用批量内核和 CUDA 权重复用调优 |
 | Attention | 每个请求直接读取自己的分页 K/V | 融合的 Ragged/Paged Attention 批量内核 |
 | Prefill | Runtime 支持分块，但真实模型仍逐请求执行 | 真实多请求 Prefill Tensor batch |
 | 解码 | CPU 与 CUDA 均有真实多上下文批量调用 | 融合计算核、减少行打包和跨批量大小的容量复用 |
@@ -29,7 +29,7 @@
 
 CUDA Decode 每一步都会使用批量 hidden、logits、embedding rows、stream、cuBLAS handle 和 Decoder 中间 Tensor。这些对象只服务本次计算，不保存请求历史；如果每一步重新创建，就会在生成循环中重复执行设备分配与释放。
 
-当前 CUDA 执行器工厂（`RealLlamaCudaExecutorFactory`）按精确批量大小保存一个持久化工作区（workspace）。例如，批量大小为 2 的连续解码步骤会复用同一组临时资源；批量大小变为 3 时单独创建另一组，避免无效填充行参与计算。互斥锁保证同一工作区串行复用；每个请求的位置和 K/V 绑定继续保存在各自的模型执行上下文中。多批次并发需要进一步拆分工作区和执行流。
+当前 CUDA 执行器工厂（`RealLlamaCudaExecutorFactory`）按精确批量大小保存一个持久化工作区（workspace）。例如，批量大小为 2 的连续解码步骤会复用同一组临时资源；批量大小变为 3 时单独创建另一组，避免无效填充行参与计算。工作区创建时按模型最大上下文预留 Attention score 和页表空间，位置增长不会在每个 Decode step 触发设备分配。量化 Linear 在同一次二维 kernel 网格中处理这些输入行，不再为每次调用展开完整 Float32 权重。互斥锁保证同一工作区串行复用；每个请求的位置和 K/V 绑定继续保存在各自的模型执行上下文中。多批次并发需要进一步拆分工作区和执行流。
 
 ## 分页 K/V 怎样提交
 
@@ -54,6 +54,8 @@ admission bind request ID
 | CUDA 连续两步复用同尺寸 workspace | 多 batch 并发与容量型 workspace |
 | ServiceCore 自动传递 request ID 并选择真实 batch | 协作式抢占和设备事件重叠 |
 | Context position、页表和分页 payload 按整批提交 | 跨请求 Prefix Cache |
+
+EXP-GPU-06 在真实 TinyLlama、双请求分页 K/V 和一次 Decode 下比较顺序执行与 Tensor Batch。两轮 batch/顺序中位数比例为 `0.922/0.919`，逐请求 logits 完全一致；这说明当前小批量融合路径减少了重复执行成本，但尚未回答更大批量和长期服务吞吐。
 
 下图强调共享模型计算与独立请求历史的分界：Linear 和 LM Head 接收多行激活，每个请求的 Attention 仍通过自己的 BlockTable 访问分页 K/V。
 

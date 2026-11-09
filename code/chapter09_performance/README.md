@@ -30,6 +30,9 @@ Chapter08 或 Chapter10 产生原始样本，迁移器把现有结果规范化�
 | `run_real_evidence.sh` | 生成服务实验、A/B 决策或 Profiling 附件 | `chapter09_real_evidence_bridge_test` |
 | `run_cuda_profile.sh` | 用 Nsight Systems 生成真实 CUDA 四词元生成的 kernel/memory 基线 | 固定 golden token、环境元数据与 CSV 附件 |
 | `run_cuda_attention_ab.sh` | 比较三阶段与融合在线 Attention 的真实 Tensor Prefill/Decode | 两轮独立运行、逐轮样本、logits 与 greedy token 闸门 |
+| `run_cuda_paged_prefill_ab.sh` | 比较分页逐 Token 与 Tensor Prefill | 两轮独立运行、跨页写入、logits 与 greedy token 闸门 |
+| `run_cuda_batch_ab.sh` | 比较双请求分页顺序 Decode 与 Tensor Batch | 两轮独立运行、逐请求 logits 与 greedy token 闸门 |
+| `run_cuda_paged_attention_ab.sh` | 比较分页三阶段与融合在线 Attention | 交替执行顺序、两轮样本、logits 与 greedy token 闸门 |
 
 1. 阅读 `EvidenceRecord`，明确一份证据必须包含哪些环境、负载和正确性字段。
 2. 阅读 `summarize()`，理解统计值如何从逐轮样本得到，而不是从另一组聚合值推测。
@@ -96,7 +99,54 @@ Attention 微基准只能说明 kernel 本身是否值得进入候选。要决�
 bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh
 ```
 
+脚本显式传入 `--attention-path compare`，由可执行程序把字符串转换为 `CudaAttentionMode`，并在同一 workload 下运行两条受维护路径。也可以直接运行构建产物并指定 `three-stage` 或 `fused-online` 采集单路径 profile。该参数切换实现；实验 ID 和结果目录只记录证据，不参与实现选择。
+
 EXP-GPU-04 固定 32-token Tensor Prefill、一次 Decode、2 次预热、15 次测量和两轮独立运行。融合路径的 logits 与 greedy token 均通过，但两轮中位数的快慢方向相反：第一轮 Prefill/Decode 分别回退约 `9.8%/4.7%`，第二轮分别改善约 `8.0%/14.5%`。该证据不支持切换默认实现，因此三阶段路径继续作为 Runtime 默认值，融合路径保留用于教学、Profiling 和后续调优。
+
+分页 Tensor Prefill 使用独立 A/B 入口：
+
+```bash
+bash code/chapter09_performance/scripts/run_cuda_paged_prefill_ab.sh
+```
+
+EXP-GPU-05 固定同一分页 payload、BlockTable、32-token prompt 和三阶段 Attention，只改变“逐 Token 调用 Decoder”与“一次 Tensor Prefill”。两轮中位数从 `701.0/692.3 ms` 降至 `54.2/54.2 ms`，logits 最大误差为 `4.82e-05`，支持保留分页 Tensor Prefill。计时不含模型加载、Context 创建和请求绑定，结论不外推到其他 prompt 长度、并发批量或 GPU。
+
+双请求 Tensor Batch 使用独立 A/B 入口：
+
+```bash
+bash code/chapter09_performance/scripts/run_cuda_batch_ab.sh
+```
+
+EXP-GPU-06 固定两个不同长度 prompt、分页 K/V 和一次 Decode，只改变“两个单请求依次执行”与“一次 Tensor Batch”。初版批量 Q4_K/Q6_K Linear 的两轮 batch/顺序中位数比例为 `0.922/0.919`，逐请求 logits 与 greedy token 一致。
+
+EXP-GPU-08 使用相同 workload，进一步让最多 4 个 batch 行共享一次 packed 权重读取与解码，并把 block 归约改为 Warp shuffle 加 8 个 Warp 部分和。两轮比例降为 `0.466/0.612`，logits 最大误差为 `0`；Nsight Systems 中 Q4_K/Q6_K kernel 仍占 GPU kernel 时间约 `96.5%`。跨实验墙钟会受到 GPU 时钟影响，因此这些数字支持保留实现和继续优化 GEMV，不用于宣称固定倍数加速。计时不含模型加载、Context 创建、请求绑定和 Prefill，结论只覆盖当前双请求小批量 Decode。
+
+取得 NCU 权限后，EXP-GPU-09～11 依次检查元数据广播、shared payload 和显式 FMA。按相同时钟下的 `Elapsed Cycles` 比较，三个候选均回退，因此只保存 profile 证据，不进入默认实现。EXP-GPU-12 将手写 FP16 位解码替换为 CUDA 原生 half 转换，Q4_K kernel 从 `140,093` 降至 `99,725` cycles，约减少 `28.8%`；真实双请求的顺序 Decode 两轮中位数为 `35.12/30.54 ms`，Tensor Batch 为 `19.80/17.02 ms`，logits 最大误差为 `0`。该实现通过 kernel 与端到端双重门禁，予以保留。
+
+继续扩大 batch 前，先运行专项矩阵：
+
+```bash
+bash code/chapter09_performance/scripts/run_cuda_quantized_gemv_matrix.sh
+```
+
+EXP-GPU-13 固定 Q4_K/Q6_K、`2048 x 2048` 权重和 `batch=1/2/4/8`，输出相对重复单行调用的加速比，并让每个 batch 行与单行路径比较。Q4_K 的 batch 2/4/8 加速约为 `2.00x/3.98x/4.07x`，Q6_K 约为 `2.00x/4.00x/4.15x`；batch=8 时间约为 batch=4 的两倍，说明固定 4 行 tile 已把单次权重解码复用上限暴露出来。需要 NCU 定位某个点时，直接运行构建产物的 `--batch`、`--format` 和 `--iterations` 参数；这些参数选择 workload，不代表切换实现。
+
+分页融合 Attention 使用独立 A/B 入口：
+
+```bash
+bash code/chapter09_performance/scripts/run_cuda_paged_attention_ab.sh
+```
+
+EXP-GPU-07 固定 32-token 分页 Tensor Prefill 和一次 Decode。第一轮融合 Prefill/Decode 分别回退约 `5.2%/21.7%`，第二轮分别改善约 `12.7%/5.6%`；两轮方向不一致，因此继续使用三阶段默认路径。融合 kernel 保留为在线 Softmax 与页表寻址实验，后续需用 Nsight 继续定位波动和物理块访问成本。
+
+需要解释端到端结果时，启用同一脚本的 Nsight Systems 附件：
+
+```bash
+CHAPTER09_CUDA_PAGED_ATTENTION_PROFILE=1 \
+bash code/chapter09_performance/scripts/run_cuda_paged_attention_ab.sh
+```
+
+归档 profile 中 Q4_K/Q6_K 融合 GEMV 占 GPU kernel 时间约 `99.2%`。分页融合 Attention 合计 `25.38 ms`，三阶段 score、Softmax 和 value 合计 `37.48 ms`，kernel 层约减少 `32.3%`；Attention 的绝对占比太小，端到端变化会被 Linear 与运行波动覆盖。采集前后图形时钟分别只有 `180/450 MHz`，也说明实验必须记录时钟、功耗、温度和利用率。下一轮性能工作应优先优化量化 GEMV，而不是继续用端到端墙钟反复调分页 Attention。
 
 ## 扩展入口
 

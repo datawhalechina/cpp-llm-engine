@@ -8,7 +8,7 @@ Chapter06 已经固定单请求的 Prefill、Decode 和停止语义。本章接�
 | --- | --- | --- |
 | A 教学闭环 | 用小尺寸连续 K/V 建立基线，再跟踪块表、物理槽位和分页 Attention | 跨块读写、事务、连续/分页输出一致和安全复用 |
 | B 真实 CPU | 把 TinyLlama 的 22 层 K/V 接入同一分页事务 | 固定 token、连续/分页 logits 一致、失败回滚和终态释放 |
-| G GPU 扩展坐标 | 保留块表与事务语义，把 CPU 分页 Attention 替换为设备 kernel | CUDA 分页 payload、Radix Context 采用和双请求 Decode batch |
+| G GPU 扩展坐标 | 保留块表与事务语义，把 CPU 分页 Attention 替换为设备 kernel | CUDA 多 Token 分页 Prefill、Radix Context 采用和双请求 Decode batch |
 | M 多模态扩展坐标 | 视觉 embedding 汇入语言 Decoder 后复用同一 K/V 生命周期 | 当前复用语言缓存契约，不建立独立视觉 K/V Cache |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
@@ -48,4 +48,4 @@ bash code/chapter07_kv_cache/scripts/run.sh
 | L1 连续基线 | `bash code/chapter04_attention/scripts/run.sh`（其中的 `chapter04_attention_test`） | 追加、容量与 Attention 读取通过 | 必做 |
 | L2 CPU 分页 | `bash code/chapter07_kv_cache/scripts/run.sh` | 分配失败无泄漏、事务一致、跨块输出等价、前缀共享与释放无串扰 | 必做 |
 | L3 真实模型分页 | `bash code/chapter07_kv_cache/scripts/run_real_paged_kv.sh` | TinyLlama 22 层 logits、固定 token、失败回滚、连续路径一致和终态释放 | 有模型时必做 |
-| L4 CUDA 前缀采用 | `bash code/engine/scripts/run_real_cuda_runtime.sh` | 源请求释放后设备 K/V 仍可共享，命中路径与冷启动 token 一致 | 有 NVIDIA GPU 时选做 |
+| L4 CUDA 分页执行 | `bash code/engine/scripts/run_real_cuda_runtime.sh` | 多 Token Prefill、后续 Decode、Radix 命中和冷启动 token 一致 | 有 NVIDIA GPU 时选做 |

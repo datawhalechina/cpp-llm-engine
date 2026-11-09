@@ -114,7 +114,7 @@ output = o / l
 | 演进阶段 | 主要解决的问题 | 本教程处理方式 |
 | --- | --- | --- |
 | FlashAttention-1 | 用分块和在线 Softmax 避免物化完整注意力矩阵，减少 HBM 与片上存储之间的读写 | 完整讲解；先实现 CPU 等价参考，再建设 CUDA 教学内核 |
-| FlashAttention-2 | 减少非矩阵运算，增加单头跨线程块并行，并调整 Warp 分工 | 完整讲解；后续实现 `FA2-inspired` 推理前向实验 |
+| FlashAttention-2 | 减少非矩阵运算，增加单头跨线程块并行，并调整 Warp 分工 | 完整讲解；CUDA 连续与分页 K/V 提供 `FA2-inspired` 推理前向实验 |
 | FlashAttention-3 | 在 Hopper 上用异步执行、Warp specialization、TMA 和 FP8 提高利用率 | 讲解设计与硬件前提，不承诺本地实现 |
 | FlashAttention-4 | 针对数据中心 Blackwell 的异步 MMA、Tensor Memory 和 2-CTA MMA 重构流水线 | 讲解硬件与算法协同演进，不作为消费级单卡实现目标 |
 
@@ -124,7 +124,7 @@ CUDA `compute_online()` 已把在线状态合并、key tile 和 Value 聚合放�
 
 真实 TinyLlama 的 2 层和 22 层单-query 双步对照已经通过，融合路径保持 hidden、logits 和 greedy token。它验证带历史 K/V 的真实 Decode 数值；多 token Tensor Prefill 由下一个实验单独验证。
 
-多 token Decoder Prefill 现已增加：连续 `[T,D]` embedding 经过批量投影、逐位置 RoPE、一次 K/V append 和因果融合 Attention。TinyLlama 22 层、2-token 结果与顺序执行一致。随后补入批量 embedding、最终 logits 和按 shape 复用的持久 workspace，连续 CUDA Executor 已使用完整 token Tensor Prefill；分页 Prefill 仍逐 token。
+多 token Decoder Prefill 现已增加：连续 `[T,D]` embedding 经过批量投影、逐位置 RoPE、K/V 写入和因果 Attention。TinyLlama 22 层、2-token 结果与顺序执行一致。随后补入批量 embedding、最终 logits 和按 shape 复用的持久 workspace；连续 CUDA Executor 追加连续 K/V，分页 CUDA Executor 根据 BlockTable 写入物理槽位。分页寻址与事务进入 [`07.4 分页 Attention`](../chapter07_kv_cache/next/04_paged_attention.md)继续学习。
 
 Chapter09 的 EXP-GPU-04 用 32-token Prompt 分别测量完整 Tensor Prefill 和一次 Decode。融合路径通过 logits 与 greedy token 检查，但两轮独立中位数一次回退、一次改善，没有稳定端到端收益。因此三阶段路径继续作为默认实现；融合路径保留为可读算法、显存访问和 kernel 调优之间的教学对照。
 

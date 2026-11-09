@@ -17,6 +17,20 @@ Benchmark 入口需要完成环境登记、预热、重复运行和结果落盘�
 
 ![一次可重复 Benchmark 的时间轴](../../assets/diagrams/chapter09-benchmark-timeline.svg)
 
+## 参数必须说明改变了什么
+
+性能入口常用命令行参数，但不同参数不能混为一类。实现参数选择被测代码路径，例如 `--attention-path three-stage|fused-online`；负载参数只改变 batch、长度或迭代次数；输出参数只决定证据保存位置。程序应输出最终生效值，遇到未知值立即退出。
+
+```text
+命令行字符串
+    -> 校验并转换为枚举或数值
+    -> 打印有效配置
+    -> 正确性闸门
+    -> 预热与测量
+```
+
+`CHAPTER09_CUDA_EXPERIMENT_ID` 这类环境变量只标记实验身份，不能选择 kernel。当前 Attention A/B 入口支持 `--attention-path compare|three-stage|fused-online`；量化 GEMV 矩阵的 `--batch`、`--format` 和 `--iterations` 仍只选择 workload。只有通过正确性测试且继续维护的实现才进入运行期枚举，失败候选保留为证据而不是用户选项。
+
 ## CPU 与 GPU 需要固定的环境
 
 教学入口优先保证命令短、条件可见和结果可保存。需要严格发布结论时，再增加隔离后台负载、固定频率和多轮独立进程等控制条件。

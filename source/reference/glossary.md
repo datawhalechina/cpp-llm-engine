@@ -145,6 +145,7 @@
 | 参考实现 | reference implementation | 优先保证语义清晰和正确性、用于校验优化实现的实现路径 | Chapter03、Chapter05 | - |
 | 回归测试 | regression test | 防止已通过行为在后续修改中退化的自动化检查 | Chapter09 | - |
 | A/B 实验 | A/B experiment | 固定 workload 和环境，只改变一个目标因素的对照测量 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
+| 墙钟时间 | wall-clock time, elapsed time | 从入口到结果可用按真实时钟经过的时间，包含计算、同步、搬运、调度和等待 | Chapter09 | - |
 
 ## 参考框架与格式
 

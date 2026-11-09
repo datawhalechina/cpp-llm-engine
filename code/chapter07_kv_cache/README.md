@@ -53,6 +53,6 @@ bash code/chapter07_kv_cache/scripts/run_real_paged_kv.sh
 
 ## 扩展入口
 
-CUDA 路径已在 `code/cuda` 实现共享分页 payload、直接读取 BlockTable 的 GQA backend 和分页双请求 Decode batch。CPU/CUDA Factory 共用 Radix 匹配与淘汰算法，分别负责主机和设备 payload 的最后引用清理；ServiceCore 准入只估算，提升运行时才同步 `BlockTable`、Request Prefill 进度和真实模型 Context。Chapter08 已能按实际命中长度排序；跨线程锁和分层淘汰策略仍未实现。
+CUDA 路径已在 `code/cuda` 实现共享分页 payload、直接读取 BlockTable 的 GQA backend、多 Token 分页 Prefill 和分页双请求 Decode batch。CPU/CUDA Factory 共用 Radix 匹配与淘汰算法，分别负责主机和设备 payload 的最后引用清理；ServiceCore 准入只估算，提升运行时才同步 `BlockTable`、Request Prefill 进度和真实模型 Context。Chapter08 已能按实际命中长度排序；跨线程锁和分层淘汰策略仍未实现。
 
 当前连续与分页 payload 都保存浮点 K/V。K/V Cache 量化仍需增加每层或每块 scale metadata、低精度 payload、事务一致性检查、Attention 读取 backend 和长上下文误差测试；BlockTable 与引用计数接口应保持不变。

@@ -28,7 +28,7 @@ def linear_fused(packed_weight, input_vector):
 | 选择执行路径 | `QuantizedLinearPolicy` | 格式、backend 与硬件能力匹配 |
 | 返回统一结果 | `compute_quantized_linear()`、`compute_quantized_linear_batch()` | reference、单行与 batch 容差一致 |
 
-实现顺序为 `Scalar reference -> fused scalar -> SIMD fused -> CUDA dequantize + SGEMM baseline -> CUDA fused GEMV`。每增加一条路径，先与上一层做数值回归，再进入 benchmark；当前 batch 仍停留在反量化加 SGEMM 基线。
+实现顺序为 `Scalar reference -> fused scalar -> SIMD fused -> CUDA dequantize + SGEMM baseline -> CUDA fused GEMV -> CUDA batched fused GEMV`。每增加一条路径，先与上一层做数值回归，再进入 benchmark。
 
 ## CUDA 融合 GEMV 怎样访问内存和归约
 
@@ -40,22 +40,30 @@ y[r] = sum(W[r,k] * x[k]), k = 0 ... K-1
 
 基线路径先把整个 packed 权重矩阵写成 Float32 workspace，再由 cuBLAS 重新读取；融合路径让一个 CUDA block 负责一个输出行。线程从该行的 Q4_K/Q6_K block 读取量化值，在寄存器中完成解码和乘加，只把最终的 `y[r]` 写回显存。
 
+批量 Decode 的输入是 `[B,K]`。批量融合路径把最多 4 个输入行组成一个 tile，一个 block 负责同一输出行在该 tile 内的多个结果。同一线程解码一个 packed 权重后，连续更新各输入行的累加器；这样既省去完整 Float32 权重副本和后续 SGEMM，也避免在相邻请求之间重复读取和解码权重。这是面向小批量 Decode 的 batched GEMV，不是面向大批量训练负载的通用量化 GEMM。
+
 Q4_K 和 Q6_K 的一个 super-block 都表示 256 个权重。当前映射使用 256 个线程，每个线程负责 super-block 中一个固定列位置，并跨该行的多个 super-block 累加局部和。相邻线程读取相邻输入位置；packed 权重则按各格式的 nibble、high-bit 和 scale 布局解码。
 
-点积结束后，256 个局部和写入共享内存。树形归约每轮把后一半加到前一半，参与线程数依次从 128 缩小到 1；线程 0 最后写回 `output[r]`。warp shuffle 可以减少同步，但线程数、占用率和 Q4_K/Q6_K 解码成本会共同影响结果，必须通过真实 workload 决定是否替换。当前 128 线程候选没有改善 TinyLlama profile，因此代码保留 256 线程版本。
+点积结束后，每个 Warp 先用 shuffle 合并 32 个局部和，8 个 Warp 只把各自结果写入共享内存；首个 Warp 再完成最终归约并写回。线程数仍为 256，但不再执行 8 轮整块共享内存树形归约。当前 128 线程候选没有改善 TinyLlama profile，因此只替换归约方法，不缩小线程块。
+
+批量输入按最多 4 行组成一个 tile。同一线程解码一个权重后，分别与 tile 中各行对应的激活相乘，随后对每行独立做 Warp 归约。这样 batch=2 时同一 packed 权重只读取和解码一次；代价是每个线程持有多个累加器，因此 tile 继续增大前需要用 Nsight Compute 检查寄存器压力和占用率。
+
+EXP-GPU-08 后的 NCU 基线显示：Q4_K kernel 的 Compute/L1 吞吐约为 `72.1%/76.5%`，DRAM 吞吐仅 `4.7%`，40 个寄存器/线程，实际 occupancy 约 `90.9%`。Warp 平均约 `32.8%` 的指令间周期在等待 L1TEX scoreboard。元数据广播、shared payload 和显式 FMA 三个候选分别回退约 `10.1%`、`1.6%` 和 `4.3%` cycles，均未保留。EXP-GPU-12 用 CUDA 原生 half 指令替换手写 FP16 位解码后，cycles 从 `140,093` 降至 `99,725`，约减少 `28.8%`；瓶颈随之转移到 L1/TEX，下一轮才适合继续研究 payload 布局。
 
 | 阶段 | 数据位置 | 发生的动作 | 避免的成本 |
 | --- | --- | --- | --- |
 | 读取 | device packed 权重、Float32 输入 | 线程定位量化 block 和固定列位置 | 不生成完整 Float32 权重矩阵 |
 | 局部乘加 | 线程寄存器 | 跨多个 super-block 解码并累加 | 不把中间权重写回显存 |
-| block 归约 | 共享内存 | 256 个局部和按 128、64、…、1 合并 | 只保存一行的部分和 |
-| 写回 | `output[r]` | 每个输出行只写一个 Float32 结果 | 避免额外矩阵读取 |
+| Warp 与 block 归约 | shuffle + 8 个共享部分和 | Warp 内归约后由首个 Warp 合并 | 减少整块同步和共享内存流量 |
+| 写回 | `output[b,r]` | 每个 block 写回 tile 内各请求的 Float32 结果 | 避免额外矩阵读取 |
+
+EXP-GPU-08 在两个不同长度请求、一次分页 Decode 上复测该设计。两轮 `batch/sequential` 中位数比例为 `0.466/0.612`，逐请求 logits 完全一致；Nsight Systems 中 Q4_K/Q6_K kernel 仍占 GPU kernel 时间约 `96.5%`。结果支持保留 4 行 tile 和 Warp 归约，也说明后续仍需继续减少量化解码与权重读取成本。
 
 ![CUDA 融合量化 GEMV 的内存访问与块归约](../assets/diagrams/chapter05-cuda-fused-gemv.svg)
 
 ## 计算后端策略与统一接口
 
-`Q4KLinearAvx2` 和 `Q6KLinearAvx2` 在读取 block 时直接用 AVX2/FMA 累加。CUDA 由 `CudaQuantizedMatrix` 保存 packed payload；单 token 使用融合 Q4_K/Q6_K GEMV，batch 先解码到复用 workspace 再调用 cuBLAS SGEMM。Q8_0 当前只有 portable scalar fused；请求不存在的 AVX2 实现会返回明确 `Status`，不会静默回退。
+`Q4KLinearAvx2` 和 `Q6KLinearAvx2` 在读取 block 时直接用 AVX2/FMA 累加。CUDA 由 `CudaQuantizedMatrix` 保存 packed payload；单 token 和小批量 Decode 都直接读取 Q4_K/Q6_K block，完整反量化加 cuBLAS 保留为数值与性能对照。Q8_0 当前只有 portable scalar fused；请求不存在的 AVX2 实现会返回明确 `Status`，不会静默回退。
 
 ```cpp
 chapter05_quantization::QuantizedLinearPolicy policy{
@@ -74,6 +82,7 @@ auto status = chapter05_quantization::compute_quantized_linear(
 | AVX2/FMA fused | 无 | 分组解码并向量乘加 | 显式 CPU 性能实验 |
 | CUDA batch baseline | Float32 workspace | CUDA 解码后调用 cuBLAS SGEMM | batch correctness 与后续融合基线 |
 | CUDA fused GEMV | 无完整浮点权重副本 | 解码、点积与行归约在同一 kernel | 单 token Decode 与真实生成优化 |
+| CUDA batched fused GEMV | 无完整浮点权重副本 | 一个二维网格计算 `[B,N]` | 小批量多请求 Decode |
 
 真实 Decoder 按 Attention、FFN 和 LM Head 分别保存 policy。Q4_K gate/up、Q6_K down、Q4_K QKV/out 复用同一 dispatcher，只改变对应作用域的策略。生产框架怎样把 quant method、硬件和 kernel 绑定，见 [`05.7 量化实现与成熟框架对照`](./07_tensorrt_gemma_vllm_comparison.md)。
 

@@ -14,6 +14,12 @@
 
 Factory 的名称表示它负责按统一规则创建和装配 Executor，而不是执行调度。Context 在这里特指请求运行状态对象，不等同于模型的上下文窗口容量。
 
+## 启动参数与内部配置
+
+可执行程序负责把命令行和环境默认值转换为类型化配置，Engine 内部不解析 `argv`。统一数据流为 `CLI -> Options/枚举 -> Factory -> Executor/Context -> Backend`。构建期开关继续由 CMake 管理，请求级生成参数进入 `GenerationConfig`，benchmark 的 batch 和迭代次数只属于 workload。
+
+实现选择应满足三项条件：候选仍受维护、已通过正确性门禁、存在清晰的类型化枚举。未知值必须在加载模型前失败，程序应打印最终生效配置。实验编号、结果目录和优化名称只用于登记证据，不得隐式切换实现。
+
 ## 资产总览
 
 | 资产 | 作用 |
@@ -73,9 +79,11 @@ bash code/engine/scripts/run_real_cuda_serving.sh
 
 当前 CUDA 执行器工厂已实现 Chapter08 `ExecutorBatchRunner`。Decode batch 把多个请求上下文的 hidden 打包为批量 Tensor，共享 RMSNorm、QKV/输出投影、FFN 和 LM Head；RoPE 使用每请求位置，Attention 根据 Context 访问连续 K/V 或各自页表映射的分页 payload。整批失败会恢复所有 Context，错误 position、请求绑定或未预留槽位在执行前拒绝。
 
-连续 CUDA Executor 的完整 prompt 使用 `RealLlamaCudaContext::prefill_tokens()`，在请求级持久 Prefill workspace 中执行批量 embedding、多层 Tensor Prefill 和最终 logits；后续生成仍逐 token Decode。绑定分页数据面的请求暂时保留逐 token Prefill，因为分页多-query Attention 尚未实现。
+连续和分页 CUDA Executor 的完整 prompt 都使用 `RealLlamaCudaContext::prefill_tokens()`，在请求级持久 Prefill workspace 中执行批量 embedding、多层 Tensor Prefill 和最终 logits；后续生成仍逐 token Decode。分页路径先按 BlockTable 预留整个 chunk，逐层写入共享设备 payload，并用多 Query 因果 Attention 直接读取离散物理块；完整 chunk 成功后才提交位置，失败则裁剪回调用前状态。
 
 `RealLlamaCudaExecutorFactory::set_attention_mode()` 可在创建请求执行器前选择三阶段或融合在线 Attention。默认值保持三阶段；Chapter09 的 EXP-GPU-04 表明融合实现已通过端到端正确性，但两轮真实 Prefill/Decode 中位数没有稳定收益，因此该开关用于教学 A/B 和继续调优，不代表生产默认策略。
+
+Chapter09 的真实 Attention 入口将命令行 `--attention-path three-stage|fused-online` 转换为 `CudaAttentionMode`；`compare` 会在同一进程中依次运行两条路径并执行 logits/greedy token 正确性闸门。该入口是当前 CLI 到类型化策略的示例，后续服务参数沿用同一边界，不让字符串进入 Model 或 kernel。
 
 执行器工厂按精确 batch size 缓存 `RealLlamaCudaBatchWorkspace`，复用 stream、cuBLAS handle、embedding rows、批量 hidden/logits 和 Decoder 中间 Tensor。同一工厂的批量调用由互斥锁串行保护；请求级位置和页表仍归各模型执行上下文所有，不进入 workspace。真实 Runtime 与 Service 测试覆盖双请求分页 batch、预留/提交分离、失败不推进和终态释放。融合 PagedAttention、跨 batch size 容量复用、并发 batch 和真实 socket server 尚未接入。
 

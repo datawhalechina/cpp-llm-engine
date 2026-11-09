@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
   <title id="title">CUDA 融合量化 GEMV 的内存访问与块归约</title>
-  <desc id="desc">一个 CUDA block 处理一个输出行。256 个线程分别读取量化权重和输入元素，在寄存器中跨 super-block 乘加，再通过共享内存树形归约。</desc>
+  <desc id="desc">一个 CUDA block 处理同一输出行的最多四个批次结果。线程只解码一次量化权重，在寄存器中更新多行累加器，再用 Warp shuffle 和少量共享内存完成归约。</desc>
   <defs>
     <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#28536b"/></marker>
     <style>
@@ -8,41 +8,41 @@
     </style>
   </defs>
   <rect width="1200" height="650" rx="22" fill="#f7fafc"/>
-  <text x="600" y="45" text-anchor="middle" class="title">一个输出行：读取 packed 权重 → 局部乘加 → 块内归约</text>
+  <text x="600" y="45" text-anchor="middle" class="title">一个输出行：一次解码权重 → 更新多个请求 → Warp 归约</text>
 
   <rect x="55" y="88" width="300" height="150" rx="16" fill="#fff0dc" stroke="#e8a765"/>
   <text x="205" y="120" text-anchor="middle" class="label">Device 全局内存</text>
   <text x="80" y="153" class="text">权重行 W[r,:]：Q4_K / Q6_K</text>
-  <text x="80" y="181" class="text">输入向量 x[0:K]：Float32</text>
+  <text x="80" y="181" class="text">最多 4 行输入 x[b,0:K]：Float32</text>
   <text x="80" y="213" class="small">按 256 权重 super-block 顺序读取</text>
 
   <rect x="445" y="78" width="310" height="170" rx="16" fill="#e8f1f7" stroke="#79a4ba"/>
-  <text x="600" y="110" text-anchor="middle" class="label">CUDA block r：256 个线程</text>
+  <text x="600" y="110" text-anchor="middle" class="label">CUDA block (r, batch tile)</text>
   <text x="470" y="143" class="text">线程 t → super-block 内位置 t</text>
   <text x="470" y="171" class="text">跨多个 super-block 保持同一局部位置</text>
-  <text x="470" y="204" class="small">解码后立即乘 x[k]，累加到寄存器</text>
+  <text x="470" y="204" class="small">原生 half 转换后分别乘各行 x[b,k]</text>
   <text x="470" y="228" class="small">不创建 Float32 权重 workspace</text>
 
   <rect x="845" y="88" width="300" height="150" rx="16" fill="#ecfdf5" stroke="#6db5a9"/>
   <text x="995" y="120" text-anchor="middle" class="label">线程局部和</text>
-  <text x="995" y="157" text-anchor="middle" class="text">sum[t] += decode(W) × x</text>
-  <text x="995" y="190" text-anchor="middle" class="small">局部结果保存在寄存器</text>
+  <text x="995" y="157" text-anchor="middle" class="text">sum[b] += decode(W) × x[b,k]</text>
+  <text x="995" y="190" text-anchor="middle" class="small">每个线程持有最多 4 个累加器</text>
   <path d="M355 163H438" class="line"/><path d="M755 163H838" class="line"/>
 
   <rect x="100" y="315" width="420" height="125" rx="16" fill="#e7f6f3" stroke="#79b8b1"/>
-  <text x="310" y="348" text-anchor="middle" class="label">共享内存保存局部和</text>
-  <text x="310" y="382" text-anchor="middle" class="text">partial[t] = sum[t]</text>
-  <text x="310" y="412" text-anchor="middle" class="small">256 个线程各写一个部分和</text>
+  <text x="310" y="348" text-anchor="middle" class="label">Warp 内 shuffle 归约</text>
+  <text x="310" y="382" text-anchor="middle" class="text">32 个 lane 合并为一个 Warp 部分和</text>
+  <text x="310" y="412" text-anchor="middle" class="small">每个 batch 行分别归约</text>
 
   <rect x="680" y="315" width="420" height="125" rx="16" fill="#fef3c7" stroke="#d4a72c"/>
-  <text x="890" y="348" text-anchor="middle" class="label">树形 block 归约</text>
-  <text x="890" y="382" text-anchor="middle" class="text">offset：128 → 64 → … → 1</text>
-  <text x="890" y="412" text-anchor="middle" class="small">线程 0 得到该输出行 y[r]</text>
+  <text x="890" y="348" text-anchor="middle" class="label">首个 Warp 合并 8 个部分和</text>
+  <text x="890" y="382" text-anchor="middle" class="text">共享内存只保存 4 × 8 个 Float32</text>
+  <text x="890" y="412" text-anchor="middle" class="small">得到各批次输出 y[b,r]</text>
   <path d="M995 238V278H310V308" class="line"/>
   <path d="M520 378H673" class="line"/>
 
   <rect x="390" y="505" width="420" height="92" rx="16" fill="#ffffff" stroke="#28536b" stroke-width="2"/>
-  <text x="600" y="540" text-anchor="middle" class="label">Device 输出：output[r]</text>
-  <text x="600" y="570" text-anchor="middle" class="text">一个 block 只写回一个 Float32 行结果</text>
+  <text x="600" y="540" text-anchor="middle" class="label">Device 输出：output[b,r]</text>
+  <text x="600" y="570" text-anchor="middle" class="text">一个 block 写回最多 4 个批次结果</text>
   <path d="M890 440V478H600V498" class="line"/>
 </svg>

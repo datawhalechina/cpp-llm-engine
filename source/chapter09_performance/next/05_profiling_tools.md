@@ -20,6 +20,45 @@ CPU 计时通常在函数返回后完成；CUDA Kernel launch 是异步的，只
 | 请求端到端 | Host 请求入口到结果可用 |
 | 服务体验 | 网络入口到首词元、相邻词元和完成 |
 
+## 先用 nsys 找热点，再用 ncu 解释热点
+
+Nsight Systems（`nsys`）观察系统时间线：CPU 线程、CUDA API、Kernel、内存复制和同步怎样交错。它适合回答“时间主要落在哪个 Kernel”“调用了多少次”“CPU 是否在等待 GPU”，不能解释单个 Kernel 内部为什么带宽低或 Warp 停顿。
+
+Nsight Compute（`ncu`）会重放选中的 CUDA Kernel 并采集硬件计数器。它适合回答“显存带宽是否接近上限”“L2 命中率如何”“活跃 Warp 和占用率是否受寄存器或共享内存限制”。采集开销较大，也会改变程序时间，因此 `ncu` 输出用于解释 Kernel，不用于报告端到端延迟。
+
+| 工具 | 先看什么 | 典型产物 | 不用于证明什么 |
+| --- | --- | --- | --- |
+| `nsys` | Kernel 总时间、实例数、CUDA API 和同步 | `.nsys-rep`、Kernel 汇总 CSV | 某个 Kernel 的硬件瓶颈已经确定 |
+| `ncu` | DRAM 吞吐、L2 命中、占用率、Warp stall | `.ncu-rep`、单 Kernel 指标 | 请求端到端一定变快 |
+
+本教程先运行已固定 workload 的脚本，避免手工命令遗漏模型和正确性闸门：
+
+```bash
+CHAPTER09_CUDA_PAGED_ATTENTION_PROFILE=1 \
+bash code/chapter09_performance/scripts/run_cuda_paged_attention_ab.sh
+```
+
+脚本使用 `nsys profile` 生成临时报告，再用 `nsys stats --report cuda_gpu_kern_sum` 导出 Kernel 总时间、实例数和分布。结果先判断热点是否值得继续；EXP-GPU-07 中量化 GEMV 占约 `99.2%`，采用批次权重复用和 Warp 归约后的 EXP-GPU-08 仍占约 `96.5%`。因此分页 Attention 即使局部加速，也不是当前端到端首要瓶颈。
+
+确定单个 Kernel 是热点后，再对最小可执行 workload 使用 `ncu`。下面的命令只展示调用结构；Kernel 名称和可用指标会随 CUDA、GPU 架构与 Nsight Compute 版本变化，运行前先用 `ncu --query-metrics` 核对本机支持项。
+
+```bash
+ncu --set basic \
+  --kernel-name regex:quantized_gemv_kernel \
+  --launch-count 1 \
+  <benchmark-executable> <model.gguf>
+```
+
+若出现 `ERR_NVGPUCTRPERM`，表示当前用户没有读取 NVIDIA GPU 性能计数器的权限。此时仍可使用 `nsys` 判断 kernel 时间占比，但 L2/DRAM 吞吐、占用率和 Warp stall 需要管理员开放 profiling counters 后再采集；不要用缺失的计数器推断具体硬件原因。
+
+EXP-GPU-09～12 展示了 NCU 指标怎样改变优化方向。元数据广播和 shared payload 看似减少全局读取，却增加了 shuffle 或 barrier，最终 cycles 回退；原生 half 转换直接删除手写规格化分支，使 Q4_K kernel cycles 下降约 `28.8%`。判断时同时读取 `Elapsed Cycles` 与 `SM Frequency`，避免把动态时钟变化误判为代码收益。
+
+分析完成后必须回到相同 workload 的端到端 A/B：`nsys` 决定热点优先级，`ncu` 解释硬件原因，墙钟样本和正确性闸门决定实现是否保留。
+
+## 记录 GPU 运行状态
+
+消费级 GPU 会随电源模式、温度和其他进程改变时钟。实验至少记录 GPU 名称、驱动、CUDA Toolkit、图形/显存时钟、功耗、温度和利用率；采集前后状态差异明显时，不把两轮墙钟结果直接归因于代码变化。`nvidia-smi` 快照只能描述采样时刻，严格实验还需要固定电源环境并持续采样。
+
 ## 验证阶段计时入口
 
 有 TinyLlama GGUF 时，运行：

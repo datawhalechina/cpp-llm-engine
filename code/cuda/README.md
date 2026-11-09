@@ -25,6 +25,7 @@
 | `quantized_dequantize_backend.h/.cu` | Q4_K/Q6_K 到 Float32 workspace 的 CUDA 解码 |
 | `quantized_gemv_backend.h/.cu` | 单 token Q4_K/Q6_K 解码、点积与行归约融合 |
 | `cuda_quantized_linear_test.cu` | CPU reference、融合 GEMV、批量回退、错误路径和固定 workload 计时 |
+| `quantized_gemv_matrix.cu` | Q4_K/Q6_K 的 batch=1/2/4/8 专项矩阵与逐行正确性对照 |
 | `core/rope_contract.h` | 固定原地 RoPE 的连续布局、旋转维度、位置和频率参数 |
 | `rope_backend.h/.cu` | 每线程处理一个相邻分量对的 CUDA RoPE backend |
 | `cuda_rope_test.cu` | 多 token/head CPU golden、局部旋转、错误参数和 event 计时 |
@@ -85,9 +86,15 @@
 
 ## Quantized Linear
 
-`CudaQuantizedMatrix` 保存 packed Q4_K/Q6_K 权重。单 token 的 `quantized_linear()` 由一个 CUDA block 负责一个输出行，在同一 kernel 内解码、乘加和归约，不创建完整 Float32 权重矩阵。`quantized_linear_batch()` 接收 `[B,K]` 输入和 `[N,K]` 权重，仍一次反量化后用一次带转置视角的 SGEMM 生成 `[B,N]`；这一回退为后续批量融合提供正确性基线。
+`CudaQuantizedMatrix` 保存 packed Q4_K/Q6_K 权重。单 token 的 `quantized_linear()` 由一个 CUDA block 负责一个输出行，在同一 kernel 内解码、乘加和归约，不创建完整 Float32 权重矩阵。Warp 内使用 shuffle，8 个 Warp 的部分和再由首个 Warp 合并。`quantized_linear_batch()` 接收 `[B,K]` 输入和 `[N,K]` 权重，把最多 4 个输入行组成一个 tile；同一线程解码一次权重后更新多行累加器，直接生成 `[B,N]`。该路径面向教学中的小批量 Decode，更大的 tile 需要继续核对寄存器压力和占用率。
+
+NCU 基线显示 Q4_K kernel 的 L1TEX 等待明显，而 DRAM 吞吐和 occupancy 不是首要限制。EXP-GPU-09 的 Warp 元数据广播、EXP-GPU-10 的 shared payload 和 EXP-GPU-11 的显式 FMA 分别回退约 `10.1%`、`1.6%` 和 `4.3%` cycles，代码不保留这些候选。EXP-GPU-12 使用 `__ushort_as_half` 与 `__half2float` 替换手写 FP16 位解码，cycles 约减少 `28.8%`，真实双请求 logits 保持一致；当前代码保留原生 half 转换，后续优化重新聚焦 L1/TEX payload 访问。
 
 固定 workload 使用 `rows=256`、`cols=256`、warmup 1 次和测量 10 次。计时在权重与输入上传后开始，包含融合 kernel、主机提交以及末尾同步，不包含 H2D/D2H。RTX 5070 Ti Laptop / CUDA 12.8 上，本次 Q4_K 与 Q6_K 主机均值约为 `0.0041 ms` 和 `0.0044 ms`；真实 TinyLlama 优化前后证据登记为 EXP-GPU-02/03。
+
+EXP-GPU-06 记录初版批量融合路径：真实双请求分页 Decode 的两轮 Tensor Batch/顺序执行中位数比例为 `0.922/0.919`。EXP-GPU-08 将批次改为最多 4 行共享一次权重解码，并使用 Warp 归约；两轮比例为 `0.466/0.612`。EXP-GPU-12 再把手写 FP16 解码替换为 CUDA 原生 half 转换，顺序 Decode 降至 `35.12/30.54 ms`，Tensor Batch 降至 `19.80/17.02 ms`，logits 保持一致。这些结果支持当前小批量融合路径，不代表大 batch 量化 GEMM 已完成。
+
+批次扩展使用独立矩阵入口：`bash code/chapter09_performance/scripts/run_cuda_quantized_gemv_matrix.sh`。可执行程序默认测量 `batch=1/2/4/8`，也可用 `--batch N --format q4|q6 --iterations N` 缩小 workload。EXP-GPU-13 中 batch 1→4 的 Q4_K/Q6_K 时间基本不变，batch=8 约翻倍，符合固定 `tile=4` 会启动两个 y 方向 block 的设计。参数只选择实验输入，不切换 kernel 实现；CUDA GEMV 当前只有通过门禁的默认路径，失败候选保留为实验资产而不进入运行时枚举。
 
 ## RoPE Kernel
 
@@ -113,7 +120,9 @@ RoPE 请求使用连续 `[tokens, heads, head_dim]` 布局，在原 Tensor 上�
 
 `CudaExecutionContext` 通过 `CudaAttentionPath` 显式选择三阶段或融合路径，默认仍为三阶段。真实 TinyLlama 2 层与 22 层双步对照均通过；22 层 hidden 和 logits 最大差异分别为 `7.63e-06` 和 `9.18e-06`，greedy token 保持 `3561`。这项双步对照固定真实单-query Decode 数值，再由后续 Tensor Prefill 和端到端实验补齐多-query 证据。
 
-随后增加的 `prefill_sequence()` 复用 `[T,D]` 批量算子，并让融合 Attention 一次处理多个 query；TinyLlama 22 层、2-token embedding Prefill 与逐 token 顺序执行的最大误差为 `3.05e-05`。`RealLlamaCudaContext::prefill_tokens()` 再接入批量 embedding、最终 logits 和按 shape 复用的持久 workspace，22 层 logits 最大误差为 `1.19e-05`。连续 CUDA Executor 已改用 Tensor Prefill，真实 Runtime 保持 golden token `3561 12053`；分页 Prefill 仍逐 token。
+CUDA 库只接收 `CudaAttentionPath` 等类型化策略，不读取命令行或环境变量。进程入口负责把 `--attention-path three-stage|fused-online` 转成枚举，再经 Engine Factory 写入请求 Context。CMake 选项决定 CUDA 代码是否参与构建，运行期参数选择已编译实现，benchmark 的 `--batch` 等参数只改变 workload；三者不能互相替代。
+
+随后增加的 `prefill_sequence()` 复用 `[T,D]` 批量算子，并让融合 Attention 一次处理多个 query；TinyLlama 22 层、2-token embedding Prefill 与逐 token 顺序执行的最大误差为 `3.05e-05`。`RealLlamaCudaContext::prefill_tokens()` 再接入批量 embedding、最终 logits 和按 shape 复用的持久 workspace，22 层 logits 最大误差为 `1.19e-05`。连续与分页 CUDA Executor 都使用 Tensor Prefill，真实 Runtime 保持 golden token `3561 12053`。
 
 EXP-GPU-04 进一步比较 32-token Tensor Prefill 和一次 Decode。两轮端到端中位数一轮回退、一轮改善，未形成稳定收益，因而不切换默认路径。融合实现仍有教学价值：它让学习者直接比较完整 score workspace 与在线状态 `(m,l,o)` 的内存行为，也为后续 Nsight 定位和 kernel 调优保留真实入口。
 
@@ -121,7 +130,11 @@ EXP-GPU-04 进一步比较 32-token Tensor Prefill 和一次 Decode。两轮端�
 
 `CudaPagedKvCache` 只拥有 `[layer, physical_block, slot, kv_head, head_dim]` 的共享设备 payload；请求 ID、逻辑块顺序和提交状态仍由 Chapter07 `KvBlockPool` 管理。写入接口接收 BlockTable 定位出的物理 block/slot，释放前可按物理块清零。
 
-`paged_gqa_attention()` 把请求的物理块列表上传到可复用 workspace。score 和 value kernel 将逻辑 token 拆为 `logical_block + slot`，经页表取得 physical block 后直接读取 payload，不先拼回连续 K/V。真实 GPU 测试构造 `{1, 0, 3}` 的非连续映射，对照双层 CPU GQA，并覆盖越界和清块。`RealLlamaCudaContext` 已接入 reserve、逐层写入、commit、trim 和 release；真实双请求 Decode batch 进一步验证不同页表共享批量 Linear，并由 Chapter08 统一提交或回滚。
+`paged_gqa_attention()` 把请求的物理块列表上传到可复用 workspace。三阶段 score/value kernel 将逻辑 token 拆为 `logical_block + slot`，经页表取得 physical block 后直接读取 payload，不先拼回连续 K/V。分页融合候选在同一个在线 Softmax kernel 中完成页表定位、QK、状态合并和 Value 累加，不申请完整 score workspace；默认路径是否切换仍由真实 A/B 决定。`prefill_sequence_paged()` 先批量计算一个 chunk 的 Q/K/V，把 K/V 逐行写入页表槽位，再以 chunk 起点作为 `query_position_offset` 执行多 Query 因果 Attention。真实 GPU 测试构造非连续映射，让 chunk 跨过块边界，并与逐词元 Decoder 和 CPU GQA 对照。
+
+EXP-GPU-07 的两轮真实 A/B 中，分页融合 Prefill/Decode 的中位数方向相反，未通过默认路径门禁。Nsight 汇总显示融合 Attention kernel 合计时间约比三阶段少 `32.3%`，但量化 GEMV 占 GPU kernel 时间约 `99.2%`；代码因此保留 `FusedOnline` 显式入口，Runtime 默认继续使用三阶段实现，下一轮优化回到量化 Linear。
+
+`RealLlamaCudaContext` 对分页 Prefill 先预留完整 chunk，所有层成功后才提交 Context 位置和 BlockTable 词元数；失败时恢复 hidden 并裁剪到 chunk 起点。真实双请求 Decode batch 继续验证不同页表共享批量 Linear，并由 Chapter08 统一提交或回滚。
 
 Engine 的 CUDA Factory 用 `PrefixBlockStore` 把同一 `RadixPrefixCache` 算法接到 `KvBlockPool` 和设备 payload。源请求释放时，索引持有的块不会被清空；只有最后一个引用将要释放时，Factory 才在专用 stream 上清理设备块。`RealLlamaCudaContext` 命中后同步推进 position，Executor 通过继续 Prefill 只计算私有后缀。真实 Runtime 测试将该路径与完整冷启动的首个生成词元对照。
 
@@ -129,7 +142,7 @@ Engine 的 CUDA Factory 用 `PrefixBlockStore` 把同一 `RadixPrefixCache` 算�
 
 Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续复用 Vector Add。单向量 RMSNorm 用一个 block 分段归约；批量 RMSNorm 用一行一个 block 处理 `[B,D]`，共享同一 `[D]` 权重。SwiGLU 与 Residual 本身按总元素数执行，可直接处理连续批量 Tensor。测试覆盖非整除宽度 257、TinyLlama hidden size 2048 和多行 CPU golden，这些算子已由下一节的 `CudaDecoderLayer` 组装成合成单层 Decoder。
 
-`CudaExecutionContext::pack_rows()` 与 `unpack_rows()` 在设备内把多个请求的 `[D]` Tensor 和 `[B,D]` 批量 Tensor 相互转换。接口先完成全部 shape 检查再排入 D2D copy；调用方必须先保证各请求 stream 的源数据已经完成。它为共享 RMSNorm/Linear 提供数据交接，不负责请求调度、K/V 所有权或失败回滚。
+`CudaExecutionContext::pack_rows()` 与 `unpack_rows()` 在设备内把多个请求的 `[D]` Tensor 和 `[B,D]` 批量 Tensor 相互转换。接口先完成全部 shape 检查再排入 D2D copy；调用方必须先保证各请求 stream 的源数据已经完成。它为共享 RMSNorm/Linear 提供数据交接，不负责请求调度、K/V 所有权或失败回滚。模型创建 Batch Workspace 时按最大上下文预留三阶段 Attention score 和页表临时空间，避免 Decode 位置增长触发逐步扩容。
 
 ## 合成单层 Decoder
 
@@ -137,7 +150,7 @@ Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续�
 
 首个测试使用 `D=8、Hq/Hkv=4/2、Dh=2、FFN=12` 的可读合成权重，逐项检查 Attention Norm、GQA context、FFN Norm、SwiGLU 和最终 hidden。它固定整层执行顺序和请求状态语义。
 
-真实权重接入使用 `CudaLinearWeight` 隔离格式差异：Float32 权重按 `[input, output]` Tensor 解释，Q4_K/Q6_K 按 `rows=output、cols=input` 的 packed Matrix 解释。量化 Linear 依据连续输入/输出的元素数校验 shape，因此 Q/K/V 可以直接写入 rank-3 Tensor；单 token 融合路径不创建反量化矩阵，批量回退的 workspace 只在计算期间复用。
+真实权重接入使用 `CudaLinearWeight` 隔离格式差异：Float32 权重按 `[input, output]` Tensor 解释，Q4_K/Q6_K 按 `rows=output、cols=input` 的 packed Matrix 解释。量化 Linear 依据连续输入/输出的元素数校验 shape，因此 Q/K/V 可以直接写入 rank-3 Tensor；单 token 与批量融合路径都不创建完整反量化矩阵。
 
 ## 真实层权重上传
 

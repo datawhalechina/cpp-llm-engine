@@ -32,6 +32,17 @@ Chapter07 命中共享 K/V 前缀时，`adopt_prefilled_prefix()` 会把同一�
 | `decode(token)` | 上一步已生成词元 | 下一组 logits | 追加该词元对应的模型 K/V |
 | `execution_state()` | 无 | 已提交词元数和 K/V 层数 | 只读观察，不推进模型 |
 
+可执行程序可以从命令行读取模型路径、后端或实现名称，但字符串解析到此为止。入口把参数转换成 `GenerationConfig`、后端枚举或 Factory 配置，Runtime 和算子只接收类型化对象。这样既能在不改源码的情况下切换实验路径，也能让非法值在模型加载前直接失败。
+
+| 配置层级 | 示例 | 生效时机 |
+| --- | --- | --- |
+| 构建选项 | `CPP_LLM_ENGINE_ENABLE_CUDA` | CMake 配置时决定是否编译 CUDA |
+| 进程实现 | `--attention-path fused-online` | 启动时转换为枚举，交给 Factory/Context |
+| 请求配置 | `max_new_tokens`、`eos_token_id` | 每个请求进入 Runtime 时 |
+| 实验负载 | `--batch 4`、`--iterations 50` | 只改变 benchmark 输入和采样方式 |
+
+命令行不是新的运行时层。它只是进程入口：`argv -> 类型化配置 -> Factory/Runtime -> Backend`。脚本中的实验编号和结果目录只负责记录证据，不能改变 kernel 实现。
+
 请求归 Generation Core 管理可观察状态；执行器持有真实模型 Context。`history()` 保存词元 ID，用于观察请求推进；真实模型的分层 K/V 由执行器持有，物理 Block 分配在 Chapter07 引入。
 
 ## Factory 为什么叫“工厂”
