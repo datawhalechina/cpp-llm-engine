@@ -94,6 +94,15 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
         add_executable(real_tinyllama_cuda_attention_benchmark
             examples/real_tinyllama_cuda_attention_benchmark.cpp
         )
+        add_executable(real_tinyllama_cuda_paged_prefill_benchmark
+            examples/real_tinyllama_cuda_paged_prefill_benchmark.cpp
+        )
+        add_executable(real_tinyllama_cuda_batch_benchmark
+            examples/real_tinyllama_cuda_batch_benchmark.cpp
+        )
+        add_executable(real_tinyllama_cuda_paged_attention_benchmark
+            examples/real_tinyllama_cuda_paged_attention_benchmark.cpp
+        )
         target_link_libraries(real_tinyllama_cuda_first_layer_test
             PRIVATE cpp_llm_engine_model_cuda chapter05_quantization)
         target_link_libraries(real_tinyllama_cuda_multilayer_test
@@ -101,6 +110,12 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
         target_link_libraries(real_tinyllama_cuda_runtime_test
             PRIVATE cpp_llm_engine_cuda_runtime)
         target_link_libraries(real_tinyllama_cuda_attention_benchmark
+            PRIVATE cpp_llm_engine_cuda_runtime)
+        target_link_libraries(real_tinyllama_cuda_paged_prefill_benchmark
+            PRIVATE cpp_llm_engine_cuda_runtime)
+        target_link_libraries(real_tinyllama_cuda_batch_benchmark
+            PRIVATE cpp_llm_engine_cuda_runtime)
+        target_link_libraries(real_tinyllama_cuda_paged_attention_benchmark
             PRIVATE cpp_llm_engine_cuda_runtime)
         cpp_llm_prepare_test(real_tinyllama_cuda_first_layer_test)
         cpp_llm_prepare_test(real_tinyllama_cuda_multilayer_test)

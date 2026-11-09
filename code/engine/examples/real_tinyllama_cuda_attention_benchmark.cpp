@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -25,6 +26,42 @@ struct Result final {
     chapter06_generation::Logits prefill_logits;
     chapter06_generation::Logits decode_logits;
 };
+
+enum class AttentionSelection {
+    Compare,
+    ThreeStage,
+    FusedOnline,
+};
+
+struct Options final {
+    std::string model_path;
+    AttentionSelection attention = AttentionSelection::Compare;
+};
+
+void print_usage() {
+    std::cerr << "usage: real_tinyllama_cuda_attention_benchmark <model.gguf> "
+                 "[--attention-path compare|three-stage|fused-online]\n";
+}
+
+bool parse_options(int argc, char** argv, Options* options) {
+    if (options == nullptr || argc < 2) return false;
+    options->model_path = argv[1];
+    for (int index = 2; index < argc; ++index) {
+        const std::string_view argument = argv[index];
+        if (argument != "--attention-path" || index + 1 >= argc) return false;
+        const std::string_view value = argv[++index];
+        if (value == "compare") {
+            options->attention = AttentionSelection::Compare;
+        } else if (value == "three-stage") {
+            options->attention = AttentionSelection::ThreeStage;
+        } else if (value == "fused-online") {
+            options->attention = AttentionSelection::FusedOnline;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
 
 double median(std::vector<double> values) {
     std::sort(values.begin(), values.end());
@@ -76,6 +113,21 @@ void print_samples(const char* name, const std::vector<double>& samples) {
     std::cout << '\n';
 }
 
+void print_single_result(
+    const char* path,
+    const Result& result,
+    const chapter06_generation::GreedySampler& sampler) {
+    std::cout << "attention_path: " << path << '\n'
+              << "prompt_tokens: 32\n"
+              << "warmup: 2\niterations: 15\nstatistic: median\n"
+              << "prefill_median_ms: " << result.prefill_ms << '\n'
+              << "decode_median_ms: " << result.decode_ms << '\n'
+              << "prefill_greedy_token: " << sampler.sample(result.prefill_logits) << '\n'
+              << "decode_greedy_token: " << sampler.sample(result.decode_logits) << '\n';
+    print_samples("prefill_samples_ms", result.prefill_samples);
+    print_samples("decode_samples_ms", result.decode_samples);
+}
+
 float max_error(
     const chapter06_generation::Logits& actual,
     const chapter06_generation::Logits& expected) {
@@ -90,13 +142,18 @@ float max_error(
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::cerr << "usage: real_tinyllama_cuda_attention_benchmark <model.gguf>\n";
+    if (argc == 2 && std::string_view(argv[1]) == "--help") {
+        print_usage();
+        return 0;
+    }
+    Options options;
+    if (!parse_options(argc, argv, &options)) {
+        print_usage();
         return 2;
     }
     std::string error;
     auto factory = cpp_llm_engine::RealLlamaCudaExecutorFactory::load(
-        argv[1], 64, &error);
+        options.model_path, 64, &error);
     if (factory == nullptr) {
         std::cerr << error << '\n';
         return 1;
@@ -104,6 +161,22 @@ int main(int argc, char** argv) {
     chapter06_generation::TokenSequence prompt(32);
     for (std::size_t index = 0; index < prompt.size(); ++index) {
         prompt[index] = index % 2 == 0 ? 1 : 15043;
+    }
+    chapter06_generation::GreedySampler sampler;
+    if (options.attention != AttentionSelection::Compare) {
+        Result selected;
+        const bool use_fused = options.attention == AttentionSelection::FusedOnline;
+        if (!run_mode(
+                factory.get(),
+                use_fused ? cpp_llm_engine::CudaAttentionMode::FusedOnline
+                          : cpp_llm_engine::CudaAttentionMode::ThreeStage,
+                prompt, &selected, &error)) {
+            std::cerr << error << '\n';
+            return 1;
+        }
+        print_single_result(
+            use_fused ? "fused-online" : "three-stage", selected, sampler);
+        return 0;
     }
     Result baseline;
     Result fused;
@@ -116,7 +189,6 @@ int main(int argc, char** argv) {
         std::cerr << error << '\n';
         return 1;
     }
-    chapter06_generation::GreedySampler sampler;
     const float prefill_error = max_error(fused.prefill_logits, baseline.prefill_logits);
     const float decode_error = max_error(fused.decode_logits, baseline.decode_logits);
     if (prefill_error > 1.0e-3F || decode_error > 1.0e-3F ||

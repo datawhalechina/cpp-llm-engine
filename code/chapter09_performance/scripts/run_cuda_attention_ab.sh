@@ -64,6 +64,7 @@ nvidia-smi --query-gpu=name,driver_version,memory.total \
 
 for run in 1 2; do
     "${build_dir}/real_tinyllama_cuda_attention_benchmark" "${model_path}" \
+        --attention-path compare \
         >"${result_dir}/run-${run}.txt"
 done
 echo "correctness=PASS" >>"${result_dir}/metadata.txt"
