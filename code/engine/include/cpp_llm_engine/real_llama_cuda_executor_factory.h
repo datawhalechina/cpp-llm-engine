@@ -90,6 +90,7 @@ public:
     std::size_t vocab_size() const;
     std::size_t layer_count() const;
     std::int32_t eos_token_id() const;
+    std::string architecture() const;
     std::size_t context_capacity() const;
     std::size_t batch_workspace_count() const;
     std::size_t batch_workspace_creation_count() const;

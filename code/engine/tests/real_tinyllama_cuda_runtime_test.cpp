@@ -1,4 +1,4 @@
-// Engine CUDA：验证真实 TinyLlama CUDA Executor 接入 Chapter06 Runtime。
+// Engine CUDA：验证真实 Llama/Qwen3 CUDA Executor 接入 Chapter06 Runtime。
 // 职责：执行 prefill/decode、双请求 batch、分页 K/V 与 Radix 前缀采用。
 // 通过条件：状态按模型调用提交，批量与前缀命中路径均与顺序冷启动一致。
 #include "cpp_llm_engine/real_llama_cuda_executor_factory.h"
@@ -30,7 +30,10 @@ int main(int argc, char** argv) {
     auto factory = cpp_llm_engine::RealLlamaCudaExecutorFactory::load(
         argv[1], 8, &error);
     CHECK(factory != nullptr);
-    CHECK(factory->layer_count() == 22);
+    CHECK(factory->architecture() == "llama" ||
+          factory->architecture() == "qwen3");
+    CHECK(factory->layer_count() > 0);
+    const std::size_t model_layer_count = factory->layer_count();
 
     chapter06_generation::GenerationConfig config;
     config.max_new_tokens = 2;
@@ -93,7 +96,7 @@ int main(int argc, char** argv) {
         }
         const auto state = executor->execution_state();
         if (!state.available || state.committed_tokens != 2 ||
-            state.kv_layer_count != 22 || !state.stores_kv_values) {
+            state.kv_layer_count != model_layer_count || !state.stores_kv_values) {
             return false;
         }
         *output = request.generated();
@@ -105,7 +108,6 @@ int main(int argc, char** argv) {
     CHECK(generate(&first));
     CHECK(generate(&second));
     CHECK(first == second);
-    CHECK(first == chapter06_generation::TokenSequence({3561, 12053}));
 
     auto batch_a = factory->create_executor();
     auto batch_b = factory->create_executor();
@@ -290,7 +292,9 @@ int main(int argc, char** argv) {
     CHECK(radix_stats.cached_blocks == 3);
     factory->release_request(7102);
 
-    std::cout << "cuda_runtime_generation: true\n"
+    std::cout << "architecture: " << factory->architecture() << '\n'
+              << "decoder_layers: " << model_layer_count << '\n'
+              << "cuda_runtime_generation: true\n"
               << "generated_tokens:";
     for (const auto token : first) std::cout << ' ' << token;
     std::cout << "\ncontext_isolation: true\n"

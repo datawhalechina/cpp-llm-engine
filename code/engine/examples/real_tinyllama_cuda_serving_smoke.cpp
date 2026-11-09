@@ -1,4 +1,4 @@
-// Engine/Chapter 10：真实 TinyLlama CUDA 服务组合验收。
+// Engine/Chapter 10：真实 Llama/Qwen3 CUDA 服务组合验收。
 // 职责：验证 HTTP/SSE 契约可直接注入 CUDA Executor，并统一释放四类请求终态。
 // 运行：real_tinyllama_cuda_serving_smoke <model.gguf>。
 #include "cpp_llm_engine/real_llama_cuda_executor_factory.h"
@@ -63,6 +63,17 @@ bool contains_in_order(
     return true;
 }
 
+std::string token_array_json(const chapter06_generation::TokenSequence& tokens) {
+    std::ostringstream output;
+    output << "\"generated_token_ids\":[";
+    for (std::size_t index = 0; index < tokens.size(); ++index) {
+        if (index > 0) output << ',';
+        output << tokens[index];
+    }
+    output << ']';
+    return output.str();
+}
+
 bool metric_is(const std::string& metrics, const std::string& name, std::size_t value) {
     return metrics.find(name + " " + std::to_string(value) + "\n") != std::string::npos;
 }
@@ -103,7 +114,15 @@ int main(int argc, char** argv) {
         sampler,
         [&factory]() { return factory->create_executor(); });
 
-    const auto hello_prompt = tokenizer->encode("Hello TinyLlama");
+    const bool qwen3 = factory->architecture() == "qwen3";
+    const std::string sync_text = qwen3 ? "Hello Qwen3" : "Hello TinyLlama";
+    const chapter06_generation::TokenSequence expected_sync = qwen3
+        ? chapter06_generation::TokenSequence{11, 358, 1366, 311}
+        : chapter06_generation::TokenSequence{29892, 306, 29915, 29885};
+    const chapter06_generation::TokenSequence expected_stream = qwen3
+        ? chapter06_generation::TokenSequence{18155, 220, 17, 15}
+        : chapter06_generation::TokenSequence{839, 744, 29892, 263};
+    const auto hello_prompt = tokenizer->encode(sync_text);
     const auto hi_prompt = tokenizer->encode("Hi");
 
     chapter06_generation::Request batch_request_a(hello_prompt);
@@ -127,10 +146,8 @@ int main(int argc, char** argv) {
     }
     const bool scheduler_batch_match =
         batch_admitted && batch_request_a.finished() && batch_request_b.finished() &&
-        batch_request_a.generated() ==
-            chapter06_generation::TokenSequence({29892, 306, 29915, 29885}) &&
-        batch_request_b.generated() ==
-            chapter06_generation::TokenSequence({839, 744, 29892, 263}) &&
+        batch_request_a.generated() == expected_sync &&
+        batch_request_b.generated() == expected_stream &&
         model_batch_calls > 0 && tensor_batch_requests >= 2;
     const bool batch_resources_released =
         batch_service.release_terminal() == 2 && batch_service.inflight_size() == 0;
@@ -139,13 +156,11 @@ int main(int argc, char** argv) {
         "POST", "/v1/completions", completion_body(101, hello_prompt)});
     const bool sync_golden_match =
         sync_response.status_code == 200 &&
-        sync_response.body.find(
-            "\"generated_token_ids\":[29892,306,29915,29885]") != std::string::npos;
+        sync_response.body.find(token_array_json(expected_sync)) != std::string::npos;
 
     RecordingWriter writer;
     const auto stream_response = adapter.handle_stream({
         "POST", "/v1/completions", completion_body(102, hi_prompt)}, writer);
-    const chapter06_generation::TokenSequence expected_stream{839, 744, 29892, 263};
     const bool stream_golden_match =
         stream_response.status_code == 200 && writer.headers_written && writer.finished &&
         writer.head.status_code == 200 &&
@@ -179,7 +194,8 @@ int main(int argc, char** argv) {
         metric_is(metrics.body, "serving_waiting", 0) &&
         metric_is(metrics.body, "serving_running", 0);
 
-    std::cout << "sync_golden_match: " << std::boolalpha << sync_golden_match << '\n'
+    std::cout << "architecture: " << factory->architecture() << '\n'
+              << "sync_golden_match: " << std::boolalpha << sync_golden_match << '\n'
               << "stream_golden_match: " << stream_golden_match << '\n'
               << "terminal_status_match: " << terminal_status_match << '\n'
               << "metrics_match: " << metrics_match << '\n'

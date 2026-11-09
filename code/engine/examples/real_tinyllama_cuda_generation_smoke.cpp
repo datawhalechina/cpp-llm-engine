@@ -1,4 +1,4 @@
-// Engine CUDA：验证真实文本经过 tokenizer、CUDA Runtime 和 detokenizer。
+// Engine CUDA：验证 Llama/Qwen3 文本经过 tokenizer、CUDA Runtime 和 detokenizer。
 // 运行：real_tinyllama_cuda_generation_smoke <model.gguf> [budget] [prompt] [golden_csv]。
 #include "cpp_llm_engine/real_llama_cuda_engine.h"
 
@@ -58,7 +58,8 @@ int main(int argc, char** argv) {
             repeated.generated_tokens == result.generated_tokens &&
             repeated.output == result.output;
     }
-    std::cout << "prompt_tokens: " << result.prompt_tokens.size() << '\n'
+    std::cout << "architecture: " << engine->architecture() << '\n'
+              << "prompt_tokens: " << result.prompt_tokens.size() << '\n'
               << "generated_tokens:";
     for (const auto token : result.generated_tokens) std::cout << ' ' << token;
     std::cout << "\ngenerated_text: " << result.output << '\n'

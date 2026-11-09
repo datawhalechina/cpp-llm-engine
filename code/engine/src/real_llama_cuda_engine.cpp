@@ -95,4 +95,8 @@ bool RealLlamaCudaEngine::generate(
     return true;
 }
 
+std::string RealLlamaCudaEngine::architecture() const {
+    return impl_->executor_factory->architecture();
+}
+
 }  // namespace cpp_llm_engine

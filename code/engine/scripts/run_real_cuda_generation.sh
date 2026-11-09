@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Engine/Chapter 06：验证真实文本经过 tokenizer、CUDA Runtime 和 detokenizer。
-# 默认使用仓库内 llama.cpp build、TinyLlama GGUF 和 CUDA 12.8。
+# 默认使用仓库内 llama.cpp build、TinyLlama GGUF 和 CUDA 12.8；参数可切换模型和 golden。
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/../../.." && pwd)"
 model_path="${1:-${CPP_LLM_ENGINE_MODEL_PATH:-${repo_root}/llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf}}"
+prompt="${2:-Hello TinyLlama}"
+golden_csv="${3:-29892,306,29915,29885}"
 cuda_home="${CUDA_HOME:-/usr/local/cuda-12.8}"
 llama_root="${LLAMA_CPP_ROOT:-${repo_root}/llama.cpp}"
 llama_build_dir="${LLAMA_CPP_BUILD_DIR:-${llama_root}/build}"
@@ -39,5 +41,5 @@ cmake -S "${repo_root}/code/engine" -B "${build_dir}" \
     -DCMAKE_BUILD_TYPE=Release
 cmake --build "${build_dir}" \
     --target real_tinyllama_cuda_generation_smoke --parallel 2
-ctest --test-dir "${build_dir}" \
-    -R '^real_tinyllama_cuda_generation_smoke$' --output-on-failure
+"${build_dir}/real_tinyllama_cuda_generation_smoke" \
+    "${model_path}" 4 "${prompt}" "${golden_csv}"

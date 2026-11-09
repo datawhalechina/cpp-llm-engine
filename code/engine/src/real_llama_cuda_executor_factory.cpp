@@ -523,6 +523,9 @@ std::size_t RealLlamaCudaExecutorFactory::layer_count() const {
 std::int32_t RealLlamaCudaExecutorFactory::eos_token_id() const {
     return impl_->model->eos_token_id();
 }
+std::string RealLlamaCudaExecutorFactory::architecture() const {
+    return impl_->model->architecture();
+}
 std::size_t RealLlamaCudaExecutorFactory::context_capacity() const {
     return impl_->context_capacity;
 }
