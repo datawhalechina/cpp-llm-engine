@@ -1,4 +1,4 @@
-// Engine：真实 TinyLlama CPU 生成入口。
+// Engine：真实 Llama/Qwen3 CPU 生成入口。
 // 职责：共享真实 tokenizer/Model，并为每次生成创建独立请求 Context。
 // 验证：真实模型 CTest 检查 golden token 和重复生成的 context 隔离。
 #pragma once
@@ -29,6 +29,7 @@ public:
                   std::size_t max_new_tokens,
                   GenerationResult* result,
                   std::string* error = nullptr);
+    std::string architecture() const;
 
 private:
     struct Impl;

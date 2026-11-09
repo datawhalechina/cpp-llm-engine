@@ -1,4 +1,4 @@
-// Engine：实现真实 TinyLlama Model 到 RequestModelExecutor 的适配。
+// Engine：实现真实 Llama/Qwen3 CPU Model 到 RequestModelExecutor 的适配。
 // 所有权：Factory 持有 Model；每个 Executor 持有独立 Context 及其分层 KV。
 // 验证：真实生成和真实服务 CTest 共同覆盖 prefill/decode 与请求隔离。
 #include "cpp_llm_engine/real_llama_executor_factory.h"
@@ -596,6 +596,10 @@ bool RealLlamaExecutorFactory::executor_uses_paged_kv(
 
 std::size_t RealLlamaExecutorFactory::model_weight_payload_bytes() const {
     return impl_->model->weight_payload_bytes();
+}
+
+std::string RealLlamaExecutorFactory::architecture() const {
+    return impl_->model->architecture();
 }
 
 std::size_t RealLlamaExecutorFactory::vocab_size() const {

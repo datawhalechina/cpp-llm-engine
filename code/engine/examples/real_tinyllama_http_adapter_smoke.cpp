@@ -1,4 +1,4 @@
-// Engine/Chapter 10：真实 TinyLlama HTTP adapter 组合 smoke。
+// Engine/Chapter 10：真实 Llama/Qwen3 HTTP adapter 组合 smoke。
 // 职责：验证同步 completion 与 SSE 共用 ServiceCore，并按请求创建独立 Executor。
 // 运行：real_tinyllama_http_adapter_smoke <model.gguf>。
 #include "cpp_llm_engine/real_llama_executor_factory.h"
@@ -62,6 +62,17 @@ bool contains_in_order(
     return true;
 }
 
+std::string token_array_json(const chapter06_generation::TokenSequence& tokens) {
+    std::ostringstream output;
+    output << "\"generated_token_ids\":[";
+    for (std::size_t index = 0; index < tokens.size(); ++index) {
+        if (index > 0) output << ',';
+        output << tokens[index];
+    }
+    output << ']';
+    return output.str();
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -99,11 +110,19 @@ int main(int argc, char** argv) {
         sampler,
         [&factory]() { return factory->create_executor(); });
 
-    const auto sync_prompt = tokenizer->encode("Hello TinyLlama");
+    const bool qwen3 = factory->architecture() == "qwen3";
+    const std::string sync_text = qwen3 ? "Hello Qwen3" : "Hello TinyLlama";
+    const chapter06_generation::TokenSequence expected_sync_tokens = qwen3
+        ? chapter06_generation::TokenSequence{11, 358, 1366, 311}
+        : chapter06_generation::TokenSequence{29892, 306, 29915, 29885};
+    const chapter06_generation::TokenSequence expected_stream = qwen3
+        ? chapter06_generation::TokenSequence{18155, 220, 17, 15}
+        : chapter06_generation::TokenSequence{839, 744, 29892, 263};
+
+    const auto sync_prompt = tokenizer->encode(sync_text);
     const chapter10_serving::HttpResponse sync_response = adapter.handle({
         "POST", "/v1/completions", completion_body(101, sync_prompt)});
-    const std::string expected_sync =
-        "\"generated_token_ids\":[29892,306,29915,29885]";
+    const std::string expected_sync = token_array_json(expected_sync_tokens);
     const bool sync_golden_match =
         sync_response.status_code == 200 &&
         sync_response.body.find(expected_sync) != std::string::npos;
@@ -112,7 +131,6 @@ int main(int argc, char** argv) {
     RecordingWriter writer;
     const chapter10_serving::HttpResponse stream_response = adapter.handle_stream({
         "POST", "/v1/completions", completion_body(102, stream_prompt)}, writer);
-    const chapter06_generation::TokenSequence expected_stream{839, 744, 29892, 263};
     const bool stream_golden_match =
         stream_response.status_code == 200 && writer.headers_written && writer.finished &&
         writer.head.status_code == 200 &&
@@ -133,7 +151,8 @@ int main(int argc, char** argv) {
         metrics.body.find("serving_ttft_seconds_count 2\n") != std::string::npos &&
         metrics.body.find("serving_completion_seconds_count 2\n") != std::string::npos;
 
-    std::cout << "sync_golden_match: " << std::boolalpha << sync_golden_match << '\n'
+    std::cout << "architecture: " << factory->architecture() << '\n'
+              << "sync_golden_match: " << std::boolalpha << sync_golden_match << '\n'
               << "stream_golden_match: " << stream_golden_match << '\n'
               << "metrics_match: " << metrics_match << '\n'
               << "real_http_adapter: ready\n";

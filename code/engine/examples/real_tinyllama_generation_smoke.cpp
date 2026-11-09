@@ -1,5 +1,5 @@
-// Engine：真实 TinyLlama 多 token 生成 smoke。
-// 职责：验证文本经过 tokenizer、22 层 Decoder、greedy sampling 和 detokenize。
+// Engine：真实稠密模型多 token 生成 smoke。
+// 职责：验证文本经过 tokenizer、完整 Decoder、greedy sampling 和 detokenize。
 // 运行：real_tinyllama_generation_smoke <model.gguf> [max_new_tokens] [prompt] [golden_csv]。
 #include "cpp_llm_engine/real_llama_engine.h"
 
@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
     }
     const std::size_t max_new_tokens = argc >= 3
         ? static_cast<std::size_t>(std::strtoul(argv[2], nullptr, 10)) : 4;
-    const std::string prompt = argc == 4 ? argv[3] : "Hello TinyLlama";
+    const std::string prompt = argc >= 4 ? argv[3] : "Hello TinyLlama";
     std::string error;
     auto engine = cpp_llm_engine::RealLlamaEngine::load(argv[1], &error);
     if (engine == nullptr) {
@@ -45,7 +45,8 @@ int main(int argc, char** argv) {
         std::cerr << "generation failed: " << error << '\n';
         return 1;
     }
-    std::cout << "prompt: " << prompt << '\n'
+    std::cout << "architecture: " << engine->architecture() << '\n'
+              << "prompt: " << prompt << '\n'
               << "prompt_tokens: " << result.prompt_tokens.size() << '\n'
               << "generated_tokens:";
     for (const auto token : result.generated_tokens) std::cout << ' ' << token;

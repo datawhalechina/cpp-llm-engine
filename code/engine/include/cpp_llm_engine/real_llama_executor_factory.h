@@ -1,4 +1,4 @@
-// Engine：真实 TinyLlama 每请求执行器工厂。
+// Engine：真实 Llama/Qwen3 CPU 每请求执行器工厂。
 // 职责：共享一份只读 CPU Model，并为每个请求创建独立 Context/Executor。
 // 验证：真实服务 CTest 检查双请求 golden token、状态隔离和终态释放。
 #pragma once
@@ -142,6 +142,7 @@ public:
     bool executor_uses_paged_kv(
         const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor) const;
     std::size_t model_weight_payload_bytes() const;
+    std::string architecture() const;
     std::size_t vocab_size() const;
     chapter06_generation::TokenId eos_token_id() const;
     std::size_t layer_count() const;

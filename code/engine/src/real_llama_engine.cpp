@@ -1,4 +1,4 @@
-// Engine：真实 TinyLlama CPU 生成入口实现。
+// Engine：真实 Llama/Qwen3 CPU 生成入口实现。
 // 职责：由 Chapter06 Runtime 驱动 prefill、greedy sampling、decode 和 EOS 停止。
 // 契约：Engine 共享只读 Model，并为每次 generate 创建独立请求 Context。
 #include "cpp_llm_engine/real_llama_engine.h"
@@ -78,6 +78,10 @@ bool RealLlamaEngine::generate(std::string_view prompt,
     };
     if (error != nullptr) error->clear();
     return true;
+}
+
+std::string RealLlamaEngine::architecture() const {
+    return impl_->executor_factory->architecture();
 }
 
 }  // namespace cpp_llm_engine

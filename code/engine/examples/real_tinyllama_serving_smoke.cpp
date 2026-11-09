@@ -1,4 +1,4 @@
-// Engine/Chapter 10：真实 TinyLlama 双请求服务 smoke。
+// Engine/Chapter 10：真实 Llama/Qwen3 双请求服务 smoke。
 // 职责：验证双请求服务、终态释放和真实 Radix 命中调度。
 // 运行：real_tinyllama_serving_smoke <model.gguf>。
 #include "cpp_llm_engine/real_llama_executor_factory.h"
@@ -34,13 +34,15 @@ int main(int argc, char** argv) {
         std::cerr << "tokenizer and model vocabulary sizes differ\n";
         return 1;
     }
+    const bool qwen3 = factory->architecture() == "qwen3";
     const auto decoder_contract = factory->decoder_contract();
     const bool decoder_contract_match = decoder_contract.validate().is_ok() &&
-        decoder_contract.vocab_size == 32000 && decoder_contract.layer_count == 22 &&
-        decoder_contract.layer.hidden_size == 2048 &&
-        decoder_contract.layer.ffn_hidden_size == 5632 &&
-        decoder_contract.layer.query_head_count == 32 &&
-        decoder_contract.layer.kv_head_count == 4 &&
+        decoder_contract.vocab_size == (qwen3 ? 151936 : 32000) &&
+        decoder_contract.layer_count == (qwen3 ? 28 : 22) &&
+        decoder_contract.layer.hidden_size == (qwen3 ? 1024 : 2048) &&
+        decoder_contract.layer.ffn_hidden_size == (qwen3 ? 3072 : 5632) &&
+        decoder_contract.layer.query_head_count == (qwen3 ? 16 : 32) &&
+        decoder_contract.layer.kv_head_count == (qwen3 ? 8 : 4) &&
         decoder_contract.layer.normalization ==
             cpp_llm_engine::core::DecoderNormalizationKind::RmsNorm &&
         decoder_contract.layer.activation ==
@@ -54,7 +56,7 @@ int main(int argc, char** argv) {
     config.eos_token_id = factory->eos_token_id();
     chapter06_generation::Runtime runtime(config);
     chapter06_generation::GreedySampler sampler;
-    Request request_a(tokenizer->encode("Hello TinyLlama"));
+    Request request_a(tokenizer->encode(qwen3 ? "Hello Qwen3" : "Hello TinyLlama"));
     Request request_b(tokenizer->encode("Hi"));
 
     auto executor_a = factory->create_executor();
@@ -86,8 +88,12 @@ int main(int argc, char** argv) {
     stats.completed = static_cast<std::size_t>(request_a.finished()) +
         static_cast<std::size_t>(request_b.finished());
 
-    const TokenSequence expected_a{29892, 306, 29915, 29885};
-    const TokenSequence expected_b{839, 744, 29892, 263};
+    const TokenSequence expected_a = qwen3
+        ? TokenSequence{11, 358, 1366, 311}
+        : TokenSequence{29892, 306, 29915, 29885};
+    const TokenSequence expected_b = qwen3
+        ? TokenSequence{18155, 220, 17, 15}
+        : TokenSequence{839, 744, 29892, 263};
     const bool request_isolation_match =
         admitted_a && admitted_b && stats.completed == 2 &&
         stats.generated_tokens == 8 && request_a.generated() == expected_a &&
@@ -126,8 +132,16 @@ int main(int argc, char** argv) {
     cache_config.max_new_tokens = 1;
     cache_config.eos_token_id = factory->eos_token_id();
     chapter06_generation::Runtime cache_runtime(cache_config);
-    const TokenSequence shared_prompt{15043, 18439, 1460, 29931, 5288, 29874};
-    const TokenSequence cached_prompt{15043, 18439, 1460, 29931, 29871, 29973};
+    TokenSequence shared_prompt = qwen3
+        ? request_a.prompt()
+        : TokenSequence{15043, 18439, 1460, 29931, 5288, 29874};
+    TokenSequence cached_prompt = qwen3
+        ? request_a.prompt()
+        : TokenSequence{15043, 18439, 1460, 29931, 29871, 29973};
+    if (qwen3) {
+        shared_prompt.insert(shared_prompt.end(), {11, 13});
+        cached_prompt.insert(cached_prompt.end(), {198, 0});
+    }
     Request source(shared_prompt);
     chapter10_serving::ServiceCore source_service(
         1, 1, {}, block_pool, {}, factory.get());
@@ -142,7 +156,7 @@ int main(int argc, char** argv) {
     const bool stats_before_ready =
         factory->prefix_cache_stats(&stats_before_scheduling, &error);
 
-    Request cold({1, 15043});
+    Request cold({1, shared_prompt.front()});
     Request cached(cached_prompt);
     chapter10_serving::ServiceCore cache_service(
         2, 1, {}, block_pool, {}, factory.get());
@@ -181,7 +195,8 @@ int main(int argc, char** argv) {
         reusable_prefix_retained && metrics_match && decoder_contract_match &&
         cache_aware_scheduling && cache_requests_released;
 
-    std::cout << "model_layers: " << factory->layer_count() << '\n'
+    std::cout << "architecture: " << factory->architecture() << '\n'
+              << "model_layers: " << factory->layer_count() << '\n'
               << "request_a_tokens:";
     for (const auto token : request_a.generated()) std::cout << ' ' << token;
     std::cout << "\nrequest_b_tokens:";
