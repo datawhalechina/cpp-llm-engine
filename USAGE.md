@@ -2,25 +2,23 @@
 
 这份文档帮助学习者选择路线、运行代码并判断学习结果。项目介绍见 [README.md](README.md)，参与修改见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## 最短开始路径
+## 最短学习路径
 
-默认 CPU 回归不下载模型，不要求网络、Python、CUDA 或外部 BLAS：
+先确认 CMake 3.20+、C++17 编译器和 Git 可用：
 
 ```bash
 cmake --version
 c++ --version
-node --version
-npm install
-npm run test:regression
+git --version
 ```
 
-回归通过后，按以下顺序学习：
+基础不足时，先按需完成 [Foundation](source/foundation/intro.md) 中的 C++、CMake 或 CTest 练习。随后按以下顺序学习：
 
 1. 运行 `bash code/chapter00_quickstart/run.sh`，确认 C++、CMake 和仓库入口可用。
 2. 按 [Chapter00](source/chapter00_quickstart/intro.md) 准备 llama.cpp 与 TinyLlama，运行 `bash code/chapter00_quickstart/run_real_inference.sh` 建立真实推理基线。
-3. C++、CMake 或测试基础不足时，按需学习 [Foundation](source/foundation/intro.md)。
-4. 按 Chapter01–10 完成 CPU 主线；需要按阶段产物推进时，使用 [CPU 六任务学习计划](source/guides/cpu_learning_plan.md)。
-5. CPU 基线稳定后，再选择 CUDA 或多模态扩展。
+3. 运行 `bash code/chapter01_tensor_loader/run.sh`，开始教程自己的 C++ 模型加载实现。
+4. 按 Chapter02–10 完成 CPU 主线；需要按阶段产物推进时，使用 [CPU 六任务学习计划](source/guides/cpu_learning_plan.md)。
+5. 完成 CPU 主线后，再选择 CUDA 或多模态扩展。
 
 ## 选择学习路线
 
@@ -99,6 +97,15 @@ bash code/engine/scripts/run_real_cuda_serving.sh
 脚本默认读取 `llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf`，也可通过 `CPP_LLM_ENGINE_MODEL_PATH` 指定模型。各阶段的详细入口、成功条件和当前限制见 [`code/engine/README.md`](code/engine/README.md)；环境准备见 [CUDA 指南](source/guides/setup_cuda.md)，学习顺序见 [GPU 六任务学习计划](source/guides/gpu_learning_plan.md)。
 
 ## 判断验证结果
+
+章节学习直接运行对应 `run.sh`。需要检查全仓代码、文档和发布规则时，再安装 Node.js 与 npm 依赖：
+
+```bash
+npm install
+npm run test:regression
+npm run test:release-contracts
+npm run docs:check-links
+```
 
 | 层级 | 入口 | 能够证明什么 |
 | --- | --- | --- |
