@@ -49,6 +49,13 @@ expect_status() {
 success_output="$(run_runner "${fake_success}" "${model_path}")"
 grep -q 'real inference passed: decoded_tokens=2' <<<"${success_output}"
 
+moe_output="$(
+    CHAPTER00_LLAMA_EXECUTABLE="${fake_success}" \
+    CPP_LLM_ENGINE_QWEN15_MOE_MODEL_PATH="${model_path}" \
+        bash "${chapter_dir}/run_qwen15_moe_baseline.sh" prompt 2
+)"
+grep -q 'real inference passed: decoded_tokens=2' <<<"${moe_output}"
+
 expect_status 2 run_runner "${work_dir}/missing-executable" "${model_path}"
 expect_status 2 run_runner "${fake_success}" "${work_dir}/missing-model.gguf"
 expect_status 2 run_runner "${fake_success}" "${model_path}" invalid
