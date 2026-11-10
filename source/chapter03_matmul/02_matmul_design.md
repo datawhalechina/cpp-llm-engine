@@ -30,7 +30,7 @@ GEMV 是 General Matrix-Vector Multiplication，即通用矩阵向量乘法；GE
 | 多 token Prefill | `X[T,K]` | GEMM：`Y = X Wᵀ` | 多个 token 复用权重 tile |
 | 小批量 Decode | `X[B,K]` | 数学上是 GEMM；专用实现常称 batched GEMV | 多个请求共享权重读取与解码 |
 
-本章公共 `MatMulOp` 统一接收二维矩阵，不根据名称切换语义。Backend 才根据 shape、设备和数据类型选择三重循环、GEMV 风格 kernel 或 GEMM 库调用。Chapter05 的量化融合路径称为 batched GEMV，是因为它扩展单向量 kernel，让少量输入行共享一次 packed 权重解码；它不是面向大矩阵的通用 GEMM。
+本章公共 `MatMulOp` 统一接收二维矩阵，不根据名称切换语义。当前教学代码由调用方显式注入 CPU Backend 或选择独立的 cuBLAS 入口；它还没有按 shape、设备和数据类型自动挑选实现。成熟运行时可以在这层之上增加策略分派。Chapter05 的量化融合路径称为 batched GEMV，是因为它扩展单向量 kernel，让少量输入行共享一次 packed 权重解码；它不是面向大矩阵的通用 GEMM。
 
 每个输出元素由左输入的一行和右输入的一列计算。`try_compute(lhs, rhs, &output)` 先检查矩阵对象和形状，再把地址与 `M、N、K` 写入 `MatmulRequest`；`compute()` 使用同一流程，在失败时抛出异常。
 

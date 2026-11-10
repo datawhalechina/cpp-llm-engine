@@ -4,6 +4,8 @@
 // 验证：chapter05_quantization_test.cpp。
 #include "chapter05_quantization/quantized_linear_policy.h"
 
+#include "chapter05_quantization/iq4nl_linear.h"
+#include "chapter05_quantization/q2k_linear.h"
 #include "chapter05_quantization/q3k_linear.h"
 #include "chapter05_quantization/q4k_linear.h"
 #include "chapter05_quantization/q5_0_linear.h"
@@ -54,6 +56,14 @@ const cpp_llm_engine::core::LinearBackend* select_backend(
             ? registry.q5_1_avx2 : &q5_1_fused_backend();
     }
     if (format == cpp_llm_engine::core::WeightFormat::Q5K) return &q5k_backend();
+    if (format == cpp_llm_engine::core::WeightFormat::Q2K) {
+        return policy.q2k == QuantizedLinearBackendKind::Avx2Fused
+            ? registry.q2k_avx2 : &q2k_backend();
+    }
+    if (format == cpp_llm_engine::core::WeightFormat::IQ4_NL) {
+        return policy.iq4_nl == QuantizedLinearBackendKind::Avx2Fused
+            ? registry.iq4_nl_avx2 : &iq4_nl_backend();
+    }
     if (format == cpp_llm_engine::core::WeightFormat::Q6K) {
         return policy.q6k == QuantizedLinearBackendKind::Avx2Fused
             ? registry.q6k_avx2 : &q6k_fused_backend();
@@ -82,7 +92,12 @@ cpp_llm_engine::core::Status validate_quantized_linear_policy(
     if (!status.is_ok()) return status;
     status = validate_backend(policy.q5_1, registry.q5_1_avx2, "Q5_1");
     if (!status.is_ok()) return status;
-    return validate_backend(policy.q5k, registry.q5k_avx2, "Q5_K");
+    status = validate_backend(policy.q5k, registry.q5k_avx2, "Q5_K");
+    if (!status.is_ok()) return status;
+    status = validate_backend(policy.q2k, registry.q2k_avx2, "Q2_K");
+    if (!status.is_ok()) return status;
+    return validate_backend(
+        policy.iq4_nl, registry.iq4_nl_avx2, "IQ4_NL");
 }
 
 cpp_llm_engine::core::Status compute_quantized_linear(
@@ -104,6 +119,11 @@ cpp_llm_engine::core::Status compute_quantized_linear(
         selection_status = validate_backend(policy.q5_1, registry.q5_1_avx2, "Q5_1");
     } else if (request.weight_format == cpp_llm_engine::core::WeightFormat::Q5K) {
         selection_status = validate_backend(policy.q5k, registry.q5k_avx2, "Q5_K");
+    } else if (request.weight_format == cpp_llm_engine::core::WeightFormat::Q2K) {
+        selection_status = validate_backend(policy.q2k, registry.q2k_avx2, "Q2_K");
+    } else if (request.weight_format == cpp_llm_engine::core::WeightFormat::IQ4_NL) {
+        selection_status = validate_backend(
+            policy.iq4_nl, registry.iq4_nl_avx2, "IQ4_NL");
     } else {
         return cpp_llm_engine::core::Status::error(
             "quantized Linear policy does not support this weight format");
@@ -133,6 +153,11 @@ cpp_llm_engine::core::Status compute_quantized_linear_batch(
         selection_status = validate_backend(policy.q5_1, registry.q5_1_avx2, "Q5_1");
     } else if (request.weight_format == cpp_llm_engine::core::WeightFormat::Q5K) {
         selection_status = validate_backend(policy.q5k, registry.q5k_avx2, "Q5_K");
+    } else if (request.weight_format == cpp_llm_engine::core::WeightFormat::Q2K) {
+        selection_status = validate_backend(policy.q2k, registry.q2k_avx2, "Q2_K");
+    } else if (request.weight_format == cpp_llm_engine::core::WeightFormat::IQ4_NL) {
+        selection_status = validate_backend(
+            policy.iq4_nl, registry.iq4_nl_avx2, "IQ4_NL");
     } else {
         return cpp_llm_engine::core::Status::error(
             "quantized Linear batch does not support this weight format");

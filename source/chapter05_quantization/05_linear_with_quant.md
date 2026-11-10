@@ -1,6 +1,6 @@
 # 05.5 在量化权重上执行线性计算
 
-Decoder 上层只需要提交激活、权重格式和输出空间，不应因权重采用 Float32、Q4_K、Q6_K 或 Q8_0 而改变调用方式。本节用 reference 与 fused 两条路径证明：执行策略可以变化，Linear 的 shape 和数值契约保持不变。
+Decoder 上层只需要提交激活、权重格式和输出空间，不应因权重采用 Q2_K、Q4_K、Q6_K、Q8_0 或 IQ4_NL 而改变调用方式。本节用 reference 与 fused 两条路径证明：执行策略可以变化，Linear 的 shape 和数值契约保持不变。
 
 ## 从参考路径到融合线性层
 
@@ -67,7 +67,7 @@ Q4_K 和 Q6_K 的一个 super-block 都表示 256 个权重。当前映射使用
 
 ## 计算后端策略与统一接口
 
-`Q4KLinearAvx2` 和 `Q6KLinearAvx2` 在读取 block 时直接用 AVX2/FMA 累加。CUDA 由 `CudaQuantizedMatrix` 保存 packed payload；单 token 和小批量 Decode 都直接读取 Q4_K/Q6_K block，完整反量化加 cuBLAS 保留为数值与性能对照。Q8_0 当前只有 portable scalar fused；请求不存在的 AVX2 实现会返回明确 `Status`，不会静默回退。
+`Q4KLinearAvx2` 和 `Q6KLinearAvx2` 在读取 block 时直接用 AVX2/FMA 累加。CUDA 由 `CudaQuantizedMatrix` 保存 packed payload；单 token 和小批量 Decode 都直接读取 Q4_K/Q6_K block，完整反量化加 cuBLAS 保留为数值与性能对照。Q2_K、IQ4_NL 与 Q8_0 当前使用 portable scalar fused；请求不存在的 AVX2 实现会返回明确 `Status`，不会静默回退。
 
 ```cpp
 chapter05_quantization::QuantizedLinearPolicy policy{
@@ -96,7 +96,7 @@ auto status = chapter05_quantization::compute_quantized_linear(
 
 ## Packed 权重与激活视图
 
-`QuantizedMatrixView` 保存 packed payload 指针、字节数、权重行列和 Q4_K/Q6_K/Q8_0 格式；它不提供普通 Float32 Tensor 的索引语义。`compute_quantized_linear_views()` 让 Chapter02 的 Float32 激活通过公共只读/可写 View 进入现有 policy 和 backend：rank-1 表示单 token，rank-2 表示多个 token 行。
+`QuantizedMatrixView` 保存 packed payload 指针、字节数、权重行列和量化格式；它不提供普通 Float32 Tensor 的索引语义。`compute_quantized_linear_views()` 让 Chapter02 的 Float32 激活通过公共只读/可写 View 进入现有 policy 和 backend：rank-1 表示单 token，rank-2 表示多个 token 行。
 
 rank-2 会构造 `LinearBatchRequest`。Q3_K、Q4_K、Q5_K、Q6_K 和 Q8_0 的 scalar fused backend 只遍历一次 packed 权重，把同一个解码值分别累加到各输入行；这样得到的是 CPU 单线程批量 GEMV，而不是逐行重复解码权重。Qwen1.5-MoE 先按专家分组，再用该接口执行组内 Gate、Up 和 Down。`RealMoeBatchMode` 保留逐行路径作为同一二进制中的实验基线；[真实首层专家分组实验](../reference/experiment_assets.md#exp-cpu-13)在双词元输入中测得分组/逐行中位数比例 `0.597`，路由一致且最大输出误差约 `6.1e-10`。该实验只计 Router、专家和共享专家，不包含 Attention、K/V、LM Head 或服务调度。AVX2 backend 目前通过公共兼容路径逐行执行，尚未提供专用多行 SIMD kernel。
 

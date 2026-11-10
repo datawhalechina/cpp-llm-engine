@@ -23,6 +23,8 @@ struct QuantizedLinearPolicy final {
     QuantizedLinearBackendKind q5_0 = QuantizedLinearBackendKind::ScalarFused;
     QuantizedLinearBackendKind q5_1 = QuantizedLinearBackendKind::ScalarFused;
     QuantizedLinearBackendKind q5k = QuantizedLinearBackendKind::ScalarFused;
+    QuantizedLinearBackendKind q2k = QuantizedLinearBackendKind::ScalarFused;
+    QuantizedLinearBackendKind iq4_nl = QuantizedLinearBackendKind::ScalarFused;
 };
 
 struct QuantizedLinearBackendRegistry final {
@@ -33,6 +35,8 @@ struct QuantizedLinearBackendRegistry final {
     const cpp_llm_engine::core::LinearBackend* q5_0_avx2 = nullptr;
     const cpp_llm_engine::core::LinearBackend* q5_1_avx2 = nullptr;
     const cpp_llm_engine::core::LinearBackend* q5k_avx2 = nullptr;
+    const cpp_llm_engine::core::LinearBackend* q2k_avx2 = nullptr;
+    const cpp_llm_engine::core::LinearBackend* iq4_nl_avx2 = nullptr;
 };
 
 cpp_llm_engine::core::Status validate_quantized_linear_policy(

@@ -145,6 +145,7 @@ bool linear(const Tensor& weight,
     }
     const auto* bytes = reinterpret_cast<const std::uint8_t*>(weight.raw_data());
     cpp_llm_engine::core::WeightFormat format = cpp_llm_engine::core::WeightFormat::Unknown;
+    if (weight.dtype() == DType::Q2_K) format = cpp_llm_engine::core::WeightFormat::Q2K;
     if (weight.dtype() == DType::Q4_K) format = cpp_llm_engine::core::WeightFormat::Q4K;
     if (weight.dtype() == DType::Q3_K) format = cpp_llm_engine::core::WeightFormat::Q3K;
     if (weight.dtype() == DType::Q5_0) format = cpp_llm_engine::core::WeightFormat::Q5_0;
@@ -152,6 +153,7 @@ bool linear(const Tensor& weight,
     if (weight.dtype() == DType::Q5_K) format = cpp_llm_engine::core::WeightFormat::Q5K;
     if (weight.dtype() == DType::Q6_K) format = cpp_llm_engine::core::WeightFormat::Q6K;
     if (weight.dtype() == DType::Q8_0) format = cpp_llm_engine::core::WeightFormat::Q8_0;
+    if (weight.dtype() == DType::IQ4_NL) format = cpp_llm_engine::core::WeightFormat::IQ4_NL;
     if (format == cpp_llm_engine::core::WeightFormat::Unknown) {
         if (error != nullptr) *error = "unsupported linear dtype: " + weight.name();
         return false;
@@ -176,7 +178,8 @@ bool same_policy(const chapter05_quantization::QuantizedLinearPolicy& left,
     return left.q4k == right.q4k && left.q6k == right.q6k &&
         left.q8_0 == right.q8_0 && left.q3k == right.q3k &&
         left.q5_0 == right.q5_0 &&
-        left.q5_1 == right.q5_1 && left.q5k == right.q5k;
+        left.q5_1 == right.q5_1 && left.q5k == right.q5k &&
+        left.q2k == right.q2k && left.iq4_nl == right.iq4_nl;
 }
 
 bool linear_batch(
@@ -212,6 +215,7 @@ bool linear_batch(
             ProfileClock::now() - pack_start).count();
     }
     cpp_llm_engine::core::WeightFormat format = cpp_llm_engine::core::WeightFormat::Unknown;
+    if (weight.dtype() == DType::Q2_K) format = cpp_llm_engine::core::WeightFormat::Q2K;
     if (weight.dtype() == DType::Q4_K) format = cpp_llm_engine::core::WeightFormat::Q4K;
     if (weight.dtype() == DType::Q3_K) format = cpp_llm_engine::core::WeightFormat::Q3K;
     if (weight.dtype() == DType::Q5_0) format = cpp_llm_engine::core::WeightFormat::Q5_0;
@@ -219,6 +223,7 @@ bool linear_batch(
     if (weight.dtype() == DType::Q5_K) format = cpp_llm_engine::core::WeightFormat::Q5K;
     if (weight.dtype() == DType::Q6_K) format = cpp_llm_engine::core::WeightFormat::Q6K;
     if (weight.dtype() == DType::Q8_0) format = cpp_llm_engine::core::WeightFormat::Q8_0;
+    if (weight.dtype() == DType::IQ4_NL) format = cpp_llm_engine::core::WeightFormat::IQ4_NL;
     if (format == cpp_llm_engine::core::WeightFormat::Unknown) {
         if (error != nullptr) *error = "unsupported batch Linear dtype: " + weight.name();
         return false;

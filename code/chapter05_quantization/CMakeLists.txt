@@ -25,12 +25,16 @@ if(NOT TARGET chapter02_tensor_ops)
 endif()
 
 add_library(chapter05_quantization
+    src/iq4nl_dequantize.cpp
+    src/iq4nl_linear.cpp
     src/dequantize_op.cpp
     src/linear_layer.cpp
     src/quantized_linear.cpp
     src/quantized_linear_view_adapter.cpp
     src/q3k_dequantize.cpp
     src/q3k_linear.cpp
+    src/q2k_dequantize.cpp
+    src/q2k_linear.cpp
     src/q4k_dequantize.cpp
     src/q4k_kernel.cpp
     src/q4k_linear.cpp
@@ -95,6 +99,10 @@ add_executable(chapter05_quantization_test
     tests/chapter05_quantization_test.cpp
 )
 
+add_executable(chapter05_deepseek_quantization_test
+    tests/deepseek_quantization_test.cpp
+)
+
 add_executable(chapter02_tensor_quantized_linear_integration_test
     tests/chapter02_tensor_quantized_linear_integration_test.cpp
 )
@@ -103,6 +111,11 @@ target_link_libraries(chapter05_quantization_test
     PRIVATE chapter05_quantization
 )
 cpp_llm_prepare_test(chapter05_quantization_test)
+
+target_link_libraries(chapter05_deepseek_quantization_test
+    PRIVATE chapter05_quantization
+)
+cpp_llm_prepare_test(chapter05_deepseek_quantization_test)
 
 target_link_libraries(chapter02_tensor_quantized_linear_integration_test
     PRIVATE chapter02_tensor_ops chapter05_quantization
@@ -119,12 +132,19 @@ enable_testing()
 
 add_test(NAME chapter05_quantization_test COMMAND chapter05_quantization_test)
 add_test(
+    NAME chapter05_deepseek_quantization_test
+    COMMAND chapter05_deepseek_quantization_test)
+add_test(
     NAME chapter02_tensor_quantized_linear_integration_test
     COMMAND chapter02_tensor_quantized_linear_integration_test
 )
 cpp_llm_set_test_labels(chapter05_quantization_test quantization)
 cpp_llm_set_test_contract(
     chapter05_quantization_test OWNER 05 LEVEL component STATUS active)
+cpp_llm_set_test_labels(
+    chapter05_deepseek_quantization_test quantization deepseek q2k iq4nl)
+cpp_llm_set_test_contract(
+    chapter05_deepseek_quantization_test OWNER 05 LEVEL component STATUS active)
 cpp_llm_set_test_labels(
     chapter02_tensor_quantized_linear_integration_test tensor quantization)
 cpp_llm_set_test_contract(

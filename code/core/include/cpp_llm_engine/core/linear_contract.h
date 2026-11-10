@@ -24,6 +24,8 @@ enum class WeightFormat : std::uint8_t {
     Q5_0,
     Q5_1,
     Q5K,
+    Q2K,
+    IQ4_NL,
 };
 
 // 行主序：weights[rows, cols] * input[cols] = output[rows]。

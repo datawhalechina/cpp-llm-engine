@@ -34,6 +34,10 @@ add_library(cpp_llm_multimodal
     ../chapter01_tensor_loader/src/real_layer_weights.cpp
     ../model/src/real_llama_cpu_decoder.cpp
     ../chapter01_tensor_loader/src/tensor.cpp
+    ../chapter05_quantization/src/iq4nl_dequantize.cpp
+    ../chapter05_quantization/src/iq4nl_linear.cpp
+    ../chapter05_quantization/src/q2k_dequantize.cpp
+    ../chapter05_quantization/src/q2k_linear.cpp
     ../chapter05_quantization/src/q3k_dequantize.cpp
     ../chapter05_quantization/src/q3k_linear.cpp
     ../chapter05_quantization/src/q4k_dequantize.cpp
