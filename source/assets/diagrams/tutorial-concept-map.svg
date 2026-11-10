@@ -126,9 +126,9 @@
 
   <rect x="458" y="486" width="365" height="120" class="card" fill="#dbeafe"/>
   <text x="480" y="518" class="label">CUDA 执行扩展</text>
-  <text x="480" y="545" class="small">设备 / 流 · cuBLAS · Q4_K/Q6_K 线性层</text>
-  <text x="480" y="568" class="small">RoPE · 连续 K/V · GQA · 合成解码器</text>
-  <text x="480" y="591" class="tiny">下一里程碑：真实 TinyLlama GPU 解码器</text>
+  <text x="480" y="545" class="small">设备 / 流 · cuBLAS · 量化 GEMV</text>
+  <text x="480" y="568" class="small">RoPE · 分页 K/V · GQA · 批执行</text>
+  <text x="480" y="591" class="tiny">TinyLlama / Qwen3 真实生成与服务已闭环</text>
   <path d="M640 410 V481" class="dash"/>
 
   <rect x="868" y="486" width="364" height="120" class="card" fill="#f1f5f9"/>
