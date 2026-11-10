@@ -53,6 +53,20 @@ bash code/chapter10_serving/scripts/run_cpp_httplib_loopback.sh
 
 准备本地 `httplib.h` 后可以设置 `CHAPTER10_CPPHTTPLIB_INCLUDE_DIR`；未设置时，CMake 获取固定版本 `v0.18.3`。该入口验证 health、metrics、同步 Completion 和 SSE，不代表并发 HTTP 服务。
 
+TinyLlama 使用真实 socket 回环验证默认 CPU 服务，Qwen3 使用独立固定模型入口验证第二种稠密架构、双请求调度和 Radix 命中：
+
+```bash
+bash code/engine/scripts/run_real_http_server.sh --check
+bash code/chapter10_serving/scripts/run_qwen3_serving.sh
+```
+
+两种稠密模型的 CUDA 服务保持 `ServiceCore` 与协议层不变，只替换 Executor：
+
+```bash
+bash code/engine/scripts/run_real_cuda_serving.sh
+bash code/engine/scripts/run_qwen3_cuda_serving.sh
+```
+
 本地已有 Qwen1.5-MoE 时，可以验证两个运行请求 Decode 期间再加入两个请求的动态 admission：
 
 ```bash

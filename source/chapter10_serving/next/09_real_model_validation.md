@@ -1,6 +1,6 @@
 # 10.9 用真实模型验证服务闭环
 
-确定性 Executor 适合覆盖状态机，真实 TinyLlama、Qwen3 和 DeepSeek-V2-Lite 用于验证 Model 共享、Context 隔离、Tokenizer、K/V 增长和 HTTP 输出。模型复用同一组 ServiceCore、Scheduler 与 Adapter；Factory 负责把具体模型装配到统一执行接口。
+确定性 Executor 适合覆盖状态机。TinyLlama 与 Qwen3 验证稠密模型的 CPU/CUDA 服务，Qwen1.5-MoE 验证动态准入和专家分组能否穿过 ServiceCore，DeepSeek-V2-Lite 验证 MLA-MoE、Completion 与 SSE。模型复用同一组 ServiceCore 和 Scheduler；进入 HTTP 的路径再复用 Adapter。Factory 负责把具体模型装配到统一执行接口。
 
 ## 真实对象怎样组装
 
@@ -41,6 +41,14 @@ bash code/chapter10_serving/scripts/run_qwen3_serving.sh
 ```
 
 两条 CPU 路径都要求同步 Completion、SSE、metrics 和固定 token golden 成立，两个请求的 Context/K/V 不串扰，Radix 前缀在调度提升时命中，终态后服务条目和请求块释放。`10.10` 将这个单进程闭环映射到成熟服务架构。
+
+Qwen1.5-MoE 使用 Chapter09 的动态准入实验验证 ServiceCore 生命周期：两个请求运行后再接纳两个请求，两种专家执行路径必须得到相同输出、批量调用和终态计数。
+
+```bash
+bash code/chapter09_performance/scripts/run_qwen15_moe_service_ab.sh
+```
+
+该入口不经过 `HttpAdapter` 或 socket，因此只证明 MoE Factory、Chapter08 批执行和 Chapter10 生命周期能够协作，不作为 Qwen1.5-MoE HTTP 服务证据。
 
 DeepSeek-V2-Lite 先验证动态准入和双请求分组 MoE，再让同步 Completion 与 SSE 顺序经过同一个 Adapter：
 

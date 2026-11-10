@@ -7,7 +7,7 @@ Chapter06 定义单请求生成，Chapter07 管理 K/V 资源，Chapter08 选择
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
 | A 服务生命周期 | 从 admission 进入 waiting/running，再处理取消、超时、失败和统一释放 | 固定状态转换、容量结果和资源归零 |
-| B 网络与并发 | 把 Completion/SSE 映射到 ServiceCore，再用 TinyLlama 和 Qwen3 验证模型切换 | HTTP 状态、词元顺序、请求级并发与指标契约 |
+| B 网络与并发 | 把 Completion/SSE 映射到 ServiceCore；比较稠密、MoE 和 MLA-MoE 模型怎样复用服务生命周期 | TinyLlama/Qwen3 HTTP 闭环、Qwen1.5-MoE 动态准入、DeepSeek HTTP/SSE 与指标契约 |
 | G GPU 扩展坐标 | 保持 ServiceCore 与 HTTP 契约不变，把 Executor 替换为设备后端 | TinyLlama 与 Qwen3 均已通过 CUDA 服务闭环 |
 | M 多模态扩展坐标 | 在 Adapter 前构造图文 embedding Executor，再复用同一服务生命周期 | 已有引擎集成测试；图片 HTTP body 与多模态 Transport 尚未实现 |
 
