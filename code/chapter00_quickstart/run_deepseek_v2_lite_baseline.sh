@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Chapter 00：使用 llama.cpp 建立 DeepSeek-V2-Lite-Chat 外部推理基线。
-# 边界：该入口验证固定 GGUF 可运行，教程自己的 DeepSeek Decoder 尚未接入。
+# 边界：该入口只验证 llama.cpp 外部结果；教程自己的执行链从 Chapter 01 继续。
 set -euo pipefail
 
 chapter_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
