@@ -4,12 +4,14 @@
 
 ## 代码架构
 
-Chapter00 有两条互相独立的验证路径：仓库内最小程序检查本地工具链，外部 `llama.cpp` 加载真实 GGUF 建立推理基线。TinyLlama 是默认主线；Qwen1.5-MoE 和 DeepSeek-V2-Lite 是架构扩展坐标。前者失败时排查 C++ 和 CMake；前者通过而真实模型失败时，排查外部构建、模型或运行参数。
+Chapter00 有两条互相独立的验证路径：仓库内最小程序检查本地工具链，外部 `llama.cpp` 加载真实 GGUF 建立推理基线。TinyLlama 是默认主线；Qwen3、Qwen1.5-MoE 和 DeepSeek-V2-Lite 是架构扩展坐标。连通性检查失败时排查 C++ 和 CMake；检查通过而真实模型失败时，排查外部构建、模型或运行参数。
 
 ```text
 run.sh -> CMake -> chapter00_quickstart --check -> 连通性检查通过
 
 run_real_inference.sh -> llama-simple + TinyLlama GGUF -> generated tokens
+
+run_qwen3_baseline.sh -> llama-simple + Qwen3 GGUF -> generated tokens
 
 run_qwen15_moe_baseline.sh -> llama-simple + Qwen1.5-MoE GGUF -> generated tokens
 
@@ -28,6 +30,8 @@ run_deepseek_v2_lite_baseline.sh -> llama-simple + DeepSeek-V2-Lite GGUF -> gene
 | `examples/main_quick.cpp` | 检查模型路径和 quickstart 入口 |
 | `run.sh` | 从临时目录配置、构建并运行连通性检查 |
 | `run_real_inference.sh` | 检查本地 llama.cpp 与 GGUF，并执行一次真实推理 |
+| `download_qwen3.sh` | 断点续传固定版本的 Qwen3-0.6B Q4_K_M，并校验大小与 SHA256 |
+| `run_qwen3_baseline.sh` | 使用 llama.cpp 验证第二种稠密模型外部基线 |
 | `download_qwen15_moe.sh` | 断点续传 Qwen1.5-MoE Q3_K_M，并校验固定 SHA256 |
 | `run_qwen15_moe_baseline.sh` | 使用 llama.cpp 验证 MoE 外部基线，不进入自研 Decoder |
 | `download_deepseek_v2_lite.sh` | 断点续传 DeepSeek-V2-Lite Q2_K，并校验固定大小与 SHA256 |
@@ -49,6 +53,13 @@ bash code/chapter00_quickstart/run_real_inference.sh
 ```
 
 脚本默认生成 8 个 token，并设置 `-ngl 0`。可用带空格的第一个参数替换 prompt，用第二个参数替换生成长度；模型和 llama.cpp 不在默认位置时使用脚本帮助中列出的环境变量。默认只显示生成文本和关键耗时，设置 `CHAPTER00_VERBOSE=1` 可查看完整 llama.cpp 日志。
+
+比较第二种稠密架构时，下载约 462 MiB 的 Qwen3-0.6B 并运行外部基线：
+
+```bash
+bash code/chapter00_quickstart/download_qwen3.sh
+bash code/chapter00_quickstart/run_qwen3_baseline.sh
+```
 
 进入 MoE 扩展路线时，先下载约 7.44GB 的 Qwen1.5-MoE Q3_K_M，再运行外部基线：
 

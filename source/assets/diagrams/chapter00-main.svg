@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 330" role="img" aria-labelledby="title desc">
   <title id="title">Chapter 00 在教程中的位置与学习步骤</title>
-  <desc id="desc">Foundation 之后先完成 A 准备检查，再通过 B 真实基线运行 TinyLlama，随后进入 Chapter01 到 Chapter10。</desc>
+  <desc id="desc">Foundation 之后先完成 A 准备检查，再通过 B 真实基线运行 TinyLlama，最后用 C 架构扩展比较 Qwen3、MoE 和 MLA，随后进入 Chapter01 到 Chapter10。</desc>
   <defs>
     <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#64748b"/></marker>
     <style>
@@ -25,13 +25,13 @@
   <text x="451" y="184" text-anchor="middle" class="small">自研 CPU 主线</text>
   <path d="M180 169H218M356 169H394" class="line"/>
   <rect x="566" y="65" width="598" height="225" rx="14" fill="#fff7ed"/>
-  <text x="590" y="98" class="section" fill="#9a4d13">A 准备检查 → B 真实基线</text>
+  <text x="590" y="98" class="section" fill="#9a4d13">A 准备检查 → B 真实基线 → C 架构扩展</text>
   <g text-anchor="middle">
     <rect x="586" y="137" width="96" height="64" rx="9" fill="#ffedd5"/><text x="634" y="164" class="label">A 环境检查</text><text x="634" y="184" class="small">C++ / CMake</text>
     <rect x="700" y="137" width="96" height="64" rx="9" fill="#ffedd5"/><text x="748" y="164" class="label">编译基线</text><text x="748" y="184" class="small">llama.cpp</text>
     <rect x="814" y="137" width="96" height="64" rx="9" fill="#ffedd5"/><text x="862" y="164" class="label">模型校验</text><text x="862" y="184" class="small">GGUF / SHA256</text>
     <rect x="928" y="132" width="96" height="74" rx="10" fill="#fb923c"/><text x="976" y="163" class="label" fill="#ffffff">B 真实推理</text><text x="976" y="184" class="small" fill="#fff7ed">CPU / greedy</text>
-    <rect x="1042" y="137" width="96" height="64" rx="9" fill="#ffedd5"/><text x="1090" y="164" class="label">失败定位</text><text x="1090" y="184" class="small">工具到参数</text>
+    <rect x="1042" y="137" width="96" height="64" rx="9" fill="#dcfce7"/><text x="1090" y="164" class="label">C 架构比较</text><text x="1090" y="184" class="small">稠密 / MoE / MLA</text>
   </g>
   <path d="M682 169H700M796 169H814M910 169H928M1024 169H1042" class="line"/>
 </svg>

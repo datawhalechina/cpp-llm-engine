@@ -50,11 +50,11 @@ echo '9fecc3b3cd76bba89d504f29b616eedf7da85b96540e490ca5824d3f7d2776a0  llama.cp
 
 ## 可选模型
 
-Qwen3-0.6B 已接入教程 CPU/CUDA 主线，适合在完成 TinyLlama 后比较 Q/K Norm、NeoX RoPE 和非对称 Q/KV 投影。已有模型文件时通过环境变量切换：
+Qwen3-0.6B 已接入教程 CPU/CUDA 主线，适合在完成 TinyLlama 后比较 Q/K Norm、NeoX RoPE 和非对称 Q/KV 投影。下载脚本固定模型 revision、文件大小和 SHA256，随后用同一套 llama.cpp 参数建立外部基线：
 
 ```bash
-CPP_LLM_ENGINE_MODEL_PATH="$PWD/llama.cpp/models/qwen3-0.6b/Qwen3-0.6B-Q4_K_M.gguf" \
-bash code/chapter00_quickstart/run_real_inference.sh "Hello Qwen3" 4
+bash code/chapter00_quickstart/download_qwen3.sh
+bash code/chapter00_quickstart/run_qwen3_baseline.sh
 ```
 
 Qwen1.5-MoE-A2.7B-Chat 用于后续 MoE 路线。下载脚本会先检查剩余磁盘空间，支持断点续传，并在完成后打印 SHA256：
