@@ -113,6 +113,15 @@
       "note": "以三段式 CPU golden 核对分块在线 Softmax 的状态合并"
     },
     {
+      "target": "chapter04_moe_feed_forward_test",
+      "source": "code/chapter04_attention/tests/moe_feed_forward_test.cpp",
+      "owner": "04",
+      "level": "component",
+      "dependencies": ["04"],
+      "status": "active",
+      "note": "用固定 golden 核对稳定 Top-K、专家 SwiGLU 和共享专家合并"
+    },
+    {
       "target": "chapter02_tensor_attention_integration_test",
       "source": "code/chapter04_attention/tests/chapter02_tensor_attention_integration_test.cpp",
       "owner": "04",
@@ -157,6 +166,56 @@
       "note": "由 Engine 的可选真实模型构建注册为 CTest"
     },
     {
+      "target": "packed_expert_view_test",
+      "source": "code/model/tests/packed_expert_view_test.cpp",
+      "owner": "05",
+      "level": "component",
+      "dependencies": ["01", "05"],
+      "status": "active",
+      "contract_cmake": "code/model/CMakeLists.txt",
+      "note": "验证三维 packed expert payload 到二维量化 Linear 权重窗口的映射"
+    },
+    {
+      "target": "real_moe_feed_forward_test",
+      "source": "code/model/tests/real_moe_feed_forward_test.cpp",
+      "owner": "05",
+      "level": "component",
+      "dependencies": ["01", "04", "05"],
+      "status": "active",
+      "contract_cmake": "code/model/CMakeLists.txt",
+      "note": "以量化常量块核对真实权重适配层的 Top-K、SwiGLU 与共享专家合并"
+    },
+    {
+      "target": "qwen15_moe_ffn_inspect",
+      "source": "code/model/examples/qwen15_moe_ffn_inspect.cpp",
+      "owner": "05",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05"],
+      "status": "active",
+      "contract_cmake": "code/model/CMakeLists.txt",
+      "note": "由 Chapter04 脚本验证真实 Qwen1.5-MoE layer-0 Top-4 与共享专家执行"
+    },
+    {
+      "target": "real_qwen2_moe_layer_test",
+      "source": "code/model/tests/real_qwen2_moe_layer_test.cpp",
+      "owner": "05",
+      "level": "component",
+      "dependencies": ["01", "04", "05"],
+      "status": "active",
+      "contract_cmake": "code/model/CMakeLists.txt",
+      "note": "以小尺寸量化权重验证 Qwen2MoE 双词元 GQA、K/V、最终 RMSNorm、LM Head 和失败原子性"
+    },
+    {
+      "target": "qwen15_moe_ffn_compare",
+      "source": "code/model/examples/qwen15_moe_ffn_compare.cpp",
+      "owner": "05",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05"],
+      "status": "active",
+      "contract_cmake": "code/model/CMakeLists.txt",
+      "note": "可选 llama.cpp cb_eval 对照；核对双词元 Attention、24 层局部 Top-K、hidden、K/V、logits 与贪心词元"
+    },
+    {
       "target": "chapter06_generation_test",
       "source": "code/chapter06_generation/tests/chapter06_generation_test.cpp",
       "owner": "06",
@@ -197,6 +256,16 @@
       "dependencies": ["01", "04", "05", "06"],
       "status": "active",
       "note": "CTest 名称为 real_tinyllama_generation_test"
+    },
+    {
+      "target": "real_qwen15_moe_runtime_test",
+      "source": "code/engine/tests/real_qwen15_moe_runtime_test.cpp",
+      "owner": "06",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05", "06"],
+      "status": "active",
+      "contract_cmake": "code/engine/CMakeLists.txt",
+      "note": "模型存在时注册；验证 24 层 Context、生成 Runtime 与工厂级 MoE batch"
     },
     {
       "target": "chapter07_block_pool_test",
@@ -282,6 +351,16 @@
       "dependencies": ["01", "04", "05", "06", "07", "08"],
       "status": "active",
       "note": "CTest 名称为 real_tinyllama_batch_test，验证真实 batch 与分页 K/V 提交"
+    },
+    {
+      "target": "real_qwen15_moe_scheduling_smoke",
+      "source": "code/engine/examples/real_qwen15_moe_scheduling_smoke.cpp",
+      "owner": "08",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05", "06", "08"],
+      "status": "active",
+      "contract_cmake": "code/engine/CMakeLists.txt",
+      "note": "验证双请求进入 Continuous Batch"
     },
     {
       "target": "chapter08_overlap_scheduler_test",
