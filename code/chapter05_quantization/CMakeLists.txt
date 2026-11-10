@@ -29,9 +29,16 @@ add_library(chapter05_quantization
     src/linear_layer.cpp
     src/quantized_linear.cpp
     src/quantized_linear_view_adapter.cpp
+    src/q3k_dequantize.cpp
+    src/q3k_linear.cpp
     src/q4k_dequantize.cpp
     src/q4k_kernel.cpp
     src/q4k_linear.cpp
+    src/q5_0_dequantize.cpp
+    src/q5_0_linear.cpp
+    src/q5_1_dequantize.cpp
+    src/q5_1_linear.cpp
+    src/q5k_linear.cpp
     src/q6k_dequantize.cpp
     src/q6k_kernel.cpp
     src/q6k_linear.cpp

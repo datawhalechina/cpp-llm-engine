@@ -1,5 +1,5 @@
 // Core：线性层后端的公共请求格式
-// 输入按行主序排列，权重格式可以是 Float32、Q4_K、Q6_K 或 Q8_0。
+// 输入按行主序排列，权重格式由具体 CPU 或 CUDA backend 解释。
 // weights、input 和 output 缓冲区不得重叠；具体后端负责计算。
 // 默认批处理实现逐行调用单样本接口。
 // 验证：code/core/tests/core_contract_test.cpp 与 Chapter05 量化测试。
@@ -20,6 +20,10 @@ enum class WeightFormat : std::uint8_t {
     Q4K,
     Q6K,
     Q8_0,
+    Q3K,
+    Q5_0,
+    Q5_1,
+    Q5K,
 };
 
 // 行主序：weights[rows, cols] * input[cols] = output[rows]。

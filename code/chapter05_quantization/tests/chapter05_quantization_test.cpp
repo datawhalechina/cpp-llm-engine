@@ -1,4 +1,4 @@
-// Chapter 05：验证 INT8、Q4_K、Q6_K、Q8_0 Linear 及 backend policy。
+// Chapter 05：验证教学 INT8、GGUF 量化 Linear 及 backend policy。
 // 每个用例只覆盖一种格式的一项可命名行为，便于定位解码、执行或策略错误。
 // 固定 payload 提供独立期望值，可用的 AVX2 实现再与 scalar reference 对照。
 // 验证入口：bash code/chapter05_quantization/scripts/run.sh。
@@ -8,6 +8,13 @@
 #include "chapter05_quantization/quantized_linear_policy.h"
 #include "chapter05_quantization/q4k_dequantize.h"
 #include "chapter05_quantization/q4k_linear.h"
+#include "chapter05_quantization/q3k_dequantize.h"
+#include "chapter05_quantization/q3k_linear.h"
+#include "chapter05_quantization/q5_0_dequantize.h"
+#include "chapter05_quantization/q5_0_linear.h"
+#include "chapter05_quantization/q5_1_dequantize.h"
+#include "chapter05_quantization/q5_1_linear.h"
+#include "chapter05_quantization/q5k_linear.h"
 #include "chapter05_quantization/q6k_dequantize.h"
 #include "chapter05_quantization/q6k_linear.h"
 #include "chapter05_quantization/q8_0_dequantize.h"
@@ -30,6 +37,42 @@ std::vector<std::uint8_t> make_q8_0_block() {
         block[2 + i] = static_cast<std::uint8_t>(
             static_cast<std::int8_t>(static_cast<int>(i) - 16));
     }
+    return block;
+}
+
+std::vector<std::uint8_t> make_q3k_block() {
+    std::vector<std::uint8_t> block(chapter05_quantization::kQ3KBlockBytes, 0);
+    block[108] = 0x00;
+    block[109] = 0x3c;  // global scale 1.0
+    return block;
+}
+
+std::vector<std::uint8_t> make_q5_1_block() {
+    std::vector<std::uint8_t> block(chapter05_quantization::kQ5_1BlockBytes, 0);
+    block[0] = 0x00;
+    block[1] = 0x38;  // scale 0.5
+    block[2] = 0x00;
+    block[3] = 0x3c;  // minimum 1.0
+    for (std::size_t i = 8; i < block.size(); ++i) block[i] = 0x21;
+    return block;
+}
+
+std::vector<std::uint8_t> make_q5_0_unit_block() {
+    std::vector<std::uint8_t> block(chapter05_quantization::kQ5_0BlockBytes, 0);
+    block[0] = 0x00;
+    block[1] = 0x3c;  // scale 1.0
+    for (std::size_t i = 2; i < 6; ++i) block[i] = 0xff;
+    for (std::size_t i = 6; i < block.size(); ++i) block[i] = 0x11;
+    return block;
+}
+
+std::vector<std::uint8_t> make_q5k_unit_block() {
+    std::vector<std::uint8_t> block(chapter05_quantization::kQ5KBlockBytes, 0);
+    block[0] = 0x00;
+    block[1] = 0x3c;  // super-block scale 1.0
+    for (std::size_t i = 0; i < 4; ++i) block[4 + i] = 1;
+    for (std::size_t i = 0; i < 4; ++i) block[12 + i] = 1;
+    for (std::size_t i = 48; i < block.size(); ++i) block[i] = 0x11;
     return block;
 }
 
@@ -92,6 +135,130 @@ int main() {
         CPP_LLM_CHECK(suite, reference_output.same_shape(quantized_output));
         CPP_LLM_CHECK(suite, near(reference_output.at(0, 0), quantized_output.at(0, 0), 1e-5f));
         CPP_LLM_CHECK(suite, near(reference_output.at(1, 1), quantized_output.at(1, 1), 1e-5f));
+    });
+
+    suite.run("Q3_K block decoding and policy match fixed golden", [&] {
+        const auto weights = make_q3k_block();
+        std::vector<float> decoded;
+        std::string error;
+        CPP_LLM_REQUIRE(suite, dequantize_q3_k(
+            weights.data(), weights.size(), kQ3KBlockElements, &decoded, &error));
+        CPP_LLM_REQUIRE(suite, decoded.size() == kQ3KBlockElements);
+        CPP_LLM_CHECK(suite, std::all_of(decoded.begin(), decoded.end(), [](float value) {
+            return near(value, 128.0f, 1e-5f);
+        }));
+
+        const std::vector<float> input(kQ3KBlockElements, 1.0f);
+        std::vector<float> reference;
+        CPP_LLM_REQUIRE(suite, Q3KLinearReference::forward(
+            weights.data(), weights.size(), 1, kQ3KBlockElements,
+            input, &reference, &error));
+        std::vector<float> output(1, 0.0f);
+        const cpp_llm_engine::core::LinearRequest request{
+            weights.data(), weights.size(), input.data(), input.size(),
+            output.data(), output.size(), 1, kQ3KBlockElements,
+            cpp_llm_engine::core::WeightFormat::Q3K};
+        CPP_LLM_REQUIRE(suite, compute_quantized_linear(request, {}).is_ok());
+        CPP_LLM_CHECK(suite, near(reference[0], 32768.0f));
+        CPP_LLM_CHECK(suite, near(output[0], reference[0]));
+
+        std::vector<float> batch_input(kQ3KBlockElements * 2, 1.0F);
+        std::fill(batch_input.begin() + kQ3KBlockElements,
+                  batch_input.end(), 0.5F);
+        std::vector<float> batch_output(2, 0.0F);
+        const cpp_llm_engine::core::LinearBatchRequest batch_request{
+            weights.data(), weights.size(), batch_input.data(),
+            batch_input.size(), batch_output.data(), batch_output.size(),
+            2, 1, kQ3KBlockElements,
+            cpp_llm_engine::core::WeightFormat::Q3K};
+        CPP_LLM_REQUIRE(
+            suite, compute_quantized_linear_batch(batch_request, {}).is_ok());
+        CPP_LLM_CHECK(suite, near(batch_output[0], 32768.0F));
+        CPP_LLM_CHECK(suite, near(batch_output[1], 16384.0F));
+    });
+
+    suite.run("Q5_0 signed block and policy match fixed golden", [&] {
+        const auto weights = make_q5_0_unit_block();
+        std::vector<float> decoded;
+        std::string error;
+        CPP_LLM_REQUIRE(suite, dequantize_q5_0(
+            weights.data(), weights.size(), kQ5_0BlockElements,
+            &decoded, &error));
+        CPP_LLM_REQUIRE(suite, decoded.size() == kQ5_0BlockElements);
+        CPP_LLM_CHECK(suite, std::all_of(
+            decoded.begin(), decoded.end(), [](float value) {
+                return near(value, 1.0F, 1.0e-5F);
+            }));
+        const std::vector<float> input(kQ5_0BlockElements, 1.0F);
+        std::vector<float> output(1, 0.0F);
+        const cpp_llm_engine::core::LinearRequest request{
+            weights.data(), weights.size(), input.data(), input.size(),
+            output.data(), output.size(), 1, kQ5_0BlockElements,
+            cpp_llm_engine::core::WeightFormat::Q5_0};
+        CPP_LLM_REQUIRE(suite, compute_quantized_linear(request, {}).is_ok());
+        CPP_LLM_CHECK(suite, near(output[0], 32.0F));
+    });
+
+    suite.run("Q5_1 block decoding and policy match fixed golden", [&] {
+        const auto weights = make_q5_1_block();
+        std::vector<float> decoded;
+        std::string error;
+        CPP_LLM_REQUIRE(suite, dequantize_q5_1(
+            weights.data(), weights.size(), kQ5_1BlockElements, &decoded, &error));
+        CPP_LLM_REQUIRE(suite, decoded.size() == kQ5_1BlockElements);
+        CPP_LLM_CHECK(suite, near(decoded.front(), 1.5f));
+        CPP_LLM_CHECK(suite, near(decoded[15], 1.5f));
+        CPP_LLM_CHECK(suite, near(decoded[16], 2.0f));
+        CPP_LLM_CHECK(suite, near(decoded.back(), 2.0f));
+
+        const std::vector<float> input(kQ5_1BlockElements, 1.0f);
+        std::vector<float> reference;
+        CPP_LLM_REQUIRE(suite, Q5_1LinearReference::forward(
+            weights.data(), weights.size(), 1, kQ5_1BlockElements,
+            input, &reference, &error));
+        std::vector<float> output(1, 0.0f);
+        const cpp_llm_engine::core::LinearRequest request{
+            weights.data(), weights.size(), input.data(), input.size(),
+            output.data(), output.size(), 1, kQ5_1BlockElements,
+            cpp_llm_engine::core::WeightFormat::Q5_1};
+        CPP_LLM_REQUIRE(suite, compute_quantized_linear(request, {}).is_ok());
+        CPP_LLM_CHECK(suite, near(reference[0], 56.0f));
+        CPP_LLM_CHECK(suite, near(output[0], reference[0]));
+    });
+
+    suite.run("Q5_K grouped scales and policy match fixed golden", [&] {
+        const auto weights = make_q5k_unit_block();
+        const std::vector<float> input(kQ5KBlockElements, 1.0f);
+        std::vector<float> output(1, 0.0f);
+        const cpp_llm_engine::core::LinearRequest request{
+            weights.data(), weights.size(), input.data(), input.size(),
+            output.data(), output.size(), 1, kQ5KBlockElements,
+            cpp_llm_engine::core::WeightFormat::Q5K};
+        CPP_LLM_REQUIRE(suite, compute_quantized_linear(request, {}).is_ok());
+        CPP_LLM_CHECK(suite, near(output[0], 256.0f));
+
+        std::vector<float> batch_input(kQ5KBlockElements * 2, 1.0F);
+        std::fill(batch_input.begin() + kQ5KBlockElements,
+                  batch_input.end(), 0.5F);
+        std::vector<float> batch_output(2, 0.0F);
+        const cpp_llm_engine::core::LinearBatchRequest batch_request{
+            weights.data(), weights.size(), batch_input.data(),
+            batch_input.size(), batch_output.data(), batch_output.size(),
+            2, 1, kQ5KBlockElements,
+            cpp_llm_engine::core::WeightFormat::Q5K};
+        CPP_LLM_REQUIRE(
+            suite, compute_quantized_linear_batch(batch_request, {}).is_ok());
+        CPP_LLM_CHECK(suite, near(batch_output[0], 256.0F));
+        CPP_LLM_CHECK(suite, near(batch_output[1], 128.0F));
+
+        auto high_bit_weights = weights;
+        high_bit_weights[16] = 0x01;
+        const cpp_llm_engine::core::LinearRequest high_bit_request{
+            high_bit_weights.data(), high_bit_weights.size(), input.data(), input.size(),
+            output.data(), output.size(), 1, kQ5KBlockElements,
+            cpp_llm_engine::core::WeightFormat::Q5K};
+        CPP_LLM_REQUIRE(suite, compute_quantized_linear(high_bit_request, {}).is_ok());
+        CPP_LLM_CHECK(suite, near(output[0], 272.0f));
     });
 
     suite.run("Q8_0 block decoding matches fixed values", [&] {
