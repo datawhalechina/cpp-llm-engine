@@ -104,7 +104,7 @@
     <text x="200" y="601" font-size="12" fill="#52606d">小 block · 误差 · 失败路径</text>
     <rect x="344" y="550" width="244" height="72" rx="12" fill="#fff0dc" stroke="#e8a765"/>
     <text x="466" y="578" font-size="14" font-weight="700" fill="#9a4d13">B 真实执行</text>
-    <text x="466" y="601" font-size="12" fill="#6f5438">GGUF Q4_K / Q6_K / Q8_0</text>
+    <text x="466" y="601" font-size="12" fill="#6f5438">九种 GGUF 格式 · 混合量化</text>
     <rect x="610" y="550" width="244" height="72" rx="12" fill="#ecfdf5" stroke="#6db5a9"/>
     <text x="732" y="578" font-size="14" font-weight="700" fill="#0f5f59">G GPU 后端</text>
     <text x="732" y="601" font-size="12" fill="#376963">融合 GEMV / batch cuBLAS</text>

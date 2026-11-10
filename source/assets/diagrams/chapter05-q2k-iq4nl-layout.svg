@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Q2_K 分组线性量化与 IQ4_NL 非线性码表</title>
+  <desc id="desc">Q2_K 用 2-bit 数值、分组 scale 和 minimum 还原 256 个权重；IQ4_NL 用 4-bit 索引查询非均匀码表，再乘 block scale 还原 32 个权重。</desc>
+  <defs>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 26px; font-weight: 700; fill: #172033; }
+      .section { font-size: 18px; font-weight: 700; }
+      .label { font-size: 15px; font-weight: 700; fill: #172033; }
+      .text { font-size: 13px; fill: #475569; }
+      .small { font-size: 12px; fill: #64748b; }
+      .line { stroke: #52606d; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .bus { stroke: #52606d; stroke-width: 2.4; fill: none; }
+    </style>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#52606d"/></marker>
+  </defs>
+  <rect width="1200" height="650" rx="24" fill="#f8fafc"/>
+  <text x="48" y="52" class="title">DeepSeek 混合量化：Q2_K 与 IQ4_NL 使用不同还原规则</text>
+  <text x="48" y="80" class="text">两条路径最终都产生 Float32 reference，供 fused Linear 和真实模型中间量对照</text>
+
+  <rect x="48" y="116" width="536" height="430" rx="18" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="72" y="152" class="section" fill="#9a4d13">Q2_K：2-bit 数值 + 分组线性参数</text>
+  <text x="72" y="178" class="small">84 字节 super-block → 256 个权重</text>
+  <rect x="76" y="214" width="132" height="86" rx="12" fill="#fff" stroke="#f0a45d"/>
+  <text x="142" y="246" text-anchor="middle" class="label">scales[16]</text>
+  <text x="142" y="272" text-anchor="middle" class="small">4-bit scale/min</text>
+  <rect x="226" y="214" width="132" height="86" rx="12" fill="#fff" stroke="#f0a45d"/>
+  <text x="292" y="246" text-anchor="middle" class="label">qs[64]</text>
+  <text x="292" y="272" text-anchor="middle" class="small">每值 2 bit</text>
+  <rect x="376" y="214" width="180" height="86" rx="12" fill="#fff" stroke="#f0a45d"/>
+  <text x="466" y="246" text-anchor="middle" class="label">d + dmin</text>
+  <text x="466" y="272" text-anchor="middle" class="small">两个 FP16 全局参数</text>
+  <rect x="108" y="356" width="416" height="112" rx="14" fill="#ffedd5" stroke="#ea580c"/>
+  <text x="316" y="390" text-anchor="middle" class="label">按 16 个分组解包</text>
+  <text x="316" y="420" text-anchor="middle" class="text">weight = d × group_scale × q2</text>
+  <text x="316" y="446" text-anchor="middle" class="text">− dmin × group_minimum</text>
+  <path d="M142 300V332H466M292 300V332M466 300V332" class="bus"/>
+  <path d="M316 332V350" class="line"/>
+  <text x="316" y="512" text-anchor="middle" class="small">当前用途：DeepSeek 专家 Gate / Up</text>
+
+  <rect x="616" y="116" width="536" height="430" rx="18" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="640" y="152" class="section" fill="#0f766e">IQ4_NL：4-bit 索引 + 非均匀码表</text>
+  <text x="640" y="178" class="small">18 字节 block → 32 个权重</text>
+  <rect x="662" y="214" width="154" height="86" rx="12" fill="#fff" stroke="#34d399"/>
+  <text x="739" y="246" text-anchor="middle" class="label">d</text>
+  <text x="739" y="272" text-anchor="middle" class="small">FP16 block scale</text>
+  <rect x="834" y="214" width="272" height="86" rx="12" fill="#fff" stroke="#34d399"/>
+  <text x="970" y="246" text-anchor="middle" class="label">qs[16]</text>
+  <text x="970" y="272" text-anchor="middle" class="small">每字节保存两个 4-bit 索引</text>
+  <rect x="676" y="344" width="190" height="124" rx="14" fill="#d1fae5" stroke="#10b981"/>
+  <text x="771" y="378" text-anchor="middle" class="label">16 项非均匀码表</text>
+  <text x="771" y="405" text-anchor="middle" class="small">−127 … −10</text>
+  <text x="771" y="430" text-anchor="middle" class="small">1 … 113</text>
+  <rect x="894" y="356" width="226" height="100" rx="14" fill="#d1fae5" stroke="#10b981"/>
+  <text x="1007" y="390" text-anchor="middle" class="label">查表并缩放</text>
+  <text x="1007" y="420" text-anchor="middle" class="text">weight = d × table[index]</text>
+  <path d="M739 300V326H1007V350" class="line"/>
+  <path d="M970 300V320H771V338" class="line"/>
+  <path d="M866 406H888" class="line"/>
+  <text x="884" y="512" text-anchor="middle" class="small">当前用途：DeepSeek 专家 Down</text>
+
+  <rect x="168" y="580" width="864" height="42" rx="12" fill="#28536b"/>
+  <text x="600" y="606" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">固定 payload → reference 解码 → scalar fused → 真实层与完整 Decoder 误差门禁</text>
+</svg>

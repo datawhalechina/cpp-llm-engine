@@ -30,7 +30,7 @@ packed 权重 + Float32 激活
 | 6 | `examples/q4k_benchmark.cpp` | 生成 baseline、fused 和 SIMD 原始测量 | Chapter09 性能证据流程 |
 | 7 | `../cuda` 量化 Linear 资产 | CUDA 完整反量化基线与单 token/批量融合 GEMV | CUDA 正确性测试、EXP-GPU-02/03 与双请求 A/B |
 
-阅读一种格式时，先看对应的 `*_dequantize.cpp`，确认 block 内缩放因子和整数位布局；再看 `q*k_kernel.cpp`，理解为什么边解码边点积可以省去完整浮点权重缓冲区；最后进入 policy 和 View adapter，观察执行选择与跨章数据交接。三种格式的 block 尺寸和编码方式不同，各自保留独立解码实现。
+阅读一种格式时，先看对应的反量化或 reference 实现，确认 block 内缩放因子、整数位或码表布局；再看 fused Linear，理解为什么边解码边点积可以省去完整浮点权重缓冲区；最后进入 policy 和 View adapter，观察执行选择与跨章数据交接。九种格式的 block 尺寸和编码方式不同，各自保留独立解码规则。
 
 ## 运行与验证
 

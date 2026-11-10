@@ -6,7 +6,7 @@
 
 | 教程对象 | 成熟框架中的对应物 | 阅读重点 |
 | --- | --- | --- |
-| Q4_K/Q6_K/Q8_0 block reader | ggml quantized type/format | scale、min、quant bits 怎样布局 |
+| 九种 GGUF block reader | ggml quantized type/format | scale、min、quant bits 与非线性码表怎样布局 |
 | reference dequantize | reference quant kernels | fused 实现用什么结果校验 |
 | scalar/AVX2 fused Linear | CPU quantized GEMV/GEMM | 是否避免完整反量化中间量 |
 | `QuantizedLinearPolicy` | quantization method/backend dispatch | dtype、硬件和 shape 怎样选择实现 |
@@ -16,7 +16,7 @@
 
 | 本章可验证对象 | 成熟系统继续增加 | 增加它解决什么问题 |
 | --- | --- | --- |
-| INT8 教学格式、真实 Q4_K/Q6_K/Q8_0 | AWQ、GPTQ、FP8 等多格式 | 适配不同模型资产和硬件能力 |
+| INT8 教学格式、九种 GGUF 格式与模型内混合量化 | AWQ、GPTQ、FP8 等多格式 | 适配不同模型资产和硬件能力 |
 | block reference 与 fused CPU Linear | GPU quantized GEMM | 降低设备端带宽和计算成本 |
 | Float32 激活输入 | SmoothQuant、W8A8、FP8 activation | 让低精度表示继续进入矩阵计算 |
 | scalar/AVX2 显式策略 | 自动硬件调优和 tactic selection | 为不同 shape 选择稳定高效实现 |
@@ -30,7 +30,7 @@
 
 | 项目卡 | 在本章中的用途 |
 | --- | --- |
-| [llama.cpp](../reference/ecosystem/local_and_delivery.md#llama-cpp) | Q4_K/Q6_K/Q8_0 block 与 CPU 量化 kernel |
+| [llama.cpp](../reference/ecosystem/local_and_delivery.md#llama-cpp) | GGUF block、非线性码表与 CPU 量化 kernel |
 | [vLLM](../reference/ecosystem/production_frameworks.md#vllm) | quant method 与模型 Linear 的绑定 |
 | [TensorRT-LLM](../reference/ecosystem/production_frameworks.md#tensorrt-llm) | GPU 量化 kernel、workspace 和执行策略 |
 
@@ -40,4 +40,4 @@
 bash code/chapter05_quantization/scripts/run.sh
 ```
 
-先用 component 测试确认各量化格式共享 Linear 契约，再用 integration 测试核对 Q4_K/Q6_K/Q8_0 如何接收 Chapter02 激活 View。二者分别对应成熟框架中的格式实现和模型执行接口；[`05.8 量化在生成运行时中的位置`](./08_quantization_in_serving_runtime.md) 将继续追踪这项接口怎样被 Decoder 和 Generation Runtime 调用。
+先用 component 测试确认九种量化格式共享 Linear 契约，再用 integration 测试核对 Q4_K/Q6_K/Q8_0 如何接收 Chapter02 激活 View。前者覆盖格式实现，后者固定公共激活接口；[`05.8 量化在生成运行时中的位置`](./08_quantization_in_serving_runtime.md) 将继续追踪这项接口怎样被 Decoder 和 Generation Runtime 调用。
