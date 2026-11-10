@@ -34,6 +34,7 @@ Factory 的名称表示它负责按统一规则创建和装配 Executor，而不
 | `scripts/run_real_batch_benchmark.sh` | 可选 TinyLlama sequential/scalar Linear batch 配对 benchmark，并输出 Chapter08 可消费的分段计时 |
 | `scripts/run_real_decoder_profile.sh` | 可选 TinyLlama Decoder 子阶段计时与结果归档 |
 | `scripts/run_real_http_server.sh` | 启动真实 TinyLlama HTTP server，或以 `--check` 执行 curl 闭环 |
+| `scripts/run_deepseek_v2_lite_http_server.sh` | 启动 DeepSeek-V2-Lite HTTP server，或执行本地 Completion/SSE 回环 |
 | `CMakeLists.txt` | CPU 集成构建，以及显式启用的 CUDA 权重适配测试 |
 
 ## 运行与验证
@@ -143,6 +144,8 @@ ctest --test-dir /tmp/cpp-llm-engine-real-generation \
 `RealLlamaExecutorFactory` 长期持有只读 CPU Model，每次 `create_executor()` 创建一个独立 Context。Model 从 GGUF 自动识别 `llama` 或 `qwen3`；Context 独占 position 和每层连续或分页 K/V。`decode_batch()` 校验 position 后，在每层合并多个 Context 的 Q/K/V、输出投影、FFN 和 LM Head Linear；scalar Q4_K/Q6_K/Q8_0 backend 一次遍历权重并累加多个输入行。真实 batch 测试证明不同长度 prompt 的 logits 和固定输出与顺序执行一致，错误 position 或 token 不会提交状态。AVX2 batch 仍使用逐行兼容路径，因此尚不宣称批量吞吐收益。
 
 Qwen1.5-MoE 使用独立的 `RealQwen2MoeExecutorFactory`，共享模型索引和全局权重，为每个请求创建 24 层 K/V Context。Factory 同时实现 `ExecutorBatchRunner`：校验请求 ID、Context 和位置后，按层合并多个请求的 MoE 分发，任一层失败时恢复整批 Context。`real_qwen15_moe_scheduling_smoke` 已验证 Chapter08 用一次 batch runner 调用推进两个请求。Factory 的类型化 `RealQwen2MoeBatchMode` 可在同一二进制中选择逐行基线或按专家分组执行，默认使用分组路径；EXP-CPU-13～18 已依次覆盖 MoE 子层、完整 Decode、batch 与多步范围、Chapter08 固定队列和 Chapter10 动态准入，并保持数值、词元与生命周期闸门。Factory 还可设置 LRU 层权重缓存容量并读取命中、未命中和常驻字节；默认关闭，避免 7.4 GB GGUF 的专家层长期占用 CPU 内存。
+
+DeepSeek-V2-Lite 使用 `RealDeepSeek2ExecutorFactory` 进入同一个 Chapter06 Runtime。Factory 共享 GGUF 索引、embedding、最终归一化和 LM Head；每个执行器持有独立的 27 层压缩 MLA Context。Prefill 按层加载权重并处理该层的全部 prompt 词元，Decode 继续同一分层历史。Factory 可配置有界层权重缓存并读取命中与常驻字节，默认关闭以控制内存。`run_deepseek_v2_lite_generation.sh` 已固定 `Hello` 生成 `11 304`、文本 `, I`，并检查默认两轮模型执行产生 54 次层读取且没有常驻副本。Factory 还实现 Chapter08 `ExecutorBatchRunner`：每层先按请求推进独立 MLA，再把同层 FFN 输入按专家分组执行；失败时恢复整批 Context。真实双请求调度固定生成 `185 85770`。Factory 的类型化模式可选择逐请求基线或专家分组；EXP-CPU-19 在 batch 2、单步 Decode 下记录到 `0.943` 的中位数比例。Chapter10 已验证四请求动态准入、两次双请求组批与终态释放，并通过通用 `HttpAdapter` 核对同步 Completion、SSE 和指标。HTTP Adapter 当前顺序执行请求；融合 Tensor kernel 和并发 socket 服务仍是独立扩展。
 
 启用分页 K/V 后，CPU 和 CUDA Factory 都持有 `RadixPrefixCache`。请求结束时，完整物理块在释放请求页表前发布到前缀索引；新请求准入只估算可复用长度，获得运行槽时才重新查询并同步共享 `BlockTable`、Request 的 Prefill 进度和 CPU/CUDA Context 位置。`PrefixBlockStore` 让索引共用匹配和淘汰算法，同时保留两种 payload 的清理时序。容量不足时，数据面先回收最久未使用的索引独占叶端块，再重试预留；真实 CPU 和 CUDA 测试都使用相同四词元前缀比较冷启动与缓存命中路径，验证 logits 或首个生成词元一致。
 

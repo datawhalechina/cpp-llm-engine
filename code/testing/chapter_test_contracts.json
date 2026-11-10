@@ -122,6 +122,15 @@
       "note": "用固定 golden 核对稳定 Top-K、专家 SwiGLU 和共享专家合并"
     },
     {
+      "target": "chapter04_mla_attention_test",
+      "source": "code/chapter04_attention/tests/mla_attention_test.cpp",
+      "owner": "04",
+      "level": "component",
+      "dependencies": ["04"],
+      "status": "active",
+      "note": "对照显式展开的多头 Attention，核对 MLA 低秩缓存语义"
+    },
+    {
       "target": "chapter02_tensor_attention_integration_test",
       "source": "code/chapter04_attention/tests/chapter02_tensor_attention_integration_test.cpp",
       "owner": "04",
@@ -140,12 +149,81 @@
       "note": "CTest 名称为 real_tinyllama_first_layer_structure_test；验证真实首层九个权重装配"
     },
     {
+      "target": "deepseek_v2_lite_layer_capture",
+      "source": "code/model/examples/deepseek_v2_lite_layer_capture.cpp",
+      "owner": "04",
+      "level": "real_model",
+      "dependencies": ["01", "04"],
+      "status": "active",
+      "contract_cmake": "code/model/CMakeLists.txt",
+      "note": "通过 llama.cpp 回调固定 DeepSeek-V2-Lite 双词元参考，对照前两层中间节点以及完整 27 层 logits 和贪心词元"
+    },
+    {
+      "target": "real_deepseek2_dense_layer_test",
+      "source": "code/model/tests/real_deepseek2_dense_layer_test.cpp",
+      "owner": "05",
+      "level": "integration",
+      "dependencies": ["01", "04", "05"],
+      "status": "active",
+      "contract_cmake": "code/model/CMakeLists.txt",
+      "note": "核对 DeepSeek2 稠密/MoE 层共享的 YaRN、压缩历史、双残差和失败原子性"
+    },
+    {
+      "target": "real_deepseek2_generation_smoke",
+      "source": "code/engine/examples/real_deepseek2_generation_smoke.cpp",
+      "owner": "06",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05", "06"],
+      "status": "active",
+      "contract_cmake": "code/engine/CMakeLists.txt",
+      "note": "可选真实模型验收；核对 DeepSeek-V2-Lite Tokenizer、27 层 Prefill/Decode、固定词元和 Context 状态"
+    },
+    {
+      "target": "real_deepseek2_scheduling_smoke",
+      "source": "code/engine/examples/real_deepseek2_scheduling_smoke.cpp",
+      "owner": "08",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05", "06", "08"],
+      "status": "active",
+      "contract_cmake": "code/engine/CMakeLists.txt",
+      "note": "可选真实模型验收；核对两个 DeepSeek Context 由 Chapter08 一次 batch runner 调用同步推进"
+    },
+    {
+      "target": "real_deepseek2_service_smoke",
+      "source": "code/engine/examples/real_deepseek2_service_smoke.cpp",
+      "owner": "10",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05", "06", "08", "10"],
+      "status": "active",
+      "contract_cmake": "code/engine/CMakeLists.txt",
+      "note": "可选真实模型验收；核对 DeepSeek 动态准入、双请求组批、固定输出和终态释放"
+    },
+    {
+      "target": "real_deepseek2_http_adapter_smoke",
+      "source": "code/engine/examples/real_deepseek2_http_adapter_smoke.cpp",
+      "owner": "10",
+      "level": "real_model",
+      "dependencies": ["01", "04", "05", "06", "08", "10"],
+      "status": "active",
+      "contract_cmake": "code/engine/CMakeLists.txt",
+      "note": "可选真实模型验收；核对 DeepSeek 同步 Completion、SSE、指标和终态释放"
+    },
+    {
       "target": "chapter05_quantization_test",
       "source": "code/chapter05_quantization/tests/chapter05_quantization_test.cpp",
       "owner": "05",
       "level": "component",
       "dependencies": ["03", "05"],
       "status": "active"
+    },
+    {
+      "target": "chapter05_deepseek_quantization_test",
+      "source": "code/chapter05_quantization/tests/deepseek_quantization_test.cpp",
+      "owner": "05",
+      "level": "component",
+      "dependencies": ["01", "05"],
+      "status": "active",
+      "note": "核对 DeepSeek-V2-Lite 所需 Q2_K 与 IQ4_NL block 和 Linear"
     },
     {
       "target": "chapter02_tensor_quantized_linear_integration_test",

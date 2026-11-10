@@ -17,6 +17,8 @@ set(CPP_LLM_ENGINE_CUDA_REAL_MODEL "" CACHE FILEPATH
     "Optional GGUF used by the real CUDA layer CTest")
 set(CPP_LLM_ENGINE_QWEN15_MOE_MODEL "" CACHE FILEPATH
     "Optional Qwen1.5-MoE GGUF used by the real CPU Runtime CTest")
+set(CPP_LLM_ENGINE_DEEPSEEK2_MODEL "" CACHE FILEPATH
+    "Optional DeepSeek-V2-Lite GGUF used by the real CPU Runtime CTest")
 set(CHAPTER05_SOURCE_DIR "" CACHE PATH "Optional Chapter 05 source directory for real-model execution")
 
 add_subdirectory(
@@ -59,6 +61,17 @@ add_subdirectory(
 )
 
 if(TARGET cpp_llm_engine_model)
+    add_library(cpp_llm_engine_deepseek2_runtime
+        src/real_deepseek2_executor_factory.cpp
+    )
+    target_include_directories(cpp_llm_engine_deepseek2_runtime
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_link_libraries(cpp_llm_engine_deepseek2_runtime
+        PUBLIC cpp_llm_engine_model chapter06_generation
+    )
+    target_compile_features(cpp_llm_engine_deepseek2_runtime PUBLIC cxx_std_17)
+
     add_library(cpp_llm_engine_qwen2_moe_runtime
         src/real_qwen2_moe_executor_factory.cpp
     )
@@ -85,6 +98,9 @@ if(TARGET cpp_llm_engine_model)
     add_executable(real_qwen15_moe_service_benchmark
         examples/real_qwen15_moe_service_benchmark.cpp
     )
+    add_executable(real_deepseek2_moe_batch_runtime_benchmark
+        examples/real_deepseek2_moe_batch_runtime_benchmark.cpp
+    )
     target_link_libraries(real_qwen15_moe_runtime_test
         PRIVATE cpp_llm_engine_qwen2_moe_runtime)
     target_link_libraries(real_qwen15_moe_layer_cache_benchmark
@@ -99,6 +115,8 @@ if(TARGET cpp_llm_engine_model)
         PRIVATE
             cpp_llm_engine_qwen2_moe_runtime
             chapter10_serving)
+    target_link_libraries(real_deepseek2_moe_batch_runtime_benchmark
+        PRIVATE cpp_llm_engine_deepseek2_runtime)
     cpp_llm_prepare_test(real_qwen15_moe_runtime_test)
     if(CPP_LLM_ENGINE_QWEN15_MOE_MODEL)
         if(NOT EXISTS "${CPP_LLM_ENGINE_QWEN15_MOE_MODEL}")
@@ -142,6 +160,71 @@ if(TARGET cpp_llm_engine_qwen2_moe_runtime AND TARGET chapter08_scheduling)
         cpp_llm_set_test_contract(
             real_qwen15_moe_scheduling_smoke
             OWNER 08 LEVEL real_model STATUS active)
+    endif()
+endif()
+
+if(TARGET cpp_llm_engine_deepseek2_runtime AND TARGET chapter08_scheduling)
+    add_executable(real_deepseek2_scheduling_smoke
+        examples/real_deepseek2_scheduling_smoke.cpp
+    )
+    target_link_libraries(real_deepseek2_scheduling_smoke
+        PRIVATE cpp_llm_engine_deepseek2_runtime chapter08_scheduling)
+    cpp_llm_prepare_test(real_deepseek2_scheduling_smoke)
+    add_executable(real_deepseek2_service_smoke
+        examples/real_deepseek2_service_smoke.cpp
+    )
+    target_link_libraries(real_deepseek2_service_smoke
+        PRIVATE cpp_llm_engine_deepseek2_runtime chapter10_serving)
+    cpp_llm_prepare_test(real_deepseek2_service_smoke)
+    add_executable(real_deepseek2_http_adapter_smoke
+        examples/real_deepseek2_http_adapter_smoke.cpp
+    )
+    target_link_libraries(real_deepseek2_http_adapter_smoke
+        PRIVATE cpp_llm_engine_deepseek2_runtime chapter10_serving)
+    cpp_llm_prepare_test(real_deepseek2_http_adapter_smoke)
+    if(TARGET chapter10_cpp_httplib_transport)
+        add_executable(real_deepseek2_http_server
+            examples/real_deepseek2_http_server.cpp
+        )
+        target_link_libraries(real_deepseek2_http_server
+            PRIVATE
+                cpp_llm_engine_deepseek2_runtime
+                chapter10_cpp_httplib_transport)
+    endif()
+    if(CPP_LLM_ENGINE_DEEPSEEK2_MODEL)
+        add_test(
+            NAME real_deepseek2_scheduling_smoke
+            COMMAND real_deepseek2_scheduling_smoke
+                "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}"
+        )
+        cpp_llm_set_test_labels(
+            real_deepseek2_scheduling_smoke
+            real_model slow cpu deepseek scheduler batch integration)
+        cpp_llm_set_test_contract(
+            real_deepseek2_scheduling_smoke
+            OWNER 08 LEVEL real_model STATUS active)
+        add_test(
+            NAME real_deepseek2_service_smoke
+            COMMAND real_deepseek2_service_smoke
+                "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}"
+        )
+        cpp_llm_set_test_labels(
+            real_deepseek2_service_smoke
+            real_model slow cpu deepseek serving batch integration)
+        cpp_llm_set_test_contract(
+            real_deepseek2_service_smoke
+            OWNER 10 LEVEL real_model STATUS active)
+        add_test(
+            NAME real_deepseek2_http_adapter_smoke
+            COMMAND real_deepseek2_http_adapter_smoke
+                "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}"
+        )
+        cpp_llm_set_test_labels(
+            real_deepseek2_http_adapter_smoke
+            real_model slow cpu deepseek serving http sse integration)
+        cpp_llm_set_test_contract(
+            real_deepseek2_http_adapter_smoke
+            OWNER 10 LEVEL real_model STATUS active)
     endif()
 endif()
 
@@ -261,6 +344,37 @@ if(CHAPTER01_ENABLE_LLAMA_CPP)
         set_target_properties(real_qwen15_moe_generation_smoke PROPERTIES
             BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
         )
+    endif()
+    if(TARGET cpp_llm_engine_deepseek2_runtime)
+        add_executable(real_deepseek2_generation_smoke
+            examples/real_deepseek2_generation_smoke.cpp
+        )
+        target_link_libraries(real_deepseek2_generation_smoke
+            PRIVATE
+                cpp_llm_engine_deepseek2_runtime
+                cpp_llm_engine_real_tokenizer
+        )
+        set_target_properties(real_deepseek2_generation_smoke PROPERTIES
+            BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
+        )
+        cpp_llm_prepare_test(real_deepseek2_generation_smoke)
+        if(CPP_LLM_ENGINE_DEEPSEEK2_MODEL)
+            if(NOT EXISTS "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}")
+                message(FATAL_ERROR
+                    "CPP_LLM_ENGINE_DEEPSEEK2_MODEL does not exist")
+            endif()
+            add_test(
+                NAME real_deepseek2_generation_smoke
+                COMMAND real_deepseek2_generation_smoke
+                    "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}"
+            )
+            cpp_llm_set_test_labels(
+                real_deepseek2_generation_smoke
+                real_model slow cpu deepseek generation integration)
+            cpp_llm_set_test_contract(
+                real_deepseek2_generation_smoke
+                OWNER 06 LEVEL real_model STATUS active)
+        endif()
     endif()
     if(TARGET cpp_llm_engine_cuda_runtime)
         target_sources(cpp_llm_engine_cuda_runtime PRIVATE

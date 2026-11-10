@@ -12,7 +12,7 @@
 | Gemma | Gemma 稠密解码器 | 比较另一种模型家族的元数据、权重命名、归一化和 FFN 差异 | 外部兼容性参照 |
 | Qwen1.5-MoE-A2.7B-Chat | Qwen2 MoE | 首个单卡 MoE 目标；学习 Router、Top-K、共享专家和专家执行 | CPU 24 层生成、按专家分组批执行、调度与服务闭环已接通 |
 | Qwen3-30B-A3B | Qwen3 MoE | 对照路由器（Router）、Top-K 专家选择与专家执行 | 外部框架对照；总权重超出当前单卡目标 |
-| DeepSeek-V2-Lite | DeepSeek MoE + MLA | 对照 MoE 与 MLA 组合后的模型执行差异 | 进阶设计参照；16B 总权重且同时引入 MLA |
+| DeepSeek-V2-Lite | DeepSeek MoE + MLA | 对照压缩 K/V、混合稠密/MoE 层与共享专家 | CPU 27 层 Decoder、生成与跨请求专家分组已接通 |
 
 TinyLlama 继续作为默认模型，因为当前 Llama GGUF 字段模式、权重名称、分词器固定结果和真实解码器测试已有可重复证据。接入另一模型时应逐项处理格式和结构差异，避免把兼容问题误判为数值错误。
 
@@ -34,7 +34,7 @@ Qwen3-0.6B 同样使用 RMSNorm、RoPE、分组查询注意力和 SwiGLU，但�
 | Chapter09 | 保存版本化固定结果、正确性比较和性能记录 |
 | Chapter10 | 复用 ServiceCore；只新增模型选择与请求输入验证 |
 
-DeepSeek-R1-Distill-Qwen-1.5B 排在 Qwen 稠密模型之后。它基于 Qwen2.5 架构并调整配置和分词器，用于验证架构适配能否复用；DeepSeek-V2/V3 的 MoE 执行需要另一组路由与专家证据。
+DeepSeek-R1-Distill-Qwen-1.5B 排在 Qwen 稠密模型之后。它基于 Qwen2.5 架构并调整配置和分词器，用于验证架构适配能否复用。DeepSeek-V2-Lite 已完成外部基线、Loader、MLA reference、27 层混合 Decoder、LM Head、可选层权重缓存、Chapter06 单请求生成、Chapter08 双请求专家分组，以及 Chapter10 动态准入与 HTTP/SSE 回环；EXP-CPU-19 已补完整 Decode 配对证据，后续工作集中在 CUDA 数据面。
 
 Gemma 也经过同一条接入链：Chapter01 识别架构、元数据和权重字段模式，Chapter04 根据配置构造对应解码器，Chapter05 核对量化格式。llama.cpp 或 gemma.cpp 的外部结果作为基线，本教程仍需独立完成上述适配与验证。
 
@@ -63,7 +63,19 @@ bash code/engine/scripts/run_qwen15_moe_generation.sh
 
 当前分组路径是 CPU 默认实现，逐词元路径作为同权重、同路由的正确性和性能对照保留。实验覆盖最多四个请求和四步 Decode，并未建立开放环到达率或 HTTP 并发吞吐结论。
 
-“激活参数较少”表示每个词元只执行少量专家，模型部署仍需容纳其余专家权重。Qwen3-30B-A3B 每个词元激活约 3B 参数，总参数约 30B；DeepSeek-V2-Lite 总参数约 16B，并额外引入多头潜在注意力（MLA）。因此它们适合作为进阶设计参照，而非第一阶段单卡基线。
+“激活参数较少”表示每个词元只执行少量专家，模型部署仍需容纳其余专家权重。Qwen3-30B-A3B 每个词元激活约 3B 参数，总参数约 30B。DeepSeek-V2-Lite 总参数约 16B，并额外引入多头潜在注意力（MLA）；固定 Q2_K GGUF 约 6.43GB，当前用于 CPU reference 和生成闭环，尚未形成 CUDA 单卡执行承诺。
+
+## DeepSeek-V2-Lite 当前接入层级
+
+```bash
+bash code/chapter00_quickstart/download_deepseek_v2_lite.sh
+bash code/chapter00_quickstart/run_deepseek_v2_lite_baseline.sh
+bash code/chapter01_tensor_loader/run_deepseek_v2_lite_schema.sh
+bash code/chapter04_attention/scripts/run_deepseek_v2_lite_layer_capture.sh
+bash code/engine/scripts/run_deepseek_v2_lite_generation.sh
+```
+
+Chapter00 固定社区 GGUF revision、文件大小和 SHA256，并用 llama.cpp 建立短文本外部结果。Chapter01 识别 `deepseek2` 架构，归一化旧版与新版 MLA 元数据，检查 27 层、377 个张量、首层稠密 FFN、后续 64 选 6 专家和共享专家，并装配组合或拆分 K/V-B 权重。Chapter04 已用 CPU reference 证明低秩缓存与显式展开 Attention 数值一致。Chapter05 已实现固定 GGUF 所需的 Q2_K 与 IQ4_NL reference、scalar fused 和 policy。双词元第 0 层输出 MAE 为 `0.000891898`；第 1 层最终输出 MAE 为 `0.00128932`、余弦相似度为 `0.999859`。完整 27 层 logits 与 llama.cpp 的余弦相似度为 `0.999616`，贪心词元同为 `185`。Chapter06 使用真实 Tokenizer 和同一 Generation Runtime 从 `Hello` 生成固定词元 `11 304`，解码为 `, I`。
 
 ## 版本与资料
 
