@@ -1,6 +1,6 @@
 # 10.9 用真实模型验证服务闭环
 
-确定性 Executor 适合覆盖状态机，真实 TinyLlama 和 Qwen3 用于验证 Model 共享、Context 隔离、Tokenizer、K/V 增长和 HTTP 输出。两种模型复用同一组 ServiceCore、Scheduler、分页缓存与 Adapter；GGUF 路径决定 Factory 加载哪种 CPU Decoder。
+确定性 Executor 适合覆盖状态机，真实 TinyLlama、Qwen3 和 DeepSeek-V2-Lite 用于验证 Model 共享、Context 隔离、Tokenizer、K/V 增长和 HTTP 输出。模型复用同一组 ServiceCore、Scheduler 与 Adapter；Factory 负责把具体模型装配到统一执行接口。
 
 ## 真实对象怎样组装
 
@@ -41,6 +41,22 @@ bash code/chapter10_serving/scripts/run_qwen3_serving.sh
 ```
 
 两条 CPU 路径都要求同步 Completion、SSE、metrics 和固定 token golden 成立，两个请求的 Context/K/V 不串扰，Radix 前缀在调度提升时命中，终态后服务条目和请求块释放。`10.10` 将这个单进程闭环映射到成熟服务架构。
+
+DeepSeek-V2-Lite 先验证动态准入和双请求分组 MoE，再让同步 Completion 与 SSE 顺序经过同一个 Adapter：
+
+```bash
+bash code/chapter10_serving/scripts/run_deepseek_v2_lite_service.sh
+```
+
+该入口证明 DeepSeek Factory 能接入 Chapter10 的协议与生命周期接口。Adapter 测试不启动 socket，也不把两个顺序请求解释为并发 HTTP 组批。
+
+需要观察真实 socket 与 SSE chunk 时，再执行：
+
+```bash
+bash code/engine/scripts/run_deepseek_v2_lite_http_server.sh --check
+```
+
+这个回环继续使用相同 Adapter 和 Factory；Transport 只负责连接与字节写回。
 
 有 NVIDIA GPU 时再运行：
 

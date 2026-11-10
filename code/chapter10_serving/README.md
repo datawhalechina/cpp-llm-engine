@@ -61,6 +61,22 @@ bash code/chapter09_performance/scripts/run_qwen15_moe_service_ab.sh
 
 EXP-CPU-18 检查完整生成序列、服务生命周期和分组 MoE 性能；Transport 不在计时范围内。
 
+本地已有 DeepSeek-V2-Lite 时，可以验证动态请求接纳、协议映射与终态释放：
+
+```bash
+bash code/chapter10_serving/scripts/run_deepseek_v2_lite_service.sh
+```
+
+该入口先用 ServiceCore 接纳两组请求，检查两次双请求 Decode 组批、固定生成结果和资源归零；随后把同一 Factory 注入 `HttpAdapter`，分别验证同步 Completion 与 SSE 的固定词元、指标和释放。Adapter 测试不创建 socket；两个 HTTP 请求顺序执行，因此不作为并发 HTTP 组批证据。
+
+需要继续观察真实 HTTP 字节与 SSE chunk 时运行：
+
+```bash
+bash code/engine/scripts/run_deepseek_v2_lite_http_server.sh --check
+```
+
+该命令复用现有 cpp-httplib Transport，完成本地 health、Completion、SSE 和 metrics 回环；去掉 `--check` 可以保留服务供手工请求。
+
 ## 扩展入口
 
 ServiceCore 已接通 Chapter08 优先级策略、真实 Decode Tensor Batch 和分页 K/V 数据。当前背压会取消并释放请求；后续可以增加自动 Deadline、异步 Writer 暂停/恢复和单线程 ServiceCore 事件循环。真实多请求 Prefill Tensor Batch 仍是 Chapter08 后续能力，不能由 Transport 线程替代。
