@@ -30,7 +30,7 @@ cpp_llm_engine::core::WeightFormat weight_format(chapter01::DType dtype) {
 
 }  // namespace
 
-bool finish_qwen2_moe_output(
+bool finish_quantized_model_output(
     const chapter01::ModelMetadata& metadata,
     const chapter01::Tensor& output_norm,
     const chapter01::Tensor& output_weight,
@@ -44,17 +44,17 @@ bool finish_qwen2_moe_output(
         output_norm.dtype() != chapter01::DType::Float32 ||
         output_norm.numel() != metadata.hidden_size ||
         output_norm.raw_data() == nullptr) {
-        return fail(error, "Qwen2MoE output norm does not match hidden state");
+        return fail(error, "model output norm does not match hidden state");
     }
     const auto& shape = output_weight.shape();
     if (shape.size() != 2 || shape[0] !=
             static_cast<std::int64_t>(metadata.hidden_size) ||
         shape[1] != static_cast<std::int64_t>(metadata.vocab_size)) {
-        return fail(error, "Qwen2MoE output weight does not match vocabulary");
+        return fail(error, "model output weight does not match vocabulary");
     }
     const auto format = weight_format(output_weight.dtype());
     if (format == cpp_llm_engine::core::WeightFormat::Unknown) {
-        return fail(error, "Qwen2MoE output weight format is not supported");
+        return fail(error, "model output weight format is not supported");
     }
 
     std::vector<float> scale(metadata.hidden_size, 0.0F);
@@ -80,12 +80,26 @@ bool finish_qwen2_moe_output(
     if (!status.is_ok()) return fail(error, status.message());
     if (!std::all_of(output.begin(), output.end(),
                      [](float value) { return std::isfinite(value); })) {
-        return fail(error, "Qwen2MoE LM Head produced non-finite logits");
+        return fail(error, "model LM Head produced non-finite logits");
     }
     *normalized_hidden = std::move(normalized);
     *logits = std::move(output);
     if (error != nullptr) error->clear();
     return true;
+}
+
+bool finish_qwen2_moe_output(
+    const chapter01::ModelMetadata& metadata,
+    const chapter01::Tensor& output_norm,
+    const chapter01::Tensor& output_weight,
+    const std::vector<float>& hidden,
+    std::vector<float>* normalized_hidden,
+    std::vector<float>* logits,
+    std::string* error,
+    const chapter05_quantization::QuantizedLinearPolicy& policy) {
+    return finish_quantized_model_output(
+        metadata, output_norm, output_weight, hidden, normalized_hidden,
+        logits, error, policy);
 }
 
 }  // namespace cpp_llm_engine::model

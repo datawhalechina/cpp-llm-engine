@@ -13,6 +13,16 @@
 
 namespace cpp_llm_engine::model {
 
+bool finish_quantized_model_output(
+    const chapter01::ModelMetadata& metadata,
+    const chapter01::Tensor& output_norm,
+    const chapter01::Tensor& output_weight,
+    const std::vector<float>& hidden,
+    std::vector<float>* normalized_hidden,
+    std::vector<float>* logits,
+    std::string* error = nullptr,
+    const chapter05_quantization::QuantizedLinearPolicy& policy = {});
+
 bool finish_qwen2_moe_output(
     const chapter01::ModelMetadata& metadata,
     const chapter01::Tensor& output_norm,

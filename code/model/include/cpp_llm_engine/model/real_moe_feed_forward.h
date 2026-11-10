@@ -47,9 +47,30 @@ bool run_real_moe_feed_forward(
     const chapter05_quantization::QuantizedLinearPolicy& policy = {},
     RealMoeTrace* trace = nullptr);
 
+bool run_real_deepseek2_moe_feed_forward(
+    const chapter01::ModelMetadata& metadata,
+    const chapter01::RealDeepSeek2MoeLayerWeights& weights,
+    const std::vector<float>& normalized_hidden,
+    std::vector<float>* output,
+    RealMoeRoute* route,
+    std::string* error = nullptr,
+    const chapter05_quantization::QuantizedLinearPolicy& policy = {},
+    RealMoeTrace* trace = nullptr);
+
 bool run_real_moe_feed_forward_batch(
     const chapter01::ModelMetadata& metadata,
     const chapter01::RealMoeLayerWeights& weights,
+    const std::vector<std::vector<float>>& normalized_hidden,
+    std::vector<std::vector<float>>* output,
+    std::vector<RealMoeRoute>* routes,
+    RealMoeDispatchStats* stats = nullptr,
+    std::string* error = nullptr,
+    const chapter05_quantization::QuantizedLinearPolicy& policy = {},
+    RealMoeBatchMode mode = RealMoeBatchMode::Grouped);
+
+bool run_real_deepseek2_moe_feed_forward_batch(
+    const chapter01::ModelMetadata& metadata,
+    const chapter01::RealDeepSeek2MoeLayerWeights& weights,
     const std::vector<std::vector<float>>& normalized_hidden,
     std::vector<std::vector<float>>* output,
     std::vector<RealMoeRoute>* routes,

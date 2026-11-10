@@ -64,9 +64,9 @@ shared_output = sigmoid(shared_router(x)) * shared_expert(x)
 output = selected_output + shared_output
 ```
 
-这里的稳定 Top-K 表示分数相同时优先选择编号较小的专家，使测试和不同运行环境得到相同路由。教学实现对选中专家重新归一化，便于观察加权和；Qwen1.5-MoE 则先对全部 60 个专家做 Softmax，再保留 Top-4 概率，因此四个权重之和通常小于 1。真实适配器通过模型路由策略区分这两种语义。Qwen1.5-MoE 还让所有词元经过一个共享专家，再用单独门控控制共享专家贡献。
+这里的稳定 Top-K 表示分数相同时优先选择编号较小的专家，使测试和不同运行环境得到相同路由。教学实现对选中专家重新归一化，便于观察加权和；Qwen1.5-MoE 和 DeepSeek-V2-Lite 都先对全部专家做 Softmax，再保留 Top-K 概率，因此选中权重之和通常小于 1。Qwen1.5-MoE 用单独门控控制共享专家贡献，DeepSeek-V2-Lite 则把共享专家输出直接相加。真实适配器根据模型元数据选择这两种共享专家语义。
 
-<a href="../_code/chapter04_attention/src/moe_feed_forward.cpp"><code>moe_feed_forward.cpp</code></a> 使用小尺寸 Float32 权重完整执行这条语义链，并把每个词元的专家编号和路由权重保存在 `MoeRoute` 中。真实路径由 <a href="../_code/model/src/real_moe_feed_forward.cpp"><code>real_moe_feed_forward.cpp</code></a> 连接 Chapter01 的三维 packed expert 权重与 Chapter05 的 Q3_K、Q4_K、Q5_0、Q5_1、Q5_K、Q6_K、Q8_0 Linear：先完成 60 选 4，再只执行命中的专家，最后合并共享专家。
+<a href="../_code/chapter04_attention/src/moe_feed_forward.cpp"><code>moe_feed_forward.cpp</code></a> 使用小尺寸 Float32 权重完整执行这条语义链，并把每个词元的专家编号和路由权重保存在 `MoeRoute` 中。真实路径由 <a href="../_code/model/src/real_moe_feed_forward.cpp"><code>real_moe_feed_forward.cpp</code></a> 连接 Chapter01 的三维 packed expert 权重与 Chapter05 的量化 Linear。Qwen1.5-MoE 使用 60 选 4 和 Q3_K/Q5_K 等格式；DeepSeek-V2-Lite 使用 64 选 6，专家 Gate/Up 为 Q2_K、Down 为 IQ4_NL，共享专家输出不经过额外门控。
 
 ## 多词元怎样按专家分组
 
@@ -113,5 +113,13 @@ bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh
 ```
 
 第一个入口加载 layer-0 的真实 Router、packed experts 和共享专家，检查全专家 Softmax 后的 Top-4 权重、2048 维输出与有限性。第二个入口从 llama.cpp 捕获 layer-0 Attention、FFN 和层输出。第三个入口扩展到 24 层，并把两种误差分开报告：局部路径使用 llama.cpp 上一层输出，验证当前层 Top-K 与数值；累计路径使用教程自己的上一层输出，观察量化误差跨过 Top-K 边界后怎样改变后续专家选择。局部路径的 24 层专家集合全部一致，最大局部 MAE 为 `0.0418066`。
+
+准备 DeepSeek-V2-Lite 后，运行同一捕获入口可同时检查第 0 层稠密 FFN 和第 1 层 MoE：
+
+```bash
+bash code/chapter04_attention/scripts/run_deepseek_v2_lite_layer_capture.sh
+```
+
+第 1 层从第 0 层输出开始，自行执行 MLA、两条残差支路、64 选 6 路由专家和共享专家。固定双词元最终层输出 MAE 为 `0.001289`、余弦相似度为 `0.999859`；其中 MoE 合并输出 MAE 为 `0.001043`。同一入口继续执行完整 27 层和 LM Head，最终 logits 余弦相似度为 `0.999616`，教程实现与 llama.cpp 的贪心词元同为 `185`。
 
 下一节将把两条残差支路、两个 LayerNorm、注意力和 FFN 组装成一个完整的教学 `DecoderLayer`。

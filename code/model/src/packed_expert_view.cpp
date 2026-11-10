@@ -20,6 +20,12 @@ bool format_of(chapter01::DType dtype,
                std::size_t* block_bytes) {
     using chapter01::DType;
     using cpp_llm_engine::core::WeightFormat;
+    if (dtype == DType::Q2_K) {
+        *format = WeightFormat::Q2K;
+        *block_elements = 256;
+        *block_bytes = 84;
+        return true;
+    }
     if (dtype == DType::Q3_K) {
         *format = WeightFormat::Q3K;
         *block_elements = 256;
@@ -60,6 +66,12 @@ bool format_of(chapter01::DType dtype,
         *format = WeightFormat::Q8_0;
         *block_elements = 32;
         *block_bytes = 34;
+        return true;
+    }
+    if (dtype == DType::IQ4_NL) {
+        *format = WeightFormat::IQ4_NL;
+        *block_elements = 32;
+        *block_bytes = 18;
         return true;
     }
     return false;

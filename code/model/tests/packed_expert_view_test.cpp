@@ -52,5 +52,32 @@ int main() {
             suite, view.format == cpp_llm_engine::core::WeightFormat::Q5_0);
         CPP_LLM_CHECK(suite, view.data[0] == std::uint8_t{9});
     });
+
+    suite.run("DeepSeek expert formats preserve block boundaries", [&] {
+        std::vector<std::byte> q2_bytes(2 * 84, std::byte{0});
+        q2_bytes[84] = std::byte{0x2a};
+        const auto q2 = chapter01::Tensor::from_raw_bytes(
+            "q2-experts", {256, 1, 2}, chapter01::DType::Q2_K,
+            std::move(q2_bytes));
+        PackedExpertView q2_view;
+        CPP_LLM_REQUIRE(suite, PackedExpertView::create(q2, 1, &q2_view));
+        CPP_LLM_CHECK(suite, q2_view.bytes == 84);
+        CPP_LLM_CHECK(
+            suite, q2_view.format == cpp_llm_engine::core::WeightFormat::Q2K);
+        CPP_LLM_CHECK(suite, q2_view.data[0] == std::uint8_t{0x2a});
+
+        std::vector<std::byte> iq4_bytes(2 * 18, std::byte{0});
+        iq4_bytes[18] = std::byte{0x4e};
+        const auto iq4 = chapter01::Tensor::from_raw_bytes(
+            "iq4-experts", {32, 1, 2}, chapter01::DType::IQ4_NL,
+            std::move(iq4_bytes));
+        PackedExpertView iq4_view;
+        CPP_LLM_REQUIRE(suite, PackedExpertView::create(iq4, 1, &iq4_view));
+        CPP_LLM_CHECK(suite, iq4_view.bytes == 18);
+        CPP_LLM_CHECK(
+            suite,
+            iq4_view.format == cpp_llm_engine::core::WeightFormat::IQ4_NL);
+        CPP_LLM_CHECK(suite, iq4_view.data[0] == std::uint8_t{0x4e});
+    });
     return suite.finish();
 }

@@ -141,7 +141,9 @@ bool tensor_view(const chapter01::Tensor& weight,
     built.bytes = weight.bytes();
     built.cols = static_cast<std::size_t>(shape[0]);
     built.rows = static_cast<std::size_t>(shape[1]);
-    if (weight.dtype() == chapter01::DType::Q3_K) {
+    if (weight.dtype() == chapter01::DType::Q2_K) {
+        built.format = cpp_llm_engine::core::WeightFormat::Q2K;
+    } else if (weight.dtype() == chapter01::DType::Q3_K) {
         built.format = cpp_llm_engine::core::WeightFormat::Q3K;
     } else if (weight.dtype() == chapter01::DType::Q4_K) {
         built.format = cpp_llm_engine::core::WeightFormat::Q4K;
@@ -155,6 +157,8 @@ bool tensor_view(const chapter01::Tensor& weight,
         built.format = cpp_llm_engine::core::WeightFormat::Q6K;
     } else if (weight.dtype() == chapter01::DType::Q8_0) {
         built.format = cpp_llm_engine::core::WeightFormat::Q8_0;
+    } else if (weight.dtype() == chapter01::DType::IQ4_NL) {
+        built.format = cpp_llm_engine::core::WeightFormat::IQ4_NL;
     } else {
         return fail(error, "shared expert weight format is not supported: " +
             weight.name() + " dtype=" +
@@ -195,8 +199,33 @@ float sigmoid(float value) {
     return exponential / (1.0F + exponential);
 }
 
+struct MoeWeightsView {
+    const chapter01::Tensor& router;
+    const chapter01::Tensor& expert_gate;
+    const chapter01::Tensor& expert_up;
+    const chapter01::Tensor& expert_down;
+    const chapter01::Tensor& shared_expert_gate;
+    const chapter01::Tensor& shared_expert_up;
+    const chapter01::Tensor& shared_expert_down;
+    const chapter01::Tensor* shared_expert_router = nullptr;
+};
+
+MoeWeightsView weights_view(const chapter01::RealMoeLayerWeights& weights) {
+    return {weights.router, weights.expert_gate, weights.expert_up,
+            weights.expert_down, weights.shared_expert_gate,
+            weights.shared_expert_up, weights.shared_expert_down,
+            &weights.shared_expert_router};
+}
+
+MoeWeightsView weights_view(
+    const chapter01::RealDeepSeek2MoeLayerWeights& weights) {
+    return {weights.router, weights.expert_gate, weights.expert_up,
+            weights.expert_down, weights.shared_expert_gate,
+            weights.shared_expert_up, weights.shared_expert_down, nullptr};
+}
+
 bool run_packed_expert(
-    const chapter01::RealMoeLayerWeights& weights,
+    const MoeWeightsView& weights,
     std::size_t expert,
     const std::vector<float>& input,
     const chapter05_quantization::QuantizedLinearPolicy& policy,
@@ -231,7 +260,7 @@ struct PreparedExpert {
     PackedExpertView down;
 };
 
-bool prepare_expert(const chapter01::RealMoeLayerWeights& weights,
+bool prepare_expert(const MoeWeightsView& weights,
                     std::size_t expert,
                     PreparedExpert* output,
                     std::string* error) {
@@ -305,7 +334,7 @@ bool run_prepared_expert_batch(
 }
 
 bool run_shared_expert(
-    const chapter01::RealMoeLayerWeights& weights,
+    const MoeWeightsView& weights,
     const std::vector<float>& input,
     const chapter05_quantization::QuantizedLinearPolicy& policy,
     std::vector<float>* output,
@@ -323,7 +352,7 @@ bool run_shared_expert(
 }
 
 bool run_shared_expert_batch(
-    const chapter01::RealMoeLayerWeights& weights,
+    const MoeWeightsView& weights,
     const std::vector<std::vector<float>>& inputs,
     const chapter05_quantization::QuantizedLinearPolicy& policy,
     std::vector<std::vector<float>>* outputs,
@@ -348,7 +377,7 @@ bool run_shared_expert_batch(
 
 bool route_hidden(const chapter01::ModelMetadata& metadata,
                   const std::vector<float>& router,
-                  const std::vector<float>& shared_router,
+                  const std::vector<float>* shared_router,
                   const std::vector<float>& hidden,
                   RealMoeRoute* route,
                   std::string* error) {
@@ -388,20 +417,22 @@ bool route_hidden(const chapter01::ModelMetadata& metadata,
     }
     for (float& value : route_weights) value *= metadata.expert_weights_scale;
 
-    float shared_logit = 0.0F;
-    for (std::size_t column = 0; column < metadata.hidden_size; ++column) {
-        shared_logit += shared_router[column] * hidden[column];
+    float shared_weight = 1.0F;
+    if (shared_router != nullptr) {
+        float shared_logit = 0.0F;
+        for (std::size_t column = 0; column < metadata.hidden_size; ++column) {
+            shared_logit += (*shared_router)[column] * hidden[column];
+        }
+        shared_weight = sigmoid(shared_logit);
     }
     *route = {std::move(order), std::move(route_weights),
-              sigmoid(shared_logit)};
+              shared_weight};
     return true;
 }
 
-}  // namespace
-
-bool run_real_moe_feed_forward(
+bool run_moe_feed_forward(
     const chapter01::ModelMetadata& metadata,
-    const chapter01::RealMoeLayerWeights& weights,
+    const MoeWeightsView& weights,
     const std::vector<float>& normalized_hidden,
     std::vector<float>* output,
     RealMoeRoute* route,
@@ -411,97 +442,63 @@ bool run_real_moe_feed_forward(
     if (output == nullptr || route == nullptr) {
         return fail(error, "MoE output and route must not be null");
     }
-    if (metadata.architecture != "qwen2moe" ||
-        normalized_hidden.size() != metadata.hidden_size ||
+    if (normalized_hidden.size() != metadata.hidden_size ||
         metadata.expert_count == 0 || metadata.expert_used_count == 0 ||
         metadata.expert_used_count > metadata.expert_count) {
-        return fail(error, "Qwen2MoE metadata and hidden input are inconsistent");
+        return fail(error, "MoE metadata and hidden input are inconsistent");
     }
 
     std::vector<float> router;
     std::vector<float> shared_router;
     if (!floating_values(weights.router, &router, error) ||
-        !floating_values(weights.shared_expert_router, &shared_router, error) ||
-        router.size() != metadata.hidden_size * metadata.expert_count ||
-        shared_router.size() != metadata.hidden_size) {
-        return fail(error, "Qwen2MoE Router payload does not match metadata");
+        router.size() != metadata.hidden_size * metadata.expert_count) {
+        return fail(error, "MoE Router payload does not match metadata");
     }
-
-    std::vector<float> logits(metadata.expert_count, 0.0F);
-    for (std::size_t expert = 0; expert < metadata.expert_count; ++expert) {
-        for (std::size_t column = 0; column < metadata.hidden_size; ++column) {
-            logits[expert] +=
-                router[expert * metadata.hidden_size + column] *
-                normalized_hidden[column];
+    const std::vector<float>* shared_router_view = nullptr;
+    if (weights.shared_expert_router != nullptr) {
+        if (!floating_values(*weights.shared_expert_router, &shared_router,
+                             error) ||
+            shared_router.size() != metadata.hidden_size) {
+            return fail(error,
+                        "MoE shared Router payload does not match metadata");
         }
-        if (!std::isfinite(logits[expert])) {
-            return fail(error, "MoE Router produced a non-finite score");
-        }
+        shared_router_view = &shared_router;
     }
 
-    std::vector<std::size_t> order(metadata.expert_count);
-    std::iota(order.begin(), order.end(), 0);
-    std::stable_sort(order.begin(), order.end(),
-                     [&logits](std::size_t left, std::size_t right) {
-                         if (logits[left] == logits[right]) return left < right;
-                         return logits[left] > logits[right];
-                     });
-    order.resize(metadata.expert_used_count);
-
-    const float maximum = *std::max_element(logits.begin(), logits.end());
-    std::vector<float> route_weights(order.size(), 0.0F);
-    float denominator = 0.0F;
-    for (const float logit : logits) {
-        denominator += std::exp(logit - maximum);
-    }
-    if (!std::isfinite(denominator) || denominator <= 0.0F) {
-        return fail(error, "MoE selected expert weights cannot be normalized");
-    }
-    float selected_sum = 0.0F;
-    for (std::size_t i = 0; i < order.size(); ++i) {
-        route_weights[i] = std::exp(logits[order[i]] - maximum) / denominator;
-        selected_sum += route_weights[i];
-    }
-    if (metadata.expert_weights_normalize) {
-        for (float& value : route_weights) value /= selected_sum;
-    }
-    for (float& value : route_weights) {
-        value *= metadata.expert_weights_scale;
+    RealMoeRoute built_route;
+    if (!route_hidden(metadata, router, shared_router_view, normalized_hidden,
+                      &built_route, error)) {
+        return false;
     }
 
     std::vector<float> built(metadata.hidden_size, 0.0F);
-    for (std::size_t i = 0; i < order.size(); ++i) {
+    for (std::size_t i = 0; i < built_route.expert_indices.size(); ++i) {
         std::vector<float> expert_output;
-        if (!run_packed_expert(weights, order[i], normalized_hidden,
-                               policy, &expert_output, error)) {
+        if (!run_packed_expert(weights, built_route.expert_indices[i],
+                               normalized_hidden, policy, &expert_output,
+                               error)) {
             return false;
         }
         for (std::size_t column = 0; column < built.size(); ++column) {
-            built[column] += route_weights[i] * expert_output[column];
+            built[column] += built_route.weights[i] * expert_output[column];
         }
     }
 
-    float shared_logit = 0.0F;
-    for (std::size_t column = 0; column < metadata.hidden_size; ++column) {
-        shared_logit += shared_router[column] * normalized_hidden[column];
-    }
     std::vector<float> shared_output;
-    if (!run_shared_expert(weights, normalized_hidden, policy,
-                           &shared_output, error)) {
+    if (!run_shared_expert(weights, normalized_hidden, policy, &shared_output,
+                           error)) {
         return false;
     }
-    const float shared_weight = sigmoid(shared_logit);
     std::vector<float> weighted_shared(shared_output.size(), 0.0F);
     for (std::size_t column = 0; column < built.size(); ++column) {
-        weighted_shared[column] = shared_weight * shared_output[column];
+        weighted_shared[column] =
+            built_route.shared_expert_weight * shared_output[column];
         built[column] += weighted_shared[column];
         if (!std::isfinite(built[column])) {
             return fail(error, "MoE FeedForward produced a non-finite value");
         }
     }
 
-    RealMoeRoute built_route{std::move(order), std::move(route_weights),
-                             shared_weight};
     *output = std::move(built);
     *route = std::move(built_route);
     if (trace != nullptr) {
@@ -516,9 +513,45 @@ bool run_real_moe_feed_forward(
     return true;
 }
 
-bool run_real_moe_feed_forward_batch(
+}  // namespace
+
+bool run_real_moe_feed_forward(
     const chapter01::ModelMetadata& metadata,
     const chapter01::RealMoeLayerWeights& weights,
+    const std::vector<float>& normalized_hidden,
+    std::vector<float>* output,
+    RealMoeRoute* route,
+    std::string* error,
+    const chapter05_quantization::QuantizedLinearPolicy& policy,
+    RealMoeTrace* trace) {
+    if (metadata.architecture != "qwen2moe") {
+        return fail(error, "Qwen2MoE metadata is required");
+    }
+    return run_moe_feed_forward(metadata, weights_view(weights),
+                                normalized_hidden, output, route, error,
+                                policy, trace);
+}
+
+bool run_real_deepseek2_moe_feed_forward(
+    const chapter01::ModelMetadata& metadata,
+    const chapter01::RealDeepSeek2MoeLayerWeights& weights,
+    const std::vector<float>& normalized_hidden,
+    std::vector<float>* output,
+    RealMoeRoute* route,
+    std::string* error,
+    const chapter05_quantization::QuantizedLinearPolicy& policy,
+    RealMoeTrace* trace) {
+    if (metadata.architecture != "deepseek2") {
+        return fail(error, "DeepSeek2 metadata is required");
+    }
+    return run_moe_feed_forward(metadata, weights_view(weights),
+                                normalized_hidden, output, route, error,
+                                policy, trace);
+}
+
+bool run_moe_feed_forward_batch_impl(
+    const chapter01::ModelMetadata& metadata,
+    const MoeWeightsView& weights,
     const std::vector<std::vector<float>>& normalized_hidden,
     std::vector<std::vector<float>>* output,
     std::vector<RealMoeRoute>* routes,
@@ -527,29 +560,35 @@ bool run_real_moe_feed_forward_batch(
     const chapter05_quantization::QuantizedLinearPolicy& policy,
     RealMoeBatchMode mode) {
     if (output == nullptr || routes == nullptr || normalized_hidden.empty() ||
-        metadata.architecture != "qwen2moe" || metadata.expert_count == 0 ||
-        metadata.expert_used_count == 0 ||
+        metadata.expert_count == 0 || metadata.expert_used_count == 0 ||
         metadata.expert_used_count > metadata.expert_count) {
-        return fail(error, "Qwen2MoE batch inputs and metadata are inconsistent");
+        return fail(error, "MoE batch inputs and metadata are inconsistent");
     }
     for (const auto& hidden : normalized_hidden) {
         if (hidden.size() != metadata.hidden_size) {
-            return fail(error, "Qwen2MoE batch hidden width is inconsistent");
+            return fail(error, "MoE batch hidden width is inconsistent");
         }
     }
 
     std::vector<float> router;
     std::vector<float> shared_router;
     if (!floating_values(weights.router, &router, error) ||
-        !floating_values(weights.shared_expert_router, &shared_router, error) ||
-        router.size() != metadata.hidden_size * metadata.expert_count ||
-        shared_router.size() != metadata.hidden_size) {
-        return fail(error, "Qwen2MoE Router payload does not match metadata");
+        router.size() != metadata.hidden_size * metadata.expert_count) {
+        return fail(error, "MoE Router payload does not match metadata");
+    }
+    const std::vector<float>* shared_router_view = nullptr;
+    if (weights.shared_expert_router != nullptr) {
+        if (!floating_values(
+                *weights.shared_expert_router, &shared_router, error) ||
+            shared_router.size() != metadata.hidden_size) {
+            return fail(error, "MoE shared Router payload does not match metadata");
+        }
+        shared_router_view = &shared_router;
     }
 
     std::vector<RealMoeRoute> built_routes(normalized_hidden.size());
     for (std::size_t token = 0; token < normalized_hidden.size(); ++token) {
-        if (!route_hidden(metadata, router, shared_router,
+        if (!route_hidden(metadata, router, shared_router_view,
                           normalized_hidden[token], &built_routes[token],
                           error)) {
             return false;
@@ -581,7 +620,9 @@ bool run_real_moe_feed_forward_batch(
         built_stats.maximum_tokens_per_expert = std::max(
             built_stats.maximum_tokens_per_expert, assignments[expert].size());
         PreparedExpert prepared;
-        if (!prepare_expert(weights, expert, &prepared, error)) return false;
+        if (!prepare_expert(weights, expert, &prepared, error)) {
+            return false;
+        }
         std::vector<std::vector<float>> expert_outputs;
         if (mode == RealMoeBatchMode::Grouped) {
             std::vector<std::vector<float>> expert_inputs;
@@ -622,7 +663,8 @@ bool run_real_moe_feed_forward_batch(
     std::vector<std::vector<float>> shared_outputs;
     if (mode == RealMoeBatchMode::Grouped) {
         if (!run_shared_expert_batch(
-                weights, normalized_hidden, policy, &shared_outputs, error)) {
+                weights, normalized_hidden, policy,
+                &shared_outputs, error)) {
             return false;
         }
     } else {
@@ -630,7 +672,8 @@ bool run_real_moe_feed_forward_batch(
         for (const auto& hidden : normalized_hidden) {
             std::vector<float> shared_output;
             if (!run_shared_expert(
-                    weights, hidden, policy, &shared_output, error)) {
+                    weights, hidden, policy, &shared_output,
+                    error)) {
                 return false;
             }
             shared_outputs.push_back(std::move(shared_output));
@@ -653,6 +696,42 @@ bool run_real_moe_feed_forward_batch(
     if (stats != nullptr) *stats = built_stats;
     if (error != nullptr) error->clear();
     return true;
+}
+
+bool run_real_moe_feed_forward_batch(
+    const chapter01::ModelMetadata& metadata,
+    const chapter01::RealMoeLayerWeights& weights,
+    const std::vector<std::vector<float>>& normalized_hidden,
+    std::vector<std::vector<float>>* output,
+    std::vector<RealMoeRoute>* routes,
+    RealMoeDispatchStats* stats,
+    std::string* error,
+    const chapter05_quantization::QuantizedLinearPolicy& policy,
+    RealMoeBatchMode mode) {
+    if (metadata.architecture != "qwen2moe") {
+        return fail(error, "Qwen2MoE metadata is required");
+    }
+    return run_moe_feed_forward_batch_impl(
+        metadata, weights_view(weights), normalized_hidden, output, routes,
+        stats, error, policy, mode);
+}
+
+bool run_real_deepseek2_moe_feed_forward_batch(
+    const chapter01::ModelMetadata& metadata,
+    const chapter01::RealDeepSeek2MoeLayerWeights& weights,
+    const std::vector<std::vector<float>>& normalized_hidden,
+    std::vector<std::vector<float>>* output,
+    std::vector<RealMoeRoute>* routes,
+    RealMoeDispatchStats* stats,
+    std::string* error,
+    const chapter05_quantization::QuantizedLinearPolicy& policy,
+    RealMoeBatchMode mode) {
+    if (metadata.architecture != "deepseek2") {
+        return fail(error, "DeepSeek2 metadata is required");
+    }
+    return run_moe_feed_forward_batch_impl(
+        metadata, weights_view(weights), normalized_hidden, output, routes,
+        stats, error, policy, mode);
 }
 
 }  // namespace cpp_llm_engine::model

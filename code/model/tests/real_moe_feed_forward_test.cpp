@@ -100,6 +100,56 @@ int main() {
         CPP_LLM_CHECK(suite, route.expert_indices == std::vector<std::size_t>{1});
     });
 
+    suite.run("DeepSeek keeps full-softmax weights and always adds shared expert", [&] {
+        auto deepseek_metadata = metadata;
+        deepseek_metadata.architecture = "deepseek2";
+        deepseek_metadata.expert_weights_normalize = false;
+
+        chapter01::RealDeepSeek2MoeLayerWeights deepseek_weights;
+        deepseek_weights.router = weights.router;
+        deepseek_weights.expert_gate = weights.expert_gate;
+        deepseek_weights.expert_up = weights.expert_up;
+        deepseek_weights.expert_down = weights.expert_down;
+        deepseek_weights.shared_expert_gate = weights.shared_expert_gate;
+        deepseek_weights.shared_expert_up = weights.shared_expert_up;
+        deepseek_weights.shared_expert_down = weights.shared_expert_down;
+
+        std::vector<float> input(32, 0.0F);
+        input[0] = 1.0F;
+        std::vector<float> output;
+        cpp_llm_engine::model::RealMoeRoute route;
+        cpp_llm_engine::model::RealMoeTrace trace;
+        std::string error;
+        CPP_LLM_REQUIRE(
+            suite,
+            cpp_llm_engine::model::run_real_deepseek2_moe_feed_forward(
+                deepseek_metadata, deepseek_weights, input, &output, &route,
+                &error, {}, &trace));
+        CPP_LLM_REQUIRE(suite, route.expert_indices.size() == 1);
+        CPP_LLM_CHECK(suite, route.expert_indices[0] == 1);
+        const float selected_probability =
+            std::exp(2.0F) / (std::exp(1.0F) + std::exp(2.0F));
+        CPP_LLM_CHECK(
+            suite,
+            std::fabs(route.weights[0] - selected_probability) <= 1.0e-6F);
+        CPP_LLM_CHECK(
+            suite, std::fabs(route.shared_expert_weight - 1.0F) <= 1.0e-6F);
+
+        const float expert_value = 32.0F / (1.0F + std::exp(-1.0F));
+        const float expected = expert_value * (selected_probability + 1.0F);
+        CPP_LLM_REQUIRE(suite, output.size() == 32);
+        CPP_LLM_REQUIRE(suite, trace.routed_output.size() == 32);
+        CPP_LLM_REQUIRE(suite, trace.weighted_shared_output.size() == 32);
+        for (std::size_t column = 0; column < output.size(); ++column) {
+            CPP_LLM_CHECK(
+                suite, std::fabs(output[column] - expected) <= 1.0e-4F);
+            CPP_LLM_CHECK(
+                suite,
+                std::fabs(trace.weighted_shared_output[column] -
+                          expert_value) <= 1.0e-4F);
+        }
+    });
+
     suite.run("batch groups tokens by selected expert", [&] {
         std::vector<std::vector<float>> inputs(
             2, std::vector<float>(32, 0.0F));
@@ -157,6 +207,87 @@ int main() {
                                      row_wise[token][column]) <= 1.0e-5F);
             }
         }
+    });
+
+    suite.run("DeepSeek batch groups requests without changing results", [&] {
+        auto deepseek_metadata = metadata;
+        deepseek_metadata.architecture = "deepseek2";
+        deepseek_metadata.expert_weights_normalize = false;
+
+        chapter01::RealDeepSeek2MoeLayerWeights deepseek_weights;
+        deepseek_weights.router = weights.router;
+        deepseek_weights.expert_gate = weights.expert_gate;
+        deepseek_weights.expert_up = weights.expert_up;
+        deepseek_weights.expert_down = weights.expert_down;
+        deepseek_weights.shared_expert_gate = weights.shared_expert_gate;
+        deepseek_weights.shared_expert_up = weights.shared_expert_up;
+        deepseek_weights.shared_expert_down = weights.shared_expert_down;
+
+        std::vector<std::vector<float>> inputs(
+            2, std::vector<float>(32, 0.0F));
+        inputs[0][0] = 1.0F;
+        inputs[1][0] = -1.0F;
+        std::vector<std::vector<float>> row_wise;
+        std::vector<cpp_llm_engine::model::RealMoeRoute> row_wise_routes;
+        cpp_llm_engine::model::RealMoeDispatchStats row_wise_stats;
+        std::string error;
+        CPP_LLM_REQUIRE(
+            suite,
+            cpp_llm_engine::model::run_real_deepseek2_moe_feed_forward_batch(
+                deepseek_metadata, deepseek_weights, inputs, &row_wise,
+                &row_wise_routes, &row_wise_stats, &error, {},
+                cpp_llm_engine::model::RealMoeBatchMode::RowWise));
+
+        std::vector<std::vector<float>> grouped;
+        std::vector<cpp_llm_engine::model::RealMoeRoute> grouped_routes;
+        cpp_llm_engine::model::RealMoeDispatchStats grouped_stats;
+        CPP_LLM_REQUIRE(
+            suite,
+            cpp_llm_engine::model::run_real_deepseek2_moe_feed_forward_batch(
+                deepseek_metadata, deepseek_weights, inputs, &grouped,
+                &grouped_routes, &grouped_stats, &error, {},
+                cpp_llm_engine::model::RealMoeBatchMode::Grouped));
+
+        CPP_LLM_REQUIRE(suite, grouped.size() == row_wise.size());
+        CPP_LLM_CHECK(suite, grouped_routes[0].expert_indices ==
+                                 std::vector<std::size_t>{1});
+        CPP_LLM_CHECK(suite, grouped_routes[1].expert_indices ==
+                                 std::vector<std::size_t>{0});
+        CPP_LLM_CHECK(suite, grouped_stats.assignment_count == 2);
+        CPP_LLM_CHECK(suite, grouped_stats.active_expert_count == 2);
+        CPP_LLM_CHECK(suite, grouped_stats.maximum_tokens_per_expert == 1);
+        CPP_LLM_CHECK(suite, row_wise_stats.assignment_count ==
+                                 grouped_stats.assignment_count);
+        for (std::size_t request = 0; request < grouped.size(); ++request) {
+            CPP_LLM_CHECK(suite, grouped_routes[request].expert_indices ==
+                                     row_wise_routes[request].expert_indices);
+            CPP_LLM_CHECK(
+                suite,
+                std::fabs(grouped_routes[request].shared_expert_weight -
+                          1.0F) <= 1.0e-6F);
+            for (std::size_t column = 0;
+                 column < grouped[request].size(); ++column) {
+                CPP_LLM_CHECK(
+                    suite,
+                    std::fabs(grouped[request][column] -
+                              row_wise[request][column]) <= 1.0e-5F);
+            }
+        }
+
+        const auto saved_grouped = grouped;
+        const auto saved_routes = grouped_routes;
+        const auto saved_stats = grouped_stats;
+        CPP_LLM_CHECK(
+            suite,
+            !cpp_llm_engine::model::run_real_deepseek2_moe_feed_forward_batch(
+                deepseek_metadata, deepseek_weights,
+                {std::vector<float>(31, 0.0F)}, &grouped, &grouped_routes,
+                &grouped_stats, &error));
+        CPP_LLM_CHECK(suite, grouped == saved_grouped);
+        CPP_LLM_CHECK(suite, grouped_routes.front().expert_indices ==
+                                 saved_routes.front().expert_indices);
+        CPP_LLM_CHECK(suite, grouped_stats.assignment_count ==
+                                 saved_stats.assignment_count);
     });
 
     suite.run("batch failure preserves prior outputs", [&] {
