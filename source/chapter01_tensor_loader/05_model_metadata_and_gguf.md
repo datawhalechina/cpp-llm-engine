@@ -65,14 +65,14 @@ Qwen3 复用同一批主体名称，但结构约束并不完全相同：
 
 Qwen3-0.6B 的隐藏维度是 1024，但每个 Q/K/V 头包含 128 个数值。16 个查询头得到宽度 2048 的 Q 投影，8 个 K/V 头得到宽度 1024 的 K/V 投影；输出投影再把 2048 维注意力结果映射回 1024 维隐藏状态。默认合成测试和真实 GGUF 都会核对这些关系；Chapter04 再用首层执行验证 Q/K Norm、NeoX RoPE 与增量 K/V，并用 28 层 CPU Decoder 对照 llama.cpp。
 
-Qwen1.5-MoE 使用另一份结构约束。真实 GGUF 声明 24 层、60 个专家，并为每个词元选择 4 个专家。每层除了注意力权重，还包含 Router、三组打包专家权重、共享专家门控和三组共享专家权重。`MoeDecoderTensorLayout` 只描述这些名称与形状，不执行 Top-K 或专家 FFN；Chapter04/05 在该结构契约之后继续执行真实 layer-0 FFN。
+Qwen1.5-MoE 使用另一份结构约束。真实 GGUF 声明 24 层、60 个专家，并为每个词元选择 4 个专家。每层除了注意力权重，还包含 Router、三组打包专家权重、共享专家门控和三组共享专家权重。`MoeDecoderTensorLayout` 只描述这些名称与形状，不执行 Top-K 或专家 FFN；Chapter04/05 先用真实首层解释计算，再由 `code/model` 连接 24 层模型与请求上下文。
 
 文件解析和模型布局通过两条路径汇合：
 
 ```text
 metadata adapter -> ModelMetadata -> ModelConfig
 张量加载器       -> 张量映射      -> 稠密 Decoder 张量布局 -> LoadedModel / DecoderInput
-                                  -> MoE Decoder 张量布局  -> 真实 layer-0 MoE FFN
+                                  -> MoE Decoder 张量布局  -> 真实 MoE Model / Context
 ```
 
 `DecoderInput` 保存稳定的 Tensor 名称映射，payload 仍由 `LoadedModel.tensors` 持有。Chapter04 根据这些配置和权重映射解释真实 Decoder 的计算；Chapter05 负责解码 Q4_K、Q6_K 等量化 payload。
@@ -85,7 +85,7 @@ metadata adapter -> ModelMetadata -> ModelConfig
 | --- | --- | --- |
 | 读取哪个模型 | 命令行模型路径或 `CPP_LLM_ENGINE_MODEL_PATH` | 调用者选择 GGUF 文件 |
 | 使用哪种模型架构 | GGUF 的 `general.architecture` | Loader 自动识别 `llama`、`qwen3` 或 `qwen2moe`，并选择对应结构约束 |
-| 在哪里执行 | CPU/CUDA 入口或后续设备配置 | Qwen3 已接入 CPU/CUDA Decoder、Generation 与服务；Qwen1.5-MoE 已接入 CPU layer-0 FFN |
+| 在哪里执行 | CPU/CUDA 入口或后续设备配置 | Qwen3 已接入 CPU/CUDA 解码、生成与服务；Qwen1.5-MoE 已接入 CPU 24 层解码、生成、批执行与服务 |
 
 架构由模型文件声明，正常运行不需要额外传入 `--architecture`。显式架构参数容易让配置与真实权重冲突，因此只应作为诊断断言，而不应覆盖 GGUF。稠密模型按架构选择 Llama 或 Qwen3 数学路径；Qwen2MoE 使用独立的 CPU Model 与 Executor Factory，已经接通 24 层 Decoder、Generation、批执行和服务。Chapter01 只识别架构并交付元数据与权重布局，执行分派由后续模型工厂完成。
 
