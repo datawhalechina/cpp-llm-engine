@@ -63,6 +63,8 @@ output = softmax(score + causal_mask) @ V
 | Value | CPU reference 临时工作区 | `[S,H,value_dim]` |
 | Query | 当前 Prefill/Decode 步骤 | `[T,H,qk_nope_dim]` 与 `[T,H,rope_dim]` |
 
+![MLA 压缩缓存与临时展开数据流](../assets/diagrams/chapter04-mla-cache-flow.svg)
+
 <a href="../_code/chapter04_attention/src/mla_attention.cpp"><code>mla_attention.cpp</code></a> 接收已经投影并完成 RoPE 的 Query、低秩缓存和 K/V 上投影权重。测试先通过低秩路径计算结果，再显式展开完整 K/V 并交给标准 CPU Attention；两条路径逐元素一致。该入口固定 MLA 的算法语义，当前尚未读取真实量化权重，也没有实现生产框架常用的权重吸收与融合 kernel。
 
 真实 DeepSeek-V2-Lite 对照由 `run_deepseek_v2_lite_layer_capture.sh` 提供。它通过 llama.cpp 回调捕获首层的归一化输入、Query、K/V-A、共享 RoPE Key、压缩 latent、Attention 输出、FFN 输入和层输出。算法测试回答“低秩路径是否正确”，真实捕获回答“固定 GGUF 的节点名称、shape 和参考数值是什么”；自研首层需要同时通过两类证据。

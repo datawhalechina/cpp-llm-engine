@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">MoE 路由、专家分发与加权合并</title>
+  <desc id="desc">词元经过 Router 和稳定 Top-K，按专家编号分组执行选中专家；共享专家并行计算，最后按路由权重恢复原词元顺序并合并输出。</desc>
+  <defs>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 26px; font-weight: 700; fill: #172033; }
+      .section { font-size: 17px; font-weight: 700; fill: #172033; }
+      .label { font-size: 15px; font-weight: 700; fill: #172033; }
+      .text { font-size: 13px; fill: #475569; }
+      .small { font-size: 12px; fill: #64748b; }
+      .line { stroke: #52606d; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .route { stroke: #c45b16; stroke-width: 2.5; fill: none; marker-end: url(#arrow-orange); }
+      .route-bus { stroke: #c45b16; stroke-width: 2.5; fill: none; }
+    </style>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#52606d"/></marker>
+    <marker id="arrow-orange" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#c45b16"/></marker>
+  </defs>
+  <rect width="1200" height="650" rx="24" fill="#f8fafc"/>
+  <text x="48" y="52" class="title">MoE：先选择专家，再按路由权重合并</text>
+  <text x="48" y="80" class="text">Attention 保持请求 K/V 隔离；同一层的 FFN 输入可以按专家编号重新分组</text>
+
+  <rect x="48" y="124" width="174" height="86" rx="14" fill="#e8f1f7" stroke="#79a4ba"/>
+  <text x="135" y="158" text-anchor="middle" class="label">词元隐藏状态</text>
+  <text x="135" y="184" text-anchor="middle" class="text">tokens [T,D]</text>
+  <rect x="278" y="116" width="190" height="102" rx="14" fill="#fff0dc" stroke="#e8a765"/>
+  <text x="373" y="150" text-anchor="middle" class="label">Router</text>
+  <text x="373" y="176" text-anchor="middle" class="text">为全部专家打分</text>
+  <text x="373" y="198" text-anchor="middle" class="small">每个词元独立计算</text>
+  <rect x="524" y="116" width="190" height="102" rx="14" fill="#fff0dc" stroke="#e8a765"/>
+  <text x="619" y="150" text-anchor="middle" class="label">稳定 Top-K</text>
+  <text x="619" y="176" text-anchor="middle" class="text">专家编号 + 路由权重</text>
+  <text x="619" y="198" text-anchor="middle" class="small">并列时按专家编号稳定选择</text>
+  <rect x="770" y="116" width="190" height="102" rx="14" fill="#fef3c7" stroke="#fbbf24"/>
+  <text x="865" y="150" text-anchor="middle" class="label">专家分发表</text>
+  <text x="865" y="176" text-anchor="middle" class="text">expert → token rows</text>
+  <text x="865" y="198" text-anchor="middle" class="small">跨词元或跨请求组批</text>
+  <path d="M222 167H278M468 167H524M714 167H770" class="line"/>
+
+  <rect x="48" y="274" width="760" height="232" rx="18" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="72" y="308" class="section" fill="#9a4d13">选中专家路径</text>
+  <g text-anchor="middle">
+    <rect x="78" y="342" width="190" height="104" rx="13" fill="#fff" stroke="#f0a45d"/>
+    <text x="173" y="376" class="label">专家 0</text><text x="173" y="402" class="text">Gate · Up · Down</text><text x="173" y="426" class="small">接收命中的 token 行</text>
+    <rect x="334" y="342" width="190" height="104" rx="13" fill="#fff" stroke="#f0a45d"/>
+    <text x="429" y="376" class="label">专家 e</text><text x="429" y="402" class="text">Gate · Up · Down</text><text x="429" y="426" class="small">复用一次 packed 权重读取</text>
+    <rect x="590" y="342" width="190" height="104" rx="13" fill="#fff" stroke="#f0a45d"/>
+    <text x="685" y="376" class="label">专家 N-1</text><text x="685" y="402" class="text">Gate · Up · Down</text><text x="685" y="426" class="small">仅执行活跃专家</text>
+  </g>
+  <path d="M865 218V320H173" class="route-bus"/>
+  <path d="M173 320V336M429 320V336M685 320V336" class="route"/>
+
+  <rect x="850" y="274" width="302" height="232" rx="18" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="874" y="308" class="section" fill="#0f766e">共享专家路径</text>
+  <rect x="880" y="342" width="242" height="104" rx="13" fill="#fff" stroke="#34d399"/>
+  <text x="1001" y="376" text-anchor="middle" class="label">共享专家 SwiGLU</text>
+  <text x="1001" y="402" text-anchor="middle" class="text">所有词元都执行</text>
+  <text x="1001" y="426" text-anchor="middle" class="small">模型决定是否另加共享门控</text>
+  <path d="M135 210V246H1001V336" class="line"/>
+
+  <rect x="232" y="550" width="736" height="66" rx="14" fill="#0f766e"/>
+  <text x="600" y="578" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">按路由权重合并选中专家 + 共享专家，再恢复原词元顺序</text>
+  <text x="600" y="600" text-anchor="middle" font-size="12" fill="#d9fffa">输出保持 [T,D]，继续进入残差连接</text>
+  <path d="M429 506V544M1001 506V526H800V544" class="line"/>
+</svg>

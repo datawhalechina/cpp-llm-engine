@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">MLA 压缩缓存与临时展开数据流</title>
+  <desc id="desc">隐藏状态产生查询和低秩 K/V。请求上下文持久保存低秩 K/V 与共享位置 Key，计算时再临时展开每个注意力头需要的 Key 和 Value。</desc>
+  <defs>
+    <style>
+      text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif; }
+      .title { font-size: 26px; font-weight: 700; fill: #172033; }
+      .section { font-size: 17px; font-weight: 700; fill: #172033; }
+      .label { font-size: 15px; font-weight: 700; fill: #172033; }
+      .text { font-size: 13px; fill: #475569; }
+      .small { font-size: 12px; fill: #64748b; }
+      .line { stroke: #52606d; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .cache-line { stroke: #0f766e; stroke-width: 2.6; fill: none; marker-end: url(#arrow-teal); }
+    </style>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#52606d"/></marker>
+    <marker id="arrow-teal" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#0f766e"/></marker>
+  </defs>
+  <rect width="1200" height="650" rx="24" fill="#f8fafc"/>
+  <text x="48" y="52" class="title">MLA：缓存压缩表示，计算时临时展开</text>
+  <text x="48" y="80" class="text">绿色区域随请求位置增长；橙色区域只在当前 Prefill 或 Decode 计算期间存在</text>
+
+  <rect x="48" y="116" width="1104" height="150" rx="18" fill="#eff6ff" stroke="#bfdbfe"/>
+  <text x="72" y="148" class="section">当前词元产生两条投影分支</text>
+  <rect x="76" y="172" width="190" height="66" rx="12" fill="#fff" stroke="#93b6c8"/>
+  <text x="171" y="200" text-anchor="middle" class="label">隐藏状态</text>
+  <text x="171" y="222" text-anchor="middle" class="small">hidden [T,D]</text>
+  <rect x="390" y="166" width="246" height="78" rx="12" fill="#dbeafe" stroke="#60a5fa"/>
+  <text x="513" y="196" text-anchor="middle" class="label">Query 投影</text>
+  <text x="513" y="218" text-anchor="middle" class="text">非位置 Q + 位置 Q</text>
+  <rect x="770" y="166" width="306" height="78" rx="12" fill="#dbeafe" stroke="#60a5fa"/>
+  <text x="923" y="196" text-anchor="middle" class="label">K/V-A 投影</text>
+  <text x="923" y="218" text-anchor="middle" class="text">低秩 K/V + 共享位置 Key</text>
+  <path d="M266 205H390" class="line"/><path d="M266 205H770" class="line"/>
+
+  <rect x="48" y="300" width="512" height="250" rx="18" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="72" y="334" class="section" fill="#0f766e">请求级持久缓存</text>
+  <rect x="78" y="366" width="210" height="116" rx="13" fill="#fff" stroke="#34d399"/>
+  <text x="183" y="397" text-anchor="middle" class="label">低秩 K/V</text>
+  <text x="183" y="421" text-anchor="middle" class="text">[S, latent_dim]</text>
+  <text x="183" y="449" text-anchor="middle" class="small">固定模型：每位置 512 维</text>
+  <rect x="320" y="366" width="210" height="116" rx="13" fill="#fff" stroke="#34d399"/>
+  <text x="425" y="397" text-anchor="middle" class="label">共享位置 Key</text>
+  <text x="425" y="421" text-anchor="middle" class="text">[S, rope_dim]</text>
+  <text x="425" y="449" text-anchor="middle" class="small">固定模型：每位置 64 维</text>
+  <text x="304" y="522" text-anchor="middle" class="text">Prefill 写入多个位置；Decode 每次追加一个位置</text>
+  <path d="M923 244V282H183V360" class="cache-line"/>
+  <path d="M923 282H425V360" class="cache-line"/>
+
+  <rect x="600" y="300" width="552" height="250" rx="18" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="624" y="334" class="section" fill="#9a4d13">当前计算的临时展开</text>
+  <rect x="630" y="366" width="220" height="116" rx="13" fill="#fff" stroke="#f0a45d"/>
+  <text x="740" y="397" text-anchor="middle" class="label">K/V-B 投影</text>
+  <text x="740" y="421" text-anchor="middle" class="text">latent → 每头 K/V</text>
+  <text x="740" y="449" text-anchor="middle" class="small">只在本次计算中保留</text>
+  <rect x="894" y="366" width="228" height="116" rx="13" fill="#fff" stroke="#f0a45d"/>
+  <text x="1008" y="397" text-anchor="middle" class="label">因果 Attention</text>
+  <text x="1008" y="421" text-anchor="middle" class="text">Q·K → Softmax → V</text>
+  <text x="1008" y="449" text-anchor="middle" class="small">输出 [T,H,value_dim]</text>
+  <path d="M288 424H630" class="line"/><path d="M850 424H894" class="line"/>
+  <path d="M530 450H576V510H1008V488" class="line"/>
+  <path d="M513 244V282H1008V360" class="line"/>
+
+  <rect x="150" y="586" width="900" height="42" rx="12" fill="#0f766e"/>
+  <text x="600" y="612" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">缓存容量按低秩表示增长；CPU reference 临时展开完整各头 K/V 用于验证数学等价</text>
+</svg>

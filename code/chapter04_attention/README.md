@@ -92,4 +92,4 @@ bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh
 
 ## 扩展入口
 
-GPU 路径通过 Core `AttentionBackend` 替换计算实现，backend 生命周期长于 `MultiHeadAttention`。真实 Llama 结构通过 Core `DecoderLayerContract` 与 `DecoderExecutionContext` 接入 `code/model` 或 CUDA 执行上下文；多模态路径在统一 embedding 序列处进入同一语言 Decoder。
+教学 CPU 路径通过 Core `AttentionBackend` 注入计算实现，backend 生命周期长于 `MultiHeadAttention`。CUDA GQA 路径复用 Core 请求中的形状语义，并通过带 CUDA Stream 的独立接口进入设备执行上下文。真实模型结构通过 Core `DecoderLayerContract` 与 `DecoderExecutionContext` 接入 `code/model` 或 CUDA 执行上下文；多模态路径在统一 embedding 序列处进入同一语言 Decoder。

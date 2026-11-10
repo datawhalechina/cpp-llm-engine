@@ -7,7 +7,7 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
 | A 教学闭环 | 用小尺寸 MHA、LayerNorm、稠密/MoE FFN 和双残差学习单层数据流，再用请求 Context 连接预填充与逐词元解码 | 单层输出、MoE 路由、因果掩码、连续 KV 追加、请求隔离和失败原子性测试 |
-| B 真实 CPU | 先用 3D/4D Q/K/V 适配器核对通用多头注意力布局，再沿真实模型路径学习 TinyLlama 的 RMSNorm、RoPE、GQA、SwiGLU 和 22 层拓扑 | 批次隔离、首层权重映射、22 层结构与跨章数值证据 |
+| B 真实 CPU | 先用 3D/4D Q/K/V 适配器核对通用注意力布局，再比较 TinyLlama/Qwen3 稠密 Decoder、Qwen1.5-MoE 专家路由和 DeepSeek-V2-Lite MLA | 稠密、MoE、MLA 三类结构的分层 K/V、路由、logits 与真实模型证据 |
 | G GPU 扩展 | 保持解码器顺序和请求状态语义不变，把 Linear、RoPE、GQA、归一化和 FFN 换成 CUDA 后端 | 真实 2/22 层对照、Tensor Prefill、融合在线 Attention 与端到端 A/B |
 | M 多模态扩展 | 视觉编码器复用归一化、Attention、FFN 和双残差结构；视觉向量进入语言 Decoder 后复用请求 Context | SigLIP Block、视觉投影和统一 embedding 序列测试 |
 
@@ -38,7 +38,7 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 
 ## 验证与下一步
 
-单层解码器数据流成立后，进入 [`Chapter 05`](../chapter05_quantization/intro.md)，让真实 Q4_K/Q6_K 权重在同一结构中完成线性计算。
+单层解码器数据流成立后，进入 [`Chapter 05`](../chapter05_quantization/intro.md)，让真实模型的九种 GGUF 量化格式在同一 Linear 语义下完成计算。
 
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |

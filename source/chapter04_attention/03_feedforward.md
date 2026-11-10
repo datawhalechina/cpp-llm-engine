@@ -68,6 +68,8 @@ output = selected_output + shared_output
 
 <a href="../_code/chapter04_attention/src/moe_feed_forward.cpp"><code>moe_feed_forward.cpp</code></a> 使用小尺寸 Float32 权重完整执行这条语义链，并把每个词元的专家编号和路由权重保存在 `MoeRoute` 中。真实路径由 <a href="../_code/model/src/real_moe_feed_forward.cpp"><code>real_moe_feed_forward.cpp</code></a> 连接 Chapter01 的三维 packed expert 权重与 Chapter05 的量化 Linear。Qwen1.5-MoE 使用 60 选 4 和 Q3_K/Q5_K 等格式；DeepSeek-V2-Lite 使用 64 选 6，专家 Gate/Up 为 Q2_K、Down 为 IQ4_NL，共享专家输出不经过额外门控。
 
+![MoE 路由、专家分发与合并](../assets/diagrams/chapter04-moe-routing.svg)
+
 ## 多词元怎样按专家分组
 
 逐词元执行时，每个词元都可以独立完成 Top-K 和专家计算，但会反复定位相同专家的权重。多词元路径先计算所有路由，再建立 `expert -> [(token, route_slot)]` 分发表：
