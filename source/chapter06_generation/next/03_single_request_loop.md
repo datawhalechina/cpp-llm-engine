@@ -61,4 +61,4 @@ ctest --test-dir /tmp/cpp-llm-chapter06-loop \
   -R 'chapter06_(generation|sampler)_test' --output-on-failure
 ```
 
-测试通过后，单请求已经具有确定的输入、输出和停止语义。后续正文将在不改变这组结果的前提下补齐完整状态机、采样策略、流式输出和真实 TinyLlama 验证。
+测试通过后，单请求已经具有确定的输入、输出和停止语义。接下来依次核对状态机、采样与停止、逐词元通知和真实模型入口，确认这些扩展继续保持同一组请求推进规则。

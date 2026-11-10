@@ -59,6 +59,8 @@ admission bind request ID
 
 Qwen1.5-MoE 还需要先按 Router 结果把 token 归入专家组。[MoE 固定队列实验](../../reference/experiment_assets.md#exp-cpu-17)使用四个请求，在 Prefill 后连续执行三个 Chapter08 调度步；按专家分组与逐行执行的中位数比例为 `0.582`，完整生成序列和每步批量调用计数一致。该结果说明调度层能够持续使用分组执行路径。Chapter08 用固定队列隔离调度行为；[Chapter10 动态准入实验](../../reference/experiment_assets.md#exp-cpu-18)再在两个请求运行期间加入另外两个请求，验证输出和终态释放。
 
+DeepSeek-V2-Lite 的 batch 先按层加载一次权重，各请求使用自己的压缩 MLA 历史完成 Attention，再把该层 64 选 6 的 FFN 输入放进共同的专家分发表。真实 smoke 中两个请求在 Prefill 后通过一次 batch runner 调用同步 Decode，固定生成 `185 85770`，请求位置都从 1 推进到 2。它证明调度、Context 隔离、跨请求专家分组和整批回滚已经连通。[EXP-CPU-19](../../reference/experiment_assets.md#exp-cpu-19) 在 batch 2、单步 Decode 和全层缓存下记录到 `0.943` 的中位数比例；该结果只说明当前固定工作负载的有限收益。
+
 下图强调共享模型计算与独立请求历史的分界：Linear 和 LM Head 接收多行激活，每个请求的 Attention 仍通过自己的 BlockTable 访问分页 K/V。
 
 ![从调度计划到真实 Tensor Batch](../../assets/diagrams/chapter08-real-batch-execution.svg)
@@ -68,6 +70,7 @@ Qwen1.5-MoE 还需要先按 Router 结果把 token 归入专家组。[MoE 固定
 ```bash
 bash code/chapter08_scheduling/scripts/run.sh
 bash code/chapter08_scheduling/scripts/run_real_batch.sh
+bash code/chapter08_scheduling/scripts/run_deepseek_v2_lite_batch.sh
 ```
 
 | 环境 | 必须通过 |
@@ -75,3 +78,4 @@ bash code/chapter08_scheduling/scripts/run_real_batch.sh
 | 无模型文件 | Ragged batch、重复请求或槽位拒绝、缓存事务和结果等价 |
 | 本地 TinyLlama | 真实 batch golden、批量 Linear、失败回滚和分页计数一致 |
 | 本地 Qwen1.5-MoE | 独立 K/V、跨请求专家分组、连续批量调用和完整生成序列一致 |
+| 本地 DeepSeek-V2-Lite | 独立 MLA 历史、一次按层 batch 调用、固定词元与位置同步推进 |

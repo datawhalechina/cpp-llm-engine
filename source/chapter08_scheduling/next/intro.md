@@ -48,4 +48,5 @@ bash code/chapter08_scheduling/scripts/run.sh
 | L3 调度到 Decode batch | 同 L1 入口中的 `chapter08_cache_transaction_test` | 批输入校验、重复 ID 拒绝、失败回滚和分页计数一致 | 必做 |
 | L4 稠密模型 batch | `bash code/chapter08_scheduling/scripts/run_real_batch.sh` | TinyLlama 顺序/批量 logits 与固定词元一致，错误位置不提交 | 有模型时必做 |
 | L5 MoE 请求 batch | `bash code/chapter08_scheduling/scripts/run_qwen15_moe_batch.sh` | Qwen1.5-MoE 两个 Context 在一次 batch runner 调用中共同推进，固定词元一致 | 学习 MoE 调度时选做 |
+| L5 MLA-MoE 请求 batch | `bash code/chapter08_scheduling/scripts/run_deepseek_v2_lite_batch.sh` | DeepSeek 两个 Context 在一次按层 batch 调用中生成固定词元 `185 85770` | 学习 MLA 调度时选做 |
 | L5 Overlap 控制面 | 同 L1 入口中的 `chapter08_overlap_scheduler_test` | 同步结果一致，取消和状态变化使旧计划失效，关闭后同步回退 | 必做 |
