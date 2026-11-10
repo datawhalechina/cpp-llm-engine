@@ -40,6 +40,26 @@ public:
         std::string* error = nullptr);
 };
 
+struct RealMoeLayerWeights {
+    std::size_t index = 0;
+    Tensor attn_norm, attn_q, attn_k, attn_v;
+    Tensor attn_q_bias, attn_k_bias, attn_v_bias, attn_output;
+    Tensor ffn_norm, router, expert_gate, expert_up, expert_down;
+    Tensor shared_expert_router, shared_expert_gate;
+    Tensor shared_expert_up, shared_expert_down;
+    bool valid() const;
+};
+
+class RealMoeLayerLoader final {
+public:
+    static bool load(const std::string& model_path,
+                     const GgufModelIndex& index,
+                     const MoeDecoderTensorLayout& layout,
+                     std::size_t layer_index,
+                     RealMoeLayerWeights* output,
+                     std::string* error = nullptr);
+};
+
 // 迁移期兼容名称；新代码使用 RealDense* 表达多架构层权重。
 using RealLlamaLayerWeights = RealDenseLayerWeights;
 using RealLlamaLayerLoader = RealDenseLayerLoader;

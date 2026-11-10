@@ -45,6 +45,29 @@ DecoderLayerLayout make_layer(std::size_t index, const std::string& architecture
     return layer;
 }
 
+MoeDecoderLayerLayout make_moe_layer(std::size_t index) {
+    MoeDecoderLayerLayout layer;
+    layer.index = index;
+    layer.attn_norm = layer_name(index, "attn_norm.weight");
+    layer.attn_q = layer_name(index, "attn_q.weight");
+    layer.attn_k = layer_name(index, "attn_k.weight");
+    layer.attn_v = layer_name(index, "attn_v.weight");
+    layer.attn_q_bias = layer_name(index, "attn_q.bias");
+    layer.attn_k_bias = layer_name(index, "attn_k.bias");
+    layer.attn_v_bias = layer_name(index, "attn_v.bias");
+    layer.attn_output = layer_name(index, "attn_output.weight");
+    layer.ffn_norm = layer_name(index, "ffn_norm.weight");
+    layer.router = layer_name(index, "ffn_gate_inp.weight");
+    layer.expert_gate = layer_name(index, "ffn_gate_exps.weight");
+    layer.expert_up = layer_name(index, "ffn_up_exps.weight");
+    layer.expert_down = layer_name(index, "ffn_down_exps.weight");
+    layer.shared_expert_router = layer_name(index, "ffn_gate_inp_shexp.weight");
+    layer.shared_expert_gate = layer_name(index, "ffn_gate_shexp.weight");
+    layer.shared_expert_up = layer_name(index, "ffn_up_shexp.weight");
+    layer.shared_expert_down = layer_name(index, "ffn_down_shexp.weight");
+    return layer;
+}
+
 bool checked_dimension(std::uint64_t value, std::size_t* result, std::string* error) {
     if (value > std::numeric_limits<std::size_t>::max()) {
         return fail(error, "GGUF tensor dimension exceeds host size");
@@ -204,6 +227,87 @@ bool validate_shapes(const ModelMetadata& metadata,
     return true;
 }
 
+bool validate_moe_shapes(const ModelMetadata& metadata,
+                         const std::vector<ShapeDescriptor>& descriptors,
+                         MoeDecoderTensorLayout* layout,
+                         std::string* error) {
+    if (layout == nullptr) return fail(error, "MoE model layout output must not be null");
+    if (metadata.architecture != "qwen2moe") {
+        return fail(error, "MoE tensor schema supports qwen2moe architecture");
+    }
+    if (metadata.expert_count == 0 || metadata.expert_used_count == 0 ||
+        metadata.expert_used_count > metadata.expert_count ||
+        metadata.expert_feed_forward_length == 0 ||
+        metadata.expert_shared_feed_forward_length == 0) {
+        return fail(error, "Qwen2MoE expert metadata is incomplete or inconsistent");
+    }
+
+    std::unordered_map<std::string, const ShapeDescriptor*> by_name;
+    for (const auto& descriptor : descriptors) {
+        if (!by_name.emplace(descriptor.name, &descriptor).second) {
+            return fail(error, "duplicate tensor in MoE model schema: " + descriptor.name);
+        }
+    }
+    const auto expect = [&](const std::string& name,
+                            const std::vector<std::size_t>& shape) -> bool {
+        const auto it = by_name.find(name);
+        if (it == by_name.end()) return fail(error, "missing Qwen2MoE tensor: " + name);
+        if (!it->second->has_payload) return fail(error, "Qwen2MoE tensor has no payload: " + name);
+        if (it->second->shape != shape) return fail(error, "shape mismatch for " + name);
+        return true;
+    };
+
+    if (!expect("token_embd.weight", {metadata.hidden_size, metadata.vocab_size}) ||
+        !expect("output_norm.weight", {metadata.hidden_size}) ||
+        !expect("output.weight", {metadata.hidden_size, metadata.vocab_size})) {
+        return false;
+    }
+
+    MoeDecoderTensorLayout built;
+    built.architecture = metadata.architecture;
+    built.embedding = "token_embd.weight";
+    built.output = "output.weight";
+    built.output_norm = "output_norm.weight";
+    built.expert_count = metadata.expert_count;
+    built.expert_used_count = metadata.expert_used_count;
+    built.layers.reserve(metadata.layer_count);
+    for (std::size_t i = 0; i < metadata.layer_count; ++i) {
+        const auto layer = make_moe_layer(i);
+        if (!expect(layer.attn_norm, {metadata.hidden_size}) ||
+            !expect(layer.attn_q, {metadata.hidden_size, metadata.hidden_size}) ||
+            !expect(layer.attn_k, {metadata.hidden_size, metadata.hidden_size}) ||
+            !expect(layer.attn_v, {metadata.hidden_size, metadata.hidden_size}) ||
+            !expect(layer.attn_q_bias, {metadata.hidden_size}) ||
+            !expect(layer.attn_k_bias, {metadata.hidden_size}) ||
+            !expect(layer.attn_v_bias, {metadata.hidden_size}) ||
+            !expect(layer.attn_output, {metadata.hidden_size, metadata.hidden_size}) ||
+            !expect(layer.ffn_norm, {metadata.hidden_size}) ||
+            !expect(layer.router, {metadata.hidden_size, metadata.expert_count}) ||
+            !expect(layer.expert_gate, {metadata.hidden_size,
+                                        metadata.expert_feed_forward_length,
+                                        metadata.expert_count}) ||
+            !expect(layer.expert_up, {metadata.hidden_size,
+                                      metadata.expert_feed_forward_length,
+                                      metadata.expert_count}) ||
+            !expect(layer.expert_down, {metadata.expert_feed_forward_length,
+                                        metadata.hidden_size,
+                                        metadata.expert_count}) ||
+            !expect(layer.shared_expert_router, {metadata.hidden_size}) ||
+            !expect(layer.shared_expert_gate, {metadata.hidden_size,
+                                               metadata.expert_shared_feed_forward_length}) ||
+            !expect(layer.shared_expert_up, {metadata.hidden_size,
+                                             metadata.expert_shared_feed_forward_length}) ||
+            !expect(layer.shared_expert_down, {metadata.expert_shared_feed_forward_length,
+                                               metadata.hidden_size})) {
+            return false;
+        }
+        built.layers.push_back(layer);
+    }
+    *layout = std::move(built);
+    if (error != nullptr) error->clear();
+    return true;
+}
+
 }  // namespace
 
 bool ModelSchema::validate_gguf(const ModelMetadata& metadata,
@@ -244,6 +348,26 @@ bool ModelSchema::validate_tensors(const ModelMetadata& metadata,
         descriptors.push_back(std::move(descriptor));
     }
     return validate_shapes(metadata, descriptors, layout, error);
+}
+
+bool ModelSchema::validate_moe_gguf(const ModelMetadata& metadata,
+                                    const GgufModelIndex& index,
+                                    MoeDecoderTensorLayout* layout,
+                                    std::string* error) {
+    std::vector<ShapeDescriptor> descriptors;
+    descriptors.reserve(index.tensors.size());
+    for (const auto& tensor : index.tensors) {
+        ShapeDescriptor descriptor;
+        descriptor.name = tensor.name;
+        descriptor.shape.reserve(tensor.dimensions.size());
+        for (const auto dimension : tensor.dimensions) {
+            std::size_t converted = 0;
+            if (!checked_dimension(dimension, &converted, error)) return false;
+            descriptor.shape.push_back(converted);
+        }
+        descriptors.push_back(std::move(descriptor));
+    }
+    return validate_moe_shapes(metadata, descriptors, layout, error);
 }
 
 }  // namespace chapter01

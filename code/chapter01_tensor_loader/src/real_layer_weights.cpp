@@ -35,7 +35,14 @@ bool load_named(
         set_error(error, "missing layer tensor: " + name);
         return false;
     }
-    return GgufTensorLoader::load_tensor(model_path, index, *info, output, error);
+    std::string load_error;
+    if (!GgufTensorLoader::load_tensor(
+            model_path, index, *info, output, &load_error)) {
+        set_error(error, "failed to load " + name + ": " + load_error);
+        return false;
+    }
+    if (error != nullptr) error->clear();
+    return true;
 }
 
 bool load_optional_named(
@@ -96,6 +103,52 @@ bool RealDenseLayerLoader::load(
         return false;
     }
     *output = std::move(loaded);
+    if (error != nullptr) error->clear();
+    return true;
+}
+
+bool RealMoeLayerWeights::valid() const {
+    return attn_norm.bytes() && attn_q.bytes() && attn_k.bytes() && attn_v.bytes() &&
+        attn_q_bias.bytes() && attn_k_bias.bytes() && attn_v_bias.bytes() &&
+        attn_output.bytes() && ffn_norm.bytes() && router.bytes() &&
+        expert_gate.bytes() && expert_up.bytes() && expert_down.bytes() &&
+        shared_expert_router.bytes() && shared_expert_gate.bytes() &&
+        shared_expert_up.bytes() && shared_expert_down.bytes();
+}
+
+bool RealMoeLayerLoader::load(const std::string& model_path,
+                              const GgufModelIndex& index,
+                              const MoeDecoderTensorLayout& layout,
+                              std::size_t layer_index,
+                              RealMoeLayerWeights* output,
+                              std::string* error) {
+    if (output == nullptr || layer_index >= layout.layers.size()) {
+        set_error(error, output == nullptr ? "MoE layer output must not be null" :
+                                            "MoE layer index is outside model layout");
+        return false;
+    }
+    const auto& n = layout.layers[layer_index];
+    RealMoeLayerWeights w;
+    w.index = layer_index;
+    if (!load_named(model_path,index,n.attn_norm,&w.attn_norm,error) ||
+        !load_named(model_path,index,n.attn_q,&w.attn_q,error) ||
+        !load_named(model_path,index,n.attn_k,&w.attn_k,error) ||
+        !load_named(model_path,index,n.attn_v,&w.attn_v,error) ||
+        !load_named(model_path,index,n.attn_q_bias,&w.attn_q_bias,error) ||
+        !load_named(model_path,index,n.attn_k_bias,&w.attn_k_bias,error) ||
+        !load_named(model_path,index,n.attn_v_bias,&w.attn_v_bias,error) ||
+        !load_named(model_path,index,n.attn_output,&w.attn_output,error) ||
+        !load_named(model_path,index,n.ffn_norm,&w.ffn_norm,error) ||
+        !load_named(model_path,index,n.router,&w.router,error) ||
+        !load_named(model_path,index,n.expert_gate,&w.expert_gate,error) ||
+        !load_named(model_path,index,n.expert_up,&w.expert_up,error) ||
+        !load_named(model_path,index,n.expert_down,&w.expert_down,error) ||
+        !load_named(model_path,index,n.shared_expert_router,&w.shared_expert_router,error) ||
+        !load_named(model_path,index,n.shared_expert_gate,&w.shared_expert_gate,error) ||
+        !load_named(model_path,index,n.shared_expert_up,&w.shared_expert_up,error) ||
+        !load_named(model_path,index,n.shared_expert_down,&w.shared_expert_down,error)) return false;
+    if (!w.valid()) { set_error(error, "loaded MoE decoder layer has an empty tensor payload"); return false; }
+    *output = std::move(w);
     if (error != nullptr) error->clear();
     return true;
 }

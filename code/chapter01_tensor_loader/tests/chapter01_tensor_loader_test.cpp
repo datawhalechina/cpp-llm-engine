@@ -1,5 +1,5 @@
 // Chapter 01：模型加载与 schema 综合测试
-// 职责：验证 CIE1 loader、GGUF index、metadata、tokenizer、Q8_0/Q4_K 和 DecoderInput。
+// 职责：验证 CIE1 loader、GGUF index、metadata、tokenizer、量化 payload 和 DecoderInput。
 // 通过条件：fixture、非法输入和失败原子性检查全部成立。
 // 验证：bash code/chapter01_tensor_loader/run.sh。
 #include "../src/model_loader.h"
@@ -596,6 +596,86 @@ void test_qwen3_metadata_and_schema(TestSuite& suite) {
     CPP_LLM_CHECK(suite, error.find("head length metadata") != std::string::npos);
 }
 
+void test_qwen2_moe_metadata_and_schema(TestSuite& suite) {
+    const MetadataMap values = {
+        {"general.architecture", std::string("qwen2moe")},
+        {"tokenizer.ggml.vocab_size", std::uint64_t{128}},
+        {"qwen2moe.embedding_length", std::uint64_t{16}},
+        {"qwen2moe.context_length", std::uint64_t{4096}},
+        {"qwen2moe.block_count", std::uint64_t{2}},
+        {"qwen2moe.feed_forward_length", std::uint64_t{32}},
+        {"qwen2moe.attention.head_count", std::uint64_t{4}},
+        {"qwen2moe.attention.head_count_kv", std::uint64_t{4}},
+        {"qwen2moe.expert_count", std::uint64_t{8}},
+        {"qwen2moe.expert_used_count", std::uint64_t{2}},
+        {"qwen2moe.expert_feed_forward_length", std::uint64_t{12}},
+        {"qwen2moe.expert_shared_feed_forward_length", std::uint64_t{32}},
+        {"tokenizer.ggml.eos_token_id", std::int64_t{2}},
+    };
+
+    ModelMetadata metadata;
+    std::string error;
+    CPP_LLM_REQUIRE(suite, ModelMetadataAdapter::from_gguf(values, &metadata, &error));
+    CPP_LLM_CHECK(suite, metadata.architecture == "qwen2moe");
+    CPP_LLM_CHECK(suite, metadata.expert_count == 8);
+    CPP_LLM_CHECK(suite, metadata.expert_used_count == 2);
+    CPP_LLM_CHECK(suite, !metadata.expert_weights_normalize);
+    CPP_LLM_CHECK(suite, metadata.expert_feed_forward_length == 12);
+    CPP_LLM_CHECK(suite, metadata.expert_shared_feed_forward_length == 32);
+
+    GgufModelIndex index;
+    const auto add = [&index](const std::string& name,
+                              std::vector<std::uint64_t> shape) {
+        index.tensors.push_back({name, std::move(shape), 0, 0});
+    };
+    add("token_embd.weight", {16, 128});
+    add("output_norm.weight", {16});
+    add("output.weight", {16, 128});
+    for (std::size_t layer = 0; layer < 2; ++layer) {
+        const std::string prefix = "blk." + std::to_string(layer) + ".";
+        add(prefix + "attn_norm.weight", {16});
+        add(prefix + "attn_q.weight", {16, 16});
+        add(prefix + "attn_k.weight", {16, 16});
+        add(prefix + "attn_v.weight", {16, 16});
+        add(prefix + "attn_q.bias", {16});
+        add(prefix + "attn_k.bias", {16});
+        add(prefix + "attn_v.bias", {16});
+        add(prefix + "attn_output.weight", {16, 16});
+        add(prefix + "ffn_norm.weight", {16});
+        add(prefix + "ffn_gate_inp.weight", {16, 8});
+        add(prefix + "ffn_gate_exps.weight", {16, 12, 8});
+        add(prefix + "ffn_up_exps.weight", {16, 12, 8});
+        add(prefix + "ffn_down_exps.weight", {12, 16, 8});
+        add(prefix + "ffn_gate_inp_shexp.weight", {16});
+        add(prefix + "ffn_gate_shexp.weight", {16, 32});
+        add(prefix + "ffn_up_shexp.weight", {16, 32});
+        add(prefix + "ffn_down_shexp.weight", {32, 16});
+    }
+
+    chapter01::MoeDecoderTensorLayout layout;
+    CPP_LLM_REQUIRE(
+        suite, ModelSchema::validate_moe_gguf(metadata, index, &layout, &error));
+    CPP_LLM_CHECK(suite, error.empty());
+    CPP_LLM_CHECK(suite, layout.layers.size() == 2);
+    CPP_LLM_CHECK(suite, layout.layers[0].router == "blk.0.ffn_gate_inp.weight");
+    CPP_LLM_CHECK(suite, layout.layers[1].expert_down ==
+                                   "blk.1.ffn_down_exps.weight");
+
+    auto missing_expert = index;
+    missing_expert.tensors.erase(missing_expert.tensors.begin() + 13);
+    CPP_LLM_CHECK(
+        suite,
+        !ModelSchema::validate_moe_gguf(metadata, missing_expert, &layout, &error));
+    CPP_LLM_CHECK(suite, error.find("Qwen2MoE tensor") != std::string::npos);
+
+    auto invalid_metadata = metadata;
+    invalid_metadata.expert_used_count = invalid_metadata.expert_count + 1;
+    CPP_LLM_CHECK(
+        suite,
+        !ModelSchema::validate_moe_gguf(invalid_metadata, index, &layout, &error));
+    CPP_LLM_CHECK(suite, error.find("expert metadata") != std::string::npos);
+}
+
 void test_gguf_reader(TestSuite& suite) {
     const auto path = std::filesystem::temp_directory_path() / "chapter01_mock.gguf";
     std::filesystem::remove(path);
@@ -858,6 +938,47 @@ void test_q8_0_payload_loader(TestSuite& suite) {
     std::filesystem::remove(path);
 }
 
+void test_moe_quantized_payload_loader(TestSuite& suite) {
+    const auto path = std::filesystem::temp_directory_path() /
+        "chapter01_moe_quantized_payload.gguf";
+    std::filesystem::remove(path);
+    {
+        std::ofstream out(path, std::ios::binary);
+        CPP_LLM_REQUIRE(suite, out);
+        const std::vector<std::byte> q3_payload(110, std::byte{0x31});
+        const std::vector<std::byte> q50_payload(22, std::byte{0x50});
+        const std::vector<std::byte> q51_payload(24, std::byte{0x51});
+        const std::vector<std::byte> q5k_payload(176, std::byte{0x5b});
+        out.write(reinterpret_cast<const char*>(q3_payload.data()),
+                  static_cast<std::streamsize>(q3_payload.size()));
+        out.write(reinterpret_cast<const char*>(q50_payload.data()),
+                  static_cast<std::streamsize>(q50_payload.size()));
+        out.write(reinterpret_cast<const char*>(q51_payload.data()),
+                  static_cast<std::streamsize>(q51_payload.size()));
+        out.write(reinterpret_cast<const char*>(q5k_payload.data()),
+                  static_cast<std::streamsize>(q5k_payload.size()));
+    }
+
+    GgufModelIndex index;
+    index.data_offset = 0;
+    index.tensors.push_back({"expert.up", {256}, 11, 0});
+    index.tensors.push_back({"expert.down_q5_0", {32}, 6, 110});
+    index.tensors.push_back({"expert.down_q5_1", {32}, 7, 132});
+    index.tensors.push_back({"shared_expert.down", {256}, 13, 156});
+    std::unordered_map<std::string, Tensor> tensors;
+    std::string error;
+    CPP_LLM_REQUIRE(suite, GgufTensorLoader::load_all(path, index, &tensors, &error));
+    CPP_LLM_CHECK(suite, tensors.at("expert.up").dtype() == DType::Q3_K);
+    CPP_LLM_CHECK(suite, tensors.at("expert.up").bytes() == 110);
+    CPP_LLM_CHECK(suite, tensors.at("expert.down_q5_0").dtype() == DType::Q5_0);
+    CPP_LLM_CHECK(suite, tensors.at("expert.down_q5_0").bytes() == 22);
+    CPP_LLM_CHECK(suite, tensors.at("expert.down_q5_1").dtype() == DType::Q5_1);
+    CPP_LLM_CHECK(suite, tensors.at("expert.down_q5_1").bytes() == 24);
+    CPP_LLM_CHECK(suite, tensors.at("shared_expert.down").dtype() == DType::Q5_K);
+    CPP_LLM_CHECK(suite, tensors.at("shared_expert.down").bytes() == 176);
+    std::filesystem::remove(path);
+}
+
 }  // namespace
 
 int run_chapter01_test_group(const std::string& group) {
@@ -894,6 +1015,9 @@ int run_chapter01_test_group(const std::string& group) {
         suite.run("Qwen3 metadata and dense tensor schema are explicit", [&] {
             test_qwen3_metadata_and_schema(suite);
         });
+        suite.run("Qwen2MoE metadata and expert tensor schema are explicit", [&] {
+            test_qwen2_moe_metadata_and_schema(suite);
+        });
         suite.run("GGUF reader builds tokenizer tensors and decoder schema", [&] {
             test_gguf_reader(suite);
         });
@@ -907,6 +1031,9 @@ int run_chapter01_test_group(const std::string& group) {
         });
         suite.run("Q4_K loader preserves quantized payload", [&] {
             test_q4_k_payload_loader(suite);
+        });
+        suite.run("MoE mixed quantized payloads preserve block bytes", [&] {
+            test_moe_quantized_payload_loader(suite);
         });
     }
     return suite.finish();

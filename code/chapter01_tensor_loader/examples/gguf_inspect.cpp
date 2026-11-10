@@ -68,6 +68,8 @@ int main(int argc, char** argv) {
               << "attention kv heads: " << metadata.attention_head_count_kv << "\n"
               << "attention key/value length: " << metadata.attention_key_length
               << "/" << metadata.attention_value_length << "\n"
+              << "experts selected/total: " << metadata.expert_used_count
+              << "/" << metadata.expert_count << "\n"
               << "special token ids: bos=" << metadata.bos_token_id
               << " eos=" << metadata.eos_token_id << "\n"
               << "chat template: "
@@ -87,6 +89,20 @@ int main(int argc, char** argv) {
     }
 
     if (argc == 3 && std::string(argv[2]) == "--validate-schema") {
+        if (metadata.architecture == "qwen2moe") {
+            chapter01::MoeDecoderTensorLayout layout;
+            if (!chapter01::ModelSchema::validate_moe_gguf(
+                    metadata, index, &layout, &error)) {
+                std::cerr << "schema validation failed: " << error << "\n";
+                return 1;
+            }
+            std::cout << "schema: qwen2moe tensors valid\n"
+                      << "decoder layers: " << layout.layers.size() << "\n"
+                      << "experts selected/total: " << layout.expert_used_count
+                      << "/" << layout.expert_count << "\n"
+                      << "decoder input: MoE schema ready\n";
+            return 0;
+        }
         chapter01::DenseDecoderTensorLayout layout;
         if (!chapter01::ModelSchema::validate_gguf(metadata, index, &layout, &error)) {
             std::cerr << "schema validation failed: " << error << "\n";

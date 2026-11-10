@@ -21,6 +21,13 @@ struct ModelMetadata {
     std::size_t attention_head_count_kv = 0;
     std::size_t attention_key_length = 0;
     std::size_t attention_value_length = 0;
+    std::size_t feed_forward_length = 0;
+    std::size_t expert_count = 0;
+    std::size_t expert_used_count = 0;
+    std::size_t expert_feed_forward_length = 0;
+    std::size_t expert_shared_feed_forward_length = 0;
+    bool expert_weights_normalize = true;
+    float expert_weights_scale = 1.0f;
     std::size_t rope_dimension_count = 0;
     float rope_freq_base = 10000.0f;
     float rms_norm_epsilon = 1.0e-5f;

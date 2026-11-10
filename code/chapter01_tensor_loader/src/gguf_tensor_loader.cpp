@@ -36,6 +36,21 @@ bool map_dtype(std::uint32_t gguf_type, GgufDType* dtype, std::string* error) {
         // Q8_0 每个 34 字节块保存一个 FP16 scale 和 32 个 int8 值。
         *dtype = {DType::Q8_0, 0, 32, 34};
         return true;
+    case 7:
+        // Q5_1 每个 24 字节块表示 32 个值。
+        *dtype = {DType::Q5_1, 0, 32, 24};
+        return true;
+    case 6:
+        // Q5_0 每个 22 字节块表示 32 个有符号 5-bit 值。
+        *dtype = {DType::Q5_0, 0, 32, 22};
+        return true;
+    case 11:
+        // Q3_K 每个 110 字节 super-block 表示 256 个值。
+        *dtype = {DType::Q3_K, 0, 256, 110};
+        return true;
+    case 13:
+        *dtype = {DType::Q5_K, 0, 256, 176};
+        return true;
     case 24:
         *dtype = {DType::Int8, sizeof(std::int8_t)};
         return true;

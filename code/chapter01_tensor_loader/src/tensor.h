@@ -1,6 +1,6 @@
 // Chapter 01：loader Tensor 对象
 // 职责：表达从模型文件加载出的单个 tensor 元数据和 payload。
-// 契约：支持 Float32、Float16、Int8、Q8_0、Q4_K、Q6_K 等 dtype 的 raw storage。
+// 契约：支持 Float32、Float16、Int8 和教程使用的 GGUF 量化 dtype raw storage。
 // 验证：chapter01_tensor_loader_test.cpp。
 #pragma once
 
@@ -26,6 +26,10 @@ enum class DType : std::uint8_t {
     Q4_K = 5,
     Q6_K = 6,
     Q8_0 = 7,
+    Q3_K = 8,
+    Q5_1 = 9,
+    Q5_K = 10,
+    Q5_0 = 11,
 };
 
 enum class Device : std::uint8_t {

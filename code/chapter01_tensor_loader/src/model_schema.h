@@ -41,6 +41,37 @@ struct DenseDecoderTensorLayout {
     std::vector<DecoderLayerLayout> layers;
 };
 
+struct MoeDecoderLayerLayout {
+    std::size_t index = 0;
+    std::string attn_norm;
+    std::string attn_q;
+    std::string attn_k;
+    std::string attn_v;
+    std::string attn_q_bias;
+    std::string attn_k_bias;
+    std::string attn_v_bias;
+    std::string attn_output;
+    std::string ffn_norm;
+    std::string router;
+    std::string expert_gate;
+    std::string expert_up;
+    std::string expert_down;
+    std::string shared_expert_router;
+    std::string shared_expert_gate;
+    std::string shared_expert_up;
+    std::string shared_expert_down;
+};
+
+struct MoeDecoderTensorLayout {
+    std::string architecture;
+    std::string embedding;
+    std::string output;
+    std::string output_norm;
+    std::size_t expert_count = 0;
+    std::size_t expert_used_count = 0;
+    std::vector<MoeDecoderLayerLayout> layers;
+};
+
 // 迁移期兼容名称；新代码使用 DenseDecoderTensorLayout 表达多架构布局。
 using LlamaTensorLayout = DenseDecoderTensorLayout;
 
@@ -55,6 +86,11 @@ public:
                                  const std::unordered_map<std::string, Tensor>& tensors,
                                  DenseDecoderTensorLayout* layout,
                                  std::string* error = nullptr);
+
+    static bool validate_moe_gguf(const ModelMetadata& metadata,
+                                  const GgufModelIndex& index,
+                                  MoeDecoderTensorLayout* layout,
+                                  std::string* error = nullptr);
 };
 
 }  // namespace chapter01

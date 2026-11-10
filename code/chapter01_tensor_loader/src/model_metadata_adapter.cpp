@@ -206,6 +206,16 @@ bool ModelMetadataAdapter::from_gguf(const MetadataMap& values,
                                      &parsed.attention_key_length, error) ||
         !read_optional_positive_size(values, prefix + "attention.value_length",
                                      &parsed.attention_value_length, error) ||
+        !read_optional_positive_size(values, prefix + "feed_forward_length",
+                                     &parsed.feed_forward_length, error) ||
+        !read_optional_positive_size(values, prefix + "expert_count",
+                                     &parsed.expert_count, error) ||
+        !read_optional_positive_size(values, prefix + "expert_used_count",
+                                     &parsed.expert_used_count, error) ||
+        !read_optional_positive_size(values, prefix + "expert_feed_forward_length",
+                                     &parsed.expert_feed_forward_length, error) ||
+        !read_optional_positive_size(values, prefix + "expert_shared_feed_forward_length",
+                                     &parsed.expert_shared_feed_forward_length, error) ||
         !read_optional_positive_size(values, prefix + "rope.dimension_count",
                                      &parsed.rope_dimension_count, error) ||
         !read_optional_positive_float(values, prefix + "rope.freq_base",
@@ -221,6 +231,11 @@ bool ModelMetadataAdapter::from_gguf(const MetadataMap& values,
     if (!parsed.valid()) {
         set_error(error, "parsed GGUF metadata is incomplete");
         return false;
+    }
+    // Qwen2MoE applies full-router Softmax and keeps the selected probabilities.
+    // Other teaching paths retain selected-expert normalization by default.
+    if (parsed.architecture == "qwen2moe") {
+        parsed.expert_weights_normalize = false;
     }
     *metadata = parsed;
     if (error != nullptr) {
