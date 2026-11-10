@@ -1,0 +1,17 @@
+paired_sample iteration=1 path_order=row-wise-first row_wise_ms=5162.16427 grouped_ms=4963.74961
+paired_sample iteration=2 path_order=grouped-first row_wise_ms=5303.36306 grouped_ms=4991.20261
+paired_sample iteration=3 path_order=row-wise-first row_wise_ms=5295.38107 grouped_ms=5088.70676
+paired_sample iteration=4 path_order=grouped-first row_wise_ms=5291.32318 grouped_ms=5104.20345
+paired_sample iteration=5 path_order=row-wise-first row_wise_ms=5258.72675 grouped_ms=4765.93851
+iterations: 5
+batch: 2
+cache_layers: 27
+row_wise_median_ms: 5291.32318
+grouped_median_ms: 4991.20261
+grouped_to_row_wise_ratio: 0.943280619
+maximum_logits_error: 0.000383377075
+minimum_logits_cosine: 1
+tokens_match: true
+row_wise_samples_ms: 5162.16427 5303.36306 5295.38107 5291.32318 5258.72675
+grouped_samples_ms: 4963.74961 4991.20261 5088.70676 5104.20345 4765.93851
+correctness: PASS

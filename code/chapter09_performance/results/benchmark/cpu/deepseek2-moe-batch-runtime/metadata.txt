@@ -1,0 +1,13 @@
+experiment_id=EXP-CPU-19
+workload_id=WL-CPU-DEEPSEEK2-MOE-RUNTIME-BATCH-V1
+model=DeepSeek-V2-Lite-Chat-Q2_K
+backend=CPU
+build_type=Release
+batch=2
+iterations=5
+cache_layers=27
+baseline=row-wise-moe
+experiment=grouped-by-expert-moe
+timing_scope=27-layer-decode-and-lm-head
+Linux 6.5.0-41-generic x86_64 GNU/Linux
+c++ (Ubuntu 13.1.0-8ubuntu1~22.04) 13.1.0

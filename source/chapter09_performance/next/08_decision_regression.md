@@ -21,6 +21,8 @@
 
 实验资产登记表保存结论和结果路径，正文解释方法。当前 AVX2 顺序/并行请求决策见 <a href="../../_code/chapter09_performance/results/evidence/tinyllama_service_core_cpu-avx2-dispatch-decision.json"><code>dispatch-decision.json</code></a>；文件引用两份 evidence，不复制原始样本。正文中的示例数字不能替代可下载、可复查的原始结果。
 
+局部 Kernel 或专家子层通过门禁后，还要沿真实 Decoder、Generation Runtime、Scheduler 和 Service 逐层复核。每一层都重新固定计时范围和保护指标；局部加速可以保留为候选，但只有端到端证据通过时才能改变默认执行路径。适用范围矩阵再说明该决定覆盖哪些 batch、上下文和 Decode 步数，不能把一个单点结论推广到全部请求。
+
 ## 验证决策回归
 
 运行 `bash code/chapter09_performance/scripts/run.sh`。`chapter09_comparison_test` 应锁定四类决策，`chapter09_versioned_evidence_test` 应确认已归档结果仍符合当前 schema，`chapter09_real_evidence_bridge_test` 应确认真实服务样本可以进入同一比较器。

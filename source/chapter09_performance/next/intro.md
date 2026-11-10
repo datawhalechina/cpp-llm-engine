@@ -38,7 +38,7 @@
 | 3 | B | [`09.5 工具顺序`](./05_profiling_tools.md)、[`09.6 热点归因`](./06_hotspot_attribution.md) | <a href="../../_code/engine/scripts/run_real_decoder_profile.sh"><code>run_real_decoder_profile.sh</code></a> | 应该先看总量、阶段、函数还是 Kernel |
 | 4 | B | [`09.7 单变量 A/B`](./07_ab_experiment.md)、[`09.8 决策与回归`](./08_decision_regression.md) | <a href="../../_code/chapter09_performance/src/comparison.cpp"><code>comparison.cpp</code></a> | 如何判断两次实验可比并形成保留或回退结论 |
 | 5 | G | [`GPU 实验资产`](../../reference/experiment_assets.md#exp-gpu-02) | <a href="../../_code/chapter09_performance/scripts/run_cuda_profile.sh"><code>run_cuda_profile.sh</code></a>、<a href="../../_code/chapter09_performance/scripts/run_cuda_attention_ab.sh"><code>run_cuda_attention_ab.sh</code></a> | kernel profile 为什么不能替代真实 Prefill/Decode A/B 决策 |
-| 6 | B/MoE | [`MoE 分组实验`](../../reference/experiment_assets.md#exp-cpu-13) | <a href="../../_code/chapter09_performance/scripts/run_qwen15_moe_grouped_batch_ab.sh"><code>run_qwen15_moe_grouped_batch_ab.sh</code></a> | 怎样从局部专家计算逐步验证完整解码、调度和服务收益 |
+| 6 | B/MoE | [`MoE 分组实验`](../../reference/experiment_assets.md#exp-cpu-13) | <a href="../../_code/chapter09_performance/scripts/run_qwen15_moe_grouped_batch_ab.sh"><code>run_qwen15_moe_grouped_batch_ab.sh</code></a>、<a href="../../_code/chapter09_performance/scripts/run_deepseek2_moe_batch_runtime_ab.sh"><code>DeepSeek Runtime A/B</code></a> | 怎样从局部专家计算逐步验证完整解码、调度和服务收益 |
 | 7 | 扩展 | [`09.9 框架对照`](./09_framework_comparison.md) | 生态卡 | 教学证据链与成熟框架工具链的对应关系 |
 
 ## 验证与下一步
@@ -51,9 +51,10 @@
 | L4 服务 A/B | `bash code/chapter09_performance/scripts/run_real_evidence.sh ab` | 保留顺序与并行原始样本、统一 evidence，并输出 `real-service-ab-decision.json` | 进入 Chapter10 后完成 |
 | L5 MoE 缓存 A/B | `bash code/chapter09_performance/scripts/run_qwen15_moe_layer_cache.sh` | 两种路径生成词元一致，同时记录命中、常驻字节和 Prefill/Decode 时延 | 有 Qwen1.5-MoE 时选做 |
 | L6 MoE 专家分组 A/B | `bash code/chapter09_performance/scripts/run_qwen15_moe_grouped_batch_ab.sh` | 逐词元与按专家分组使用相同路由，输出误差通过并保留配对样本 | 学习 MoE 批执行时选做 |
-| L7 MoE 动态准入 A/B | `bash code/chapter09_performance/scripts/run_qwen15_moe_service_ab.sh` | 运行中加入请求后，两条路径的完整输出、批量执行和终态释放一致 | 学习 MoE 服务时选做 |
-| L8 CUDA 热点 | `bash code/chapter09_performance/scripts/run_cuda_profile.sh` | 固定模型、词元和设备信息，保存 kernel/memory CSV 与 golden token | 有 Nsight Systems 时选做 |
-| L9 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 两轮独立 Prefill/Decode 样本和正确性检查完整；不稳定收益不会进入默认路径 | 调优融合 Attention 时必做 |
+| L7 DeepSeek MoE Runtime A/B | `bash code/chapter09_performance/scripts/run_deepseek2_moe_batch_runtime_ab.sh` | 五轮反向顺序配对通过 logits、余弦和词元闸门，并保存原始样本 | 学习 MLA 与 MoE 组批时选做 |
+| L8 MoE 动态准入 A/B | `bash code/chapter09_performance/scripts/run_qwen15_moe_service_ab.sh` | 运行中加入请求后，两条路径的完整输出、批量执行和终态释放一致 | 学习 MoE 服务时选做 |
+| L9 CUDA 热点 | `bash code/chapter09_performance/scripts/run_cuda_profile.sh` | 固定模型、词元和设备信息，保存 kernel/memory CSV 与 golden token | 有 Nsight Systems 时选做 |
+| L10 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 两轮独立 Prefill/Decode 样本和正确性检查完整；不稳定收益不会进入默认路径 | 调优融合 Attention 时必做 |
 
 L1 构建证据记录、统计和比较器，并运行六项测试；它证明记录格式、校验规则与决策逻辑可用，不代表当前机器上的性能数字可以直接推广到其他环境。
 
