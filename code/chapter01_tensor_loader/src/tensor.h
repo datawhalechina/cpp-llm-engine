@@ -30,6 +30,8 @@ enum class DType : std::uint8_t {
     Q5_1 = 9,
     Q5_K = 10,
     Q5_0 = 11,
+    Q2_K = 12,
+    IQ4_NL = 13,
 };
 
 enum class Device : std::uint8_t {

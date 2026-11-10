@@ -60,6 +60,58 @@ public:
                      std::string* error = nullptr);
 };
 
+struct RealDeepSeek2DenseLayerWeights {
+    std::size_t index = 0;
+    Tensor attn_norm;
+    Tensor attn_q;
+    Tensor attn_kv_a_mqa;
+    Tensor attn_kv_a_norm;
+    Tensor attn_kv_b;
+    Tensor attn_k_b;
+    Tensor attn_v_b;
+    Tensor attn_output;
+    Tensor ffn_norm;
+    Tensor ffn_gate;
+    Tensor ffn_up;
+    Tensor ffn_down;
+
+    bool uses_combined_kv_b() const;
+    bool valid() const;
+};
+
+class RealDeepSeek2DenseLayerLoader final {
+public:
+    static bool load(
+        const std::string& model_path,
+        const GgufModelIndex& index,
+        const DeepSeek2DecoderTensorLayout& layout,
+        std::size_t layer_index,
+        RealDeepSeek2DenseLayerWeights* output,
+        std::string* error = nullptr);
+};
+
+struct RealDeepSeek2MoeLayerWeights {
+    std::size_t index = 0;
+    Tensor attn_norm, attn_q, attn_kv_a_mqa, attn_kv_a_norm;
+    Tensor attn_kv_b, attn_k_b, attn_v_b, attn_output;
+    Tensor ffn_norm, router, expert_gate, expert_up, expert_down;
+    Tensor shared_expert_gate, shared_expert_up, shared_expert_down;
+
+    bool uses_combined_kv_b() const;
+    bool valid() const;
+};
+
+class RealDeepSeek2MoeLayerLoader final {
+public:
+    static bool load(
+        const std::string& model_path,
+        const GgufModelIndex& index,
+        const DeepSeek2DecoderTensorLayout& layout,
+        std::size_t layer_index,
+        RealDeepSeek2MoeLayerWeights* output,
+        std::string* error = nullptr);
+};
+
 // 迁移期兼容名称；新代码使用 RealDense* 表达多架构层权重。
 using RealLlamaLayerWeights = RealDenseLayerWeights;
 using RealLlamaLayerLoader = RealDenseLayerLoader;

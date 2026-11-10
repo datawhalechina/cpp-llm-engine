@@ -308,6 +308,193 @@ bool validate_moe_shapes(const ModelMetadata& metadata,
     return true;
 }
 
+DeepSeek2DecoderLayerLayout make_deepseek2_layer(std::size_t index,
+                                                 bool uses_dense_ffn) {
+    DeepSeek2DecoderLayerLayout layer;
+    layer.index = index;
+    layer.uses_dense_ffn = uses_dense_ffn;
+    layer.attn_norm = layer_name(index, "attn_norm.weight");
+    layer.attn_q = layer_name(index, "attn_q.weight");
+    layer.attn_kv_a_mqa = layer_name(index, "attn_kv_a_mqa.weight");
+    layer.attn_kv_a_norm = layer_name(index, "attn_kv_a_norm.weight");
+    layer.attn_kv_b = layer_name(index, "attn_kv_b.weight");
+    layer.attn_k_b = layer_name(index, "attn_k_b.weight");
+    layer.attn_v_b = layer_name(index, "attn_v_b.weight");
+    layer.attn_output = layer_name(index, "attn_output.weight");
+    layer.ffn_norm = layer_name(index, "ffn_norm.weight");
+    if (uses_dense_ffn) {
+        layer.ffn_gate = layer_name(index, "ffn_gate.weight");
+        layer.ffn_up = layer_name(index, "ffn_up.weight");
+        layer.ffn_down = layer_name(index, "ffn_down.weight");
+    } else {
+        layer.router = layer_name(index, "ffn_gate_inp.weight");
+        layer.expert_gate = layer_name(index, "ffn_gate_exps.weight");
+        layer.expert_up = layer_name(index, "ffn_up_exps.weight");
+        layer.expert_down = layer_name(index, "ffn_down_exps.weight");
+        layer.shared_expert_gate = layer_name(index, "ffn_gate_shexp.weight");
+        layer.shared_expert_up = layer_name(index, "ffn_up_shexp.weight");
+        layer.shared_expert_down = layer_name(index, "ffn_down_shexp.weight");
+    }
+    return layer;
+}
+
+bool validate_deepseek2_shapes(const ModelMetadata& metadata,
+                               const std::vector<ShapeDescriptor>& descriptors,
+                               DeepSeek2DecoderTensorLayout* layout,
+                               std::string* error) {
+    if (layout == nullptr) return fail(error, "DeepSeek2 model layout output must not be null");
+    if (metadata.architecture != "deepseek2") {
+        return fail(error, "DeepSeek2 tensor schema requires deepseek2 architecture");
+    }
+    if (metadata.attention_head_count == 0 ||
+        metadata.attention_kv_lora_rank == 0 ||
+        metadata.attention_key_length_mla <= metadata.rope_dimension_count ||
+        metadata.attention_value_length_mla == 0 ||
+        metadata.attention_key_length !=
+            metadata.attention_kv_lora_rank + metadata.rope_dimension_count ||
+        metadata.attention_value_length != metadata.attention_kv_lora_rank) {
+        return fail(error, "DeepSeek2 MLA metadata is incomplete or inconsistent");
+    }
+    if (metadata.leading_dense_layer_count > metadata.layer_count ||
+        metadata.feed_forward_length == 0 || metadata.expert_count == 0 ||
+        metadata.expert_used_count == 0 ||
+        metadata.expert_used_count > metadata.expert_count ||
+        metadata.expert_feed_forward_length == 0 ||
+        metadata.expert_shared_count == 0) {
+        return fail(error, "DeepSeek2 dense and expert metadata is incomplete or inconsistent");
+    }
+
+    std::unordered_map<std::string, const ShapeDescriptor*> by_name;
+    for (const auto& descriptor : descriptors) {
+        if (!by_name.emplace(descriptor.name, &descriptor).second) {
+            return fail(error, "duplicate tensor in DeepSeek2 schema: " + descriptor.name);
+        }
+    }
+    const auto find = [&](const std::string& name) -> const ShapeDescriptor* {
+        const auto it = by_name.find(name);
+        return it == by_name.end() ? nullptr : it->second;
+    };
+    const auto expect = [&](const std::string& name,
+                            const std::vector<std::size_t>& shape) -> bool {
+        const auto* descriptor = find(name);
+        if (descriptor == nullptr) return fail(error, "missing DeepSeek2 tensor: " + name);
+        if (!descriptor->has_payload) return fail(error, "DeepSeek2 tensor has no payload: " + name);
+        if (descriptor->shape != shape) return fail(error, "shape mismatch for " + name);
+        return true;
+    };
+
+    if (!expect("token_embd.weight", {metadata.hidden_size, metadata.vocab_size}) ||
+        !expect("output_norm.weight", {metadata.hidden_size})) {
+        return false;
+    }
+
+    DeepSeek2DecoderTensorLayout built;
+    built.architecture = metadata.architecture;
+    built.embedding = "token_embd.weight";
+    built.output_norm = "output_norm.weight";
+    if (find("output.weight") != nullptr) {
+        if (!expect("output.weight", {metadata.hidden_size, metadata.vocab_size})) return false;
+        built.output = "output.weight";
+    } else {
+        built.output = built.embedding;
+        built.output_tied_to_embedding = true;
+    }
+    built.leading_dense_layer_count = metadata.leading_dense_layer_count;
+    built.expert_count = metadata.expert_count;
+    built.expert_used_count = metadata.expert_used_count;
+    built.layers.reserve(metadata.layer_count);
+
+    const std::size_t qk_nope =
+        metadata.attention_key_length_mla - metadata.rope_dimension_count;
+    std::size_t query_size = 0;
+    std::size_t output_input_size = 0;
+    if (!checked_product(metadata.attention_head_count,
+                         metadata.attention_key_length_mla, &query_size, error) ||
+        !checked_product(metadata.attention_head_count,
+                         metadata.attention_value_length_mla,
+                         &output_input_size, error)) {
+        return false;
+    }
+    std::size_t shared_ffn_size = 0;
+    if (!checked_product(metadata.expert_feed_forward_length,
+                         metadata.expert_shared_count, &shared_ffn_size, error)) {
+        return false;
+    }
+
+    for (std::size_t i = 0; i < metadata.layer_count; ++i) {
+        const bool dense = i < metadata.leading_dense_layer_count;
+        auto layer = make_deepseek2_layer(i, dense);
+        if (!expect(layer.attn_norm, {metadata.hidden_size}) ||
+            !expect(layer.attn_q, {metadata.hidden_size, query_size}) ||
+            !expect(layer.attn_kv_a_mqa,
+                    {metadata.hidden_size,
+                     metadata.attention_kv_lora_rank + metadata.rope_dimension_count}) ||
+            !expect(layer.attn_kv_a_norm, {metadata.attention_kv_lora_rank}) ||
+            !expect(layer.attn_output, {output_input_size, metadata.hidden_size}) ||
+            !expect(layer.ffn_norm, {metadata.hidden_size})) {
+            return false;
+        }
+        if (find(layer.attn_k_b) != nullptr || find(layer.attn_v_b) != nullptr) {
+            if (!expect(layer.attn_k_b,
+                        {qk_nope, metadata.attention_kv_lora_rank,
+                         metadata.attention_head_count}) ||
+                !expect(layer.attn_v_b,
+                        {metadata.attention_kv_lora_rank,
+                         metadata.attention_value_length_mla,
+                         metadata.attention_head_count})) {
+                return false;
+            }
+            layer.attn_kv_b.clear();
+        } else {
+            std::size_t expanded_kv_size = 0;
+            if (!checked_product(metadata.attention_head_count,
+                                 qk_nope + metadata.attention_value_length_mla,
+                                 &expanded_kv_size, error) ||
+                !expect(layer.attn_kv_b,
+                        {metadata.attention_kv_lora_rank, expanded_kv_size})) {
+                return false;
+            }
+            layer.attn_k_b.clear();
+            layer.attn_v_b.clear();
+        }
+        if (dense) {
+            if (!expect(layer.ffn_gate,
+                        {metadata.hidden_size, metadata.feed_forward_length}) ||
+                !expect(layer.ffn_up,
+                        {metadata.hidden_size, metadata.feed_forward_length}) ||
+                !expect(layer.ffn_down,
+                        {metadata.feed_forward_length, metadata.hidden_size})) {
+                return false;
+            }
+        } else if (!expect(layer.router,
+                           {metadata.hidden_size, metadata.expert_count}) ||
+                   !expect(layer.expert_gate,
+                           {metadata.hidden_size,
+                            metadata.expert_feed_forward_length,
+                            metadata.expert_count}) ||
+                   !expect(layer.expert_up,
+                           {metadata.hidden_size,
+                            metadata.expert_feed_forward_length,
+                            metadata.expert_count}) ||
+                   !expect(layer.expert_down,
+                           {metadata.expert_feed_forward_length,
+                            metadata.hidden_size,
+                            metadata.expert_count}) ||
+                   !expect(layer.shared_expert_gate,
+                           {metadata.hidden_size, shared_ffn_size}) ||
+                   !expect(layer.shared_expert_up,
+                           {metadata.hidden_size, shared_ffn_size}) ||
+                   !expect(layer.shared_expert_down,
+                           {shared_ffn_size, metadata.hidden_size})) {
+            return false;
+        }
+        built.layers.push_back(layer);
+    }
+    *layout = std::move(built);
+    if (error != nullptr) error->clear();
+    return true;
+}
+
 }  // namespace
 
 bool ModelSchema::validate_gguf(const ModelMetadata& metadata,
@@ -368,6 +555,27 @@ bool ModelSchema::validate_moe_gguf(const ModelMetadata& metadata,
         descriptors.push_back(std::move(descriptor));
     }
     return validate_moe_shapes(metadata, descriptors, layout, error);
+}
+
+bool ModelSchema::validate_deepseek2_gguf(
+    const ModelMetadata& metadata,
+    const GgufModelIndex& index,
+    DeepSeek2DecoderTensorLayout* layout,
+    std::string* error) {
+    std::vector<ShapeDescriptor> descriptors;
+    descriptors.reserve(index.tensors.size());
+    for (const auto& tensor : index.tensors) {
+        ShapeDescriptor descriptor;
+        descriptor.name = tensor.name;
+        descriptor.shape.reserve(tensor.dimensions.size());
+        for (const auto dimension : tensor.dimensions) {
+            std::size_t converted = 0;
+            if (!checked_dimension(dimension, &converted, error)) return false;
+            descriptor.shape.push_back(converted);
+        }
+        descriptors.push_back(std::move(descriptor));
+    }
+    return validate_deepseek2_shapes(metadata, descriptors, layout, error);
 }
 
 }  // namespace chapter01

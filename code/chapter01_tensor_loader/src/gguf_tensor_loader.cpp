@@ -36,6 +36,10 @@ bool map_dtype(std::uint32_t gguf_type, GgufDType* dtype, std::string* error) {
         // Q8_0 每个 34 字节块保存一个 FP16 scale 和 32 个 int8 值。
         *dtype = {DType::Q8_0, 0, 32, 34};
         return true;
+    case 10:
+        // Q2_K 每个 84 字节 super-block 表示 256 个值。
+        *dtype = {DType::Q2_K, 0, 256, 84};
+        return true;
     case 7:
         // Q5_1 每个 24 字节块表示 32 个值。
         *dtype = {DType::Q5_1, 0, 32, 24};
@@ -61,6 +65,10 @@ bool map_dtype(std::uint32_t gguf_type, GgufDType* dtype, std::string* error) {
     case 14:
         // Q6_K 每个 210 字节 super-block 表示 256 个值。
         *dtype = {DType::Q6_K, 0, 256, 210};
+        return true;
+    case 20:
+        // IQ4_NL 每个 18 字节非线性 block 表示 32 个值。
+        *dtype = {DType::IQ4_NL, 0, 32, 18};
         return true;
     default:
         return set_error(error, "GGUF dtype is not supported by the Chapter 01 loader: " +

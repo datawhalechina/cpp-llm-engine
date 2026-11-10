@@ -88,10 +88,11 @@ void Tensor::set_device(Device device) { device_ = device; }
 std::size_t Tensor::numel() const { return product(shape_); }
 
 std::size_t Tensor::bytes() const {
-    if (dtype_ == DType::Q3_K || dtype_ == DType::Q4_K ||
+    if (dtype_ == DType::Q2_K || dtype_ == DType::Q3_K ||
+        dtype_ == DType::Q4_K ||
         dtype_ == DType::Q5_0 || dtype_ == DType::Q5_1 ||
         dtype_ == DType::Q5_K || dtype_ == DType::Q6_K ||
-        dtype_ == DType::Q8_0) {
+        dtype_ == DType::Q8_0 || dtype_ == DType::IQ4_NL) {
         return payload_bytes_;
     }
     const std::size_t element_bytes = dtype_size(dtype_);

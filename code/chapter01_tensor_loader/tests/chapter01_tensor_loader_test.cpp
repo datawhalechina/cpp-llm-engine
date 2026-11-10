@@ -6,6 +6,7 @@
 #include "../src/model_config.h"
 #include "../src/model_metadata.h"
 #include "../src/model_metadata_adapter.h"
+#include "../src/real_layer_weights.h"
 #include "../src/gguf_reader.h"
 #include "../src/gguf_tensor_loader.h"
 #include "../src/model_builder.h"
@@ -15,6 +16,7 @@
 #include "cpp_llm_engine/testing/test.h"
 #include "support/chapter01_test_groups.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -34,8 +36,14 @@ using chapter01::MetadataMap;
 using chapter01::ModelMetadataAdapter;
 using chapter01::ModelSchema;
 using chapter01::DenseDecoderTensorLayout;
+using chapter01::DeepSeek2DecoderTensorLayout;
+using chapter01::RealDeepSeek2DenseLayerLoader;
+using chapter01::RealDeepSeek2DenseLayerWeights;
+using chapter01::RealDeepSeek2MoeLayerLoader;
+using chapter01::RealDeepSeek2MoeLayerWeights;
 using chapter01::GgufReader;
 using chapter01::GgufModelIndex;
+using chapter01::GgufTensorInfo;
 using chapter01::GgufTensorLoader;
 using chapter01::LoadedModel;
 using chapter01::ModelBuilder;
@@ -676,6 +684,294 @@ void test_qwen2_moe_metadata_and_schema(TestSuite& suite) {
     CPP_LLM_CHECK(suite, error.find("expert metadata") != std::string::npos);
 }
 
+void test_deepseek2_metadata_and_schema(TestSuite& suite) {
+    const MetadataMap values = {
+        {"general.architecture", std::string("deepseek2")},
+        {"tokenizer.ggml.vocab_size", std::uint64_t{128}},
+        {"deepseek2.embedding_length", std::uint64_t{16}},
+        {"deepseek2.context_length", std::uint64_t{4096}},
+        {"deepseek2.block_count", std::uint64_t{2}},
+        {"deepseek2.feed_forward_length", std::uint64_t{32}},
+        {"deepseek2.leading_dense_block_count", std::uint64_t{1}},
+        {"deepseek2.attention.head_count", std::uint64_t{4}},
+        {"deepseek2.attention.head_count_kv", std::uint64_t{1}},
+        {"deepseek2.attention.key_length", std::uint64_t{12}},
+        {"deepseek2.attention.value_length", std::uint64_t{8}},
+        {"deepseek2.attention.key_length_mla", std::uint64_t{8}},
+        {"deepseek2.attention.value_length_mla", std::uint64_t{4}},
+        {"deepseek2.attention.kv_lora_rank", std::uint64_t{8}},
+        {"deepseek2.rope.dimension_count", std::uint64_t{4}},
+        {"deepseek2.rope.scaling.type", std::string("yarn")},
+        {"deepseek2.rope.scaling.factor", 40.0F},
+        {"deepseek2.rope.scaling.original_context_length", std::uint64_t{4096}},
+        {"deepseek2.rope.scaling.yarn_log_multiplier", 0.0707F},
+        {"deepseek2.expert_count", std::uint64_t{8}},
+        {"deepseek2.expert_used_count", std::uint64_t{2}},
+        {"deepseek2.expert_shared_count", std::uint64_t{2}},
+        {"deepseek2.expert_feed_forward_length", std::uint64_t{12}},
+        {"tokenizer.ggml.eos_token_id", std::int64_t{2}},
+    };
+
+    ModelMetadata metadata;
+    std::string error;
+    CPP_LLM_REQUIRE(suite, ModelMetadataAdapter::from_gguf(values, &metadata, &error));
+    CPP_LLM_CHECK(suite, metadata.architecture == "deepseek2");
+    CPP_LLM_CHECK(suite, metadata.attention_kv_lora_rank == 8);
+    CPP_LLM_CHECK(suite, metadata.attention_key_length_mla == 8);
+    CPP_LLM_CHECK(suite, metadata.leading_dense_layer_count == 1);
+    CPP_LLM_CHECK(suite, metadata.expert_shared_count == 2);
+    CPP_LLM_CHECK(suite, metadata.rope_scaling_type == "yarn");
+    CPP_LLM_CHECK(suite, metadata.rope_scaling_factor == 40.0F);
+    CPP_LLM_CHECK(suite, metadata.rope_scaling_original_context == 4096);
+    CPP_LLM_CHECK(suite, metadata.rope_yarn_log_multiplier == 0.0707F);
+
+    auto legacy_values = values;
+    legacy_values.erase("deepseek2.attention.key_length_mla");
+    legacy_values.erase("deepseek2.attention.value_length_mla");
+    legacy_values["deepseek2.attention.key_length"] = std::uint64_t{8};
+    legacy_values["deepseek2.attention.value_length"] = std::uint64_t{4};
+    ModelMetadata legacy_metadata;
+    CPP_LLM_REQUIRE(
+        suite,
+        ModelMetadataAdapter::from_gguf(legacy_values, &legacy_metadata, &error));
+    CPP_LLM_CHECK(suite, legacy_metadata.attention_key_length == 12);
+    CPP_LLM_CHECK(suite, legacy_metadata.attention_value_length == 8);
+    CPP_LLM_CHECK(suite, legacy_metadata.attention_key_length_mla == 8);
+    CPP_LLM_CHECK(suite, legacy_metadata.attention_value_length_mla == 4);
+
+    GgufModelIndex index;
+    const auto add = [&index](const std::string& name,
+                              std::vector<std::uint64_t> shape) {
+        index.tensors.push_back({name, std::move(shape), 0, 0});
+    };
+    add("token_embd.weight", {16, 128});
+    add("output_norm.weight", {16});
+    for (std::size_t layer = 0; layer < 2; ++layer) {
+        const std::string prefix = "blk." + std::to_string(layer) + ".";
+        add(prefix + "attn_norm.weight", {16});
+        add(prefix + "attn_q.weight", {16, 32});
+        add(prefix + "attn_kv_a_mqa.weight", {16, 12});
+        add(prefix + "attn_kv_a_norm.weight", {8});
+        add(prefix + "attn_k_b.weight", {4, 8, 4});
+        add(prefix + "attn_v_b.weight", {8, 4, 4});
+        add(prefix + "attn_output.weight", {16, 16});
+        add(prefix + "ffn_norm.weight", {16});
+        if (layer == 0) {
+            add(prefix + "ffn_gate.weight", {16, 32});
+            add(prefix + "ffn_up.weight", {16, 32});
+            add(prefix + "ffn_down.weight", {32, 16});
+        } else {
+            add(prefix + "ffn_gate_inp.weight", {16, 8});
+            add(prefix + "ffn_gate_exps.weight", {16, 12, 8});
+            add(prefix + "ffn_up_exps.weight", {16, 12, 8});
+            add(prefix + "ffn_down_exps.weight", {12, 16, 8});
+            add(prefix + "ffn_gate_shexp.weight", {16, 24});
+            add(prefix + "ffn_up_shexp.weight", {16, 24});
+            add(prefix + "ffn_down_shexp.weight", {24, 16});
+        }
+    }
+
+    DeepSeek2DecoderTensorLayout layout;
+    CPP_LLM_REQUIRE(
+        suite, ModelSchema::validate_deepseek2_gguf(metadata, index, &layout, &error));
+    CPP_LLM_CHECK(suite, error.empty());
+    CPP_LLM_CHECK(suite, layout.output_tied_to_embedding);
+    CPP_LLM_REQUIRE(suite, layout.layers.size() == 2);
+    CPP_LLM_CHECK(suite, layout.layers[0].uses_dense_ffn);
+    CPP_LLM_CHECK(suite, !layout.layers[1].uses_dense_ffn);
+    CPP_LLM_CHECK(suite, layout.layers[1].attn_kv_a_mqa ==
+                                   "blk.1.attn_kv_a_mqa.weight");
+    CPP_LLM_CHECK(suite, layout.layers[0].attn_kv_b.empty());
+    CPP_LLM_CHECK(suite, !layout.layers[0].attn_k_b.empty());
+    CPP_LLM_CHECK(suite, !layout.layers[0].attn_v_b.empty());
+    CPP_LLM_CHECK(suite, layout.layers[1].router ==
+                                   "blk.1.ffn_gate_inp.weight");
+
+    auto combined_kv_index = index;
+    for (std::size_t layer = 0; layer < 2; ++layer) {
+        const std::string prefix = "blk." + std::to_string(layer) + ".";
+        combined_kv_index.tensors.erase(
+            std::remove_if(
+                combined_kv_index.tensors.begin(), combined_kv_index.tensors.end(),
+                [&prefix](const GgufTensorInfo& tensor) {
+                    return tensor.name == prefix + "attn_k_b.weight" ||
+                           tensor.name == prefix + "attn_v_b.weight";
+                }),
+            combined_kv_index.tensors.end());
+        const auto add_combined = [&combined_kv_index](
+                                      const std::string& name,
+                                      std::vector<std::uint64_t> shape) {
+            combined_kv_index.tensors.push_back(
+                {name, std::move(shape), 0, 0});
+        };
+        add_combined(prefix + "attn_kv_b.weight", {8, 32});
+    }
+    CPP_LLM_REQUIRE(
+        suite,
+        ModelSchema::validate_deepseek2_gguf(
+            metadata, combined_kv_index, &layout, &error));
+    CPP_LLM_CHECK(suite, layout.layers[0].attn_kv_b ==
+                                   "blk.0.attn_kv_b.weight");
+    CPP_LLM_CHECK(suite, layout.layers[0].attn_k_b.empty());
+    CPP_LLM_CHECK(suite, layout.layers[0].attn_v_b.empty());
+
+    auto invalid_mla = metadata;
+    invalid_mla.attention_key_length = 11;
+    CPP_LLM_CHECK(
+        suite,
+        !ModelSchema::validate_deepseek2_gguf(invalid_mla, index, &layout, &error));
+    CPP_LLM_CHECK(suite, error.find("MLA metadata") != std::string::npos);
+
+    auto missing_kv_projection = index;
+    const auto missing = std::find_if(
+        missing_kv_projection.tensors.begin(), missing_kv_projection.tensors.end(),
+        [](const GgufTensorInfo& tensor) {
+            return tensor.name == "blk.1.attn_kv_a_mqa.weight";
+        });
+    CPP_LLM_REQUIRE(suite, missing != missing_kv_projection.tensors.end());
+    missing_kv_projection.tensors.erase(missing);
+    CPP_LLM_CHECK(
+        suite,
+        !ModelSchema::validate_deepseek2_gguf(
+            metadata, missing_kv_projection, &layout, &error));
+    CPP_LLM_CHECK(suite, error.find("attn_kv_a_mqa.weight") != std::string::npos);
+}
+
+void test_deepseek2_dense_layer_loader(TestSuite& suite) {
+    const auto path = std::filesystem::temp_directory_path() /
+        "chapter01_deepseek_dense_layer.bin";
+    std::filesystem::remove(path);
+    {
+        std::ofstream out(path, std::ios::binary);
+        CPP_LLM_REQUIRE(suite, out);
+        const std::vector<float> payload(10, 1.0F);
+        out.write(reinterpret_cast<const char*>(payload.data()),
+                  static_cast<std::streamsize>(payload.size() * sizeof(float)));
+    }
+
+    DeepSeek2DecoderTensorLayout layout;
+    layout.layers.resize(1);
+    auto& names = layout.layers.front();
+    names.index = 0;
+    names.uses_dense_ffn = true;
+    names.attn_norm = "blk.0.attn_norm.weight";
+    names.attn_q = "blk.0.attn_q.weight";
+    names.attn_kv_a_mqa = "blk.0.attn_kv_a_mqa.weight";
+    names.attn_kv_a_norm = "blk.0.attn_kv_a_norm.weight";
+    names.attn_kv_b = "blk.0.attn_kv_b.weight";
+    names.attn_output = "blk.0.attn_output.weight";
+    names.ffn_norm = "blk.0.ffn_norm.weight";
+    names.ffn_gate = "blk.0.ffn_gate.weight";
+    names.ffn_up = "blk.0.ffn_up.weight";
+    names.ffn_down = "blk.0.ffn_down.weight";
+
+    GgufModelIndex index;
+    const std::vector<std::string> tensor_names = {
+        names.attn_norm, names.attn_q, names.attn_kv_a_mqa,
+        names.attn_kv_a_norm, names.attn_kv_b, names.attn_output,
+        names.ffn_norm, names.ffn_gate, names.ffn_up, names.ffn_down};
+    for (std::size_t i = 0; i < tensor_names.size(); ++i) {
+        index.tensors.push_back(
+            {tensor_names[i], {1}, 0, i * sizeof(float)});
+    }
+
+    RealDeepSeek2DenseLayerWeights weights;
+    std::string error;
+    CPP_LLM_REQUIRE(
+        suite,
+        RealDeepSeek2DenseLayerLoader::load(
+            path.string(), index, layout, 0, &weights, &error));
+    CPP_LLM_CHECK(suite, error.empty());
+    CPP_LLM_CHECK(suite, weights.valid());
+    CPP_LLM_CHECK(suite, weights.uses_combined_kv_b());
+    CPP_LLM_CHECK(suite, weights.ffn_down.name() == names.ffn_down);
+
+    names.attn_k_b = "blk.0.attn_k_b.weight";
+    names.attn_v_b = "blk.0.attn_v_b.weight";
+    CPP_LLM_CHECK(
+        suite,
+        !RealDeepSeek2DenseLayerLoader::load(
+            path.string(), index, layout, 0, &weights, &error));
+    CPP_LLM_CHECK(
+        suite,
+        error == "DeepSeek2 layer must use exactly one K/V-B layout");
+    names.attn_k_b.clear();
+    names.attn_v_b.clear();
+
+    layout.layers.front().uses_dense_ffn = false;
+    CPP_LLM_CHECK(
+        suite,
+        !RealDeepSeek2DenseLayerLoader::load(
+            path.string(), index, layout, 0, &weights, &error));
+    CPP_LLM_CHECK(suite, error == "DeepSeek2 layer does not use a dense FFN");
+    CPP_LLM_CHECK(suite, weights.valid());
+    std::filesystem::remove(path);
+}
+
+void test_deepseek2_moe_layer_loader(TestSuite& suite) {
+    const auto path = std::filesystem::temp_directory_path() /
+        "chapter01_deepseek_moe_layer.bin";
+    std::filesystem::remove(path);
+
+    DeepSeek2DecoderTensorLayout layout;
+    layout.layers.resize(1);
+    auto& names = layout.layers.front();
+    names.index = 1;
+    names.uses_dense_ffn = false;
+    names.attn_norm = "blk.1.attn_norm.weight";
+    names.attn_q = "blk.1.attn_q.weight";
+    names.attn_kv_a_mqa = "blk.1.attn_kv_a_mqa.weight";
+    names.attn_kv_a_norm = "blk.1.attn_kv_a_norm.weight";
+    names.attn_kv_b = "blk.1.attn_kv_b.weight";
+    names.attn_output = "blk.1.attn_output.weight";
+    names.ffn_norm = "blk.1.ffn_norm.weight";
+    names.router = "blk.1.ffn_gate_inp.weight";
+    names.expert_gate = "blk.1.ffn_gate_exps.weight";
+    names.expert_up = "blk.1.ffn_up_exps.weight";
+    names.expert_down = "blk.1.ffn_down_exps.weight";
+    names.shared_expert_gate = "blk.1.ffn_gate_shexp.weight";
+    names.shared_expert_up = "blk.1.ffn_up_shexp.weight";
+    names.shared_expert_down = "blk.1.ffn_down_shexp.weight";
+
+    const std::vector<std::string> tensor_names = {
+        names.attn_norm, names.attn_q, names.attn_kv_a_mqa,
+        names.attn_kv_a_norm, names.attn_kv_b, names.attn_output,
+        names.ffn_norm, names.router, names.expert_gate, names.expert_up,
+        names.expert_down, names.shared_expert_gate, names.shared_expert_up,
+        names.shared_expert_down};
+    {
+        std::ofstream out(path, std::ios::binary);
+        CPP_LLM_REQUIRE(suite, out);
+        const std::vector<float> payload(tensor_names.size(), 1.0F);
+        out.write(reinterpret_cast<const char*>(payload.data()),
+                  static_cast<std::streamsize>(payload.size() * sizeof(float)));
+    }
+    GgufModelIndex index;
+    for (std::size_t i = 0; i < tensor_names.size(); ++i) {
+        index.tensors.push_back(
+            {tensor_names[i], {1}, 0, i * sizeof(float)});
+    }
+
+    RealDeepSeek2MoeLayerWeights weights;
+    std::string error;
+    CPP_LLM_REQUIRE(
+        suite, RealDeepSeek2MoeLayerLoader::load(
+                   path.string(), index, layout, 0, &weights, &error));
+    CPP_LLM_CHECK(suite, weights.valid());
+    CPP_LLM_CHECK(suite, weights.uses_combined_kv_b());
+    CPP_LLM_CHECK(suite, weights.expert_down.name() == names.expert_down);
+
+    names.attn_k_b = "blk.1.attn_k_b.weight";
+    names.attn_v_b = "blk.1.attn_v_b.weight";
+    CPP_LLM_CHECK(
+        suite, !RealDeepSeek2MoeLayerLoader::load(
+                   path.string(), index, layout, 0, &weights, &error));
+    CPP_LLM_CHECK(
+        suite, error == "DeepSeek2 layer must use exactly one K/V-B layout");
+    CPP_LLM_CHECK(suite, weights.valid());
+    std::filesystem::remove(path);
+}
+
 void test_gguf_reader(TestSuite& suite) {
     const auto path = std::filesystem::temp_directory_path() / "chapter01_mock.gguf";
     std::filesystem::remove(path);
@@ -979,6 +1275,40 @@ void test_moe_quantized_payload_loader(TestSuite& suite) {
     std::filesystem::remove(path);
 }
 
+void test_deepseek_quantized_payload_loader(TestSuite& suite) {
+    const auto path = std::filesystem::temp_directory_path() /
+        "chapter01_deepseek_quantized_payload.gguf";
+    std::filesystem::remove(path);
+    {
+        std::ofstream out(path, std::ios::binary);
+        CPP_LLM_REQUIRE(suite, out);
+        const std::vector<std::byte> q2k_payload(84, std::byte{0x2a});
+        const std::vector<std::byte> iq4nl_payload(18, std::byte{0x4e});
+        out.write(reinterpret_cast<const char*>(q2k_payload.data()),
+                  static_cast<std::streamsize>(q2k_payload.size()));
+        out.write(reinterpret_cast<const char*>(iq4nl_payload.data()),
+                  static_cast<std::streamsize>(iq4nl_payload.size()));
+    }
+
+    GgufModelIndex index;
+    index.data_offset = 0;
+    index.tensors.push_back({"deepseek.attn_q", {256}, 10, 0});
+    index.tensors.push_back({"deepseek.ffn_down", {32}, 20, 84});
+    std::unordered_map<std::string, Tensor> tensors;
+    std::string error;
+    CPP_LLM_REQUIRE(suite, GgufTensorLoader::load_all(path, index, &tensors, &error));
+    CPP_LLM_CHECK(suite, tensors.at("deepseek.attn_q").dtype() == DType::Q2_K);
+    CPP_LLM_CHECK(suite, tensors.at("deepseek.attn_q").bytes() == 84);
+    CPP_LLM_CHECK(suite,
+                  tensors.at("deepseek.attn_q").raw_data()[0] == std::byte{0x2a});
+    CPP_LLM_CHECK(suite,
+                  tensors.at("deepseek.ffn_down").dtype() == DType::IQ4_NL);
+    CPP_LLM_CHECK(suite, tensors.at("deepseek.ffn_down").bytes() == 18);
+    CPP_LLM_CHECK(suite,
+                  tensors.at("deepseek.ffn_down").raw_data()[17] == std::byte{0x4e});
+    std::filesystem::remove(path);
+}
+
 }  // namespace
 
 int run_chapter01_test_group(const std::string& group) {
@@ -1018,6 +1348,15 @@ int run_chapter01_test_group(const std::string& group) {
         suite.run("Qwen2MoE metadata and expert tensor schema are explicit", [&] {
             test_qwen2_moe_metadata_and_schema(suite);
         });
+        suite.run("DeepSeek2 metadata separates MLA and mixed FFN layers", [&] {
+            test_deepseek2_metadata_and_schema(suite);
+        });
+        suite.run("DeepSeek2 dense layer loader preserves the K/V-B layout", [&] {
+            test_deepseek2_dense_layer_loader(suite);
+        });
+        suite.run("DeepSeek2 MoE layer loader preserves packed experts", [&] {
+            test_deepseek2_moe_layer_loader(suite);
+        });
         suite.run("GGUF reader builds tokenizer tensors and decoder schema", [&] {
             test_gguf_reader(suite);
         });
@@ -1034,6 +1373,9 @@ int run_chapter01_test_group(const std::string& group) {
         });
         suite.run("MoE mixed quantized payloads preserve block bytes", [&] {
             test_moe_quantized_payload_loader(suite);
+        });
+        suite.run("DeepSeek quantized payloads preserve block bytes", [&] {
+            test_deepseek_quantized_payload_loader(suite);
         });
     }
     return suite.finish();

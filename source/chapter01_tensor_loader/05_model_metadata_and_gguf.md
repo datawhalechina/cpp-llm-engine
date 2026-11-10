@@ -48,7 +48,7 @@ GGUF Reader -> GGUF Metadata Adapter -> ModelMetadata
 | `max_position` | 限制输入长度和位置编号 |
 | `layer_count` | 校验解码器块数量 |
 | `attention_head_count` / `attention_head_count_kv` | 计算 Q 头和共享 K/V 头的投影宽度 |
-| `attention_key_length` / `attention_value_length` | 确定每个注意力头保存多少个数值 |
+| `attention_key_length` / `attention_value_length` | 确定 GQA 的头维度，或 MLA 每个词元保存的压缩 K/V 宽度 |
 | `bos_token_id` / `eos_token_id` | 固定输入输出的特殊 token 语义 |
 
 TinyLlama 1.1B 提供本教程的第一条真实模型基线。`block_count=22` 对应 `blk.0` 到 `blk.21`；每个 Block 的九个权重 Tensor 由 Llama schema 检查，embedding、Final Norm 和输出权重位于 Block 堆栈之外。
@@ -67,12 +67,25 @@ Qwen3-0.6B 的隐藏维度是 1024，但每个 Q/K/V 头包含 128 个数值。1
 
 Qwen1.5-MoE 使用另一份结构约束。真实 GGUF 声明 24 层、60 个专家，并为每个词元选择 4 个专家。每层除了注意力权重，还包含 Router、三组打包专家权重、共享专家门控和三组共享专家权重。`MoeDecoderTensorLayout` 只描述这些名称与形状，不执行 Top-K 或专家 FFN；Chapter04/05 先用真实首层解释计算，再由 `code/model` 连接 24 层模型与请求上下文。
 
+DeepSeek-V2-Lite 同时改变注意力和 FFN 布局。它的多头潜在注意力（MLA）先把 K/V 历史压缩到低秩表示，再在计算注意力时展开；因此 Loader 需要同时保存压缩缓存宽度、展开后的 K/V 头宽度和 K/V 低秩维度。
+
+| DeepSeek2 字段 | 固定模型值 | Loader 用途 |
+| --- | --- | --- |
+| K/V 低秩维度 | `512` | 每个词元保存的潜在 K/V 内容 |
+| RoPE 维度 | `64` | 与 K/V 低秩内容共同形成 576 维压缩 K |
+| MLA K/V 展开维度 | `192 / 128` | 检查注意力投影输出形状 |
+| 前置稠密层数 | `1` | `blk.0` 使用普通 Gate/Up/Down FFN |
+| 路由专家 | `64 选 6` | `blk.1` 以后检查 Router、专家和共享专家 |
+
+早期 DeepSeek2 GGUF 把 `192 / 128` 写入通用 K/V 长度字段，较新的转换器提供独立 MLA 字段。Metadata Adapter 将两种表示统一为 576/512 的压缩缓存宽度和 192/128 的展开宽度；后续代码只读取归一化后的内部字段。真实固定资产使用合并的 `attn_kv_b.weight`，结构约束也兼容较新的 K-B、V-B 分离命名。
+
 文件解析和模型布局通过两条路径汇合：
 
 ```text
 metadata adapter -> ModelMetadata -> ModelConfig
 张量加载器       -> 张量映射      -> 稠密 Decoder 张量布局 -> LoadedModel / DecoderInput
                                   -> MoE Decoder 张量布局  -> 真实 MoE Model / Context
+                                  -> DeepSeek2 张量布局     -> MLA/MoE 结构输入
 ```
 
 `DecoderInput` 保存稳定的 Tensor 名称映射，payload 仍由 `LoadedModel.tensors` 持有。Chapter04 根据这些配置和权重映射解释真实 Decoder 的计算；Chapter05 负责解码 Q4_K、Q6_K 等量化 payload。
@@ -84,14 +97,14 @@ metadata adapter -> ModelMetadata -> ModelConfig
 | 决定 | 信息来源 | 当前行为 |
 | --- | --- | --- |
 | 读取哪个模型 | 命令行模型路径或 `CPP_LLM_ENGINE_MODEL_PATH` | 调用者选择 GGUF 文件 |
-| 使用哪种模型架构 | GGUF 的 `general.architecture` | Loader 自动识别 `llama`、`qwen3` 或 `qwen2moe`，并选择对应结构约束 |
-| 在哪里执行 | CPU/CUDA 入口或后续设备配置 | Qwen3 已接入 CPU/CUDA 解码、生成与服务；Qwen1.5-MoE 已接入 CPU 24 层解码、生成、批执行与服务 |
+| 使用哪种模型架构 | GGUF 的 `general.architecture` | Loader 自动识别 `llama`、`qwen3`、`qwen2moe` 或 `deepseek2`，并选择对应结构约束 |
+| 在哪里执行 | CPU/CUDA 入口或后续设备配置 | Qwen3 已接入 CPU/CUDA；Qwen1.5-MoE 已接入 CPU；DeepSeek2 当前完成 Loader 结构验证 |
 
-架构由模型文件声明，正常运行不需要额外传入 `--architecture`。显式架构参数容易让配置与真实权重冲突，因此只应作为诊断断言，而不应覆盖 GGUF。稠密模型按架构选择 Llama 或 Qwen3 数学路径；Qwen2MoE 使用独立的 CPU Model 与 Executor Factory，已经接通 24 层 Decoder、Generation、批执行和服务。Chapter01 只识别架构并交付元数据与权重布局，执行分派由后续模型工厂完成。
+架构由模型文件声明，正常运行不需要额外传入 `--architecture`。显式架构参数容易让配置与真实权重冲突，因此只应作为诊断断言，而不应覆盖 GGUF。稠密模型按架构选择 Llama 或 Qwen3 数学路径；Qwen2MoE 使用独立的 CPU Model 与执行器工厂。DeepSeek2 目前只完成结构选择，后续还需要实现 MLA 与对应 MoE 执行。Chapter01 只识别架构并交付元数据与权重布局，执行分派由后续模型工厂完成。
 
 ## 验证与衔接
 
-默认回归使用小型测试文件检查 GGUF 文件头、模型元数据、张量索引、数据对齐，以及 Llama、Qwen3 和 Qwen2MoE 结构约束：
+默认回归使用小型测试文件检查 GGUF 文件头、模型元数据、张量索引、数据对齐，以及 Llama、Qwen3、Qwen2MoE 和 DeepSeek2 结构约束：
 
 ```bash
 bash code/chapter01_tensor_loader/run.sh
@@ -131,6 +144,14 @@ bash code/chapter01_tensor_loader/run_qwen15_moe_schema.sh
 ```
 
 预期输出包含 `schema: qwen2moe tensors valid`、`decoder layers: 24` 和 `experts selected/total: 4/60`。
+
+DeepSeek-V2-Lite 下载完成后，运行真实 MLA 与混合层结构检查：
+
+```bash
+bash code/chapter01_tensor_loader/run_deepseek_v2_lite_schema.sh
+```
+
+预期输出包含 `schema: deepseek2 tensors valid`、`MLA key/value length: 192/128`、`leading dense layers: 1` 和 `experts selected/total: 6/64`。该入口只读取 GGUF 元数据与张量索引，不执行 DeepSeek Decoder。
 
 需要单独核对某个权重时，使用 `--tensor` 查看数据类型和形状：
 

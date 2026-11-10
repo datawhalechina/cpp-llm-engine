@@ -153,4 +153,163 @@ bool RealMoeLayerLoader::load(const std::string& model_path,
     return true;
 }
 
+bool RealDeepSeek2DenseLayerWeights::uses_combined_kv_b() const {
+    return attn_kv_b.bytes() > 0;
+}
+
+bool RealDeepSeek2DenseLayerWeights::valid() const {
+    const bool combined = attn_kv_b.bytes() > 0 &&
+        attn_k_b.bytes() == 0 && attn_v_b.bytes() == 0;
+    const bool split = attn_kv_b.bytes() == 0 &&
+        attn_k_b.bytes() > 0 && attn_v_b.bytes() > 0;
+    return (combined || split) && attn_norm.bytes() > 0 &&
+        attn_q.bytes() > 0 && attn_kv_a_mqa.bytes() > 0 &&
+        attn_kv_a_norm.bytes() > 0 && attn_output.bytes() > 0 &&
+        ffn_norm.bytes() > 0 && ffn_gate.bytes() > 0 &&
+        ffn_up.bytes() > 0 && ffn_down.bytes() > 0;
+}
+
+bool RealDeepSeek2DenseLayerLoader::load(
+    const std::string& model_path,
+    const GgufModelIndex& index,
+    const DeepSeek2DecoderTensorLayout& layout,
+    std::size_t layer_index,
+    RealDeepSeek2DenseLayerWeights* output,
+    std::string* error) {
+    if (output == nullptr) {
+        set_error(error, "DeepSeek2 dense layer output must not be null");
+        return false;
+    }
+    if (layer_index >= layout.layers.size()) {
+        set_error(error, "DeepSeek2 layer index is outside model layout");
+        return false;
+    }
+    const auto& names = layout.layers[layer_index];
+    if (!names.uses_dense_ffn) {
+        set_error(error, "DeepSeek2 layer does not use a dense FFN");
+        return false;
+    }
+    const bool combined_kv_b = !names.attn_kv_b.empty();
+    const bool split_kv_b = !names.attn_k_b.empty() && !names.attn_v_b.empty();
+    if (combined_kv_b == split_kv_b) {
+        set_error(error, "DeepSeek2 layer must use exactly one K/V-B layout");
+        return false;
+    }
+
+    RealDeepSeek2DenseLayerWeights loaded;
+    loaded.index = layer_index;
+    if (!load_named(model_path, index, names.attn_norm, &loaded.attn_norm, error) ||
+        !load_named(model_path, index, names.attn_q, &loaded.attn_q, error) ||
+        !load_named(model_path, index, names.attn_kv_a_mqa,
+                    &loaded.attn_kv_a_mqa, error) ||
+        !load_named(model_path, index, names.attn_kv_a_norm,
+                    &loaded.attn_kv_a_norm, error) ||
+        !load_optional_named(model_path, index, names.attn_kv_b,
+                             &loaded.attn_kv_b, error) ||
+        !load_optional_named(model_path, index, names.attn_k_b,
+                             &loaded.attn_k_b, error) ||
+        !load_optional_named(model_path, index, names.attn_v_b,
+                             &loaded.attn_v_b, error) ||
+        !load_named(model_path, index, names.attn_output,
+                    &loaded.attn_output, error) ||
+        !load_named(model_path, index, names.ffn_norm, &loaded.ffn_norm, error) ||
+        !load_named(model_path, index, names.ffn_gate, &loaded.ffn_gate, error) ||
+        !load_named(model_path, index, names.ffn_up, &loaded.ffn_up, error) ||
+        !load_named(model_path, index, names.ffn_down, &loaded.ffn_down, error)) {
+        return false;
+    }
+    if (!loaded.valid()) {
+        set_error(error, "loaded DeepSeek2 dense layer has an invalid payload set");
+        return false;
+    }
+    *output = std::move(loaded);
+    if (error != nullptr) error->clear();
+    return true;
+}
+
+bool RealDeepSeek2MoeLayerWeights::uses_combined_kv_b() const {
+    return attn_kv_b.bytes() > 0;
+}
+
+bool RealDeepSeek2MoeLayerWeights::valid() const {
+    const bool combined = attn_kv_b.bytes() > 0 &&
+        attn_k_b.bytes() == 0 && attn_v_b.bytes() == 0;
+    const bool split = attn_kv_b.bytes() == 0 &&
+        attn_k_b.bytes() > 0 && attn_v_b.bytes() > 0;
+    return (combined || split) && attn_norm.bytes() > 0 &&
+        attn_q.bytes() > 0 && attn_kv_a_mqa.bytes() > 0 &&
+        attn_kv_a_norm.bytes() > 0 && attn_output.bytes() > 0 &&
+        ffn_norm.bytes() > 0 && router.bytes() > 0 &&
+        expert_gate.bytes() > 0 && expert_up.bytes() > 0 &&
+        expert_down.bytes() > 0 && shared_expert_gate.bytes() > 0 &&
+        shared_expert_up.bytes() > 0 && shared_expert_down.bytes() > 0;
+}
+
+bool RealDeepSeek2MoeLayerLoader::load(
+    const std::string& model_path,
+    const GgufModelIndex& index,
+    const DeepSeek2DecoderTensorLayout& layout,
+    std::size_t layer_index,
+    RealDeepSeek2MoeLayerWeights* output,
+    std::string* error) {
+    if (output == nullptr) {
+        set_error(error, "DeepSeek2 MoE layer output must not be null");
+        return false;
+    }
+    if (layer_index >= layout.layers.size()) {
+        set_error(error, "DeepSeek2 MoE layer index is outside model layout");
+        return false;
+    }
+    const auto& names = layout.layers[layer_index];
+    if (names.uses_dense_ffn) {
+        set_error(error, "DeepSeek2 layer does not use a MoE FFN");
+        return false;
+    }
+    const bool combined_kv_b = !names.attn_kv_b.empty();
+    const bool split_kv_b = !names.attn_k_b.empty() && !names.attn_v_b.empty();
+    if (combined_kv_b == split_kv_b) {
+        set_error(error, "DeepSeek2 layer must use exactly one K/V-B layout");
+        return false;
+    }
+    RealDeepSeek2MoeLayerWeights loaded;
+    loaded.index = layer_index;
+    if (!load_named(model_path, index, names.attn_norm, &loaded.attn_norm, error) ||
+        !load_named(model_path, index, names.attn_q, &loaded.attn_q, error) ||
+        !load_named(model_path, index, names.attn_kv_a_mqa,
+                    &loaded.attn_kv_a_mqa, error) ||
+        !load_named(model_path, index, names.attn_kv_a_norm,
+                    &loaded.attn_kv_a_norm, error) ||
+        !load_optional_named(model_path, index, names.attn_kv_b,
+                             &loaded.attn_kv_b, error) ||
+        !load_optional_named(model_path, index, names.attn_k_b,
+                             &loaded.attn_k_b, error) ||
+        !load_optional_named(model_path, index, names.attn_v_b,
+                             &loaded.attn_v_b, error) ||
+        !load_named(model_path, index, names.attn_output,
+                    &loaded.attn_output, error) ||
+        !load_named(model_path, index, names.ffn_norm, &loaded.ffn_norm, error) ||
+        !load_named(model_path, index, names.router, &loaded.router, error) ||
+        !load_named(model_path, index, names.expert_gate,
+                    &loaded.expert_gate, error) ||
+        !load_named(model_path, index, names.expert_up,
+                    &loaded.expert_up, error) ||
+        !load_named(model_path, index, names.expert_down,
+                    &loaded.expert_down, error) ||
+        !load_named(model_path, index, names.shared_expert_gate,
+                    &loaded.shared_expert_gate, error) ||
+        !load_named(model_path, index, names.shared_expert_up,
+                    &loaded.shared_expert_up, error) ||
+        !load_named(model_path, index, names.shared_expert_down,
+                    &loaded.shared_expert_down, error)) {
+        return false;
+    }
+    if (!loaded.valid()) {
+        set_error(error, "loaded DeepSeek2 MoE layer has an invalid payload set");
+        return false;
+    }
+    *output = std::move(loaded);
+    if (error != nullptr) error->clear();
+    return true;
+}
+
 }  // namespace chapter01

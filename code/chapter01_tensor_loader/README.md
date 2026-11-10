@@ -32,7 +32,8 @@ Reader 只解释外部格式，Adapter 把外部字段转换为稳定配置，Lo
 | `src/gguf_reader.*` | 读取 GGUF 文件头、模型元数据和张量索引 |
 | `src/model_metadata*`、`src/tokenizer_metadata*` | 把 GGUF 字段转换为内部配置 |
 | `src/gguf_tensor_loader.*` | 按索引读取 F32/F16/I8 与 Q3_K/Q4_K/Q5_1/Q6_K/Q8_0 payload |
-| `src/model_schema.*` | 分别检查 Llama/Qwen3 稠密布局与 Qwen2MoE 专家布局 |
+| `src/model_schema.*` | 检查 Llama/Qwen3 稠密布局、Qwen2MoE 专家布局与 DeepSeek2 MLA 混合布局 |
+| `src/real_layer_weights.*` | 按需装配稠密层、Qwen MoE 层和 DeepSeek2 稠密/MoE 层权重 |
 | `src/model_builder.*` | 装配 `LoadedModel` 和 `DecoderInput` |
 | `src/real_layer_weights.*` | 按层取得后续 Decoder 使用的权重 |
 | `examples/gguf_inspect.cpp` | 检查真实 GGUF 配置、索引和 schema |
@@ -92,11 +93,19 @@ bash code/chapter01_tensor_loader/run_qwen15_moe_schema.sh
 
 输出 `schema: qwen2moe tensors valid` 表示文件结构已经进入稳定输入契约。真实 FFN 执行由 Chapter04 的模型适配入口继续验证。
 
+DeepSeek-V2-Lite 使用固定 GGUF 验证 MLA 元数据、第一层稠密 FFN 和后续 MoE 层：
+
+```bash
+bash code/chapter01_tensor_loader/run_deepseek_v2_lite_schema.sh
+```
+
+脚本检查 27 层、377 个张量、64 选 6 专家和压缩 K/V 维度。默认测试还验证旧版组合 `attn_kv_b` 与新版拆分 K-B/V-B 布局，并保证 Q2_K、IQ4_NL 原始 block 能分别进入稠密层和 MoE 层权重对象。Loader 交付的两类层输入由 `code/model` 连接为完整 27 层 CPU Decoder；Chapter01 本身仍只负责解析、校验和权重装配。
+
 ## 扩展入口
 
 本章在 `LoadedModel` 和 `DecoderInput` 处结束。后续扩展从以下位置继续：
 
-`DenseDecoderTensorLayout` 保存 Llama/Qwen3 稠密布局，`MoeDecoderTensorLayout` 保存 Qwen2MoE 专家布局；`LlamaTensorLayout` 暂时作为兼容别名保留。Llama 与 Qwen3 已进入完整 CPU/CUDA Decoder、Generation 和服务验证；Qwen2MoE 已进入 CPU 24 层 Decoder、Generation、按专家分组批执行、Chapter08 调度和 Chapter10 服务验证。Chapter01 仍只负责识别并交付模型结构，不承担后续执行逻辑。
+`DenseDecoderTensorLayout` 保存 Llama/Qwen3 稠密布局，`MoeDecoderTensorLayout` 保存 Qwen2MoE 专家布局，`DeepSeek2DecoderTensorLayout` 保存 MLA 与混合 Dense/MoE 布局；`LlamaTensorLayout` 暂时作为兼容别名保留。Llama 与 Qwen3 已进入完整 CPU/CUDA Decoder、Generation 和服务验证；Qwen2MoE 已进入 CPU 24 层 Decoder、Generation、按专家分组批执行、Chapter08 调度和 Chapter10 服务验证。DeepSeek2 当前交付元数据、张量布局、首个稠密层和首个 MoE 层载荷，执行证据位于 Chapter04 与 `code/model`。
 
 | 方向 | 后续入口 |
 | --- | --- |

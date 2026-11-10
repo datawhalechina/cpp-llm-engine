@@ -39,6 +39,21 @@ bool read_string(const MetadataMap& values,
     return true;
 }
 
+bool read_optional_string(const MetadataMap& values,
+                          const std::string& key,
+                          std::string* output,
+                          std::string* error) {
+    const MetadataValue* value = find_value(values, key);
+    if (value == nullptr) return true;
+    const auto* text = std::get_if<std::string>(value);
+    if (text == nullptr || text->empty()) {
+        set_error(error, "metadata key is not a non-empty string: " + key);
+        return false;
+    }
+    *output = *text;
+    return true;
+}
+
 bool read_size(const MetadataMap& values,
                const std::string& key,
                std::size_t* output,
@@ -206,12 +221,22 @@ bool ModelMetadataAdapter::from_gguf(const MetadataMap& values,
                                      &parsed.attention_key_length, error) ||
         !read_optional_positive_size(values, prefix + "attention.value_length",
                                      &parsed.attention_value_length, error) ||
+        !read_optional_positive_size(values, prefix + "attention.key_length_mla",
+                                     &parsed.attention_key_length_mla, error) ||
+        !read_optional_positive_size(values, prefix + "attention.value_length_mla",
+                                     &parsed.attention_value_length_mla, error) ||
+        !read_optional_positive_size(values, prefix + "attention.kv_lora_rank",
+                                     &parsed.attention_kv_lora_rank, error) ||
         !read_optional_positive_size(values, prefix + "feed_forward_length",
                                      &parsed.feed_forward_length, error) ||
+        !read_optional_positive_size(values, prefix + "leading_dense_block_count",
+                                     &parsed.leading_dense_layer_count, error) ||
         !read_optional_positive_size(values, prefix + "expert_count",
                                      &parsed.expert_count, error) ||
         !read_optional_positive_size(values, prefix + "expert_used_count",
                                      &parsed.expert_used_count, error) ||
+        !read_optional_positive_size(values, prefix + "expert_shared_count",
+                                     &parsed.expert_shared_count, error) ||
         !read_optional_positive_size(values, prefix + "expert_feed_forward_length",
                                      &parsed.expert_feed_forward_length, error) ||
         !read_optional_positive_size(values, prefix + "expert_shared_feed_forward_length",
@@ -220,6 +245,16 @@ bool ModelMetadataAdapter::from_gguf(const MetadataMap& values,
                                      &parsed.rope_dimension_count, error) ||
         !read_optional_positive_float(values, prefix + "rope.freq_base",
                                       &parsed.rope_freq_base, error) ||
+        !read_optional_string(values, prefix + "rope.scaling.type",
+                              &parsed.rope_scaling_type, error) ||
+        !read_optional_positive_float(values, prefix + "rope.scaling.factor",
+                                      &parsed.rope_scaling_factor, error) ||
+        !read_optional_positive_size(
+            values, prefix + "rope.scaling.original_context_length",
+            &parsed.rope_scaling_original_context, error) ||
+        !read_optional_positive_float(
+            values, prefix + "rope.scaling.yarn_log_multiplier",
+            &parsed.rope_yarn_log_multiplier, error) ||
         !read_optional_positive_float(values, prefix + "attention.layer_norm_rms_epsilon",
                                       &parsed.rms_norm_epsilon, error) ||
         !read_optional_token_id(values, "tokenizer.ggml.bos_token_id",
@@ -228,13 +263,28 @@ bool ModelMetadataAdapter::from_gguf(const MetadataMap& values,
         return false;
     }
 
+    // Older DeepSeek2 GGUFs store expanded MLA head lengths in key/value_length
+    // and omit the explicit *_mla keys. Normalize both generations here.
+    if (parsed.architecture == "deepseek2" &&
+        parsed.attention_key_length_mla == 0 &&
+        parsed.attention_value_length_mla == 0 &&
+        parsed.attention_kv_lora_rank > 0 &&
+        parsed.rope_dimension_count > 0) {
+        parsed.attention_key_length_mla = parsed.attention_key_length;
+        parsed.attention_value_length_mla = parsed.attention_value_length;
+        parsed.attention_key_length =
+            parsed.attention_kv_lora_rank + parsed.rope_dimension_count;
+        parsed.attention_value_length = parsed.attention_kv_lora_rank;
+    }
+
     if (!parsed.valid()) {
         set_error(error, "parsed GGUF metadata is incomplete");
         return false;
     }
-    // Qwen2MoE applies full-router Softmax and keeps the selected probabilities.
+    // Qwen2MoE and DeepSeek2 keep probabilities from the full-router Softmax.
     // Other teaching paths retain selected-expert normalization by default.
-    if (parsed.architecture == "qwen2moe") {
+    if (parsed.architecture == "qwen2moe" ||
+        parsed.architecture == "deepseek2") {
         parsed.expert_weights_normalize = false;
     }
     *metadata = parsed;

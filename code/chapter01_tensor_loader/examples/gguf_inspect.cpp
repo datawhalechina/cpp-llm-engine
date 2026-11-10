@@ -68,6 +68,10 @@ int main(int argc, char** argv) {
               << "attention kv heads: " << metadata.attention_head_count_kv << "\n"
               << "attention key/value length: " << metadata.attention_key_length
               << "/" << metadata.attention_value_length << "\n"
+              << "MLA key/value length: " << metadata.attention_key_length_mla
+              << "/" << metadata.attention_value_length_mla << "\n"
+              << "KV LoRA rank: " << metadata.attention_kv_lora_rank << "\n"
+              << "leading dense layers: " << metadata.leading_dense_layer_count << "\n"
               << "experts selected/total: " << metadata.expert_used_count
               << "/" << metadata.expert_count << "\n"
               << "special token ids: bos=" << metadata.bos_token_id
@@ -89,6 +93,21 @@ int main(int argc, char** argv) {
     }
 
     if (argc == 3 && std::string(argv[2]) == "--validate-schema") {
+        if (metadata.architecture == "deepseek2") {
+            chapter01::DeepSeek2DecoderTensorLayout layout;
+            if (!chapter01::ModelSchema::validate_deepseek2_gguf(
+                    metadata, index, &layout, &error)) {
+                std::cerr << "schema validation failed: " << error << "\n";
+                return 1;
+            }
+            std::cout << "schema: deepseek2 tensors valid\n"
+                      << "decoder layers: " << layout.layers.size() << "\n"
+                      << "leading dense layers: " << layout.leading_dense_layer_count << "\n"
+                      << "experts selected/total: " << layout.expert_used_count
+                      << "/" << layout.expert_count << "\n"
+                      << "decoder input: DeepSeek2 schema ready\n";
+            return 0;
+        }
         if (metadata.architecture == "qwen2moe") {
             chapter01::MoeDecoderTensorLayout layout;
             if (!chapter01::ModelSchema::validate_moe_gguf(
