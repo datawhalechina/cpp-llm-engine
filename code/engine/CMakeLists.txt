@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../testing/cmake/CppLlmTesting.cmake)
+include(CTest)
+enable_testing()
 
 option(CHAPTER01_ENABLE_LLAMA_CPP "Build the real llama.cpp tokenizer backend" OFF)
 option(CPP_LLM_ENGINE_ENABLE_CUDA "Build optional CUDA model adapters" OFF)
@@ -13,6 +15,8 @@ set(LLAMA_CPP_ROOT "" CACHE PATH "llama.cpp checkout containing include/ and bui
 set(CPP_LLM_ENGINE_REAL_MODEL "" CACHE FILEPATH "Optional GGUF used by real-model CTest")
 set(CPP_LLM_ENGINE_CUDA_REAL_MODEL "" CACHE FILEPATH
     "Optional GGUF used by the real CUDA layer CTest")
+set(CPP_LLM_ENGINE_QWEN15_MOE_MODEL "" CACHE FILEPATH
+    "Optional Qwen1.5-MoE GGUF used by the real CPU Runtime CTest")
 set(CHAPTER05_SOURCE_DIR "" CACHE PATH "Optional Chapter 05 source directory for real-model execution")
 
 add_subdirectory(
@@ -54,10 +58,92 @@ add_subdirectory(
     ${CMAKE_CURRENT_BINARY_DIR}/chapter06_generation
 )
 
+if(TARGET cpp_llm_engine_model)
+    add_library(cpp_llm_engine_qwen2_moe_runtime
+        src/real_qwen2_moe_executor_factory.cpp
+    )
+    target_include_directories(cpp_llm_engine_qwen2_moe_runtime
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_link_libraries(cpp_llm_engine_qwen2_moe_runtime
+        PUBLIC cpp_llm_engine_model chapter06_generation
+    )
+    target_compile_features(cpp_llm_engine_qwen2_moe_runtime PUBLIC cxx_std_17)
+
+    add_executable(real_qwen15_moe_runtime_test
+        tests/real_qwen15_moe_runtime_test.cpp
+    )
+    add_executable(real_qwen15_moe_layer_cache_benchmark
+        examples/real_qwen15_moe_layer_cache_benchmark.cpp
+    )
+    add_executable(real_qwen15_moe_batch_runtime_benchmark
+        examples/real_qwen15_moe_batch_runtime_benchmark.cpp
+    )
+    add_executable(real_qwen15_moe_scheduling_benchmark
+        examples/real_qwen15_moe_scheduling_benchmark.cpp
+    )
+    add_executable(real_qwen15_moe_service_benchmark
+        examples/real_qwen15_moe_service_benchmark.cpp
+    )
+    target_link_libraries(real_qwen15_moe_runtime_test
+        PRIVATE cpp_llm_engine_qwen2_moe_runtime)
+    target_link_libraries(real_qwen15_moe_layer_cache_benchmark
+        PRIVATE cpp_llm_engine_qwen2_moe_runtime)
+    target_link_libraries(real_qwen15_moe_batch_runtime_benchmark
+        PRIVATE cpp_llm_engine_qwen2_moe_runtime)
+    target_link_libraries(real_qwen15_moe_scheduling_benchmark
+        PRIVATE
+            cpp_llm_engine_qwen2_moe_runtime
+            chapter08_scheduling)
+    target_link_libraries(real_qwen15_moe_service_benchmark
+        PRIVATE
+            cpp_llm_engine_qwen2_moe_runtime
+            chapter10_serving)
+    cpp_llm_prepare_test(real_qwen15_moe_runtime_test)
+    if(CPP_LLM_ENGINE_QWEN15_MOE_MODEL)
+        if(NOT EXISTS "${CPP_LLM_ENGINE_QWEN15_MOE_MODEL}")
+            message(FATAL_ERROR "CPP_LLM_ENGINE_QWEN15_MOE_MODEL does not exist")
+        endif()
+        add_test(
+            NAME real_qwen15_moe_runtime_test
+            COMMAND real_qwen15_moe_runtime_test
+                "${CPP_LLM_ENGINE_QWEN15_MOE_MODEL}"
+        )
+        cpp_llm_set_test_labels(
+            real_qwen15_moe_runtime_test
+            real_model slow cpu moe generation integration)
+        cpp_llm_set_test_contract(
+            real_qwen15_moe_runtime_test
+            OWNER 06 LEVEL real_model STATUS active)
+    endif()
+endif()
+
 add_subdirectory(
     ${CMAKE_CURRENT_SOURCE_DIR}/../chapter10_serving
     ${CMAKE_CURRENT_BINARY_DIR}/chapter10_serving
 )
+
+if(TARGET cpp_llm_engine_qwen2_moe_runtime AND TARGET chapter08_scheduling)
+    add_executable(real_qwen15_moe_scheduling_smoke
+        examples/real_qwen15_moe_scheduling_smoke.cpp
+    )
+    target_link_libraries(real_qwen15_moe_scheduling_smoke
+        PRIVATE cpp_llm_engine_qwen2_moe_runtime chapter08_scheduling)
+    cpp_llm_prepare_test(real_qwen15_moe_scheduling_smoke)
+    if(CPP_LLM_ENGINE_QWEN15_MOE_MODEL)
+        add_test(
+            NAME real_qwen15_moe_scheduling_smoke
+            COMMAND real_qwen15_moe_scheduling_smoke
+                "${CPP_LLM_ENGINE_QWEN15_MOE_MODEL}"
+        )
+        cpp_llm_set_test_labels(
+            real_qwen15_moe_scheduling_smoke
+            real_model slow cpu moe scheduler batch integration)
+        cpp_llm_set_test_contract(
+            real_qwen15_moe_scheduling_smoke
+            OWNER 08 LEVEL real_model STATUS active)
+    endif()
+endif()
 
 add_library(cpp_llm_engine
     src/embedding_request_executor.cpp
@@ -163,6 +249,19 @@ if(CHAPTER01_ENABLE_LLAMA_CPP)
     set_target_properties(real_tokenizer_engine_smoke PROPERTIES
         BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
     )
+    if(TARGET cpp_llm_engine_qwen2_moe_runtime)
+        add_executable(real_qwen15_moe_generation_smoke
+            examples/real_qwen15_moe_generation_smoke.cpp
+        )
+        target_link_libraries(real_qwen15_moe_generation_smoke
+            PRIVATE
+                cpp_llm_engine_qwen2_moe_runtime
+                cpp_llm_engine_real_tokenizer
+        )
+        set_target_properties(real_qwen15_moe_generation_smoke PROPERTIES
+            BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
+        )
+    endif()
     if(TARGET cpp_llm_engine_cuda_runtime)
         target_sources(cpp_llm_engine_cuda_runtime PRIVATE
             src/real_llama_cuda_engine.cpp
@@ -244,8 +343,6 @@ target_link_libraries(cpp_llm_engine_test
 )
 cpp_llm_prepare_test(cpp_llm_engine_test)
 
-include(CTest)
-enable_testing()
 add_test(NAME cpp_llm_engine_test COMMAND cpp_llm_engine_test)
 add_test(NAME embedding_request_executor_test COMMAND embedding_request_executor_test)
 add_test(NAME embedding_request_service_test COMMAND embedding_request_service_test)
