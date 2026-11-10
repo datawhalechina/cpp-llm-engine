@@ -55,9 +55,9 @@ admission bind request ID
 | ServiceCore 自动传递 request ID 并选择真实 batch | 协作式抢占和设备事件重叠 |
 | Context position、页表和分页 payload 按整批提交 | 跨请求 Prefix Cache |
 
-EXP-GPU-06 在真实 TinyLlama、双请求分页 K/V 和一次 Decode 下比较顺序执行与 Tensor Batch。两轮 batch/顺序中位数比例为 `0.922/0.919`，逐请求 logits 完全一致；这说明当前小批量融合路径减少了重复执行成本，但尚未回答更大批量和长期服务吞吐。
+[CUDA 双请求批执行实验](../../reference/experiment_assets.md#exp-gpu-06)在真实 TinyLlama、分页 K/V 和一次 Decode 下比较顺序执行与 Tensor Batch。两轮 batch/顺序中位数比例为 `0.922/0.919`，逐请求 logits 完全一致；这说明当前小批量融合路径减少了重复执行成本，但尚未回答更大批量和长期服务吞吐。
 
-Qwen1.5-MoE 还需要先按 Router 结果把 token 归入专家组。EXP-CPU-17 固定四个请求，在 Prefill 后连续执行三个 Chapter08 调度步；按专家分组与逐行执行的中位数比例为 `0.582`，完整生成序列和每步批量调用计数一致。该结果说明调度层能够持续使用分组执行路径。请求在计时前一次性进入队列，因此动态到达仍需单独验证。
+Qwen1.5-MoE 还需要先按 Router 结果把 token 归入专家组。[MoE 固定队列实验](../../reference/experiment_assets.md#exp-cpu-17)使用四个请求，在 Prefill 后连续执行三个 Chapter08 调度步；按专家分组与逐行执行的中位数比例为 `0.582`，完整生成序列和每步批量调用计数一致。该结果说明调度层能够持续使用分组执行路径。Chapter08 用固定队列隔离调度行为；[Chapter10 动态准入实验](../../reference/experiment_assets.md#exp-cpu-18)再在两个请求运行期间加入另外两个请求，验证输出和终态释放。
 
 下图强调共享模型计算与独立请求历史的分界：Linear 和 LM Head 接收多行激活，每个请求的 Attention 仍通过自己的 BlockTable 访问分页 K/V。
 

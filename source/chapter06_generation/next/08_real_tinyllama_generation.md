@@ -1,6 +1,6 @@
-# 06.8 验证真实稠密模型单请求生成
+# 06.8 验证真实模型单请求生成
 
-合成 logits 可以稳定验证状态和停止条件，但不能证明 Tokenizer、完整 Decoder、量化权重和模型 K/V 已经连通。真实模型闭环保持同一个 `Request -> Runtime -> Sampler` 控制流，只把教学执行器替换为真实模型 Context。TinyLlama 是默认基线，Qwen3 用于验证同一 Runtime 能否接收第二种稠密架构。
+合成 logits 可以稳定验证状态和停止条件，但不能证明 Tokenizer、完整 Decoder、量化权重和模型 K/V 已经连通。真实模型闭环保持同一个 `Request -> Runtime -> Sampler` 控制流，只把教学执行器替换为真实模型 Context。TinyLlama 是默认基线，Qwen3 用于验证第二种稠密架构，Qwen1.5-MoE 用于验证同一 Runtime 怎样驱动专家模型。
 
 ## 文本怎样进入 Generation Core
 
@@ -28,6 +28,12 @@
 
 Golden 用于发现 Loader、Tokenizer、量化 Linear、Attention 或 Runtime 的行为变化，不用于评价回答质量。模型版本、Tokenizer 或数值 backend 改变后，应先定位差异来源，再决定是否更新结果。
 
+## MoE 怎样复用同一生成循环
+
+Qwen1.5-MoE 仍把词元、logits 和停止状态交给 Chapter06。区别位于模型执行器：`RealQwen2MoeExecutorFactory` 识别 `qwen2moe` 架构，共享 24 层只读权重，并为每个请求创建独立 Context。Context 保存位置和每层 K/V；Prefill 与 Decode 进入模型后，再执行 Router、Top-K、命中专家和共享专家。
+
+因此 Generation Runtime 无需理解专家数量或量化格式。它只调用统一的 Prefill/Decode 接口，模型 Context 负责维护内部状态；Chapter08 再把多个 Context 组织成批次。
+
 ## 运行真实模型验收
 
 确认模型位于 `llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf`，然后执行：
@@ -54,3 +60,11 @@ bash code/chapter06_generation/scripts/run_qwen3_generation.sh
 ```
 
 输出中的 `architecture: qwen3` 证明架构来自模型文件，golden 与请求隔离检查证明 Chapter06 控制流无需为 Qwen3 复制一套实现。
+
+准备好 Qwen1.5-MoE 固定 GGUF 后，运行专家模型的相同生成闭环：
+
+```bash
+bash code/engine/scripts/run_qwen15_moe_generation.sh
+```
+
+入口使用真实分词器执行 24 层 Prefill 和 Decode，默认生成词元 `11 358`，解码为 `, I`。输出 `qwen15_moe_text_generation: PASS` 表示文本、模型执行和请求状态已经连通。
