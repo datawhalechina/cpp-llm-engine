@@ -80,8 +80,8 @@
 
   <rect x="624" y="476" width="520" height="90" rx="16" fill="#ffffff" stroke="#d6e0dc"/>
   <text x="648" y="506" font-size="14" font-weight="700" fill="#52606d">B 真实执行闭环</text>
-  <text x="648" y="532" font-size="13" fill="#52606d">TinyLlama Tokenizer · 22 层 Decoder · 请求 Context</text>
-  <text x="648" y="553" font-size="12" fill="#7b8b93">固定 token golden 与连续请求隔离</text>
+  <text x="648" y="532" font-size="13" fill="#52606d">稠密 · MoE · MLA-MoE 共用 Runtime</text>
+  <text x="648" y="553" font-size="12" fill="#7b8b93">四种模型的固定词元、文本与请求 Context 隔离</text>
 
   <rect x="56" y="590" width="1088" height="32" rx="10" fill="#173f35"/>
   <text x="600" y="612" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">本章产物：不依赖 Scheduler 和物理 KV Block 的单请求生成契约</text>
