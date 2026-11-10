@@ -36,12 +36,15 @@ x_hat = q * scale
 
 ## 从教学 INT8 到 GGUF 分块格式
 
-Chapter05 先用“一个整数数组加一个缩放因子”固定公式，再处理 TinyLlama GGUF 中的 Q4_K、Q6_K 和 Q8_0。后者不是普通整数数组，而是由固定大小的 block 共同保存缩放参数、最小值和 packed quant。
+Chapter05 先用“一个整数数组加一个缩放因子”固定公式，再处理真实 GGUF 中的 Q3_K、Q4_K、Q5_0、Q5_1、Q6_K 和 Q8_0。后者不是普通整数数组，而是由固定大小的 block 共同保存缩放参数、最小值和 packed quant。
 
 | 表示 | 每个数的可见形式 | 计算前必须知道什么 | 本章用途 |
 | --- | --- | --- | --- |
 | 教学 INT8 | `int8_t` | shape、单个 scale | 解释量化与反量化公式 |
 | Q8_0 | 8-bit quant block | block scale 与布局 | 验证简单分块量化路径 |
+| Q5_0 | 有符号 5-bit quant block | block scale、低 4 bit 与第五位表 | Qwen1.5-MoE 部分层的专家下投影 |
+| Q5_1 | 5-bit quant block | block scale、minimum 与高位表 | Qwen1.5-MoE 专家下投影 |
+| Q3_K | packed low-bit super-block | 3-bit quant 与 6-bit 分组 scale | Qwen1.5-MoE 专家 gate/up |
 | Q4_K / Q6_K | packed low-bit super-block | block 字节布局、分组参数和 shape | 执行真实 TinyLlama 权重 |
 
 量化格式决定怎样读取字节，Linear 契约决定输入输出 shape，backend 决定由标量、SIMD 还是 CUDA 完成计算。三者分开后，新增执行路径不需要改变 Decoder 的调用方式。
@@ -55,6 +58,10 @@ Chapter05 先用“一个整数数组加一个缩放因子”固定公式，再�
 | Q4_K | 144 字节，约 4.5 bit/weight | 存储较小，同时使用分组 scale 与 minimum 控制误差 | TinyLlama 多数 Q4_K 权重、CPU/CUDA 融合执行主线 |
 | Q6_K | 210 字节，约 6.56 bit/weight | 比 Q4_K 保存更多量化位，通常用于更敏感或需要更高精度的 Tensor | TinyLlama FFN down 等真实权重验证 |
 | Q8_0 | 272 字节，约 8.5 bit/weight | 对称结构简单，每 32 个权重共享一个 scale，但存储更大 | 简单 block 参考和 SmolVLM 真实多模态权重 |
+| Q3_K | 110 字节，约 3.44 bit/weight | 256 个值共享总 scale，分组 scale 补偿低位精度 | Qwen1.5-MoE 打包 gate/up 权重 |
+| Q5_0 | 22 字节，5.5 bit/weight | 32 个值共享 scale，5-bit quant 恢复后减 16 | Qwen1.5-MoE 打包 down 权重 |
+| Q5_1 | 24 字节，6 bit/weight | 32 个值共享 scale 与 minimum，5-bit quant 由低四位和高位表组成 | Qwen1.5-MoE 打包 down 权重 |
+| Q5_K | 176 字节，5.5 bit/weight | 256 个值按八组共享 scale 与 minimum，并单独保存第五位 | Qwen1.5-MoE 共享专家 down 权重 |
 
 这里的 `K` 表示 ggml 的 K-quant 分块格式族，与 Attention 的 K/V Cache 没有关系。格式选择需要同时比较模型精度、文件大小、内存带宽和目标设备 kernel，不能只按位数给出统一优劣顺序。
 

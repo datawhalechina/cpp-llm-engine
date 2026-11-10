@@ -6,7 +6,7 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
-| A 教学闭环 | 用小尺寸 MHA、LayerNorm、FFN 和双残差组装一个 `DecoderLayer`，再用请求 Context 连接预填充与逐词元解码 | 单层输出、因果掩码、连续 KV 追加、请求隔离和失败原子性测试 |
+| A 教学闭环 | 用小尺寸 MHA、LayerNorm、稠密/MoE FFN 和双残差学习单层数据流，再用请求 Context 连接预填充与逐词元解码 | 单层输出、MoE 路由、因果掩码、连续 KV 追加、请求隔离和失败原子性测试 |
 | B 真实 CPU | 先用 3D/4D Q/K/V 适配器核对通用多头注意力布局，再沿真实模型路径学习 TinyLlama 的 RMSNorm、RoPE、GQA、SwiGLU 和 22 层拓扑 | 批次隔离、首层权重映射、22 层结构与跨章数值证据 |
 | G GPU 扩展 | 保持解码器顺序和请求状态语义不变，把 Linear、RoPE、GQA、归一化和 FFN 换成 CUDA 后端 | 真实 2/22 层对照、Tensor Prefill、融合在线 Attention 与端到端 A/B |
 | M 多模态扩展 | 视觉编码器复用归一化、Attention、FFN 和双残差结构；视觉向量进入语言 Decoder 后复用请求 Context | SigLIP Block、视觉投影和统一 embedding 序列测试 |
@@ -18,6 +18,7 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | FA2-inspired | 只吸收 FlashAttention-2 的在线状态与 Warp 分工思想，不等同于官方完整实现 | [`04.1 多头注意力`](./01_multihead_attention.md) |
 | 残差连接（Residual） | 把子模块输出加回原输入，保留一条直接数据通路 | [`04.4 解码器层`](./04_decoder_layer.md) |
 | 前馈网络（FFN） | 对每个词元独立执行“扩展、激活、投影回原维度” | [`04.3 前馈网络`](./03_feedforward.md) |
+| 混合专家前馈网络（MoE FFN） | 先用 Router 为每个词元选择少量专家，再合并专家与共享专家输出 | [`04.3 前馈网络`](./03_feedforward.md) |
 | 解码器层（`DecoderLayer`） | 按固定顺序组合注意力、前馈网络、归一化和残差连接 | [`04.4 解码器层`](./04_decoder_layer.md) |
 
 ![Chapter 04 主图：解码器结构与注意力](../assets/diagrams/chapter04-main.svg)
@@ -40,10 +41,11 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |
-| L1 默认 CPU | `bash code/chapter04_attention/scripts/run.sh` | 公共视图上的归一化、残差、FFN、解码器与 3D/4D 注意力通过 CTest；连续 KV 按 2→3 增长，请求互不影响，失败不提交 Context 或输出 | 必做 |
+| L1 默认 CPU | `bash code/chapter04_attention/scripts/run.sh` | 归一化、残差、稠密/MoE FFN、解码器与 3D/4D 注意力通过 CTest；连续 KV 按 2→3 增长，请求互不影响，失败不提交 Context 或输出 | 必做 |
 | L2 真实结构 | `bash code/chapter04_attention/scripts/run_real_structure.sh` | 22 层配置、首层九个权重的名称、shape、dtype 和 payload 通过 CTest；不执行完整 Decoder | 有模型时必做 |
 | L2 可选 Qwen3 首层 | `bash code/chapter04_attention/scripts/run_qwen3_first_layer.sh` | Q/K Norm、16/8 头、128 维头空间、NeoX RoPE、增量 K/V 和因果注意力通过 | 学习模型差异时执行 |
 | L3 可选 Qwen3 全层 | `bash code/chapter04_attention/scripts/run_qwen3_decoder.sh` | 28 层 CPU logits、前五候选和连续四步贪心词元通过 llama.cpp 对照 | 验收第二种稠密架构时执行 |
+| L3 可选 Qwen1.5-MoE | `bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh` | 24 层局部 Top-K 全部匹配 llama.cpp，并核对双词元因果 Attention、逐层 hidden、98304 个 K/V 元素、logits 和贪心词元 | 学习 MoE 真实权重时执行 |
 | L3 可选 CUDA | `bash code/engine/scripts/run_real_cuda_decoder.sh` | TinyLlama 2 层与 22 层 hidden、分层 K/V 匹配 CPU 参考实现 | 有 NVIDIA GPU 和模型时选做 |
 | L3 可选 Qwen3 CUDA | `bash code/engine/scripts/run_qwen3_cuda_decoder.sh` | Qwen3 28 层 hidden、分层 K/V、logits、融合 Attention 与 Tensor Prefill匹配 CPU 参考实现 | 验收第二种 CUDA 稠密架构时执行 |
 | L4 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 三阶段与融合路径均通过 logits/greedy 检查，并保留两轮 Prefill/Decode 样本；收益不稳定时不切换默认路径 | 调优融合内核时必做 |

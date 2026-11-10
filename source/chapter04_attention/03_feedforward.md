@@ -51,6 +51,40 @@ output = down_proj(hidden)
 
 两条路径保留的共同约束是：词元数不变，最终隐藏维恢复为 `D`，输出才能进入残差加法。真实路径位于 `RealLlamaCpuContext`，量化线性层复用 Chapter05 计算后端；教学 `FeedForward` 保持小尺寸和可读性。
 
+## 从稠密 FFN 到混合专家 FFN
+
+稠密 FFN 让每个词元经过同一组 Gate、Up 和 Down 权重。混合专家（Mixture of Experts，MoE）保留 SwiGLU 计算，但先让 Router 为每个词元打分，只执行分数最高的 `K` 个专家：
+
+```text
+router_logits = x @ router_weight
+selected = stable_top_k(router_logits, K)
+route_weights = softmax(router_logits[selected])
+selected_output = sum(route_weights[i] * expert_i(x))
+shared_output = sigmoid(shared_router(x)) * shared_expert(x)
+output = selected_output + shared_output
+```
+
+这里的稳定 Top-K 表示分数相同时优先选择编号较小的专家，使测试和不同运行环境得到相同路由。教学实现对选中专家重新归一化，便于观察加权和；Qwen1.5-MoE 则先对全部 60 个专家做 Softmax，再保留 Top-4 概率，因此四个权重之和通常小于 1。真实适配器通过模型路由策略区分这两种语义。Qwen1.5-MoE 还让所有词元经过一个共享专家，再用单独门控控制共享专家贡献。
+
+<a href="../_code/chapter04_attention/src/moe_feed_forward.cpp"><code>moe_feed_forward.cpp</code></a> 使用小尺寸 Float32 权重完整执行这条语义链，并把每个词元的专家编号和路由权重保存在 `MoeRoute` 中。真实路径由 <a href="../_code/model/src/real_moe_feed_forward.cpp"><code>real_moe_feed_forward.cpp</code></a> 连接 Chapter01 的三维 packed expert 权重与 Chapter05 的 Q3_K、Q4_K、Q5_0、Q5_1、Q5_K、Q6_K、Q8_0 Linear：先完成 60 选 4，再只执行命中的专家，最后合并共享专家。
+
+## 多词元怎样按专家分组
+
+逐词元执行时，每个词元都可以独立完成 Top-K 和专家计算，但会反复定位相同专家的权重。多词元路径先计算所有路由，再建立 `expert -> [(token, route_slot)]` 分发表：
+
+```text
+token hidden
+  -> Router + Top-K
+  -> 按 expert_id 分组
+  -> 每个活跃专家处理自己的 token
+  -> 乘路由权重并合并回原 token 顺序
+  -> 加入每个 token 的共享专家输出
+```
+
+`run_real_moe_feed_forward_batch()` 返回 assignment 数、活跃专家数和单个专家接收的最大 token 数。CPU 实现复用每个专家的 packed 权重 View，并把同一专家接收的输入交给 batch Linear。Q3_K/Q5_K 后端每次解码一个量化块，再同时累加多个输入行；这与生产系统的 grouped GEMM 目标一致，但当前仍是标量 CPU 教学实现，不等同于 GPU grouped GEMM。
+
+多个请求一起 Decode 时，不能把它们当作同一条序列：每个请求仍从自己的历史 K/V 计算 Attention。教程按层完成 Attention 后，才把这一层的 FFN 输入放进共同的专家分发表；专家输出再按请求拆回。这样既能跨请求复用专家权重，又不会让请求 A 读到请求 B 的 K/V。
+
 在解码器中，注意力和 FFN 各自位于一条残差支路：
 
 ```text
@@ -68,6 +102,16 @@ x = x + FFN(Norm(x))
 bash code/chapter04_attention/scripts/run.sh
 ```
 
-`chapter04_attention_test` 构造 `FeedForward(4,8)`，输入 `[2,4]` 后检查输出仍为 `[2,4]`。跨章测试还把 Chapter02 的 `[1,2]` 张量送入 `LinearLayer(2,3)` 和 `FeedForward(2,3)`，分别验证 `[0.05,0.10,0.15]` 与 `[0.007,0.014]`，并确认错误输出形状不会覆盖已有数据。
+`chapter04_attention_test` 构造 `FeedForward(4,8)`，输入 `[2,4]` 后检查输出仍为 `[2,4]`。跨章测试还把 Chapter02 的 `[1,2]` 张量送入 `LinearLayer(2,3)` 和 `FeedForward(2,3)`，分别验证 `[0.05,0.10,0.15]` 与 `[0.007,0.014]`。`chapter04_moe_feed_forward_test` 使用三个专家、Top-2 和共享专家，固定检查并列分数的选择顺序、归一化权重、合并结果与失败时输出不变。模型组件测试另外要求分组执行与逐词元执行一致，并核对专家分发表统计和失败原子性。
+
+准备 Qwen1.5-MoE 后，可继续运行：
+
+```bash
+bash code/chapter04_attention/scripts/run_qwen15_moe_ffn.sh
+bash code/chapter04_attention/scripts/run_qwen15_moe_ffn_compare.sh
+bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh
+```
+
+第一个入口加载 layer-0 的真实 Router、packed experts 和共享专家，检查全专家 Softmax 后的 Top-4 权重、2048 维输出与有限性。第二个入口从 llama.cpp 捕获 layer-0 Attention、FFN 和层输出。第三个入口扩展到 24 层，并把两种误差分开报告：局部路径使用 llama.cpp 上一层输出，验证当前层 Top-K 与数值；累计路径使用教程自己的上一层输出，观察量化误差跨过 Top-K 边界后怎样改变后续专家选择。局部路径的 24 层专家集合全部一致，最大局部 MAE 为 `0.0418066`。
 
 下一节将把两条残差支路、两个 LayerNorm、注意力和 FFN 组装成一个完整的教学 `DecoderLayer`。

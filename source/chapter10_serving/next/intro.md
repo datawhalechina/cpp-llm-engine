@@ -42,5 +42,6 @@ Chapter06 定义单请求生成，Chapter07 管理 K/V 资源，Chapter08 选择
 | L4 可选 Qwen3 | `bash code/chapter10_serving/scripts/run_qwen3_serving.sh` | Qwen3 Completion、SSE、双请求调度、Radix 命中和释放通过 | 扩展模型时执行 |
 | L5 CUDA 服务 | `bash code/engine/scripts/run_real_cuda_serving.sh` | CUDA golden、SSE 顺序、取消、超时和 inflight 归零 | 有 CUDA 时可选 |
 | L5 Qwen3 CUDA 服务 | `bash code/engine/scripts/run_qwen3_cuda_serving.sh` | Qwen3 Completion/SSE golden、Tensor Batch 和终态资源归零 | 完成 Qwen3 CUDA Generation 后执行 |
+| L5 Qwen1.5-MoE 动态准入 | `bash code/chapter09_performance/scripts/run_qwen15_moe_service_ab.sh` | 运行中加入请求后，输出、批量执行和终态释放一致 | 学习 MoE 服务时选做 |
 
 L1 入口会构建 Chapter06–08 依赖与 `chapter10_serving`，再运行 ServiceCore、终态释放、HTTP/SSE 契约和请求 Worker 四个测试。

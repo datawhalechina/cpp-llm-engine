@@ -98,7 +98,7 @@ auto status = chapter05_quantization::compute_quantized_linear(
 
 `QuantizedMatrixView` 保存 packed payload 指针、字节数、权重行列和 Q4_K/Q6_K/Q8_0 格式；它不提供普通 Float32 Tensor 的索引语义。`compute_quantized_linear_views()` 让 Chapter02 的 Float32 激活通过公共只读/可写 View 进入现有 policy 和 backend：rank-1 表示单 token，rank-2 表示多个 token 行。
 
-rank-2 会构造 `LinearBatchRequest`。Q4_K、Q6_K 和 Q8_0 的 scalar fused backend 只遍历一次 packed 权重，把同一个解码值分别累加到各输入行；这样得到的是 CPU 单线程批量 GEMV，而不是逐行重复解码权重。AVX2 backend 目前通过公共兼容路径逐行执行，尚未提供专用多行 SIMD kernel。
+rank-2 会构造 `LinearBatchRequest`。Q3_K、Q4_K、Q5_K、Q6_K 和 Q8_0 的 scalar fused backend 只遍历一次 packed 权重，把同一个解码值分别累加到各输入行；这样得到的是 CPU 单线程批量 GEMV，而不是逐行重复解码权重。Qwen1.5-MoE 先按专家分组，再用该接口执行组内 Gate、Up 和 Down。`RealMoeBatchMode` 保留逐行路径作为同一二进制中的实验基线；EXP-CPU-13 在真实第一层、双词元 workload 中测得分组/逐行中位数比例 `0.597`，路由一致且最大输出误差约 `6.1e-10`。该实验只计 Router、专家和共享专家，不包含 Attention、K/V、LM Head 或服务调度。AVX2 backend 目前通过公共兼容路径逐行执行，尚未提供专用多行 SIMD kernel。
 
 所有 batch 行必须连续且宽度相同，输出采用 `[batch, output_rows]`。适配器先写临时结果，整批成功后才提交到输出 View；非连续激活必须由调用方显式 `contiguous()`，packed 权重也必须严格匹配格式对应的 block 字节数。
 

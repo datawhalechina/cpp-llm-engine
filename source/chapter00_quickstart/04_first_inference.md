@@ -34,6 +34,15 @@ bash code/chapter00_quickstart/run_real_inference.sh "Hello TinyLlama" 4
 
 该命令只验证 llama.cpp 的外部 GPU 基线，不代表本教程 CUDA backend 已完成。Chapter00 的必做结果仍是 CPU 推理。
 
+Qwen1.5-MoE Q3_K_M 约 7.44GB。12GB 显卡先使用短 prompt、batch 1 和较小上下文尝试完整卸载：
+
+```bash
+CHAPTER00_GPU_LAYERS=999 \
+bash code/chapter00_quickstart/run_qwen15_moe_baseline.sh
+```
+
+若设备还承担桌面显示或工作区不足，可以降低 `CHAPTER00_GPU_LAYERS`，让剩余层留在 CPU。激活参数量影响每个词元的计算量，总参数量仍决定需要容纳的专家权重。
+
 ## 验证与衔接
 
 | 输出 | 表示什么 | 通过条件 |

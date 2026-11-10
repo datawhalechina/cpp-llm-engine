@@ -61,6 +61,18 @@ bash code/chapter08_scheduling/scripts/run.sh
 bash code/chapter08_scheduling/scripts/run_real_batch.sh
 ```
 
+本地已有 Qwen1.5-MoE Q3_K_M 时，可以验证两个请求从 Prefill 进入同一次 MoE Decode batch：
+
+```bash
+bash code/chapter08_scheduling/scripts/run_qwen15_moe_batch.sh
+```
+
+需要复核多个连续调度步的性能与输出时，运行 Chapter09 固定四请求队列实验：
+
+```bash
+bash code/chapter09_performance/scripts/run_qwen15_moe_scheduling_ab.sh
+```
+
 ## 扩展入口
 
-当前实现包含同步 CPU 调度、优先级老化、真实 Radix 命中排序、真实 Decode batch 和 overlap 计划校验。Chapter10 用估算长度排列 waiting 请求，提升运行时再让 Chapter07 与 Engine 把真实 CPU/CUDA 命中同步到共享块、Request 和模型 Context；真实多请求 Prefill Tensor batch、Deadline、抢占和设备事件重叠仍待扩展。
+当前实现包含同步 CPU 调度、优先级老化、真实 Radix 命中排序、真实 Decode batch 和 overlap 计划校验。TinyLlama CPU/CUDA 与 Qwen1.5-MoE CPU Factory 都实现 `ExecutorBatchRunner`；Qwen smoke 验证独立 K/V、跨请求专家分发和一次批量调用，EXP-CPU-17 再验证四请求固定队列连续执行三个 Decode step。专家组内 Linear 已进入 batch 契约，Q3_K/Q5_K 会跨输入行复用块解码。Chapter10 用估算长度排列 waiting 请求，提升运行时再让 Chapter07 与 Engine 把真实 CPU/CUDA 命中同步到共享块、Request 和模型 Context；EXP-CPU-18 已在服务核心中验证运行期间动态加入请求。真实多请求 Prefill Tensor batch、Deadline、抢占、设备事件重叠和开放环到达率仍是后续扩展。

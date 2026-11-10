@@ -27,7 +27,7 @@ assert similarity >= similarity_threshold
 
 ## 仓库中的验证证据
 
-Q4_K CPU reference 使用真实 TinyLlama `token_embd.weight` 与 llama.cpp reference 交叉验证；Q6_K 使用 `blk.0.ffn_down.weight` 做同类验证。Q8_0 使用合成 block 和真实 SmolVLM 路径检查 decode-and-dot、embedding-prefill 与完整 Decoder 输出。
+Q4_K CPU reference 使用真实 TinyLlama `token_embd.weight` 与 llama.cpp reference 交叉验证；Q6_K 使用 `blk.0.ffn_down.weight` 做同类验证。Q8_0 使用合成 block 和真实 SmolVLM 路径检查 decode-and-dot、embedding-prefill 与完整 Decoder 输出。Q3_K/Q4_K/Q5_0/Q5_1/Q5_K 由固定 block 和 Qwen1.5-MoE 两层对照共同验证；layer-1 的 Q5_0 打包专家 down 和 Q4_K 共享专家 down 会经过同一 Linear policy。
 
 | 验证对象 | 当前证据 | 通过标准 |
 | --- | --- | --- |

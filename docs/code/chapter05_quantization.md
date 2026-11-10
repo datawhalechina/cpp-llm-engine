@@ -1,6 +1,6 @@
 # chapter05_quantization 代码导航
 
-本章代码包含 INT8、Q4_K、Q6_K 解码、量化 Linear、benchmark 和精度测试。
+本章代码包含 INT8 与 Q3_K/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0 解码、量化 Linear、benchmark 和精度测试。
 
 ## 阅读顺序
 
@@ -15,6 +15,13 @@
 | <a href="/_code/chapter05_quantization/include/chapter05_quantization/tensor.h"><code>tensor.h</code></a> | 量化 Tensor 接口 |
 | <a href="/_code/chapter05_quantization/src/tensor.cpp"><code>src/tensor.cpp</code></a> | 量化 Tensor 实现 |
 | <a href="/_code/chapter05_quantization/src/dequantize_op.cpp"><code>src/dequantize_op.cpp</code></a> | 反量化算子 |
+| <a href="/_code/chapter05_quantization/src/q3k_dequantize.cpp"><code>src/q3k_dequantize.cpp</code></a> | Q3_K CPU reference 反量化 |
+| <a href="/_code/chapter05_quantization/src/q3k_linear.cpp"><code>src/q3k_linear.cpp</code></a> | Q3_K reference 与 scalar fused Linear |
+| <a href="/_code/chapter05_quantization/src/q5_0_dequantize.cpp"><code>src/q5_0_dequantize.cpp</code></a> | Q5_0 有符号 5-bit CPU reference 反量化 |
+| <a href="/_code/chapter05_quantization/src/q5_0_linear.cpp"><code>src/q5_0_linear.cpp</code></a> | Q5_0 scalar fused Linear |
+| <a href="/_code/chapter05_quantization/src/q5_1_dequantize.cpp"><code>src/q5_1_dequantize.cpp</code></a> | Q5_1 CPU reference 反量化 |
+| <a href="/_code/chapter05_quantization/src/q5_1_linear.cpp"><code>src/q5_1_linear.cpp</code></a> | Q5_1 reference 与 scalar fused Linear |
+| <a href="/_code/chapter05_quantization/src/q5k_linear.cpp"><code>src/q5k_linear.cpp</code></a> | Q5_K 分组解码与 scalar Linear |
 | <a href="/_code/chapter05_quantization/src/linear_layer.cpp"><code>src/linear_layer.cpp</code></a> | FP baseline Linear |
 | <a href="/_code/chapter05_quantization/src/quantized_linear.cpp"><code>src/quantized_linear.cpp</code></a> | 量化 Linear |
 | <a href="/_code/chapter05_quantization/include/chapter05_quantization/q4k_dequantize.h"><code>q4k_dequantize.h</code></a> | Q4_K block 解码接口 |

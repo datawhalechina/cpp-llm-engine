@@ -328,6 +328,19 @@ greedy_token = argmax(logit)
 
 代码对应：Chapter06 当前可执行实现为 Greedy；Temperature、Top-K 和 Top-P 仍是扩展项。
 
+## 数值评估
+
+<a id="f-eval-01"></a>
+### F-EVAL-01 余弦相似度
+
+对长度相同的两个向量 `x` 和 `y`：
+
+```text
+cosine_similarity(x, y) = dot(x, y) / (norm(x) * norm(y))
+```
+
+结果接近 `1` 表示两个向量方向相近，接近 `0` 表示整体变化方向缺少相关性，接近 `-1` 表示方向相反。它对整体缩放不敏感，因此不能替代最大误差、平均绝对误差、Top-K 重合或贪心词元检查。教程用它比较 hidden state 和 logits 的整体数值结构。
+
 ## Benchmark 与 Serving
 
 <a id="f-perf-01"></a>

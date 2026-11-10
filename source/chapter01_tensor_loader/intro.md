@@ -8,6 +8,7 @@ Chapter 00 已经用 llama.cpp 跑通 TinyLlama，证明模型文件、分词器
 | --- | --- | --- |
 | A 教学闭环 | 用小型 CIE1 文件、固定测试数据和教学分词器分开观察格式、加载过程与输入错误 | 可检查的张量、错误文件拒绝和词元编号 |
 | B 真实执行闭环 | 读取 TinyLlama GGUF 的模型元数据、真实分词器信息和权重目录；用 Qwen3 检查第二种稠密架构 | `ModelConfig`、张量映射、稠密 Decoder 权重布局和真实文件检查 |
+| C 架构扩展坐标 | 用 Qwen1.5-MoE 检查 Router、打包专家和共享专家权重 | MoE 输入结构已验证，执行器留给后续章节 |
 | G GPU 扩展坐标 | 复用 Host 侧 GGUF 解析结果，再由 CUDA 适配器上传权重 | 本章不在 GPU 上解析文件；设备权重验证位于 `code/cuda` |
 | M 多模态扩展坐标 | 复用 GGUF Reader 读取视觉投影 metadata 与 payload | mmproj schema 与视觉权重验证位于 `code/multimodal` |
 
@@ -24,7 +25,7 @@ Chapter 00 已经用 llama.cpp 跑通 TinyLlama，证明模型文件、分词器
 
 ## 开始学习
 
-先从张量对象认识加载结果，再用 CIE1 小文件观察一条完整且容易排错的加载链。理解名称、形状、数据类型和权重字节怎样被校验后，再进入真实分词器、GGUF 元数据、张量目录和稠密 Decoder 权重布局。TinyLlama 用于跑通主线，Qwen3 用于观察模型家族变化怎样影响加载要求。
+先从张量对象认识加载结果，再用 CIE1 小文件观察一条完整且容易排错的加载链。理解名称、形状、数据类型和权重字节怎样被校验后，再进入真实分词器、GGUF 元数据和模型布局。TinyLlama 用于跑通主线，Qwen3 展示稠密模型家族变化，Qwen1.5-MoE 展示专家模型为何需要独立结构约束。
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
@@ -43,4 +44,5 @@ Chapter 00 已经用 llama.cpp 跑通 TinyLlama，证明模型文件、分词器
 | L1 默认 CPU | `bash code/chapter01_tensor_loader/run.sh` | Tensor、教学 Loader、Tokenizer、模型配置、GGUF 测试文件、结构约束和错误路径通过 CTest | 必做 |
 | L2 真实模型 | `bash code/chapter01_tensor_loader/run_real_tokenizer.sh` | 固定文本得到预期 token IDs；模型元数据、201 个张量索引、22 层布局、数据区偏移和 Decoder 输入映射通过检查 | 有模型时必做 |
 | L2 可选 Qwen3 | `bash code/chapter01_tensor_loader/run_qwen3_baseline.sh` | 文件校验值、固定词元、聊天模板、28 层和 311 个张量通过检查 | 扩展模型时执行 |
+| L3 可选 Qwen1.5-MoE | `bash code/chapter01_tensor_loader/run_qwen15_moe_schema.sh` | 24 层、411 个张量、60 选 4 与专家布局通过检查 | 学习 MoE 时执行 |
 | L3 可选 CUDA | 不单独设置 Loader CUDA 验收 | 文件解析和权重索引保持 Host 侧职责，设备上传由后续 backend 验证 | 不适用 |

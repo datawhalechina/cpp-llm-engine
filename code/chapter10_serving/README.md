@@ -53,6 +53,14 @@ bash code/chapter10_serving/scripts/run_cpp_httplib_loopback.sh
 
 准备本地 `httplib.h` 后可以设置 `CHAPTER10_CPPHTTPLIB_INCLUDE_DIR`；未设置时，CMake 获取固定版本 `v0.18.3`。该入口验证 health、metrics、同步 Completion 和 SSE，不代表并发 HTTP 服务。
 
+本地已有 Qwen1.5-MoE 时，可以验证两个运行请求 Decode 期间再加入两个请求的动态 admission：
+
+```bash
+bash code/chapter09_performance/scripts/run_qwen15_moe_service_ab.sh
+```
+
+EXP-CPU-18 检查完整生成序列、服务生命周期和分组 MoE 性能；Transport 不在计时范围内。
+
 ## 扩展入口
 
 ServiceCore 已接通 Chapter08 优先级策略、真实 Decode Tensor Batch 和分页 K/V 数据。当前背压会取消并释放请求；后续可以增加自动 Deadline、异步 Writer 暂停/恢复和单线程 ServiceCore 事件循环。真实多请求 Prefill Tensor Batch 仍是 Chapter08 后续能力，不能由 Transport 线程替代。

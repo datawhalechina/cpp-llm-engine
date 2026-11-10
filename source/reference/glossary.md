@@ -58,6 +58,7 @@
 | 注意力 | Attention | 根据 Q/K 相关性对 V 加权聚合 | Chapter04 | [F-ATTN-02](./formulas.md#f-attn-02) |
 | 多头注意力 | Multi-head Attention, MHA | 将隐藏维度拆成多个 head 分别计算 Attention，再合并回原维度 | [Chapter04 Multi-head Attention](../chapter04_attention/01_multihead_attention.md) | [F-ATTN-02](./formulas.md#f-attn-02) |
 | 分组查询注意力 | Grouped-Query Attention, GQA | 多个 query head 共享较少的 KV head | Chapter04 | [F-ATTN-03](./formulas.md#f-attn-03) |
+| 专家分组执行 | grouped expert execution | 在同一层把命中同一专家的词元或请求行组成一组，共享专家权重读取与量化块解码；一个 Top-K 词元会进入 K 组 | Chapter04、08 | - |
 | 因果掩码 | causal mask | 阻止当前位置读取未来 token 的 Attention mask | Chapter04 | [F-ATTN-02](./formulas.md#f-attn-02) |
 | 层归一化 | LayerNorm | 使用均值和方差归一化 hidden state | Chapter04 | [F-NORM-01](./formulas.md#f-norm-01) |
 | 均方根归一化 | RMSNorm | 不减均值、按均方根缩放 hidden state | Chapter04、真实 Decoder | [F-NORM-02](./formulas.md#f-norm-02) |
@@ -65,8 +66,10 @@
 | 前馈网络 | Feed-Forward Network, FFN | Transformer block 中 Attention 后的非线性变换 | Chapter04 | [F-FFN-01](./formulas.md#f-ffn-01) |
 | 门控激活 | SwiGLU | 使用 SiLU gate 与 up 分支逐元素相乘的 FFN 结构 | Chapter04、真实 Decoder | [F-FFN-01](./formulas.md#f-ffn-01) |
 | 解码器 | Decoder | 组合 Attention、FFN、Residual 和 Norm 的生成模型主体 | Chapter04 | [F-ATTN-02](./formulas.md#f-attn-02) |
+| 解码器块 | Transformer decoder block, layer | Decoder 中重复堆叠的一层计算结构，通常包含 Attention、FFN、归一化和残差；“22 层/24 层”指块数量，不是隐藏维度 | Chapter04 | [F-ATTN-02](./formulas.md#f-attn-02) |
 | 残差连接 | residual connection | 将子层输出与输入相加，形成 Transformer block 的主数据通路 | Chapter04 | - |
 | 候选分数 | logits | 模型对词表中每个候选 token 输出的未归一化分数 | Chapter04-06 | [F-SAMPLE-01](./formulas.md#f-sample-01) |
+| 余弦相似度 | cosine similarity | 用两个向量夹角衡量整体方向的一致性；接近 1 表示分量变化模式相近，但仍需结合绝对误差、Top-K 和贪心词元判断 | Chapter04、09 | [F-EVAL-01](./formulas.md#f-eval-01) |
 
 ## 生成、缓存与调度
 
@@ -75,6 +78,8 @@
 | 中文术语 | 英文或缩写 | 定义 | 首次学习 | 相关公式 |
 | --- | --- | --- | --- | --- |
 | 词元 | token | tokenizer 和模型处理的离散输入输出单位 | Chapter00-01 | - |
+| 双词元输入 | two-token input | 序列长度 `T=2` 的最小多词元用例；用于验证位置 1 能读取位置 0 的 K/V，不表示 batch size 为 2 | Chapter04 | [F-ATTN-02](./formulas.md#f-attn-02) |
+| 专家分发与合并 | expert dispatch and combine | 按 Router 的 Top-K 结果把 token 分组给专家执行，再乘路由权重并恢复原 token 顺序 | Chapter04 | `run_real_moe_feed_forward_batch` |
 | 提示输入 | prompt | 用户提供并在生成前完成 prefill 的输入序列 | Chapter00、Chapter06 | - |
 | 请求 | Request | 保存 prompt、生成 token、执行阶段、停止原因和请求级资源的运行时对象 | [Chapter06 Request 生命周期](../chapter06_generation/next/04_request_lifecycle.md) | [F-SCHED-01](./formulas.md#f-sched-01) |
 | 上下文窗口 | context window | 模型一次请求最多能够处理的词元范围，描述容量限制，不是一个 C++ 状态对象 | Chapter00、Chapter06 | - |

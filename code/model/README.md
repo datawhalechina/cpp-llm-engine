@@ -11,6 +11,14 @@
 | `gguf_first_layer_forward` | 用真实量化权重执行首层单词元前向 |
 | `gguf_first_layer_multitoken` | 用真实量化权重观察 RoPE、因果注意力和增量 K/V |
 | `gguf_decoder_multilayer` | 执行多层 Decoder，并可选与 llama.cpp 比较 |
+| `PackedExpertView` | 把 `[cols, rows, experts]` 的真实 packed 权重映射为单个专家的二维只读窗口 |
+| `run_real_moe_feed_forward` | 先做 Router/Top-K，再按需执行命中专家和共享专家 |
+| `run_real_moe_feed_forward_batch` | 先路由整个 token 集合，再按专家分发、执行并合并回原顺序；可切换逐行基线与分组路径 |
+| `qwen15_moe_ffn_inspect` | 用 Qwen1.5-MoE layer-0 检查 60 选 4 与真实量化 FFN |
+| `qwen15_moe_ffn_compare` | 捕获 llama.cpp Attention、Top-K、逐层输出与 logits，对照单层、两层或 24 层前向 |
+| `RealQwen2MoeCpuModel` | 共享 GGUF 索引、embedding、最终归一化和 LM Head，执行时逐层加载专家权重 |
+| `RealQwen2MoeCpuContext` | 保存单个请求的位置和 24 层历史 K/V，支持 Prefill、Decode 和 reset |
+| `run_qwen2_moe_layer_batch_with_context` | 保持各请求 Attention/K/V 独立，在同一层合并 MoE 路由与专家分发 |
 
 CPU 类型暂时保留在 `chapter01` 命名空间，以兼容已有引擎和多模态调用方；CUDA 类型使用 `cpp_llm_engine::model`。两条路径都遵守“模型共享权重、Context 隔离请求状态”的结构。
 
@@ -25,3 +33,17 @@ CUDA 模型持有量化 embedding、分层 Decoder 权重、final norm 和 LM He
 `forward_hidden_sequence()` 接收连续 `[T,D]` embedding，逐层使用 `CudaDecoderBatchLayer::prefill_sequence()` 批量执行 RMSNorm、Linear、RoPE 和因果 GQA，并一次向每层连续 K/V 追加 T 个位置。TinyLlama 22 层、2-token Tensor Prefill 与顺序执行的最大误差为 `3.05e-05`。
 
 `prefill_tokens()` 继续补上批量 embedding、最后一行 RMSNorm 和 LM Head，并在 Context 内按 token 数复用 Prefill workspace。22 层最终 logits 与顺序执行最大误差为 `1.19e-05`；reset 后重复相同 shape，workspace 创建次数保持 1。连续 CUDA Executor 已使用该入口，绑定分页数据面的请求仍保留逐 token 路径。
+
+Qwen1.5-MoE 路径把 Chapter01 的 Router、三组 packed experts 和共享专家权重交给 `run_real_moe_feed_forward()`。执行器先对 60 个 Router 分数做 Softmax，再只为 Top-4 专家创建 View；Q3_K/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0 均进入 Chapter05 统一 Linear。`run_qwen2_moe_prefill_layer()` 连接 RMSNorm、带 bias 的 Q/K/V、NeoX RoPE、因果 Attention、MoE 和双残差，并按词元返回旋转后的 K/V 负载。
+
+多词元 MoE 先构造按专家索引的 assignment 表，每个活跃专家只创建一次 packed View，再把组内输入交给 Gate、Up、Down 的 batch Linear，最后将加权输出写回原 token 行。这里的“组”是同一层中命中同一专家的 `(token, route_slot)` 集合，不是请求组或 K/V 槽位；一个 Top-K 词元会进入 K 个专家组。Q3_K 与 Q5_K batch backend 会让同一个量化块只解码一次并服务多个输入行；其他格式按各自 backend 的 batch 能力执行。`RealMoeBatchMode` 在同一份权重和路由上切换 `RowWise` 与 `Grouped`，默认使用后者。
+
+EXP-CPU-13～18 从第一层 MoE 子层逐步扩展到完整 Decoder、batch 1/2/4、多步 Decode、Chapter08 固定队列和 Chapter10 动态准入。各层数值与生成词元闸门均通过；性能结论限于归档 workload，不外推为开放环或 HTTP 吞吐。
+
+多请求 Decode 采用按层交错：每个请求先从自己的历史 K/V 计算 Attention，再把该层所有请求的归一化 FFN 输入交给同一张专家 assignment 表，最后按请求拆回输出。全部请求完成后才提交本层 K/V；后续层或 LM Head 失败时，Model 恢复整批请求的 24 层状态。层级测试将该路径与逐请求执行逐元素对照。
+
+24 层对照按层加载权重，避免 60 个专家的全部层权重同时常驻内存。局部路径使用 llama.cpp 上一层输出，24 层 Top-K 专家集合全部一致，最大局部 MAE 为 `0.0418066`、最低余弦相似度为 `0.999857`。累计路径保留教程输出，量化误差在 3 个词元位置触发路由分叉，最终 hidden MAE 为 `0.136931`、余弦相似度为 `0.997824`。最终 RMSNorm 与 Q6_K LM Head 已接入统一 Linear；累计 logits 余弦相似度为 `0.999401`，Top-5 前四项与贪心词元 `151643` 匹配 llama.cpp。
+
+请求 Context 为每层分别保存旋转后的历史 K/V 和当前位置。整段 Prefill 与逐词元调用使用同一位置规则；任一层、最终归一化或 LM Head 失败时恢复全部 24 层状态。`RealQwen2MoeExecutorFactory` 已将该 Context 接入 Chapter06，真实 Tokenizer 文本闭环生成 `11 358` 并解码为 `, I`。默认路径按层从 GGUF 重载权重以控制常驻内存，当前不作服务并发性能承诺。
+
+Model 提供显式 LRU 层权重缓存和命中、未命中、常驻字节统计，默认容量为 0。24 层顺序执行中，容量小于 24 通常会在下一轮到来前淘汰旧层，因此小缓存用于观察策略而不是默认优化；全层缓存可以跨 Decode 复用权重，但会让大部分 GGUF payload 常驻 CPU 内存。是否启用必须由调用方根据内存预算和 Chapter09 实验决定。

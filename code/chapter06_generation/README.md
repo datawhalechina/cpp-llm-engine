@@ -32,6 +32,7 @@ Request(prompt + phase + generated + token history)
 | 4 | `src/runtime.cpp` | 模型调用、提交、停止与回调顺序 | `chapter06_generation_test` |
 | 5 | `embedding.cpp`、`position_encoding.cpp`、`decoder_layer.cpp`、`transformer.cpp` | 无模型文件的确定性教学执行器 | `chapter06_generation_demo` |
 | 6 | `real_tinyllama_generation_smoke.cpp` | 真实 Tokenizer、22 层 Decoder 和 Context 隔离 | `real_tinyllama_generation_test` |
+| 7 | `real_qwen2_moe_executor_factory.cpp` | 24 层 MoE Context、分层 K/V 与 Runtime 适配 | Qwen1.5-MoE Context、Runtime 和文本 smoke |
 
 先读 `request.h` 的状态，再读 `model_executor.h` 的模型调用接口；随后沿 `Runtime::prefill_chunk()` 和 `Runtime::decode_one()` 看一次状态提交，最后阅读批量入口。`commit_batch_logits()` 会先校验全部请求和 logits 行，再统一提交，避免半个 batch 已写入、半个 batch 失败；Scheduler 只负责选择哪些请求进入该 batch。
 
@@ -57,6 +58,16 @@ bash code/chapter06_generation/scripts/run_generation_core.sh
 ```bash
 bash code/chapter06_generation/scripts/run_real_generation.sh
 ```
+
+Qwen1.5-MoE 按三个层级验证请求状态、Runtime 和文本输入：
+
+```bash
+bash code/chapter06_generation/scripts/run_qwen15_moe_context.sh
+bash code/engine/scripts/run_qwen15_moe_runtime.sh
+bash code/engine/scripts/run_qwen15_moe_generation.sh
+```
+
+第一条直接检查 24 层 Context 的位置和 K/V；第二条用 token ID 检查 Chapter06 状态机；第三条增加真实 Tokenizer 与文本解码。模型权重按层加载，命令会读取约 7.4 GB GGUF，运行时间高于默认 TinyLlama 路线。
 
 ## 扩展入口
 

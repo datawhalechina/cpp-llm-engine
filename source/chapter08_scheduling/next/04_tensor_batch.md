@@ -57,6 +57,8 @@ admission bind request ID
 
 EXP-GPU-06 在真实 TinyLlama、双请求分页 K/V 和一次 Decode 下比较顺序执行与 Tensor Batch。两轮 batch/顺序中位数比例为 `0.922/0.919`，逐请求 logits 完全一致；这说明当前小批量融合路径减少了重复执行成本，但尚未回答更大批量和长期服务吞吐。
 
+Qwen1.5-MoE 还需要先按 Router 结果把 token 归入专家组。EXP-CPU-17 固定四个请求，在 Prefill 后连续执行三个 Chapter08 调度步；按专家分组与逐行执行的中位数比例为 `0.582`，完整生成序列和每步批量调用计数一致。该结果说明调度层能够持续使用分组执行路径。请求在计时前一次性进入队列，因此动态到达仍需单独验证。
+
 下图强调共享模型计算与独立请求历史的分界：Linear 和 LM Head 接收多行激活，每个请求的 Attention 仍通过自己的 BlockTable 访问分页 K/V。
 
 ![从调度计划到真实 Tensor Batch](../../assets/diagrams/chapter08-real-batch-execution.svg)
@@ -72,3 +74,4 @@ bash code/chapter08_scheduling/scripts/run_real_batch.sh
 | --- | --- |
 | 无模型文件 | Ragged batch、重复请求或槽位拒绝、缓存事务和结果等价 |
 | 本地 TinyLlama | 真实 batch golden、批量 Linear、失败回滚和分页计数一致 |
+| 本地 Qwen1.5-MoE | 独立 K/V、跨请求专家分组、连续批量调用和完整生成序列一致 |

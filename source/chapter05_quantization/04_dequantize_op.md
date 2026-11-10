@@ -1,6 +1,6 @@
 # 05.4 按格式还原量化权重
 
-量化权重进入计算前，必须按格式规则还原数值。这里先用 INT8 加标量 scale 固定反量化语义，再比较 GGUF Q4_K、Q6_K 和 Q8_0 的 block 解码；这些路径共享“读取量化表示、应用参数、产生浮点参考值”这一结果契约。
+量化权重进入计算前，必须按格式规则还原数值。这里先用 INT8 加标量 scale 固定反量化语义，再比较五种 GGUF block 解码；这些路径共享“读取量化表示、应用参数、产生浮点参考值”这一结果约定。
 
 ## INT8 与 GGUF Block 的还原规则
 
@@ -11,19 +11,27 @@
 | Q8_0 | 32 | 2 字节 half scale 与 32 个 8-bit quant | <a href="../_code/chapter05_quantization/src/q8_0_dequantize.cpp"><code>q8_0_dequantize.cpp</code></a> |
 | Q4_K | 256 | 144 字节内保存总 scale、minimum、分组参数和 4-bit quant | <a href="../_code/chapter05_quantization/src/q4k_dequantize.cpp"><code>q4k_dequantize.cpp</code></a> |
 | Q6_K | 256 | 210 字节内组合低 4 bit、高 2 bit、分组 scale 和总 scale | <a href="../_code/chapter05_quantization/src/q6k_dequantize.cpp"><code>q6k_dequantize.cpp</code></a> |
+| Q3_K | 256 | 110 字节内组合低 2 bit、高位掩码、6-bit 分组 scale 和总 scale | <a href="../_code/chapter05_quantization/src/q3k_dequantize.cpp"><code>q3k_dequantize.cpp</code></a> |
+| Q5_0 | 32 | 22 字节内保存 scale、低 4 bit 和第五位表，恢复后减 16 | <a href="../_code/chapter05_quantization/src/q5_0_dequantize.cpp"><code>q5_0_dequantize.cpp</code></a> |
+| Q5_1 | 32 | 24 字节内保存 scale、minimum、低 4 bit 和第五位表 | <a href="../_code/chapter05_quantization/src/q5_1_dequantize.cpp"><code>q5_1_dequantize.cpp</code></a> |
+| Q5_K | 256 | 176 字节内保存总 scale/minimum、八组参数、低 4 bit 和第五位表 | <a href="../_code/chapter05_quantization/src/q5k_linear.cpp"><code>q5k_linear.cpp</code></a> |
 
-下图按字段职责对齐三种 block。量化码必须与同一 block 内的 scale、minimum 或高位数据一起解释，不能把 payload 当作普通整数数组逐元素读取。
+下图用 Q8_0、Q4_K 和 Q6_K 展示三类典型 block 字段。量化码必须与同一 block 内的 scale、minimum 或高位数据一起解释，不能把 payload 当作普通整数数组逐元素读取。
 
-三种格式可以先用概念公式区分；实际代码还要负责 half 转换、bit unpack、分组索引和边界检查：
+各格式可以先用概念公式区分；实际代码还要负责 half 转换、bit unpack、分组索引和边界检查：
 
 ```text
 Q8_0:  weight = block_scale * signed_q8
 Q4_K:  weight = block_scale * group_scale * q4
                  - block_min * group_min
 Q6_K:  weight = block_scale * group_scale * signed_q6
+Q3_K:  weight = block_scale * group_scale * signed_q3
+Q5_0:  weight = block_scale * (unsigned_q5 - 16)
+Q5_1:  weight = block_scale * unsigned_q5 + block_minimum
+Q5_K:  weight = block_scale * group_scale * unsigned_q5 - block_minimum * group_minimum
 ```
 
-Q8_0 的 8-bit 值可直接解释为有符号整数。Q4_K 需要组合 4-bit 量化码、分组 scale 和 minimum；Q6_K 则把低 4 bit 与高 2 bit 合成有符号 6-bit 值，再应用分组与 block scale。相同的 `weight` 结果契约让三种 reference 可以被同一 Linear 测试比较，但它们的 payload 不能共用一套解包代码。
+Q8_0 的 8-bit 值可直接解释为有符号整数。Q4_K 需要组合 4-bit 量化码、分组 scale 和 minimum；Q6_K 则把低 4 bit 与高 2 bit 合成有符号 6-bit 值，再应用分组与 block scale。相同的 `weight` 结果契约让各格式 reference 可以被同一 Linear 测试比较，但它们的 payload 不能共用一套解包代码。
 
 ![Q8_0、Q4_K 与 Q6_K block 布局](../assets/diagrams/chapter05-quantized-block-layout.svg)
 

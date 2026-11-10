@@ -151,6 +151,22 @@ Chapter04 的 `KvCache` 用固定容量连续数组保存 K/V。`MultiHeadAttent
 | 序列增长 | `size: S -> S+1` | committed tokens: `S -> S+1` |
 | 计算结果 | 当前 query 聚合历史 value | 与连续路径 logits 一致 |
 
+### 用双词元证明 Attention 确实读取历史
+
+Qwen1.5-MoE 的 position 0 只能看到一个 K/V，Softmax 权重恒为 1，因此单词元对照不能单独证明 RoPE、因果掩码和历史聚合正确。双词元入口使用位置 0 和 1：第一个查询只读取位置 0，第二个查询读取位置 0..1。每个位置都先对 Q/K 执行 NeoX 前后半维配对旋转，再把旋转后的 K 和原始 V 写入连续负载。
+
+```bash
+bash code/chapter04_attention/scripts/run_qwen15_moe_prefill_compare.sh
+```
+
+固定模型含 16 个 K/V 头、每头 128 维，因此两个词元的单层 K 和 V 负载各有 `2 × 16 × 128 = 4096` 个元素。layer-0 Attention 残差 MAE 为 `0.0002315`、层输出 MAE 为 `0.0005157`。继续执行 layer-1 后，两层最终输出 MAE 为 `0.0019475`、余弦相似度为 `0.999999`，证明 hidden 和分层 K/V 已能跨层交接。
+
+24 层入口进一步区分局部误差与累计误差：局部路径每层都使用 llama.cpp 的上一层输出，可以判断当前层的 Attention、MoE 和 Top-K 是否正确；累计路径继续使用教程自己的输出，可以观察量化误差是否跨过 Router 的 Top-K 边界。固定模型的局部 Top-K 全部一致，24 层 K/V 各有 `24 × 4096 = 98304` 个元素。累计路径有 3 个词元位置选择了不同专家，最终 hidden 仍保持 `0.997824` 的余弦相似度。最终 RMSNorm 和 Q6_K LM Head 把末词元转换为 151936 维 logits；累计 logits 余弦相似度为 `0.999401`，贪心词元 `151643` 与 llama.cpp 一致。llama.cpp 在模型最后一层只保留末词元隐藏状态用于计算 logits，因此最终层核对 2048 个元素，其余层核对两个词元的 4096 个元素。
+
+```bash
+bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh
+```
+
 ## 验证与衔接
 
 从仓库根目录运行：

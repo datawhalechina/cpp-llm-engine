@@ -31,8 +31,8 @@ Reader 只解释外部格式，Adapter 把外部字段转换为稳定配置，Lo
 | `src/model_loader.*` | 加载 CIE1 教学格式并验证记录完整性 |
 | `src/gguf_reader.*` | 读取 GGUF 文件头、模型元数据和张量索引 |
 | `src/model_metadata*`、`src/tokenizer_metadata*` | 把 GGUF 字段转换为内部配置 |
-| `src/gguf_tensor_loader.*` | 按索引读取 F32/F16/I8/Q8_0/Q4_K/Q6_K payload |
-| `src/model_schema.*` | 根据 Llama/Qwen3 架构检查权重名称与形状 |
+| `src/gguf_tensor_loader.*` | 按索引读取 F32/F16/I8 与 Q3_K/Q4_K/Q5_1/Q6_K/Q8_0 payload |
+| `src/model_schema.*` | 分别检查 Llama/Qwen3 稠密布局与 Qwen2MoE 专家布局 |
 | `src/model_builder.*` | 装配 `LoadedModel` 和 `DecoderInput` |
 | `src/real_layer_weights.*` | 按层取得后续 Decoder 使用的权重 |
 | `examples/gguf_inspect.cpp` | 检查真实 GGUF 配置、索引和 schema |
@@ -47,7 +47,7 @@ Reader 只解释外部格式，Adapter 把外部字段转换为稳定配置，Lo
 bash code/chapter01_tensor_loader/run.sh
 ```
 
-脚本隔离构建并运行三个 Chapter01 测试组，覆盖合法加载、非法输入、失败原子性、GGUF 测试文件、模型结构约束和量化 payload。Qwen3 合成用例还检查 Q/K Norm、共享输出权重和可选 BOS。设置 `CHAPTER01_BUILD_DIR` 可以保留检查工具：
+脚本隔离构建并运行三个 Chapter01 测试组，覆盖合法加载、非法输入、失败原子性、GGUF 测试文件、模型结构约束和量化 payload。Qwen3 合成用例检查 Q/K Norm、共享输出权重和可选 BOS；Qwen2MoE 用例检查 Router、打包专家权重和共享专家。设置 `CHAPTER01_BUILD_DIR` 可以保留检查工具：
 
 ```bash
 export CHAPTER01_BUILD_DIR=/tmp/cpp-llm-engine-chapter01-build
@@ -84,16 +84,24 @@ bash code/chapter01_tensor_loader/run_qwen3_baseline.sh
 
 该脚本验证文件 SHA-256、`Hello Qwen3` 的固定词元、聊天模板、28 层元数据和 311 个张量。它不调用 Qwen Decoder，因此通过条件只表示 Chapter01 输入契约成立。
 
+Qwen1.5-MoE 使用独立布局验证 Router、打包专家和共享专家权重：
+
+```bash
+bash code/chapter01_tensor_loader/run_qwen15_moe_schema.sh
+```
+
+输出 `schema: qwen2moe tensors valid` 表示文件结构已经进入稳定输入契约。真实 FFN 执行由 Chapter04 的模型适配入口继续验证。
+
 ## 扩展入口
 
 本章在 `LoadedModel` 和 `DecoderInput` 处结束。后续扩展从以下位置继续：
 
-`DenseDecoderTensorLayout` 是新代码使用的公共名称；`LlamaTensorLayout` 暂时作为兼容别名保留。Llama 与 Qwen3 都已进入完整 CPU Decoder、Generation 和服务验证；Qwen3 CUDA 仍待后续设备适配。
+`DenseDecoderTensorLayout` 保存 Llama/Qwen3 稠密布局，`MoeDecoderTensorLayout` 保存 Qwen2MoE 专家布局；`LlamaTensorLayout` 暂时作为兼容别名保留。Llama 与 Qwen3 已进入完整 CPU/CUDA Decoder、Generation 和服务验证；Qwen2MoE 已进入 CPU 24 层 Decoder、Generation、按专家分组批执行、Chapter08 调度和 Chapter10 服务验证。Chapter01 仍只负责识别并交付模型结构，不承担后续执行逻辑。
 
 | 方向 | 后续入口 |
 | --- | --- |
 | 真实 Decoder | [`code/model`](../model) 与 [Chapter04](../../source/chapter04_attention/06_real_tinyllama_decoder.md) |
-| Q4_K/Q6_K/Q8_0 数值执行 | [`code/chapter05_quantization`](../chapter05_quantization) |
+| Q3_K/Q4_K/Q5_1/Q6_K/Q8_0 数值执行 | [`code/chapter05_quantization`](../chapter05_quantization) |
 | CUDA 权重上传 | [`code/cuda`](../cuda) |
 | 多模态 mmproj | [`code/multimodal`](../multimodal) |
 | 其他模型支持 | [模型支持状态](../../source/reference/model_support.md) |

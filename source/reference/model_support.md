@@ -10,6 +10,7 @@
 | Qwen3-0.6B | Qwen3 稠密解码器 | 第二种小模型兼容目标；暴露 Llama 专用假设 | CPU 与 CUDA 推理服务纵向闭环已通过 |
 | DeepSeek-R1-Distill-Qwen-1.5B | Qwen2.5 稠密解码器 | 验证 Qwen2.5 分词器、聊天模板和模型配置变化 | 规划：复用 Qwen 稠密模型适配路径 |
 | Gemma | Gemma 稠密解码器 | 比较另一种模型家族的元数据、权重命名、归一化和 FFN 差异 | 外部兼容性参照 |
+| Qwen1.5-MoE-A2.7B-Chat | Qwen2 MoE | 首个单卡 MoE 目标；学习 Router、Top-K、共享专家和专家执行 | CPU 24 层生成、按专家分组批执行、调度与服务闭环已接通 |
 | Qwen3-30B-A3B | Qwen3 MoE | 对照路由器（Router）、Top-K 专家选择与专家执行 | 外部框架对照；总权重超出当前单卡目标 |
 | DeepSeek-V2-Lite | DeepSeek MoE + MLA | 对照 MoE 与 MLA 组合后的模型执行差异 | 进阶设计参照；16B 总权重且同时引入 MLA |
 
@@ -41,11 +42,26 @@ Gemma 也经过同一条接入链：Chapter01 识别架构、元数据和权重�
 
 MoE 教学聚焦一次词元怎样经过路由器、选择 Top-K 专家、按专家重排、执行 FFN，再按路由权重合并。建议按以下顺序建设：
 
-1. 在小尺寸固定输入上实现 Router、Top-K 和加权合并，并为并列分数、非法专家编号和空批次建立测试。
-2. 增加专家分组与分发/合并索引，观察每个专家接收的词元数和临时内存。
-3. 把教学 MoE FFN 作为 Chapter04 解码器的可选分支，保持稠密主线的调用方式。
-4. 在 Chapter08 讨论多请求批次中的专家负载与调度，在 Chapter09 记录吞吐、内存和负载分布。
-5. 最后选择一个真实 MoE 格式做外部框架基线；只有总权重、量化格式和设备内存满足单机条件时，才进入自研真实模型执行。
+首个真实目标选择 Qwen1.5-MoE-A2.7B-Chat。该模型总参数约 14.3B、每个词元激活约 2.7B；当前固定的 Q3_K_M GGUF 约 7.44GB，可以在本教程的 12GB 单卡目标上建立量化外部基线。Chapter01 已验证 24 层、411 个张量和 60 选 4 布局；Chapter04/05 已以双词元 24 层对照验证 NeoX RoPE、因果 Attention、分层 K/V、MoE、残差、最终 RMSNorm、Q6_K LM Head 和混合量化 Linear。Chapter06 已接入请求级 Context、真实 Tokenizer、Prefill、Decode 与贪心生成；Chapter08/10 继续验证跨请求专家分组、连续调度、动态准入和终态释放。
+
+```bash
+bash code/chapter00_quickstart/download_qwen15_moe.sh
+bash code/chapter00_quickstart/run_qwen15_moe_baseline.sh
+bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh
+bash code/engine/scripts/run_qwen15_moe_generation.sh
+```
+
+1. 已用 llama.cpp 运行固定 Qwen1.5-MoE GGUF，并记录架构、文件校验值和生成结果。
+2. Chapter01 已建立独立 MoE Schema，核对真实 Router、专家和共享专家权重。
+3. Chapter04 已在小尺寸固定输入上实现稳定 Top-K、选中专家与共享专家加权合并，并覆盖并列分数、非法 Top-K、非有限输入和失败原子性。
+4. Chapter05 已把首层真实量化专家权重接入统一 Linear，并用 llama.cpp 中间张量核对 Top-4 与共享专家合并结果。
+5. Chapter04 已用双词元验证 NeoX RoPE、因果 Attention、连续 K/V 负载和完整 layer-0 输出。
+6. Chapter04 已顺序加载 24 层权重；局部路径的 Top-K 全部匹配 llama.cpp，累计路径记录量化误差触发的路由分叉和最终隐藏状态误差。
+7. 最终 RMSNorm 与 Q6_K LM Head 已通过 logits、Top-5 和贪心词元对照。
+8. 每请求 Context 保存 24 层历史 K/V；Chapter06 Runtime 与真实 Tokenizer 文本闭环已经通过。
+9. 按专家分组的分发/合并索引已接入 Chapter08 批执行；Chapter09 的 EXP-CPU-13～18 依次验证 MoE 子层、完整 Decoder、batch 范围、多步 Decode、固定队列和 Chapter10 动态准入。
+
+当前分组路径是 CPU 默认实现，逐词元路径作为同权重、同路由的正确性和性能对照保留。实验覆盖最多四个请求和四步 Decode，并未建立开放环到达率或 HTTP 并发吞吐结论。
 
 “激活参数较少”表示每个词元只执行少量专家，模型部署仍需容纳其余专家权重。Qwen3-30B-A3B 每个词元激活约 3B 参数，总参数约 30B；DeepSeek-V2-Lite 总参数约 16B，并额外引入多头潜在注意力（MLA）。因此它们适合作为进阶设计参照，而非第一阶段单卡基线。
 

@@ -7,7 +7,7 @@ Chapter06 固定单请求生成语义，Chapter07 提供可提交和回滚的 K/
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
 | A 选择与事务 | 从 Round-robin 升级到 token budget、Continuous Batching、优先级和 Chunked Prefill | 固定候选顺序、老化、公平性与失败回滚 |
-| B 批量执行 | 把 Step batch 转成 Executor/Tensor batch，再接入真实 TinyLlama 多 Context | 顺序/批量结果一致、位置校验和整批回滚 |
+| B 批量执行 | 把 Step batch 转成 Executor/Tensor batch，再接入稠密模型或 MoE 的多 Context | 顺序/批量结果一致、位置校验和整批回滚 |
 | G GPU 扩展坐标 | 保留计划与事务契约，把 Executor batch 交给设备后端和完成事件 | 当前只有 Overlap 状态校验，尚未实现设备执行重叠 |
 | M 多模态扩展坐标 | 将视觉输入产生的词元和阶段成本纳入调度预算 | 当前多模态请求复用服务终态，尚未接入本章预算策略 |
 
@@ -46,5 +46,6 @@ bash code/chapter08_scheduling/scripts/run.sh
 | L1 调度规则 | `bash code/chapter08_scheduling/scripts/run.sh` | Round-robin、预算、混排、分块 Prefill、优先级老化和回滚通过 | 必做 |
 | L2 教学 Ragged batch | 同 L1 入口中的 `chapter08_tensor_batch_test` | 批量 Prefill、偏移、重复输入和准入原子性通过 | 必做 |
 | L3 调度到 Decode batch | 同 L1 入口中的 `chapter08_cache_transaction_test` | 批输入校验、重复 ID 拒绝、失败回滚和分页计数一致 | 必做 |
-| L4 真实模型 batch | `bash code/chapter08_scheduling/scripts/run_real_batch.sh` | TinyLlama 顺序/批量 logits 与固定词元一致，错误位置不提交 | 有模型时必做 |
+| L4 稠密模型 batch | `bash code/chapter08_scheduling/scripts/run_real_batch.sh` | TinyLlama 顺序/批量 logits 与固定词元一致，错误位置不提交 | 有模型时必做 |
+| L5 MoE 请求 batch | `bash code/chapter08_scheduling/scripts/run_qwen15_moe_batch.sh` | Qwen1.5-MoE 两个 Context 在一次 batch runner 调用中共同推进，固定词元一致 | 学习 MoE 调度时选做 |
 | L5 Overlap 控制面 | 同 L1 入口中的 `chapter08_overlap_scheduler_test` | 同步结果一致，取消和状态变化使旧计划失效，关闭后同步回退 | 必做 |
