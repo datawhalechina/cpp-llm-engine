@@ -83,7 +83,7 @@ token hidden
 
 `run_real_moe_feed_forward_batch()` 返回 assignment 数、活跃专家数和单个专家接收的最大 token 数。CPU 实现复用每个专家的 packed 权重 View，并把同一专家接收的输入交给 batch Linear。Q3_K/Q5_K 后端每次解码一个量化块，再同时累加多个输入行；这与生产系统的 grouped GEMM 目标一致，但当前仍是标量 CPU 教学实现，不等同于 GPU grouped GEMM。
 
-多个请求一起 Decode 时，不能把它们当作同一条序列：每个请求仍从自己的历史 K/V 计算 Attention。教程按层完成 Attention 后，才把这一层的 FFN 输入放进共同的专家分发表；专家输出再按请求拆回。这样既能跨请求复用专家权重，又不会让请求 A 读到请求 B 的 K/V。
+多个请求一起 Decode 时，每个请求保持独立序列，并从自己的历史 K/V 计算 Attention。教程先按请求完成当前解码层的 Attention，再把同一解码层的 FFN 输入放进共同的专家分发表；专家输出随后按请求拆回。这样可以跨请求复用专家权重，同时保持请求之间的 K/V 隔离。
 
 在解码器中，注意力和 FFN 各自位于一条残差支路：
 
