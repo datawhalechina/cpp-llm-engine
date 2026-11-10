@@ -17,6 +17,19 @@ Context 先绑定抽象 K/V 数据面，引擎适配层再连接请求 ID 和分
 
 CUDA Context 对连续和分页数据面使用同一组模型权重与批量 Decoder 算子。连续 Prefill 把 K/V 追加到请求独占缓存；分页 Prefill 根据请求 BlockTable 把同一个 chunk 写入共享物理 payload，并让多 Query Attention 直接读取页表。两条路径都只在完整 chunk 成功后推进 Context 位置。
 
+## 模型架构怎样改变分页适配
+
+块分配、引用计数和提交回滚可以保持平台无关，真正保存的 payload 仍由 Attention 架构决定。当前真实分页闭环以 TinyLlama 的标准 GQA K/V 为基线；其他模型需要先确认自己的缓存表示能否直接放入相同布局。
+
+| 模型 | 请求级 Attention 历史 | 迁移到 Chapter07 时的处理 |
+| --- | --- | --- |
+| TinyLlama | 每层标准 key/value，多个 Query head 共享 KV head | 已接入标准分页 payload |
+| Qwen3 | 标准 GQA K/V，head 数和 RoPE 参数不同 | 复用 payload 形状，另建模型级分页 golden |
+| Qwen1.5-MoE | Attention 仍使用标准 K/V，MoE 只改变 FFN | 可复用标准 payload，当前 Factory 尚未绑定数据面 |
+| DeepSeek-V2-Lite | 每层保存低秩 latent K/V 与共享位置 Key | 复用 BlockTable/事务，新增 MLA payload 和读取 backend |
+
+DeepSeek 的压缩缓存原理见 [`04.1 多头注意力与 MLA`](../../chapter04_attention/01_multihead_attention.md)。这里不把 latent 强行展开为标准 K/V 再长期保存，因为那会丢失 MLA 降低缓存容量的设计目标。
+
 ## 为什么要逐级比较
 
 只比较最终文本无法定位误差。验证应从单层 Attention 开始，再扩大到 Decoder hidden state、22 层 logits、固定词元序列和重复请求资源释放。前一级成立后，后一级失败才有明确排查范围。

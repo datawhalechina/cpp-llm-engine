@@ -21,6 +21,15 @@ Chapter08 / Chapter10
 
 `RadixPrefixCache` 只负责匹配、块引用、命中统计和叶端 LRU 淘汰，不直接修改 Request 或模型 Context。Engine 的 CPU/CUDA Factory 持有索引，并通过 Chapter06 的生命周期钩子完成三方同步；Chapter10 准入时只估算命中，提升运行时才采用真实前缀，终态释放前发布完整块。请求引用计数会固定活跃共享块，容量重试只回收索引独占的叶端块。
 
+当前分页 payload 的形状按标准 GQA K/V 设计。模型能复用 BlockTable 和事务语义，不代表已经复用同一种 payload：
+
+| 模型路径 | K/V 表示 | 当前接入状态 |
+| --- | --- | --- |
+| TinyLlama | `[layer, token, kv_head, head_dim]` 标准 K/V | CPU/CUDA 分页、Radix 和真实模型证据完整 |
+| Qwen3 | 与 TinyLlama 相同的标准 GQA K/V | 可复用 Llama 数据面接口，当前没有独立分页 golden |
+| Qwen1.5-MoE | 标准分层 K/V，FFN 改为专家结构 | 当前 MoE Factory 使用请求 Context，尚未绑定分页 payload |
+| DeepSeek-V2-Lite | 低秩 latent K/V 加共享位置 Key | BlockTable 事务可复用，payload 与 Attention 读取需要 MLA 专用适配 |
+
 ## 阅读顺序与资产
 
 | 顺序 | 文件或对象 | 阅读重点 | 对应验证 |
@@ -30,7 +39,7 @@ Chapter08 / Chapter10
 | 3 | `paged_kv_cache.cpp` 的写入与提交 | payload 可见性、逐层完成条件和批量原子性 | `chapter07_paged_kv_cache_test` |
 | 4 | `trim_to_tokens()`、`release()` | 清理发生在物理块重新可用之前 | 裁剪与释放复用用例 |
 | 5 | `attention()` | 根据块表直接读取跨块 K/V，并与连续参考比较 | 跨块 GQA 数值用例 |
-| 6 | `radix_prefix_cache.cpp` | 最长块对齐前缀、共享引用和私有后缀 | `chapter07_radix_prefix_cache_test` |
+| 6 | `radix_prefix_cache.h/.cpp`、`PrefixBlockStore` | 最长块对齐前缀、跨后端块所有权、共享引用和私有后缀 | `chapter07_radix_prefix_cache_test` |
 | 7 | `run_real_paged_kv.sh` | TinyLlama 连续 Context 与分页 Context 的交接 | `real_tinyllama_paged_kv_test` |
 
 ## 运行与验证
