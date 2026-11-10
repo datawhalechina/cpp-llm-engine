@@ -37,7 +37,7 @@ Chapter 00 已经用 llama.cpp 跑通 TinyLlama，证明模型文件、分词器
 
 ## 验证与下一步
 
-本章留下可检查的权重张量、模型配置、分词器、张量映射和稠密 Decoder 权重布局。TinyLlama 在 [`Chapter 04`](../chapter04_attention/06_real_tinyllama_decoder.md) 进入默认真实解码器，Qwen3 在 [`04.5 接入首层权重`](../chapter04_attention/05_load_first_layer.md) 继续完成 Q/K Norm、NeoX RoPE 和 28 层 CPU Decoder；[`Chapter 02`](../chapter02_tensor_ops/intro.md) 用独立的教学张量建立视图与执行布局。
+本章留下可检查的权重张量、模型配置、分词器和架构布局。Llama/Qwen3 稠密模型交付整体 Decoder 输入，Qwen1.5-MoE 与 DeepSeek-V2-Lite 交付 Router、专家或 MLA 所需的分层权重对象。TinyLlama 在 [`Chapter 04`](../chapter04_attention/06_real_tinyllama_decoder.md) 进入默认真实解码器，Qwen3 在 [`04.5 接入首层权重`](../chapter04_attention/05_load_first_layer.md) 继续完成 Q/K Norm、NeoX RoPE 和 28 层 CPU Decoder；[`Chapter 02`](../chapter02_tensor_ops/intro.md) 用独立的教学张量建立视图与执行布局。
 
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |

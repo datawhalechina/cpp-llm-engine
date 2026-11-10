@@ -4,19 +4,20 @@
 
 ## 代码架构
 
-教学链使用小型 CIE1 文件展示一条完整加载过程；真实链把 GGUF 的结构解析、payload 读取和模型装配分开。两条路径最终都输出可检查的 Tensor 与模型配置，不在本章执行 Decoder。
+教学链使用小型 CIE1 文件展示一条完整加载过程；真实链把 GGUF 的结构解析、payload 读取和模型装配分开。两条路径最终都输出可检查的 Tensor 与模型配置，不在本章执行 Decoder。稠密模型由 `ModelBuilder` 装配整体布局，MoE 和 DeepSeek 模型由分层权重加载器交付对应层对象。
 
 ```text
 CIE1 bytes -> ModelLoader -----------------------> Tensor map
 
-GGUF bytes -> GgufReader ------> 元数据/索引
-                          |              |
-                          |              +-> Metadata/Tokenizer adapters
-                          |              +-> GgufTensorLoader -> Tensor map
-                          |                                   |
-                          +----------------------------> ModelBuilder
-                                                           |
-                                             LoadedModel + DecoderInput
+GGUF bytes -> GgufReader -> Metadata/Tokenizer adapters -> ModelConfig
+                         -> GgufTensorLoader -------------> Tensor map
+                                                              |
+                         +------------------------------------+
+                         |                                    |
+                  ModelBuilder                    real_layer_weights
+                  稠密整体布局                    MoE / MLA 分层对象
+                         |                                    |
+              LoadedModel + DecoderInput              Model 执行层
 ```
 
 Reader 只解释外部格式，Adapter 把外部字段转换为稳定配置，Loader 负责 payload 边界，Builder 检查模型结构。任一步失败都不提交半加载结果。
@@ -31,10 +32,10 @@ Reader 只解释外部格式，Adapter 把外部字段转换为稳定配置，Lo
 | `src/model_loader.*` | 加载 CIE1 教学格式并验证记录完整性 |
 | `src/gguf_reader.*` | 读取 GGUF 文件头、模型元数据和张量索引 |
 | `src/model_metadata*`、`src/tokenizer_metadata*` | 把 GGUF 字段转换为内部配置 |
-| `src/gguf_tensor_loader.*` | 按索引读取 F32/F16/I8 与 Q3_K/Q4_K/Q5_1/Q6_K/Q8_0 payload |
+| `src/gguf_tensor_loader.*` | 按索引读取 F32/F16/I8 与 Q2_K/Q3_K/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0/IQ4_NL payload |
 | `src/model_schema.*` | 检查 Llama/Qwen3 稠密布局、Qwen2MoE 专家布局与 DeepSeek2 MLA 混合布局 |
 | `src/real_layer_weights.*` | 按层装配稠密层、Qwen MoE 层和 DeepSeek2 稠密/MoE 层权重 |
-| `src/model_builder.*` | 装配 `LoadedModel` 和 `DecoderInput` |
+| `src/model_builder.*` | 为 Llama/Qwen3 稠密模型装配 `LoadedModel` 和 `DecoderInput` |
 | `examples/gguf_inspect.cpp` | 检查真实 GGUF 配置、索引和 schema |
 | `examples/gguf_first_layer_inspect.cpp` | 检查首层九个权重的 dtype、shape 和 payload |
 | `tests/chapter01_*_test.cpp` | 分别验证 Loader、Schema、Tokenizer/Payload 契约 |
@@ -102,14 +103,14 @@ bash code/chapter01_tensor_loader/run_deepseek_v2_lite_schema.sh
 
 ## 扩展入口
 
-本章在 `LoadedModel` 和 `DecoderInput` 处结束。后续扩展从以下位置继续：
+本章在稳定模型配置、张量布局和分层权重对象处结束。后续扩展从以下位置继续：
 
 `DenseDecoderTensorLayout` 保存 Llama/Qwen3 稠密布局，`MoeDecoderTensorLayout` 保存 Qwen2MoE 专家布局，`DeepSeek2DecoderTensorLayout` 保存 MLA 与混合 Dense/MoE 布局；`LlamaTensorLayout` 暂时作为兼容别名保留。Llama 与 Qwen3 已进入完整 CPU/CUDA Decoder、Generation 和服务验证；Qwen2MoE 已进入 CPU 24 层 Decoder、Generation、按专家分组批执行、Chapter08 调度和 Chapter10 服务验证。DeepSeek2 已进入 CPU 27 层 Decoder、Generation、跨请求专家分组、Chapter08 调度和 Chapter10 HTTP/SSE 验证；Chapter01 仍只负责交付其元数据、张量布局与分层权重对象。
 
 | 方向 | 后续入口 |
 | --- | --- |
 | 真实 Decoder | [`code/model`](../model) 与 [Chapter04](../../source/chapter04_attention/06_real_tinyllama_decoder.md) |
-| Q3_K/Q4_K/Q5_1/Q6_K/Q8_0 数值执行 | [`code/chapter05_quantization`](../chapter05_quantization) |
+| Q2_K/Q3_K/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0/IQ4_NL 数值执行 | [`code/chapter05_quantization`](../chapter05_quantization) |
 | CUDA 权重上传 | [`code/cuda`](../cuda) |
 | 多模态 mmproj | [`code/multimodal`](../multimodal) |
 | 其他模型支持 | [模型支持状态](../../source/reference/model_support.md) |
