@@ -19,8 +19,19 @@
 | `RealQwen2MoeCpuModel` | 共享 GGUF 索引、embedding、最终归一化和 LM Head，执行时逐层加载专家权重 |
 | `RealQwen2MoeCpuContext` | 保存单个请求的位置和 24 层历史 K/V，支持 Prefill、Decode 和 reset |
 | `run_qwen2_moe_layer_batch_with_context` | 保持各请求 Attention/K/V 独立，在同一层合并 MoE 路由与专家分发 |
+| `RealDeepSeek2LayerContext` | 保存单层位置、归一化 latent K/V 与已旋转共享 Key，供稠密与 MoE 层共用 |
+| `run_deepseek2_dense_token_layer` | 连接 DeepSeek2 首个稠密层的 RMSNorm、YaRN partial RoPE、压缩 MLA、SwiGLU 与双残差 |
+| `run_real_deepseek2_moe_feed_forward` | 连接 DeepSeek2 的全路由 Softmax、64 选 6、量化专家和无门控共享专家 |
+| `run_deepseek2_moe_token_layer_batch` | 保持各请求压缩 MLA 历史独立，再把同层 FFN 输入按专家分组执行 |
+| `run_deepseek2_moe_token_layer` | 复用同一 MLA/Context 主体，连接后续 MoE 层和双残差 |
+| `RealDeepSeek2CpuModel` | 共享 GGUF 索引、embedding、最终归一化和 LM Head，按层执行 1 个稠密层与 26 个 MoE 层 |
+| `RealDeepSeek2CpuContext` | 保存单个请求的位置和 27 层压缩 MLA 历史，支持 Prefill、Decode 和 reset |
 
 CPU 类型暂时保留在 `chapter01` 命名空间，以兼容已有引擎和多模态调用方；CUDA 类型使用 `cpp_llm_engine::model`。两条路径都遵守“模型共享权重、Context 隔离请求状态”的结构。
+
+DeepSeek2 的稠密层和 MoE 层共享同一个按词元执行主体。Q 的 64 维位置分支和共享 Key 使用 GGUF 中的 YaRN factor、原始上下文长度与 log multiplier；归一化后的 512 维 latent K/V 和旋转后的共享 Key 只在整层成功后追加。第 0 层注入稠密 SwiGLU，后续 26 层注入全路由 Softmax、Top-6 和无门控共享专家；FFN 或残差失败时不提交 K/V、层输出或路由。Prefill 按层加载一次权重并顺序处理该层的全部词元，Context 只保存请求自己的压缩历史。`deepseek_v2_lite_layer_capture` 还会执行完整 27 层、最终 RMSNorm 和 LM Head；双词元 logits 与 llama.cpp 的余弦相似度为 `0.999616`，贪心词元同为 `185`。
+
+`RealDeepSeek2CpuModel` 提供有界 LRU 层权重缓存，统计容量、常驻层、常驻字节、命中和未命中。默认容量为 0，执行后立即释放当层权重。完整 Decode 固定按 0–26 层顺序访问，容量小于 27 时层的复用距离大于缓存容量，下一轮通常仍全部未命中；容量 27 可以消除后续 GGUF 层读取，但会额外常驻接近整套 Decoder 权重。该缓存管理模型权重，不保存请求 K/V。
 
 首层示例和 CPU 模型同时接受 Llama 与 Qwen3 布局。Qwen3 路径根据元数据使用 16 个 Q 头、8 个 K/V 头和 128 维头空间，在 RoPE 前对每个 Q/K 头独立执行 RMSNorm，并使用前半维与后半维配对的 NeoX RoPE。运行 `bash code/chapter04_attention/scripts/run_qwen3_first_layer.sh` 可观察首层数据流；运行 `bash code/chapter04_attention/scripts/run_qwen3_decoder.sh` 可验证 28 层 logits 和连续四步贪心解码。
 
@@ -41,6 +52,8 @@ Qwen1.5-MoE 路径把 Chapter01 的 Router、三组 packed experts 和共享专�
 EXP-CPU-13～18 从第一层 MoE 子层逐步扩展到完整 Decoder、batch 1/2/4、多步 Decode、Chapter08 固定队列和 Chapter10 动态准入。各层数值与生成词元闸门均通过；性能结论限于归档 workload，不外推为开放环或 HTTP 吞吐。
 
 多请求 Decode 采用按层交错：每个请求先从自己的历史 K/V 计算 Attention，再把该层所有请求的归一化 FFN 输入交给同一张专家 assignment 表，最后按请求拆回输出。全部请求完成后才提交本层 K/V；后续层或 LM Head 失败时，Model 恢复整批请求的 24 层状态。层级测试将该路径与逐请求执行逐元素对照。
+
+DeepSeek-V2-Lite 使用相同的分组原则，但 Attention 侧保存的是各请求独立的压缩 latent K/V 和位置 Key。每层先逐请求完成 MLA，再把 64 选 6 的 FFN 输入交给共同的专家分发表；无门控共享专家仍按请求执行并直接相加。该路径复用量化专家 View 和 batch Linear，属于 CPU 分组语义实现，不等同于 GPU grouped GEMM。
 
 24 层对照按层加载权重，避免 60 个专家的全部层权重同时常驻内存。局部路径使用 llama.cpp 上一层输出，24 层 Top-K 专家集合全部一致，最大局部 MAE 为 `0.0418066`、最低余弦相似度为 `0.999857`。累计路径保留教程输出，量化误差在 3 个词元位置触发路由分叉，最终 hidden MAE 为 `0.136931`、余弦相似度为 `0.997824`。最终 RMSNorm 与 Q6_K LM Head 已接入统一 Linear；累计 logits 余弦相似度为 `0.999401`，Top-5 前四项与贪心词元 `151643` 匹配 llama.cpp。
 

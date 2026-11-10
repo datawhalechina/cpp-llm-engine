@@ -9,6 +9,8 @@ endif()
 if(TARGET chapter05_quantization)
     add_library(cpp_llm_engine_model
         src/packed_expert_view.cpp
+        src/real_deepseek2_cpu_model.cpp
+        src/real_deepseek2_dense_layer.cpp
         src/real_moe_feed_forward.cpp
         src/real_qwen2_moe_layer.cpp
         src/real_qwen2_moe_cpu_model.cpp
@@ -51,6 +53,18 @@ if(TARGET chapter05_quantization)
         real_qwen2_moe_layer_test model moe attention prefill)
     cpp_llm_set_test_contract(
         real_qwen2_moe_layer_test OWNER 05 LEVEL component STATUS active)
+
+    add_executable(real_deepseek2_dense_layer_test
+        tests/real_deepseek2_dense_layer_test.cpp)
+    target_link_libraries(real_deepseek2_dense_layer_test
+        PRIVATE cpp_llm_engine_model)
+    cpp_llm_prepare_test(real_deepseek2_dense_layer_test)
+    add_test(NAME real_deepseek2_dense_layer_test
+        COMMAND real_deepseek2_dense_layer_test)
+    cpp_llm_set_test_labels(
+        real_deepseek2_dense_layer_test model deepseek attention quantization)
+    cpp_llm_set_test_contract(
+        real_deepseek2_dense_layer_test OWNER 05 LEVEL integration STATUS active)
 
     add_executable(qwen15_moe_context_smoke
         examples/qwen15_moe_context_smoke.cpp)
@@ -174,6 +188,28 @@ if(TARGET cpp_llm_engine_model AND CHAPTER01_ENABLE_LLAMA_CPP)
             ${CMAKE_DL_LIBS}
     )
     set_target_properties(qwen15_moe_ffn_compare PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+        BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
+    )
+
+    add_executable(deepseek_v2_lite_layer_capture
+        examples/deepseek_v2_lite_layer_capture.cpp
+    )
+    target_include_directories(deepseek_v2_lite_layer_capture
+        PRIVATE
+            ${LLAMA_CPP_ROOT}/include
+            ${LLAMA_CPP_ROOT}/ggml/include
+    )
+    target_link_libraries(deepseek_v2_lite_layer_capture
+        PRIVATE
+            cpp_llm_engine_model
+            ${LLAMA_LIBRARY}
+            ${GGML_LIBRARY}
+            ${GGML_CPU_LIBRARY}
+            ${GGML_BASE_LIBRARY}
+            ${CMAKE_DL_LIBS}
+    )
+    set_target_properties(deepseek_v2_lite_layer_capture PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
         BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
     )
