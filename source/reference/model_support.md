@@ -12,7 +12,7 @@
 | Gemma | Gemma 稠密解码器 | 比较另一种模型家族的元数据、权重命名、归一化和 FFN 差异 | 外部兼容性参照 |
 | Qwen1.5-MoE-A2.7B-Chat | Qwen2 MoE | 首个单卡 MoE 目标；学习 Router、Top-K、共享专家和专家执行 | CPU 24 层生成、按专家分组批执行、调度与服务闭环已接通 |
 | Qwen3-30B-A3B | Qwen3 MoE | 对照路由器（Router）、Top-K 专家选择与专家执行 | 外部框架对照；总权重超出当前单卡目标 |
-| DeepSeek-V2-Lite | DeepSeek MoE + MLA | 对照压缩 K/V、混合稠密/MoE 层与共享专家 | CPU 27 层 Decoder、生成与跨请求专家分组已接通 |
+| DeepSeek-V2-Lite | DeepSeek MoE + MLA | 对照压缩 K/V、混合稠密/MoE 层与共享专家 | CPU 27 层 Decoder、生成、跨请求专家分组与 HTTP/SSE 服务已接通 |
 
 TinyLlama 继续作为默认模型，因为当前 Llama GGUF 字段模式、权重名称、分词器固定结果和真实解码器测试已有可重复证据。接入另一模型时应逐项处理格式和结构差异，避免把兼容问题误判为数值错误。
 
@@ -73,9 +73,13 @@ bash code/chapter00_quickstart/run_deepseek_v2_lite_baseline.sh
 bash code/chapter01_tensor_loader/run_deepseek_v2_lite_schema.sh
 bash code/chapter04_attention/scripts/run_deepseek_v2_lite_layer_capture.sh
 bash code/engine/scripts/run_deepseek_v2_lite_generation.sh
+bash code/chapter08_scheduling/scripts/run_deepseek_v2_lite_batch.sh
+bash code/chapter09_performance/scripts/run_deepseek2_moe_batch_runtime_ab.sh
+bash code/chapter10_serving/scripts/run_deepseek_v2_lite_service.sh
+bash code/engine/scripts/run_deepseek_v2_lite_http_server.sh --check
 ```
 
-Chapter00 固定社区 GGUF revision、文件大小和 SHA256，并用 llama.cpp 建立短文本外部结果。Chapter01 识别 `deepseek2` 架构，归一化旧版与新版 MLA 元数据，检查 27 层、377 个张量、首层稠密 FFN、后续 64 选 6 专家和共享专家，并装配组合或拆分 K/V-B 权重。Chapter04 已用 CPU reference 证明低秩缓存与显式展开 Attention 数值一致。Chapter05 已实现固定 GGUF 所需的 Q2_K 与 IQ4_NL reference、scalar fused 和 policy。双词元第 0 层输出 MAE 为 `0.000891898`；第 1 层最终输出 MAE 为 `0.00128932`、余弦相似度为 `0.999859`。完整 27 层 logits 与 llama.cpp 的余弦相似度为 `0.999616`，贪心词元同为 `185`。Chapter06 使用真实 Tokenizer 和同一 Generation Runtime 从 `Hello` 生成固定词元 `11 304`，解码为 `, I`。
+Chapter00 固定社区 GGUF revision、文件大小和 SHA256，并用 llama.cpp 建立短文本外部结果。Chapter01 识别 `deepseek2` 架构，归一化旧版与新版 MLA 元数据，检查 27 层、377 个张量、首层稠密 FFN、后续 64 选 6 专家和共享专家，并装配组合或拆分 K/V-B 权重。Chapter04 已用 CPU reference 证明低秩缓存与显式展开 Attention 数值一致。Chapter05 已实现固定 GGUF 所需的 Q2_K 与 IQ4_NL reference、scalar fused 和 policy。双词元第 0 层输出 MAE 为 `0.000891898`；第 1 层最终输出 MAE 为 `0.00128932`、余弦相似度为 `0.999859`。完整 27 层 logits 与 llama.cpp 的余弦相似度为 `0.999616`，贪心词元同为 `185`。Chapter06 使用真实 Tokenizer 和同一 Generation Runtime 从 `Hello` 生成固定词元 `11 304`，解码为 `, I`。Chapter08 验证两个独立 MLA Context 进入同一次 Decode batch，Chapter09 用 EXP-CPU-19 登记完整 Decode 配对结果，Chapter10 验证动态准入、Completion、SSE、指标和 socket 回环。
 
 ## 版本与资料
 
