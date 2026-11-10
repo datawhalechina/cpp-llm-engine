@@ -65,7 +65,7 @@
   <text x="172" y="434" text-anchor="middle" class="code">HTTP · SSE · Writer</text>
 
   <text x="412" y="376" text-anchor="middle" class="box-title">准入与 waiting</text>
-  <text x="412" y="407" text-anchor="middle" class="box-sub">ID · 容量 · Deadline</text>
+  <text x="412" y="407" text-anchor="middle" class="box-sub">ID · 容量 · 优先级 · 缓存估算</text>
   <text x="412" y="434" text-anchor="middle" class="code">admit()</text>
 
   <text x="652" y="376" text-anchor="middle" class="box-title">running 集合</text>
@@ -91,7 +91,7 @@
 
   <rect x="70" y="570" width="410" height="108" rx="18" fill="#fff5ec" stroke="#d89570" stroke-width="2"/>
   <text x="275" y="605" text-anchor="middle" class="box-title">异常事件进入同一终态</text>
-  <text x="275" y="635" text-anchor="middle" class="box-sub">取消 · Deadline · 客户端断开 · 背压 · Executor 失败</text>
+  <text x="275" y="635" text-anchor="middle" class="box-sub">取消 · 显式超时 · 客户端断开 · 背压 · Executor 失败</text>
   <text x="275" y="659" text-anchor="middle" class="code">Cancelled · TimedOut · Failed</text>
 
   <rect x="630" y="560" width="740" height="128" rx="20" fill="#163f38" filter="url(#shadow)"/>

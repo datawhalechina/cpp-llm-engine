@@ -40,7 +40,7 @@
   <rect x="250" y="534" width="700" height="104" rx="18" fill="#0f766e"/>
   <text x="600" y="570" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">4 真实 Tensor Batch</text>
   <text x="600" y="598" text-anchor="middle" font-size="13" fill="#d9fffa">多行激活 → 一次批量 Linear / Decoder 调用 → 多行 logits</text>
-  <text x="600" y="622" text-anchor="middle" font-size="12" fill="#b5e4de">共享只读权重；position、BlockTable 和分页 K/V 仍按请求隔离</text>
+  <text x="600" y="622" text-anchor="middle" font-size="12" fill="#b5e4de">共享只读权重；position、标准 K/V 或 MLA 历史仍按请求隔离</text>
 
   <rect x="24" y="426" width="140" height="184" rx="16" fill="#fff" stroke="#94a3b8" stroke-width="2" stroke-dasharray="7 5"/>
   <text x="94" y="458" text-anchor="middle" class="label">Worker Pool</text>
