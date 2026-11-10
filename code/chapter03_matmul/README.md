@@ -1,6 +1,6 @@
 # Chapter 03：MatMul 与计算后端
 
-本目录接收教学 `Matrix` 或 Chapter02 `Tensor` View，把二维矩阵乘转换为公共 `MatmulRequest`，再交给 CPU 参考后端执行。这里建立的算子、后端和内核分层会继续被 Chapter04 Decoder 使用；原理、公式和设计推导从[Chapter03 导读](../../source/chapter03_matmul/intro.md)开始阅读。
+本目录接收教学 `Matrix` 或 Chapter02 `Tensor` View，把二维矩阵乘转换为公共 `MatmulRequest`，再交给 CPU 参考后端执行。这里建立的形状约束、计算语义和验证方法会继续用于 Chapter04 Decoder；Chapter04 采用独立的教学 Linear 实现，并复用这些约束与验证方法。原理、公式和设计推导从[Chapter03 导读](../../source/chapter03_matmul/intro.md)开始阅读。
 
 ## 代码架构
 
@@ -55,9 +55,11 @@ bash code/chapter03_matmul/scripts/run.sh
 
 ## 扩展入口
 
-CPU 参考内核是数值基线，不承担 GPU 执行。cuBLAS 在独立 CUDA target 中复用矩阵乘数学要求；Chapter04 通过公共 Tensor View 和算子结果继续组合 Attention 与 FFN。
+CPU 参考内核是数值基线，不承担 GPU 执行。cuBLAS 在独立 CUDA target 中复用 `MatmulRequest` 的形状数据，并通过带 CUDA Stream 的独立接口执行；Chapter04 复用矩阵乘语义和公共 Tensor View，独立组合 Attention 与 FFN。
 
 | 方向 | 代码位置 | 连接对象 | 验证入口 |
 | --- | --- | --- | --- |
-| CUDA/cuBLAS | `code/cuda/src/cublas_matmul_backend.cpp` | `MatmulBackend`、设备缓冲区和 CUDA stream | `CUDA_HOME=... bash code/cuda/scripts/run.sh` |
+| CUDA/cuBLAS | `code/cuda/src/cublas_matmul_backend.cpp` | `MatmulRequest`、设备缓冲区和 CUDA stream | `CUDA_HOME=... bash code/cuda/scripts/run.sh` |
 | Decoder | `code/chapter04_attention/` | Linear、Attention 和 FFN | `bash code/chapter04_attention/scripts/run.sh` |
+| 量化 GEMV | `code/chapter05_quantization/`、`code/cuda/` | packed 权重、融合反量化和小批量执行 | `bash code/chapter05_quantization/scripts/run.sh` |
+| 批执行与性能决策 | `code/chapter08_scheduling/`、`code/chapter09_performance/` | 请求组批、实现选择和性能证据 | 学到对应章节后执行 |

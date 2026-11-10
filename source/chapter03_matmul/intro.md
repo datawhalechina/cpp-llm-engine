@@ -2,7 +2,7 @@
 
 ## 本章导读
 
-Chapter02 已经能用张量视图找到一段数据。本章把两个连续二维视图送入矩阵乘法，先用 CPU 三重循环算出可手工复查的结果，再观察同一次计算怎样交给 CPU Backend 或可选的 cuBLAS。Chapter04 将用这些矩阵乘法组装线性层、注意力和前馈网络。
+Chapter02 已经能用张量视图找到一段数据。本章把两个连续二维视图送入矩阵乘法，先用 CPU 三重循环算出可手工复查的结果，再观察同一计算语义怎样进入 CPU Backend 或可选的 cuBLAS。Chapter04 将复用这里的形状约束和验证方法，独立组装线性层、注意力和前馈网络。
 
 在 Transformer 中，一组词元特征可以写成 `X[T,D]`：`T` 是词元数，`D` 是每个词元的特征宽度。线性投影用 `X[T,D] × W[D,O]` 得到 `Y[T,O]`，Q/K/V 投影、Attention 输出投影和 FFN 都会重复这项计算。Chapter03 先用一个二维例子把形状、地址和计算方法讲清楚。
 
@@ -26,7 +26,7 @@ bash code/chapter03_matmul/scripts/run.sh
 
 ## 验证与下一步
 
-CPU 主线完成后进入 [`Chapter 04`](../chapter04_attention/intro.md)，把矩阵乘法放进线性层、注意力和前馈网络。下面两条命令分别检查默认 CPU 路径和可选 CUDA 路径。
+CPU 主线完成后进入 [`Chapter 04`](../chapter04_attention/intro.md)，观察相同乘加语义怎样进入独立的教学 Linear、注意力和前馈网络。量化权重的 GEMV 放在 Chapter05，请求组批与实现选择分别放在 Chapter08 和 Chapter09。下面两条命令分别检查默认 CPU 路径和可选 CUDA 路径。
 
 | 路径 | 执行入口 | 通过条件 |
 | --- | --- | --- |

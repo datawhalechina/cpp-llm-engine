@@ -7,7 +7,7 @@
 ```text
 Tensor：shared_ptr<vector<float>> + shape + strides + offset
   ├─ reshape / slice / transpose ──> 共享 Storage 的 Tensor View
-  ├─ contiguous ───────────────────> 独立、连续的 Tensor
+  ├─ contiguous ───────────────────> 连续时共享；非连续时复制为独立 Tensor
   └─ view_ref / mutable_view_ref ──> Core 非拥有引用 ──> Chapter03–05 算子
 ```
 
