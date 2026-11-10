@@ -84,10 +84,10 @@
   <text x="930" y="426" font-size="12" text-anchor="middle" fill="#92511b">否</text>
 
   <rect x="56" y="578" width="520" height="54" rx="13" fill="#ffffff" stroke="#ddd9cc"/>
-  <text x="316" y="601" font-size="13" font-weight="700" text-anchor="middle" fill="#52606d">A 选择与事务：预算 · 优先级老化 · 公平性 · 计划校验</text>
+  <text x="316" y="601" font-size="13" font-weight="700" text-anchor="middle" fill="#52606d">A 选择与事务：预算 · 分块 Prefill · 缓存命中 · 老化</text>
   <text x="316" y="620" font-size="11" text-anchor="middle" fill="#7b8b93">验证候选顺序、状态失效与回滚</text>
   <rect x="624" y="578" width="520" height="54" rx="13" fill="#ffffff" stroke="#ddd9cc"/>
-  <text x="884" y="601" font-size="13" font-weight="700" text-anchor="middle" fill="#52606d">B 批量执行：张量批次 · 真实模型上下文 · 分页 K/V 镜像</text>
+  <text x="884" y="601" font-size="13" font-weight="700" text-anchor="middle" fill="#52606d">B 批量执行：稠密批量 · MoE 分组 · 独立请求历史</text>
   <text x="884" y="620" font-size="11" text-anchor="middle" fill="#7b8b93">验证批量结果、整批提交与失败原子性</text>
 
   <rect x="56" y="646" width="1088" height="24" rx="9" fill="#4c351a"/>

@@ -25,6 +25,14 @@
 | Prefill | Runtime 支持分块，但真实模型仍逐请求执行 | 真实多请求 Prefill Tensor batch |
 | 解码 | CPU 与 CUDA 均有真实多上下文批量调用 | 融合计算核、减少行打包和跨批量大小的容量复用 |
 
+不同模型共享 `ExecutorBatchRunner` 的整批成功或整批回滚规则，但批量执行内部不完全相同：
+
+| 模型 | Attention 历史 | 跨请求复用 | 当前分页状态 |
+| --- | --- | --- | --- |
+| TinyLlama | 每请求标准 GQA K/V | Q/K/V、输出投影、FFN 与 LM Head 的多行 Linear | CPU/CUDA 已绑定 Chapter07 BlockTable |
+| Qwen1.5-MoE | 每请求分层标准 K/V | 同层权重只加载一次，MoE 输入按专家重新分组 | Context 连续保存，尚未迁移到 Chapter07 |
+| DeepSeek-V2-Lite | 每请求低秩 MLA K/V 与共享位置 Key | 同层权重只加载一次，64 选 6 的 FFN 输入按专家分组 | MLA Context 连续保存，需要新的分页 payload 适配 |
+
 ## 为什么批量临时张量需要复用
 
 CUDA Decode 每一步都会使用批量 hidden、logits、embedding rows、stream、cuBLAS handle 和 Decoder 中间 Tensor。这些对象只服务本次计算，不保存请求历史；如果每一步重新创建，就会在生成循环中重复执行设备分配与释放。
@@ -47,13 +55,13 @@ admission bind request ID
   -> commit the complete batch
 ```
 
-| 当前证据 | 后续扩展 |
+| 当前证据 | 仍需扩展 |
 | --- | --- |
 | 顺序与 batch logits、greedy token 一致 | 融合的 CPU PagedAttention 内核 |
-| 错误 position 与无效 token 会整体回滚 | CUDA 双请求分页 batch 已接入同一事务边界 |
+| 错误 position、无效 token 和 CUDA 双请求分页 batch 共用整批回滚边界 | 更大 batch 的故障注入与容量压力测试 |
 | CUDA 连续两步复用同尺寸 workspace | 多 batch 并发与容量型 workspace |
 | ServiceCore 自动传递 request ID 并选择真实 batch | 协作式抢占和设备事件重叠 |
-| Context position、页表和分页 payload 按整批提交 | 跨请求 Prefix Cache |
+| Context position、页表和分页 payload 按整批提交 | MoE/MLA Context 的分页 payload 适配 |
 
 [CUDA 双请求批执行实验](../../reference/experiment_assets.md#exp-gpu-06)在真实 TinyLlama、分页 K/V 和一次 Decode 下比较顺序执行与 Tensor Batch。两轮 batch/顺序中位数比例为 `0.922/0.919`，逐请求 logits 完全一致；这说明当前小批量融合路径减少了重复执行成本，但尚未回答更大批量和长期服务吞吐。
 
@@ -61,7 +69,7 @@ Qwen1.5-MoE 还需要先按 Router 结果把 token 归入专家组。[MoE 固定
 
 DeepSeek-V2-Lite 的 batch 先按层加载一次权重，各请求使用自己的压缩 MLA 历史完成 Attention，再把该层 64 选 6 的 FFN 输入放进共同的专家分发表。真实 smoke 中两个请求在 Prefill 后通过一次 batch runner 调用同步 Decode，固定生成 `185 85770`，请求位置都从 1 推进到 2。它证明调度、Context 隔离、跨请求专家分组和整批回滚已经连通。[EXP-CPU-19](../../reference/experiment_assets.md#exp-cpu-19) 在 batch 2、单步 Decode 和全层缓存下记录到 `0.943` 的中位数比例；该结果只说明当前固定工作负载的有限收益。
 
-下图强调共享模型计算与独立请求历史的分界：Linear 和 LM Head 接收多行激活，每个请求的 Attention 仍通过自己的 BlockTable 访问分页 K/V。
+下图强调共享模型计算与独立请求历史的分界：稠密模型让多行激活进入共同的 Linear，MoE 模型在 Attention 后按专家重新分组；每个请求仍从自己的标准 K/V 或压缩 MLA 历史计算 Attention。
 
 ![从调度计划到真实 Tensor Batch](../../assets/diagrams/chapter08-real-batch-execution.svg)
 

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
   <title id="title">Chapter08 从调度计划到真实 Tensor Batch</title>
-  <desc id="desc">StepBatchPlan 补齐 token、position 和分页 K/V 槽位后形成 ExecutorBatchInput。多请求共享模型权重和批量 Linear，各请求按自己的页表执行 Attention，最后批量 LM Head 输出结果并统一提交或回滚。</desc>
+  <desc id="desc">StepBatchPlan 补齐 token、position 和 K/V 位置后形成 ExecutorBatchInput。多请求共享模型权重，各请求从自己的标准 K/V 或 MLA 历史计算 Attention；稠密 FFN 使用多行计算，MoE FFN 按专家重新分组，最后统一提交或回滚。</desc>
   <defs>
     <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#475569"/></marker>
     <style>
@@ -34,7 +34,7 @@
   <text x="528" y="472" text-anchor="middle" class="label">Request B Attention</text><text x="528" y="500" text-anchor="middle" class="text">position B · BlockTable B</text><text x="528" y="522" text-anchor="middle" class="text">读取/写入分页 K/V B</text>
   <path d="M296 392H334V366H373" class="line"/><path d="M334 392V486H373" class="line"/>
   <rect x="760" y="340" width="240" height="104" rx="15" fill="#fef3c7" stroke="#f59e0b"/>
-  <text x="880" y="374" text-anchor="middle" class="label">Batch Output + FFN</text><text x="880" y="403" text-anchor="middle" class="text">合并多行继续计算</text><text x="880" y="427" text-anchor="middle" class="text">再拆回各请求 hidden</text>
+  <text x="880" y="370" text-anchor="middle" class="label">模型结构分支</text><text x="880" y="397" text-anchor="middle" class="text">稠密：多行 FFN</text><text x="880" y="421" text-anchor="middle" class="text">MoE：按专家分组后拆回请求</text>
   <path d="M678 366H718V392H755" class="line"/><path d="M678 486H718V392" class="line"/>
   <rect x="1032" y="340" width="96" height="104" rx="15" fill="#ede9fe" stroke="#a78bfa"/>
   <text x="1080" y="378" text-anchor="middle" class="label">下一层</text><text x="1080" y="407" text-anchor="middle" class="text">重复</text>

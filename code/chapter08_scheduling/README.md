@@ -27,6 +27,14 @@ ContinuousBatchScheduler
 
 Planner 不修改请求和缓存；同优先级、同等待时间的 Prefill 请求优先选择 `cached_prefix_tokens` 更长者。waiting 阶段的数值是 CPU/CUDA Factory 给出的无副作用估算，只决定哪个请求先获得运行槽；ServiceCore 提升请求时重新查询并采用真实前缀，再把实际长度交给 Planner。Scheduler 在执行前预留资源，模型失败时裁剪到原计数，成功后才提交 K/V 与请求结果。Runner 必须自行回滚模型 Context，因为 Scheduler 只拥有请求与外部缓存事务。`OverlapScheduler` 只保存计划和状态快照，不拥有 Request、Executor 或物理块。
 
+`ExecutorBatchRunner` 固定批次提交规则，不要求所有模型使用同一种 K/V 数据面。当前三条真实路径如下：
+
+| 模型路径 | 请求历史 | 跨请求合并的计算 | Chapter07 分页事务 |
+| --- | --- | --- | --- |
+| TinyLlama CPU/CUDA | 每请求标准 GQA K/V | 批量 Linear、LM Head，CUDA 还复用批量工作区 | 已接入 BlockTable、分页 payload 与 Radix 前缀 |
+| Qwen1.5-MoE CPU | 每请求分层标准 K/V | 同层权重加载与专家分组 | 当前由模型 Context 持有，尚未绑定分页数据面 |
+| DeepSeek-V2-Lite CPU | 每请求低秩 MLA K/V 与位置 Key | 同层权重加载与 MoE 专家分组 | 当前由 MLA Context 持有，需要专用分页 payload 适配 |
+
 ## 阅读顺序与资产
 
 | 模块 | 学习内容 | 验证 |
@@ -81,4 +89,4 @@ bash code/chapter09_performance/scripts/run_qwen15_moe_scheduling_ab.sh
 
 ## 扩展入口
 
-当前实现包含同步 CPU 调度、优先级老化、真实 Radix 命中排序、真实 Decode batch 和 overlap 计划校验。TinyLlama CPU/CUDA、Qwen1.5-MoE CPU 与 DeepSeek-V2-Lite CPU Factory 都实现 `ExecutorBatchRunner`。Qwen 与 DeepSeek 路径都保持请求 Attention/K/V 独立，并把同层 MoE 输入按专家分组；DeepSeek 的 MLA 和最终 LM Head 仍按请求计算。Chapter10 用估算长度排列 waiting 请求，提升运行时再让 Chapter07 与 Engine 把真实 CPU/CUDA 命中同步到共享块、Request 和模型 Context。真实多请求 Prefill Tensor batch、DeepSeek 融合专家 kernel、Deadline、抢占、设备事件重叠和开放环到达率仍是后续扩展。
+当前实现包含同步 CPU 调度、优先级老化、真实 Radix 命中排序、真实 Decode batch 和 overlap 计划校验。TinyLlama CPU/CUDA、Qwen1.5-MoE CPU 与 DeepSeek-V2-Lite CPU Factory 都实现 `ExecutorBatchRunner`。Qwen 与 DeepSeek 路径都保持请求 Attention/K/V 独立，并把同层 MoE 输入按专家分组；DeepSeek 的 MLA 和最终 LM Head 仍按请求计算。Chapter10 用估算长度排列 waiting 请求，提升运行时再让 Chapter07 与 Llama/Qwen3 Engine 把真实 CPU/CUDA 命中同步到共享块、Request 和模型 Context。真实多请求 Prefill Tensor batch、MoE/MLA 专用分页数据面、DeepSeek 融合专家 kernel、Deadline、抢占、设备事件重叠和开放环到达率仍是后续扩展。
