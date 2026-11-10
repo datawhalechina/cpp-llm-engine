@@ -8,7 +8,7 @@ Chapter 00 已经用 llama.cpp 跑通 TinyLlama，证明模型文件、分词器
 | --- | --- | --- |
 | A 教学闭环 | 用小型 CIE1 文件、固定测试数据和教学分词器分开观察格式、加载过程与输入错误 | 可检查的张量、错误文件拒绝和词元编号 |
 | B 真实执行闭环 | 读取 TinyLlama GGUF 的模型元数据、真实分词器信息和权重目录；用 Qwen3 检查第二种稠密架构 | `ModelConfig`、张量映射、稠密 Decoder 权重布局和真实文件检查 |
-| C 架构扩展坐标 | 用 Qwen1.5-MoE 检查专家权重，用 DeepSeek-V2-Lite 检查 MLA 与混合层 | 两种 MoE 输入结构均可验证；DeepSeek 执行器留给后续建设 |
+| C 架构扩展坐标 | 用 Qwen1.5-MoE 检查专家权重，用 DeepSeek-V2-Lite 检查 MLA 与混合层 | 两种 MoE 输入结构均可验证，并已交付后续 CPU Model 与执行器 |
 | G GPU 扩展坐标 | 复用 Host 侧 GGUF 解析结果，再由 CUDA 适配器上传权重 | 本章不在 GPU 上解析文件；设备权重验证位于 `code/cuda` |
 | M 多模态扩展坐标 | 复用 GGUF Reader 读取视觉投影 metadata 与 payload | mmproj schema 与视觉权重验证位于 `code/multimodal` |
 

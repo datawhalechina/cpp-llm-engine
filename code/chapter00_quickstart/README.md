@@ -66,7 +66,7 @@ bash code/chapter00_quickstart/download_deepseek_v2_lite.sh
 bash code/chapter00_quickstart/run_deepseek_v2_lite_baseline.sh
 ```
 
-该入口只建立 llama.cpp 外部结果；教程当前在 Chapter01 验证真实 GGUF 结构，DeepSeek Decoder 仍是后续建设项。
+该入口只建立 llama.cpp 外部结果。教程自己的实现从 Chapter01 的 GGUF 结构验证继续进入 MLA、量化 Linear、27 层 CPU Decoder、生成、调度和服务；各层入口集中列在[模型支持状态](../../source/reference/model_support.md#deepseek-v2-lite-当前接入层级)。
 
 ## 扩展入口
 

@@ -24,7 +24,7 @@ Chapter00 使用 llama.cpp 建立外部基线，后续章节再把同一模型�
 | TinyLlama 1.1B Chat Q4_K_M | 从 GGUF、Decoder、生成到服务的完整主线 | 默认模型，CPU/CUDA 真实链路已接通 |
 | Qwen3-0.6B | 权重命名、Tokenizer、聊天模板、Q/K Norm、NeoX RoPE 和 Decoder 配置适配 | CPU/CUDA 推理服务纵向闭环已接通 |
 | Qwen1.5-MoE-A2.7B-Chat | Router、Top-K、共享专家与专家执行 | CPU 24 层生成、批执行、调度与服务闭环已接通 |
-| DeepSeek-V2-Lite Q2_K | MLA、压缩 K/V 与稠密/MoE 混合层 | 外部基线、结构、MLA 与量化组件已接通；真实 Decoder 建设中 |
+| DeepSeek-V2-Lite Q2_K | MLA、压缩 K/V 与稠密/MoE 混合层 | CPU 27 层 Decoder、生成、请求组批和服务闭环已接通 |
 
 ## 下载与校验
 
@@ -72,7 +72,7 @@ bash code/chapter00_quickstart/run_deepseek_v2_lite_baseline.sh
 bash code/chapter01_tensor_loader/run_deepseek_v2_lite_schema.sh
 ```
 
-前两条命令建立 llama.cpp 外部结果，第三条命令验证教程 Loader 识别 27 层、MLA 压缩维度和混合 Dense/MoE 权重布局。Chapter04/05 已提供 MLA 数值参考和 Q2_K/IQ4_NL Linear，下一步把它们连接为真实 DeepSeek Decoder。
+前两条命令建立 llama.cpp 外部结果，第三条命令验证教程 Loader 识别 27 层、MLA 压缩维度和混合 Dense/MoE 权重布局。后续章节已经连接 MLA、Q2_K/IQ4_NL Linear、完整 CPU Decoder、Generation Runtime、跨请求专家分组和 HTTP/SSE 服务；具体入口见[模型基线与扩展顺序](../reference/model_support.md#deepseek-v2-lite-当前接入层级)。
 
 这些 Chapter00 入口先建立外部结果。教程自己的实现与验证入口分布在 Chapter01、04～06、08～10，当前支持范围汇总在[模型基线与扩展顺序](../reference/model_support.md)。
 
