@@ -10,8 +10,8 @@ Chapter 04 已经固定 Decoder、Attention 和 FFN 的计算结构；本章在 
 
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
-| A 教学证据线 | 用小型 INT8 与五种 GGUF block 的 CPU reference 看清 scale、反量化与误差 | 固定反量化数值、浮点/量化输出误差和失败状态 |
-| B 真实执行线 | 读取 GGUF packed 权重，通过 fused/SIMD backend 接入 TinyLlama 22 层 Decoder | 与 llama.cpp 对照 logits 数值指标和 greedy token 序列 |
+| A 教学证据线 | 用小型 INT8 与七种 GGUF block 的 CPU reference 看清 scale、反量化与误差 | 固定反量化数值、浮点/量化输出误差和失败状态 |
+| B 真实执行线 | 读取 GGUF packed 权重，将 TinyLlama 的 Q4_K/Q6_K 和 Qwen1.5-MoE 的混合量化接入真实解码器 | 与 llama.cpp 对照 logits 数值指标、专家选择和 greedy token 序列 |
 | G GPU 执行线 | 保持 packed 权重和 Linear 语义不变，单 token 与小批量路径融合解码、点积和归约 | Q4_K/Q6_K 设备端结果、真实生成 token 与性能证据 |
 | M 多模态复用线 | 复用 Q8_0 解码与 Linear 契约处理 SmolVLM 视觉权重 | 视觉 Encoder、Projector 和语言模型权重通过真实模型测试 |
 

@@ -50,9 +50,9 @@ Q4_K 和 Q6_K 的一个 super-block 都表示 256 个权重。当前映射使用
 
 批量输入按最多 4 行组成一个 tile。同一线程解码一个权重后，分别与 tile 中各行对应的激活相乘，随后对每行独立做 Warp 归约。这样 batch=2 时同一 packed 权重只读取和解码一次；代价是每个线程持有多个累加器，因此 tile 继续增大前需要用 Nsight Compute 检查寄存器压力和占用率。
 
-EXP-GPU-08 后的 NCU 基线显示：Q4_K kernel 的 Compute/L1 吞吐约为 `72.1%/76.5%`，DRAM 吞吐仅 `4.7%`，40 个寄存器/线程，实际 occupancy 约 `90.9%`。Warp 平均约 `32.8%` 的指令间周期在等待 L1TEX scoreboard。元数据广播、shared payload 和显式 FMA 三个候选分别回退约 `10.1%`、`1.6%` 和 `4.3%` cycles，均未保留。EXP-GPU-12 用 CUDA 原生 half 指令替换手写 FP16 位解码后，cycles 从 `140,093` 降至 `99,725`，约减少 `28.8%`；瓶颈随之转移到 L1/TEX，下一轮才适合继续研究 payload 布局。
+[批量权重复用实验](../reference/experiment_assets.md#exp-gpu-08)后的 Nsight Compute 基线显示：Q4_K kernel 的 Compute/L1 吞吐约为 `72.1%/76.5%`，DRAM 吞吐仅 `4.7%`，40 个寄存器/线程，实际 occupancy 约 `90.9%`。Warp 平均约 `32.8%` 的指令间周期在等待 L1TEX scoreboard。元数据广播、shared payload 和显式 FMA 三个候选分别回退约 `10.1%`、`1.6%` 和 `4.3%` cycles，均未保留。[原生 FP16 解码实验](../reference/experiment_assets.md#exp-gpu-12)用 CUDA 原生 half 指令替换手写 FP16 位解码后，cycles 从 `140,093` 降至 `99,725`，约减少 `28.8%`；瓶颈随之转移到 L1/TEX，下一轮才适合继续研究 payload 布局。
 
-EXP-GPU-14 继续检查 batch 形状造成的无效工作。自适应 tile 将 batch=1/2 的共享内存从 `128 B` 降为 `32/64 B`，执行指令减少约 `21%`～`37%`。L1 命中率基本不变，占用率只小幅提高，说明 cycles 下降主要来自不再为不存在的输入行执行展开后的累加与归约。EXP-GPU-15 随后确认真实双请求 Tensor Batch Decode 两轮均改善且 logits 不变，因此默认执行路径采用自适应 tile；固定 4 行实现只用于 A/B 基线。
+[自适应 tile 局部实验](../reference/experiment_assets.md#exp-gpu-14)继续检查 batch 形状造成的无效工作。自适应 tile 将 batch=1/2 的共享内存从 `128 B` 降为 `32/64 B`，执行指令减少约 `21%`～`37%`。L1 命中率基本不变，占用率只小幅提高，说明 cycles 下降主要来自省去空输入行的累加与归约。[真实双请求实验](../reference/experiment_assets.md#exp-gpu-15)随后确认 Tensor Batch Decode 两轮均改善且 logits 不变，因此默认执行路径采用自适应 tile；固定 4 行实现只用于 A/B 基线。
 
 | 阶段 | 数据位置 | 发生的动作 | 避免的成本 |
 | --- | --- | --- | --- |
@@ -61,7 +61,7 @@ EXP-GPU-14 继续检查 batch 形状造成的无效工作。自适应 tile 将 b
 | Warp 与 block 归约 | shuffle + 8 个共享部分和 | Warp 内归约后由首个 Warp 合并 | 减少整块同步和共享内存流量 |
 | 写回 | `output[b,r]` | 每个 block 写回 tile 内各请求的 Float32 结果 | 避免额外矩阵读取 |
 
-EXP-GPU-08 在两个不同长度请求、一次分页 Decode 上复测该设计。两轮 `batch/sequential` 中位数比例为 `0.466/0.612`，逐请求 logits 完全一致；Nsight Systems 中 Q4_K/Q6_K kernel 仍占 GPU kernel 时间约 `96.5%`。结果支持保留 4 行 tile 和 Warp 归约，也说明后续仍需继续减少量化解码与权重读取成本。
+同一[批量权重复用实验](../reference/experiment_assets.md#exp-gpu-08)还在两个不同长度请求、一次分页 Decode 上复测该设计。两轮 `batch/sequential` 中位数比例为 `0.466/0.612`，逐请求 logits 完全一致；Nsight Systems 中 Q4_K/Q6_K kernel 仍占 GPU kernel 时间约 `96.5%`。结果支持保留 4 行 tile 和 Warp 归约，也说明后续仍需继续减少量化解码与权重读取成本。
 
 ![CUDA 融合量化 GEMV 的内存访问与块归约](../assets/diagrams/chapter05-cuda-fused-gemv.svg)
 
@@ -98,7 +98,7 @@ auto status = chapter05_quantization::compute_quantized_linear(
 
 `QuantizedMatrixView` 保存 packed payload 指针、字节数、权重行列和 Q4_K/Q6_K/Q8_0 格式；它不提供普通 Float32 Tensor 的索引语义。`compute_quantized_linear_views()` 让 Chapter02 的 Float32 激活通过公共只读/可写 View 进入现有 policy 和 backend：rank-1 表示单 token，rank-2 表示多个 token 行。
 
-rank-2 会构造 `LinearBatchRequest`。Q3_K、Q4_K、Q5_K、Q6_K 和 Q8_0 的 scalar fused backend 只遍历一次 packed 权重，把同一个解码值分别累加到各输入行；这样得到的是 CPU 单线程批量 GEMV，而不是逐行重复解码权重。Qwen1.5-MoE 先按专家分组，再用该接口执行组内 Gate、Up 和 Down。`RealMoeBatchMode` 保留逐行路径作为同一二进制中的实验基线；EXP-CPU-13 在真实第一层、双词元 workload 中测得分组/逐行中位数比例 `0.597`，路由一致且最大输出误差约 `6.1e-10`。该实验只计 Router、专家和共享专家，不包含 Attention、K/V、LM Head 或服务调度。AVX2 backend 目前通过公共兼容路径逐行执行，尚未提供专用多行 SIMD kernel。
+rank-2 会构造 `LinearBatchRequest`。Q3_K、Q4_K、Q5_K、Q6_K 和 Q8_0 的 scalar fused backend 只遍历一次 packed 权重，把同一个解码值分别累加到各输入行；这样得到的是 CPU 单线程批量 GEMV，而不是逐行重复解码权重。Qwen1.5-MoE 先按专家分组，再用该接口执行组内 Gate、Up 和 Down。`RealMoeBatchMode` 保留逐行路径作为同一二进制中的实验基线；[真实首层专家分组实验](../reference/experiment_assets.md#exp-cpu-13)在双词元输入中测得分组/逐行中位数比例 `0.597`，路由一致且最大输出误差约 `6.1e-10`。该实验只计 Router、专家和共享专家，不包含 Attention、K/V、LM Head 或服务调度。AVX2 backend 目前通过公共兼容路径逐行执行，尚未提供专用多行 SIMD kernel。
 
 所有 batch 行必须连续且宽度相同，输出采用 `[batch, output_rows]`。适配器先写临时结果，整批成功后才提交到输出 View；非连续激活必须由调用方显式 `contiguous()`，packed 权重也必须严格匹配格式对应的 block 字节数。
 

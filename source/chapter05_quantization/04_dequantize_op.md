@@ -1,6 +1,6 @@
 # 05.4 按格式还原量化权重
 
-量化权重进入计算前，必须按格式规则还原数值。这里先用 INT8 加标量 scale 固定反量化语义，再比较五种 GGUF block 解码；这些路径共享“读取量化表示、应用参数、产生浮点参考值”这一结果约定。
+量化权重进入计算前，必须按格式规则还原数值。这里先用 INT8 加标量 scale 固定反量化语义，再比较七种 GGUF block 解码；这些路径共享“读取量化表示、应用参数、产生浮点参考值”这一结果约定。
 
 ## INT8 与 GGUF Block 的还原规则
 
@@ -64,14 +64,14 @@ def dequantize_q4k(super_block):
 
 ## 参考实现与线性层接口
 
-INT8 教学路径由 <a href="../_code/chapter05_quantization/src/dequantize_op.cpp"><code>dequantize_op.cpp</code></a> 输出 Float32 Tensor。Q4_K、Q6_K 和 Q8_0 reference 路径则按 block 还原完整浮点权重，为 fused backend 提供独立数值基线。
+INT8 教学路径由 <a href="../_code/chapter05_quantization/src/dequantize_op.cpp"><code>dequantize_op.cpp</code></a> 输出 Float32 Tensor。Q3_K、Q4_K、Q5_0、Q5_1、Q5_K、Q6_K 和 Q8_0 reference 路径则按 block 还原完整浮点权重或等价参考结果，为 fused backend 提供独立数值基线。
 
 反量化保持为独立 reference 的原因不是要求生产路径始终创建完整浮点权重，而是让格式解析可以单独验证。下一节的 fused Linear 会边解码边累加，省去中间数组，但每个量化值的还原规则不能改变。
 
 | 路径 | 输入 | 输出或消费方式 | 用途 |
 | --- | --- | --- | --- |
 | INT8 `DequantizeOp` | 整数 Tensor、标量 scale | Float32 Tensor | 建立最小公式与 dtype 契约 |
-| Q4_K/Q6_K/Q8_0 reference | GGUF packed blocks | 完整浮点权重 | 校验格式和 fused 结果 |
+| 七种 GGUF block reference | GGUF packed blocks | 完整浮点权重或等价参考结果 | 校验格式和 fused 结果 |
 | fused Linear | packed blocks、激活向量 | 直接累加输出 | 避免完整反量化中间量 |
 
 量化格式、shape 或 payload 长度不匹配时，接口必须返回明确错误，不能静默按其他 dtype 读取。成熟框架怎样组织格式与 kernel 的对应关系，集中在 [`05.7 量化实现与成熟框架对照`](./07_tensorrt_gemma_vllm_comparison.md)。
@@ -82,4 +82,4 @@ INT8 教学路径由 <a href="../_code/chapter05_quantization/src/dequantize_op.
 bash code/chapter05_quantization/scripts/run.sh
 ```
 
-测试用固定 INT8 样本检查 `q * scale`，并用固定 Q4_K、Q6_K、Q8_0 payload 比较 block reference 与预期值。通过标准包括输出元素数正确、误差落在容差内、非法 shape/payload 被拒绝。下一节 [`05.5 量化线性层`](./05_linear_with_quant.md) 将同一解码规则放进矩阵向量乘加。
+测试用固定 INT8 样本检查 `q * scale`，并用七种 GGUF 格式的固定 payload 比较 block reference 与预期值。通过标准包括输出元素数正确、误差落在容差内、非法 shape/payload 被拒绝。下一节 [`05.5 量化线性层`](./05_linear_with_quant.md) 将同一解码规则放进矩阵向量乘加。
