@@ -56,6 +56,13 @@ moe_output="$(
 )"
 grep -q 'real inference passed: decoded_tokens=2' <<<"${moe_output}"
 
+deepseek_output="$(
+    CHAPTER00_LLAMA_EXECUTABLE="${fake_success}" \
+    CPP_LLM_ENGINE_DEEPSEEK_V2_LITE_MODEL_PATH="${model_path}" \
+        bash "${chapter_dir}/run_deepseek_v2_lite_baseline.sh" prompt 2
+)"
+grep -q 'real inference passed: decoded_tokens=2' <<<"${deepseek_output}"
+
 expect_status 2 run_runner "${work_dir}/missing-executable" "${model_path}"
 expect_status 2 run_runner "${fake_success}" "${work_dir}/missing-model.gguf"
 expect_status 2 run_runner "${fake_success}" "${model_path}" invalid

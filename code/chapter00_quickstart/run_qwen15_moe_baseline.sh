@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Chapter 00：使用 llama.cpp 建立 Qwen1.5-MoE-A2.7B-Chat 外部推理基线。
-# 边界：该入口验证外部框架可运行，不表示教程自己的 MoE Decoder 已接入。
+# 边界：该入口只验证外部框架；教程自己的 MoE Decoder 使用后续章节入口。
 set -euo pipefail
 
 chapter_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

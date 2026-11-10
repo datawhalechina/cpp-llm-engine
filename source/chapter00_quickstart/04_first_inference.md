@@ -43,6 +43,15 @@ bash code/chapter00_quickstart/run_qwen15_moe_baseline.sh
 
 若设备还承担桌面显示或工作区不足，可以降低 `CHAPTER00_GPU_LAYERS`，让剩余层留在 CPU。激活参数量影响每个词元的计算量，总参数量仍决定需要容纳的专家权重。
 
+DeepSeek-V2-Lite Q2_K 约 6.43GB，可用短输入建立外部 MLA + MoE 基线：
+
+```bash
+CHAPTER00_GPU_LAYERS=999 \
+bash code/chapter00_quickstart/run_deepseek_v2_lite_baseline.sh
+```
+
+显存还需要容纳 K/V、计算工作区和 llama.cpp 运行资源。完整卸载空间不足时降低 `CHAPTER00_GPU_LAYERS`，由 CPU 承接剩余层。
+
 ## 验证与衔接
 
 | 输出 | 表示什么 | 通过条件 |

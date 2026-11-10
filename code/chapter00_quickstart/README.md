@@ -4,7 +4,7 @@
 
 ## 代码架构
 
-Chapter00 有两条互相独立的验证路径：仓库内最小程序检查本地工具链，外部 `llama.cpp` 加载真实 GGUF 建立推理基线。TinyLlama 是默认主线；Qwen1.5-MoE 是后续架构扩展的外部坐标。前者失败时排查 C++ 和 CMake；前者通过而真实模型失败时，排查外部构建、模型或运行参数。
+Chapter00 有两条互相独立的验证路径：仓库内最小程序检查本地工具链，外部 `llama.cpp` 加载真实 GGUF 建立推理基线。TinyLlama 是默认主线；Qwen1.5-MoE 和 DeepSeek-V2-Lite 是架构扩展坐标。前者失败时排查 C++ 和 CMake；前者通过而真实模型失败时，排查外部构建、模型或运行参数。
 
 ```text
 run.sh -> CMake -> chapter00_quickstart --check -> 连通性检查通过
@@ -12,9 +12,11 @@ run.sh -> CMake -> chapter00_quickstart --check -> 连通性检查通过
 run_real_inference.sh -> llama-simple + TinyLlama GGUF -> generated tokens
 
 run_qwen15_moe_baseline.sh -> llama-simple + Qwen1.5-MoE GGUF -> generated tokens
+
+run_deepseek_v2_lite_baseline.sh -> llama-simple + DeepSeek-V2-Lite GGUF -> generated tokens
 ```
 
-本目录不实现 Tensor、Decoder 或 Runtime。默认检查和测试不访问网络；只有学习者显式运行 `download_qwen15_moe.sh` 时才会下载可选模型。
+本目录不实现 Tensor、Decoder 或 Runtime。默认检查和测试不访问网络；可选模型由对应下载脚本显式获取。
 
 ## 阅读顺序与资产
 
@@ -28,6 +30,8 @@ run_qwen15_moe_baseline.sh -> llama-simple + Qwen1.5-MoE GGUF -> generated token
 | `run_real_inference.sh` | 检查本地 llama.cpp 与 GGUF，并执行一次真实推理 |
 | `download_qwen15_moe.sh` | 断点续传 Qwen1.5-MoE Q3_K_M，并校验固定 SHA256 |
 | `run_qwen15_moe_baseline.sh` | 使用 llama.cpp 验证 MoE 外部基线，不进入自研 Decoder |
+| `download_deepseek_v2_lite.sh` | 断点续传 DeepSeek-V2-Lite Q2_K，并校验固定大小与 SHA256 |
+| `run_deepseek_v2_lite_baseline.sh` | 使用 llama.cpp 验证 DeepSeek2 + MLA 外部基线 |
 | `tests/run_real_inference_contract.sh` | 用伪执行程序验证脚本成功与失败分支 |
 
 ## 运行与验证
@@ -54,6 +58,15 @@ bash code/chapter00_quickstart/run_qwen15_moe_baseline.sh
 ```
 
 默认使用 CPU，设置 `CHAPTER00_GPU_LAYERS` 可以把层卸载到 GPU。下载脚本最后输出 SHA256；固定模型版本后，应把该值登记到模型支持文档。
+
+学习多头潜在注意力（MLA）与混合稠密/MoE 层结构时，可准备约 6.43GB 的 DeepSeek-V2-Lite Q2_K：
+
+```bash
+bash code/chapter00_quickstart/download_deepseek_v2_lite.sh
+bash code/chapter00_quickstart/run_deepseek_v2_lite_baseline.sh
+```
+
+该入口只建立 llama.cpp 外部结果；教程当前在 Chapter01 验证真实 GGUF 结构，DeepSeek Decoder 仍是后续建设项。
 
 ## 扩展入口
 
