@@ -31,7 +31,7 @@
   <path d="M600 416V444" class="line"/>
 
   <rect x="278" y="450" width="644" height="76" rx="16" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
-  <text x="306" y="481" class="label">4 算子与实现</text><text x="472" y="481" class="text">GEMM · RoPE · Softmax · Paged Attention</text>
+  <text x="306" y="481" class="label">4 算子与实现</text><text x="472" y="481" class="text">量化 GEMV · Attention · RoPE · Softmax</text>
   <text x="306" y="507" class="text">定位具体函数或 Kernel，并核对调用次数、自耗时和总耗时。</text>
   <path d="M600 526V554" class="line"/>
 

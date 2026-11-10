@@ -4,16 +4,22 @@
 
 ## 代码架构
 
-Chapter08 或 Chapter10 产生原始样本，迁移器将结果规范化为 `EvidenceRecord`。`EvidenceRecord::valid()` 检查 schema、环境、工作负载和正确性；`summarize()` 从逐轮样本生成统计值；两份记录有效且可比时，`compare()` 才给出决策。
+Chapter08、Chapter10 或专项 Kernel 入口产生原始样本；Benchmark 记录端到端结果，Profiler 附件解释热点原因。可进入统一证据链的样本由迁移器规范化为 `EvidenceRecord`，专项 A/B 和矩阵实验则保留配对顺序与工作负载维度。`EvidenceRecord::valid()` 检查 schema、环境、工作负载和正确性；`summarize()` 从逐轮样本生成统计值；两份记录有效且可比时，`compare()` 才给出决策。
 
 ```text
-原始样本
-   │
-   ▼
-EvidenceRecord::valid ──> summarize ──> compare
-   │                         │             │
-   └─ 身份与正确性           └─ 聚合值      └─ KEEP / REJECT /
-                                             NOT_COMPARABLE / INVALID
+Runtime / Scheduler / Service / Kernel
+              │
+      ┌───────┴────────┐
+      ▼                ▼
+Benchmark 样本      Profiler 附件
+端到端与保护指标    阶段 / Kernel / 硬件原因
+      │                │
+      └───────┬────────┘
+              ▼
+正确性 + 身份 + 配对顺序 + 适用范围矩阵
+              │
+              ▼
+EvidenceRecord / 专项决策 -> KEEP / REJECT / 重测
 ```
 
 | 阶段 | 输入 | 代码入口 | 输出 |
