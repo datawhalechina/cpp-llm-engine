@@ -21,7 +21,7 @@
 | 组件协作 | Runtime、Cache、Scheduler 的提交与回滚 | 组件和跨章集成测试 |
 | 教学主线 | Chapter00–10、引擎集成与多模态默认路径 | `npm run test:regression` |
 | 发布验收 | Release 构建中的关键 owner、label 和 target | `npm run test:release-contracts` |
-| 真实模型 | GGUF、词元、logits、HTTP/SSE | TinyLlama CPU/CUDA、Qwen3 稠密架构与 Qwen1.5-MoE golden |
+| 真实模型 | GGUF、词元、logits、HTTP/SSE | TinyLlama CPU/CUDA、Qwen3 稠密架构、Qwen1.5-MoE 与 DeepSeek-V2-Lite golden |
 | 性能实验 | 固定模型、工作负载、环境和重复样本 | Chapter09 evidence 与 A/B 决策 |
 
 ## 工作负载固定什么
