@@ -14,6 +14,7 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
 | 多头注意力（Multi-head Attention） | 让每个词元按相关程度读取当前及历史词元的信息 | [`04.1 多头注意力`](./01_multihead_attention.md) |
+| 多头潜在注意力（MLA） | 持久保存低秩 K/V 与位置分支，计算时再恢复各头需要的 K/V | [`04.1 多头注意力`](./01_multihead_attention.md) |
 | 在线 Softmax | 分块读取 K/V 时持续更新最大值、指数和与 Value 累加，不保存完整分数矩阵 | [`04.1 多头注意力`](./01_multihead_attention.md) |
 | FA2-inspired | 只吸收 FlashAttention-2 的在线状态与 Warp 分工思想，不等同于官方完整实现 | [`04.1 多头注意力`](./01_multihead_attention.md) |
 | 残差连接（Residual） | 把子模块输出加回原输入，保留一条直接数据通路 | [`04.4 解码器层`](./04_decoder_layer.md) |
@@ -29,7 +30,7 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
-| 1 | A/B/G 公共 | [`04.1 多头注意力`](./01_multihead_attention.md) | <a href="../_code/chapter04_attention/src/attention_kernel.cpp"><code>attention_kernel.cpp</code></a>、<a href="../_code/cuda/src/gqa_attention_backend.cu"><code>gqa_attention_backend.cu</code></a> | 三阶段 Attention、在线 Softmax、融合 kernel 与端到端门禁怎样逐层建立证据 |
+| 1 | A/B/G 公共 | [`04.1 多头注意力`](./01_multihead_attention.md) | <a href="../_code/chapter04_attention/src/attention_kernel.cpp"><code>attention_kernel.cpp</code></a>、<a href="../_code/chapter04_attention/src/mla_attention.cpp"><code>mla_attention.cpp</code></a>、<a href="../_code/cuda/src/gqa_attention_backend.cu"><code>gqa_attention_backend.cu</code></a> | 标准 Attention、MLA、在线 Softmax 与融合 kernel 怎样逐层建立证据 |
 | 2 | A | [`04.2 层归一化与激活函数`](./02_layernorm_and_activation.md)、[`04.3 前馈网络`](./03_feedforward.md)、[`04.4 解码器层`](./04_decoder_layer.md) | <a href="../_code/chapter04_attention/src/decoder_layer.cpp"><code>decoder_layer.cpp</code></a>、<a href="../_code/chapter04_attention/src/decoder_context.cpp"><code>decoder_context.cpp</code></a> | 归一化、注意力、残差和 FFN 组成可执行解码器层，请求上下文连接预填充与解码 |
 | 3 | B | [`04.5 接入首层权重`](./05_load_first_layer.md)、[`04.6 连接真实 TinyLlama 解码器`](./06_real_tinyllama_decoder.md) | <a href="../_code/model/src/real_llama_cpu_decoder.cpp"><code>real_llama_cpu_decoder.cpp</code></a> | Chapter01 权重怎样映射到 22 层 Model 与请求 Context |
 | 4 | B | [`04.7 解码器成熟框架对照`](./07_framework_comparison.md) | [`解码器数据流图`](./04_decoder_layer.md) | 将教学层和真实模型映射到成熟执行器与 GPU 计算后端 |
@@ -46,6 +47,8 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | L2 可选 Qwen3 首层 | `bash code/chapter04_attention/scripts/run_qwen3_first_layer.sh` | Q/K Norm、16/8 头、128 维头空间、NeoX RoPE、增量 K/V 和因果注意力通过 | 学习模型差异时执行 |
 | L3 可选 Qwen3 全层 | `bash code/chapter04_attention/scripts/run_qwen3_decoder.sh` | 28 层 CPU logits、前五候选和连续四步贪心词元通过 llama.cpp 对照 | 验收第二种稠密架构时执行 |
 | L3 可选 Qwen1.5-MoE | `bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh` | 24 层局部 Top-K 全部匹配 llama.cpp，并核对双词元因果 Attention、逐层 hidden、98304 个 K/V 元素、logits 和贪心词元 | 学习 MoE 真实权重时执行 |
+| L3 可选 DeepSeek MLA | `bash code/chapter04_attention/scripts/run.sh` 中的 `chapter04_mla_attention_test` | 低秩 K/V 缓存路径与显式展开 Attention 逐元素一致，非法位置不提交输出 | 学习 MLA 时执行 |
+| L3 可选 DeepSeek 真实模型 | `bash code/chapter04_attention/scripts/run_deepseek_v2_lite_layer_capture.sh` | 双词元前两层中间节点、完整 27 层 logits 和贪心词元与 llama.cpp 对齐 | 学习 MLA 与混合 Dense/MoE 层时执行 |
 | L3 可选 CUDA | `bash code/engine/scripts/run_real_cuda_decoder.sh` | TinyLlama 2 层与 22 层 hidden、分层 K/V 匹配 CPU 参考实现 | 有 NVIDIA GPU 和模型时选做 |
 | L3 可选 Qwen3 CUDA | `bash code/engine/scripts/run_qwen3_cuda_decoder.sh` | Qwen3 28 层 hidden、分层 K/V、logits、融合 Attention 与 Tensor Prefill匹配 CPU 参考实现 | 验收第二种 CUDA 稠密架构时执行 |
 | L4 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 三阶段与融合路径均通过 logits/greedy 检查，并保留两轮 Prefill/Decode 样本；收益不稳定时不切换默认路径 | 调优融合内核时必做 |

@@ -33,6 +33,7 @@ add_library(chapter04_attention
     src/feed_forward.cpp
     src/layer_norm.cpp
     src/linear_layer.cpp
+    src/mla_attention.cpp
     src/moe_feed_forward.cpp
     src/kv_cache.cpp
     src/tensor.cpp
@@ -72,6 +73,10 @@ add_executable(chapter04_moe_feed_forward_test
     tests/moe_feed_forward_test.cpp
 )
 
+add_executable(chapter04_mla_attention_test
+    tests/mla_attention_test.cpp
+)
+
 add_executable(chapter02_tensor_attention_integration_test
     tests/chapter02_tensor_attention_integration_test.cpp
 )
@@ -96,12 +101,18 @@ target_link_libraries(chapter04_moe_feed_forward_test
 )
 cpp_llm_prepare_test(chapter04_moe_feed_forward_test)
 
+target_link_libraries(chapter04_mla_attention_test
+    PRIVATE chapter04_attention
+)
+cpp_llm_prepare_test(chapter04_mla_attention_test)
+
 include(CTest)
 enable_testing()
 
 add_test(NAME chapter04_attention_test COMMAND chapter04_attention_test)
 add_test(NAME chapter04_online_softmax_test COMMAND chapter04_online_softmax_test)
 add_test(NAME chapter04_moe_feed_forward_test COMMAND chapter04_moe_feed_forward_test)
+add_test(NAME chapter04_mla_attention_test COMMAND chapter04_mla_attention_test)
 add_test(
     NAME chapter02_tensor_attention_integration_test
     COMMAND chapter02_tensor_attention_integration_test
@@ -115,6 +126,9 @@ cpp_llm_set_test_contract(
 cpp_llm_set_test_labels(chapter04_moe_feed_forward_test moe router ffn)
 cpp_llm_set_test_contract(
     chapter04_moe_feed_forward_test OWNER 04 LEVEL component STATUS active)
+cpp_llm_set_test_labels(chapter04_mla_attention_test attention mla cache)
+cpp_llm_set_test_contract(
+    chapter04_mla_attention_test OWNER 04 LEVEL component STATUS active)
 cpp_llm_set_test_labels(
     chapter02_tensor_attention_integration_test tensor attention)
 cpp_llm_set_test_contract(

@@ -37,6 +37,38 @@ output = weight @ V
 | Chapter02 张量适配器 | `[T,H,Dh]`、`[B,T,H,Dh]` | 验证维数、连续布局和批次隔离 |
 | TinyLlama CPU 执行上下文 | 词元隐藏向量与分层 KV | 执行 GQA、RoPE、KV Cache 和 22 个解码器块 |
 
+## MLA 为什么保存低秩 K/V
+
+标准 MHA 或 GQA 把每个历史词元的 K/V 按注意力头写入缓存。DeepSeek-V2-Lite 的多头潜在注意力（MLA）先把 K/V 信息压缩成低秩向量，并把带 RoPE 的 Key 位置分支单独保存。以当前固定模型为例，每个词元持久保存 512 维潜在 K/V 与 64 维位置 Key；计算 Attention 时，再把潜在向量展开成 16 个头各自使用的 128 维非位置 Key 和 128 维 Value。
+
+```text
+隐藏状态
+  ├─ Q 投影 -> 每头 [非位置 Q 128 | 位置 Q 64]
+  └─ K/V-A 投影 -> [潜在 K/V 512 | 位置 K 64]
+                         │
+                         ├─ 写入请求级压缩缓存
+                         └─ K/V-B 投影 -> 每头非位置 K 128 与 V 128
+
+score = (Q_nope · K_nope + Q_rope · K_rope) / sqrt(192)
+output = softmax(score + causal_mask) @ V
+```
+
+位置 Key 对所有查询头共享，非位置 Key 和 Value 由每个头自己的上投影权重恢复。持久缓存因此按词元增长 `512 + 64` 个数，而完整展开缓存需要按头保存 K/V。这里节省的是请求生命周期内反复保留的缓存；CPU reference 为了清楚展示数学过程，仍会在一次调用内建立临时展开工作区。
+
+| 对象 | 持久还是临时 | 当前代码布局 |
+| --- | --- | --- |
+| 潜在 K/V | 请求级持久状态 | `[S, latent_dim]` |
+| 位置 Key | 请求级持久状态 | `[S, rope_dim]` |
+| 非位置 K | CPU reference 临时工作区 | `[S,H,qk_nope_dim]` |
+| Value | CPU reference 临时工作区 | `[S,H,value_dim]` |
+| Query | 当前 Prefill/Decode 步骤 | `[T,H,qk_nope_dim]` 与 `[T,H,rope_dim]` |
+
+<a href="../_code/chapter04_attention/src/mla_attention.cpp"><code>mla_attention.cpp</code></a> 接收已经投影并完成 RoPE 的 Query、低秩缓存和 K/V 上投影权重。测试先通过低秩路径计算结果，再显式展开完整 K/V 并交给标准 CPU Attention；两条路径逐元素一致。该入口固定 MLA 的算法语义，当前尚未读取真实量化权重，也没有实现生产框架常用的权重吸收与融合 kernel。
+
+真实 DeepSeek-V2-Lite 对照由 `run_deepseek_v2_lite_layer_capture.sh` 提供。它通过 llama.cpp 回调捕获首层的归一化输入、Query、K/V-A、共享 RoPE Key、压缩 latent、Attention 输出、FFN 输入和层输出。算法测试回答“低秩路径是否正确”，真实捕获回答“固定 GGUF 的节点名称、shape 和参考数值是什么”；自研首层需要同时通过两类证据。
+
+自研入口先在位置 0 验证量化投影、维度拆分、输出投影、SwiGLU 和双残差，再用位置 1 读取两项历史。请求 Context 持久保存归一化后的 512 维 latent K/V 和已旋转的 64 维共享 Key；Q 与共享 Key 都按照 GGUF 的 YaRN 参数执行 partial RoPE。双词元对照同时验证缓存追加、位置偏移和历史聚合，最终层输出与 llama.cpp 的余弦相似度为 `0.999883`。
+
 通用资料常写 `[B,H,T,Dh]`。本教程的跨章适配器使用词元优先（token-major）布局 `[B,T,H,Dh]`，让同一个词元的所有注意力头连续存放。阅读下图时从左到右追踪形状，再在下半部分比较预填充与逐词元解码的请求差异。
 
 ![多头注意力的形状、因果掩码与预填充/解码数据流](../assets/diagrams/chapter04-attention-dataflow.svg)
@@ -175,6 +207,6 @@ bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh
 bash code/chapter04_attention/scripts/run.sh
 ```
 
-测试提供六组可观察证据：因果预填充的首个输出只能读取首个 V；`query_position_offset=1` 的逐词元解码可以读取两项历史 V，并得到 `51`；缓存路径向 backend 报告 `key_tokens: 2 -> 3` 和解码偏移 `2`；4D 输入中的两个批次分别保持数值 `3` 和 `7`；非连续视图在显式连续化前被拒绝；分块在线 Softmax 在不同 tile、因果位置和极端 score 下与三段式 CPU golden 一致。
+测试提供七组可观察证据：因果预填充的首个输出只能读取首个 V；`query_position_offset=1` 的逐词元解码可以读取两项历史 V，并得到 `51`；缓存路径向 backend 报告 `key_tokens: 2 -> 3` 和解码偏移 `2`；4D 输入中的两个批次分别保持数值 `3` 和 `7`；非连续视图在显式连续化前被拒绝；分块在线 Softmax 在不同 tile、因果位置和极端 score 下与三段式 CPU golden 一致；MLA 低秩缓存与显式展开路径逐元素一致。
 
 验证还应看到 `MultiHeadAttention(4,2)` 保持输入输出形状 `[2,4]`，计算后端类型为 CPU。下一节将补上解码器中围绕注意力和 FFN 使用的归一化与激活函数。
