@@ -8,15 +8,24 @@ _A Practical Tutorial for Building a C++ LLM Inference Engine_
 
 [![CPU and docs CI](https://github.com/datawhalechina/cpp-llm-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/datawhalechina/cpp-llm-engine/actions/workflows/ci.yml)
 
-这是一套中文优先、以 C++ 为实现主线的推理引擎工程教程。教程以 TinyLlama 作为默认语言模型基线，连接模型加载、张量、算子、解码器、生成运行时、缓存、调度和服务；每章通过测试、参考结果或性能实验验证实现，并与 llama.cpp、vLLM、SGLang 和 TensorRT-LLM 的工程策略对照。CPU 建立完整推理服务主线，单卡 CUDA 在保持上层语义不变的前提下替换执行后端，SmolVLM 多模态在解码器前扩展视觉输入并复用后续运行时，最终目标是构建一个可 DIY 的单机推理服务框架。
+这是一套中文优先、以 C++ 为实现主线的推理引擎工程教程。你将从一次 TinyLlama 真实推理开始，逐步实现模型加载、张量、算子、解码器、生成、缓存、调度和服务。只使用 CPU 也能完成整条主线；具备单张 NVIDIA GPU 时，可以继续学习 CUDA 加速，并通过 SmolVLM 把文本输入扩展到图文输入。完成教程后，你将得到一个可以继续替换组件和验证优化效果的单机推理服务框架。
+
+## 教程特点
+
+- **从 CPU 完成完整主线**：普通 CPU 环境即可学习加载、解码、生成、缓存、调度和服务，再按需进入消费级 GPU 加速路线。
+- **从不同模型理解架构差异**：先用 TinyLlama 掌握 Llama 解码器，再通过 Qwen3 学习另一种稠密架构，通过 Qwen1.5-MoE 学习路由器、Top-K 和共享专家。
+- **先理解原理，再学习优化**：先在 CPU 或平台无关代码中看清分页 K/V、连续批处理、前缀缓存和在线 Softmax，再观察 CUDA 如何改变数据布局与计算方式。
+- **亲手验证每一步**：使用固定结果、组件测试、真实模型对照和性能实验检查实现，并通过成熟框架对照理解教学代码与生产系统的差距。
 
 ![cpp-llm-engine 教程主图](source/assets/diagrams/tutorial-concept-map.svg)
 
 ## 快速开始
 
-第一次学习建议完成三个动作：在 Chapter00 看见一条完整的模型推理路径，在 Chapter01 读取模型配置和权重，再沿 [USAGE.md](USAGE.md) 进入 Tensor、算子、Decoder、Runtime 和服务章节。
+按下面四步完成第一次学习：确认工具链、运行仓库检查、建立真实模型基线，再进入教程自己的 C++ 实现。
 
-先准备 CMake 3.20+、支持 C++17 的编译器和 Git。Linux 可以直接使用下面的命令；Windows 建议进入 WSL2 Ubuntu 后执行。安装方法和常见问题见 [Chapter00 环境准备](source/chapter00_quickstart/01_environment_setup.md)。
+### 1. 检查工具链
+
+准备 CMake 3.20+、支持 C++17 的编译器和 Git。Linux 可以直接运行，Windows 建议使用 WSL2 Ubuntu：
 
 ```bash
 cmake --version
@@ -24,59 +33,78 @@ c++ --version
 git --version
 ```
 
-[Foundation](source/foundation/intro.md) 提供 C++ 所有权、CMake 和 CTest 练习。需要补充其中某项基础时先完成对应练习，工具链基础具备后从 Chapter00 开始主线。
+安装方法见 [Chapter00 环境准备](source/chapter00_quickstart/01_environment_setup.md)。如果还不熟悉 C++ 所有权、CMake 或 CTest，先按需完成 [Foundation](source/foundation/intro.md) 的对应练习。
 
-先运行使用仓库内置示例的 Chapter00 环境实验。看到 CTest 显示测试通过，说明 C++ 编译和运行环境已经就绪：
+### 2. 运行仓库检查
+
+这一步不需要模型、网络或 GPU：
 
 ```bash
 bash code/chapter00_quickstart/run.sh
 ```
 
-Chapter00 将工具链验证和真实模型推理分成两个步骤。按照 [Chapter00 导读](source/chapter00_quickstart/intro.md) 准备 `llama.cpp`、TinyLlama GGUF 和模型路径后，继续运行真实推理；CPU 环境可以完成教程主线，CUDA 环境用于后续可选加速实验。
+看到 CTest 全部通过，说明仓库入口和 C++ 构建环境可用。
 
-准备好 `llama.cpp` 和 TinyLlama GGUF 后，再运行一次真实模型推理，观察 prompt 怎样变成连续输出：
+### 3. 建立真实模型基线
+
+按照[构建 llama.cpp](source/chapter00_quickstart/02_clone_and_build_llamacpp.md)和[准备 TinyLlama](source/chapter00_quickstart/03_download_tinyllama.md)完成一次性准备，然后运行：
 
 ```bash
 bash code/chapter00_quickstart/run_real_inference.sh
 ```
 
-随后进入 Chapter01，开始读取 GGUF 元数据、Tokenizer 配置和模型权重：
+终端会显示生成文本、耗时摘要和 `real inference passed`。这条外部基线帮助你先观察完整推理，再进入各组件的 C++ 实现。
+
+### 4. 进入 C++ 实现
+
+从 Chapter01 开始构建并验证模型加载、结构校验和分词器组件：
 
 ```bash
 bash code/chapter01_tensor_loader/run.sh
 ```
 
-完成 Chapter01 后，按照 [USAGE.md](USAGE.md) 的阅读顺序和运行命令继续 Chapter02–10。
+看到三组 Chapter01 测试通过后，按照 [USAGE.md](USAGE.md) 的学习顺序继续 Chapter02–10。
 
 ## 教程框架
 
-主图展示章节主线和可选扩展，下面的阶段表用于定位每组章节的学习产物。具体页面和运行命令统一由 [USAGE.md](USAGE.md) 导航。
+主图展示章节主线和可选扩展。下面进一步说明推理策略怎样从算法语义进入 CPU/CUDA 执行，以及不同模型为教程带来的架构差异；具体页面和运行命令统一由 [USAGE.md](USAGE.md) 导航。
 
-| 阶段 | 章节 | 产物 |
+### 推理策略
+
+![推理策略从算法语义进入设备执行](source/assets/diagrams/strategy-execution-path.svg)
+
+Chapter04–05 建立 Attention 与量化 Linear 的数值语义，Chapter07–08 把缓存和请求组织成持续执行的数据面，Chapter09 再用正确性闸门、A/B 实验和性能剖析决定是否保留优化。具体格式、实现状态和实验结果见[教程架构](source/reference/architecture.md)与[实验资产表](source/reference/experiment_assets.md)。
+
+### 模型适配
+
+| 模型 | 架构差异带来的学习内容 | 当前状态 |
 | --- | --- | --- |
-| 真实基线 | Foundation（按需）、Chapter00 | TinyLlama 本地推理与工具链基线 |
-| 引擎对象 | Chapter01–03 | 模型、张量/视图、算子和执行后端 |
-| 模型与生成 | Chapter04–06 | 解码器、量化线性层、请求、预填充/解码和流式输出 |
-| 缓存与调度 | Chapter07–08 | 分页 K/V、块表、连续批处理和张量批次 |
-| 证据与服务 | Chapter09–10 | 基准测试、性能剖析、服务核心和 HTTP/SSE |
-| 可选扩展 | CUDA、多模态 | GPU 执行后端或视觉输入接入现有运行时 |
+| TinyLlama 1.1B | Llama 稠密 Decoder、22 个解码器块、GGUF 与 GQA | CPU/CUDA 生成与服务主线 |
+| Qwen3-0.6B | Q/K Norm、NeoX RoPE、非对称 Q/K/V 头和共享 LM Head | CPU/CUDA 推理服务闭环 |
+| Qwen1.5-MoE-A2.7B | 60 选 4 Router、packed experts、共享专家和混合量化 | CPU 24 层生成、按专家分组批执行、调度与服务闭环 |
+| DeepSeek-R1-Distill-Qwen-1.5B | Qwen2.5 配置、Tokenizer 与聊天模板差异 | 待适配 |
+| DeepSeek-V2-Lite | MoE 与 MLA 组合 | 进阶设计参照，待实现 |
 
-## 建设进度
+详细模型证据和后续适配顺序见[模型基线与扩展顺序](source/reference/model_support.md)。
 
-更新时间：**2026-11-09**。下面按最新进展在前排列；详细实验条件与复现入口见[实验资产表](source/reference/experiment_assets.md)。
+## 当前可学内容
 
-| 时间 | 里程碑 | 状态 | 可验证产物 |
-| --- | --- | --- | --- |
-| 2026-11-09 | Qwen3 CPU 推理服务闭环 | 完成 | Qwen3-0.6B Loader、Tokenizer、28 层 Decoder、Generation、分页 K/V、Radix 命中与 HTTP/SSE 验收 |
-| 2026-11-09 | Adaptive GEMV 适用范围矩阵 | 完成 | EXP-GPU-16 覆盖 `batch=1/2`、上下文 `16/128` 和 Decode `1/8` 步；Tensor Batch 延迟降低约 `12.9%`～`23.1%` |
-| 2026-11-09 | CUDA 量化性能证据 | 完成 | Adaptive GEMV 默认路径、自动 `KEEP/REJECT/INCONCLUSIVE` 决策、NCU 原因指标与 EXP-GPU-14/15 |
-| 2026-11-09 | 分页缓存与前缀复用 | 完成 | CUDA 分页 Prefill、分页 Decode batch、Radix Cache、共享块引用和缓存感知调度 |
-| 2026-11-09 | 学习入口与参考资产整合 | 完成 | CPU、CPU+GPU、多模态路线，术语/公式表，框架对照卡和实验资产表 |
-| 2026-11-08 | TinyLlama CUDA 纵向闭环 | 完成 | 22 层 Model/Context、真实生成、分页 GQA、Chapter06 Runtime 与 Chapter10 服务 |
-| 2026-11 | 工程验证体系 | 完成 | 默认回归、Release 发布验收、测试资产审计、文档检查和 GitHub Actions CI |
-| 2026-10 | 多模态输入闭环 | 完成 | SmolVLM Vision、Projector、Decoder、ServiceCore 和 profiling golden |
-| 2026-10 | CPU 主线闭环 | 完成 | TinyLlama 22 层 Decoder、Runtime、HTTP/SSE 和真实模型验收 |
-| 2026-08 | 教程骨架与 Foundation | 完成 | 章节主线、基础题库和 benchmark trace |
+更新时间：**2026-11-10**。下面按最新内容在前排列；需要复现实验或核对具体环境时，再查阅[实验资产表](source/reference/experiment_assets.md)。
+
+| 时间 | 新增学习内容 | 你可以复现什么 |
+| --- | --- | --- |
+| 2026-11-10 | Qwen1.5-MoE 批处理与服务 | 比较逐词元与按专家分组执行，并观察四个请求在运行中加入、生成和释放资源 |
+| 2026-11-10 | Qwen1.5-MoE 完整生成 | 用真实分词器运行 24 层 MoE 模型，观察 Top-K 专家选择、分层 K/V 和文本生成 |
+| 2026-11-09 | Qwen3 推理服务 | 运行 Qwen3-0.6B 的 28 层 CPU/CUDA 推理、分页缓存、前缀命中以及 HTTP/SSE 输出 |
+| 2026-11-09 | 自适应量化 GEMV | 在不同批量、上下文长度和解码步数下切换量化矩阵-向量乘实现，并比较延迟 |
+| 2026-11-09 | CUDA 量化性能分析 | 使用配对实验和 Nsight Compute 指标判断一次计算核优化是否有效 |
+| 2026-11-09 | 分页缓存与前缀复用 | 观察 CUDA 预填充与解码怎样使用物理块、共享前缀并影响请求调度 |
+| 2026-11-09 | 三条学习路线 | 分别沿 CPU、CPU+GPU 或多模态路线学习，并使用术语、公式和框架对照资料 |
+| 2026-11-08 | TinyLlama CUDA 完整链路 | 从 22 层 GPU 模型执行进入真实生成、分页注意力和推理服务 |
+| 2026-11 | 教程验证体系 | 用章节测试、默认回归、发布验收和文档检查判断代码是否仍然可运行 |
+| 2026-10 | SmolVLM 多模态链路 | 把图片经过视觉编码器和投影层送入解码器，并比较同步与流式服务结果 |
+| 2026-10 | TinyLlama CPU 完整链路 | 从 22 层解码器进入生成运行时，再通过 HTTP/SSE 输出真实模型结果 |
+| 2026-08 | Foundation 与章节骨架 | 按需练习 C++、CMake、CTest，并沿章节入口逐步进入推理引擎 |
 
 ## 查阅与贡献
 
