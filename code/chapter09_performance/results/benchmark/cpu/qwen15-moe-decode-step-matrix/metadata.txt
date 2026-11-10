@@ -1,0 +1,14 @@
+experiment_id=EXP-CPU-16
+workload_id=WL-CPU-QWEN15-MOE-DECODE-STEP-MATRIX-V1
+model=Qwen1.5-MoE-A2.7B-Chat-Q3_K_M
+backend=CPU
+build_type=Release
+batches=1,2
+decode_steps=1,4
+iterations=2
+cache_layers=24
+baseline=row-wise-moe
+experiment=grouped-by-expert-moe
+timing_scope=24-layer-decode-and-lm-head
+Linux 6.5.0-41-generic x86_64 GNU/Linux
+c++ (Ubuntu 13.1.0-8ubuntu1~22.04) 13.1.0

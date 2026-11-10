@@ -1,0 +1,23 @@
+iterations: 2
+cache_layers: 24
+matrix_sample batch=1 decode_steps=1 iteration=1 path_order=row-wise-first row_wise_ms=2248.35 grouped_ms=1976.73
+matrix_sample batch=1 decode_steps=1 iteration=2 path_order=grouped-first row_wise_ms=2245.11 grouped_ms=1976.89
+matrix_cell batch=1 decode_steps=1 row_wise_median_ms=2246.73 grouped_median_ms=1976.81 grouped_to_row_wise_ratio=0.879861 maximum_logits_error=3.19481e-05 tokens_match=true correctness=PASS
+row_wise_samples_ms: 2248.35 2245.11
+grouped_samples_ms: 1976.73 1976.89
+matrix_sample batch=1 decode_steps=4 iteration=1 path_order=row-wise-first row_wise_ms=8983.55 grouped_ms=7912.76
+matrix_sample batch=1 decode_steps=4 iteration=2 path_order=grouped-first row_wise_ms=8986.68 grouped_ms=7907.43
+matrix_cell batch=1 decode_steps=4 row_wise_median_ms=8985.12 grouped_median_ms=7910.1 grouped_to_row_wise_ratio=0.880355 maximum_logits_error=5.72205e-05 tokens_match=true correctness=PASS
+row_wise_samples_ms: 8983.55 8986.68
+grouped_samples_ms: 7912.76 7907.43
+matrix_sample batch=2 decode_steps=1 iteration=1 path_order=row-wise-first row_wise_ms=4491.32 grouped_ms=3050.57
+matrix_sample batch=2 decode_steps=1 iteration=2 path_order=grouped-first row_wise_ms=4795.49 grouped_ms=3157.64
+matrix_cell batch=2 decode_steps=1 row_wise_median_ms=4643.4 grouped_median_ms=3104.11 grouped_to_row_wise_ratio=0.668498 maximum_logits_error=3.19481e-05 tokens_match=true correctness=PASS
+row_wise_samples_ms: 4491.32 4795.49
+grouped_samples_ms: 3050.57 3157.64
+matrix_sample batch=2 decode_steps=4 iteration=1 path_order=row-wise-first row_wise_ms=19303 grouped_ms=13145.5
+matrix_sample batch=2 decode_steps=4 iteration=2 path_order=grouped-first row_wise_ms=17985.7 grouped_ms=12902.6
+matrix_cell batch=2 decode_steps=4 row_wise_median_ms=18644.4 grouped_median_ms=13024 grouped_to_row_wise_ratio=0.698551 maximum_logits_error=5.72205e-05 tokens_match=true correctness=PASS
+row_wise_samples_ms: 19303 17985.7
+grouped_samples_ms: 13145.5 12902.6
+matrix_correctness: PASS

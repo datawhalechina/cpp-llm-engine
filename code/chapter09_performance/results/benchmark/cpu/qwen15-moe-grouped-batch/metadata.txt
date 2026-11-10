@@ -1,0 +1,14 @@
+experiment_id=EXP-CPU-13
+workload_id=WL-CPU-QWEN15-MOE-LAYER0-BATCH-V1
+model=Qwen1.5-MoE-A2.7B-Chat-Q3_K_M
+backend=CPU
+build_type=Release
+layer=0
+batch=2
+warmup=1
+iterations=5
+baseline=row-wise
+experiment=grouped-by-expert
+timing_scope=router-experts-shared-expert
+Linux 6.5.0-41-generic x86_64 GNU/Linux
+c++ (Ubuntu 13.1.0-8ubuntu1~22.04) 13.1.0

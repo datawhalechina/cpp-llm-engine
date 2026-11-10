@@ -36,6 +36,12 @@ Chapter08 或 Chapter10 产生原始样本，迁移器把现有结果规范化�
 | `run_cuda_adaptive_gemv_runtime_ab.sh` | 在真实 TinyLlama Decode 中复核自适应 tile | 两轮交错执行、顺序路径保护指标与自动 `KEEP/REJECT/INCONCLUSIVE` 决策 |
 | `run_cuda_adaptive_gemv_runtime_matrix.sh` | 扩展 batch、上下文长度和 Decode 步数 | 一次模型加载、两轮反向路径顺序、逐单元 logits 闸门与 JSON 摘要 |
 | `run_cuda_paged_attention_ab.sh` | 比较分页三阶段与融合在线 Attention | 交替执行顺序、两轮样本、logits 与 greedy token 闸门 |
+| `run_qwen15_moe_layer_cache.sh` | 比较 Qwen1.5-MoE 逐层读取与全层 LRU 缓存 | 反向执行顺序、生成词元、缓存命中与常驻字节数 |
+| `run_qwen15_moe_grouped_batch_ab.sh` | 比较 MoE 专家逐行与分组 batch Linear | 同一权重、反向执行顺序、路由与逐元素误差闸门 |
+| `run_qwen15_moe_batch_runtime_ab.sh` | 在完整 24 层 Decode 中复核 MoE 分组执行 | 双请求、反向执行顺序、logits 与贪心词元闸门 |
+| `run_qwen15_moe_batch_runtime_matrix.sh` | 检查 MoE 分组执行的 batch 适用范围 | 一次模型加载、batch 1/2/4、反向顺序与逐步 logits 闸门 |
+| `run_qwen15_moe_scheduling_ab.sh` | 在 Chapter08 固定请求队列中复核分组 MoE | 四请求、三个连续调度步、完整生成序列与批量调用计数 |
+| `run_qwen15_moe_service_ab.sh` | 在 Chapter10 动态 admission 中复核分组 MoE | 运行中加入请求、完整输出、服务指标与终态释放 |
 
 1. 阅读 `EvidenceRecord`，明确一份证据必须包含哪些环境、负载和正确性字段。
 2. 阅读 `summarize()`，理解统计值如何从逐轮样本得到，而不是从另一组聚合值推测。
@@ -65,6 +71,76 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
 旧服务结果若只有 mean、P50 等聚合值，导入器会拒绝迁移，因为聚合值不能还原逐轮样本。新的 `real_tinyllama_serving_benchmark` 会写出 `samples`，重新运行后即可迁移。
 
 当前四组 TinyLlama scalar/AVX2、顺序/并行请求原始样本位于 `results/raw/`，转换后的统一证据位于 `results/evidence/`。重构前的实现和结果保存在 `legacy/` 与 `results/legacy/`，只用于追溯，不是默认学习入口。
+
+### MoE 层权重缓存
+
+Qwen1.5-MoE 的默认 CPU 路径逐层读取权重，控制常驻内存；同一请求继续 Decode 时会再次读取 24 层。下面的实验把缓存容量设为 24，比较关闭缓存和保留全部层权重：
+
+```bash
+CPP_LLM_QWEN15_MOE_CACHE_ORDER=uncached-first \
+bash code/chapter09_performance/scripts/run_qwen15_moe_layer_cache.sh
+
+CPP_LLM_QWEN15_MOE_CACHE_ORDER=cached-first \
+bash code/chapter09_performance/scripts/run_qwen15_moe_layer_cache.sh
+```
+
+EXP-CPU-12 的两轮反向顺序实验都保持生成词元一致。全层缓存让一次 Decode 从约 `4.29`～`4.61 s` 降至 `2.33`～`2.42 s`，同时常驻约 `6.56 GiB` 权重；第一次 Prefill 仍需加载全部层，没有稳定收益。每种顺序当前只有一个样本，所以结果用于解释时间与内存交换，不作为发布吞吐基线，缓存默认关闭。
+
+### MoE 分组执行
+
+Qwen1.5-MoE 的多个请求可能命中同一专家。逐行基线为每个 token 重复执行 Gate、Up 和 Down；分组路径先按专家收集 token，再让组内输入共享 packed 权重读取和量化块解码：
+
+```bash
+bash code/chapter09_performance/scripts/run_qwen15_moe_grouped_batch_ab.sh
+```
+
+EXP-CPU-13 使用真实第一层、batch 2、1 次预热和 5 次配对测量，每轮反转两条路径的先后顺序。逐行与分组中位数分别为 `151.825 ms` 和 `90.697 ms`，比值为 `0.597`；路由一致，最大输出误差约 `6.1e-10`。计时区间只覆盖 Router、专家和共享专家，因此结果支持把分组执行作为默认 MoE 子层路径，不支持宣称完整 24 层 Runtime 获得同等比例加速。
+
+局部结果通过后，再运行完整 Decoder 复核：
+
+```bash
+bash code/chapter09_performance/scripts/run_qwen15_moe_batch_runtime_ab.sh
+```
+
+EXP-CPU-14 固定双请求、一次 Decode 和 24 层权重缓存，Prefill 位于计时区间外。3 轮配对样本中，逐行与分组中位数分别为 `4564.28 ms` 和 `3267.10 ms`，比值为 `0.716`；最大 logits 误差约 `3.19e-5`，贪心词元一致。该实验支持完整 Runtime 默认使用分组执行，结论范围仍限于当前 CPU、batch 2、单步 Decode 与全层缓存 workload，不代表开放环服务吞吐。
+
+默认路径确定后，用矩阵检查 batch 范围：
+
+```bash
+bash code/chapter09_performance/scripts/run_qwen15_moe_batch_runtime_matrix.sh
+```
+
+EXP-CPU-15 在一次模型加载中依次测量 batch 1/2/4，每个单元执行两轮反向顺序配对。分组/逐行中位数比例分别为 `0.907/0.688/0.581`，所有单元最大 logits 误差约 `3.19e-5` 且生成词元一致。batch=1 的差异来自统一 batch backend 与单行兼容路径的实现差别；batch 增大后，同一专家组内共享权重解码的机会增加。两轮样本用于确认趋势与正确性，尚不足以作为稳定服务吞吐基线。
+
+EXP-CPU-16 进一步固定 batch 1/2，对比一步和四步 Decode。batch 1 的分组/逐行比例为 `0.880/0.880`，batch 2 为 `0.668/0.699`；四步最大 logits 误差为 `5.72e-5`，生成词元仍一致。当前四步范围没有出现收益消失或离散输出漂移，但误差闸门仍需随更长序列继续观察。复现实验时显式登记新的实验和 workload 身份：
+
+```bash
+CPP_LLM_QWEN15_MOE_MATRIX_EXPERIMENT_ID=EXP-CPU-16 \
+CPP_LLM_QWEN15_MOE_MATRIX_WORKLOAD_ID=WL-CPU-QWEN15-MOE-DECODE-STEP-MATRIX-V1 \
+CPP_LLM_QWEN15_MOE_MATRIX_BATCHES=1,2 \
+CPP_LLM_QWEN15_MOE_MATRIX_DECODE_STEPS=1,4 \
+bash code/chapter09_performance/scripts/run_qwen15_moe_batch_runtime_matrix.sh
+```
+
+### MoE 调度层复核
+
+Runtime 矩阵只直接调用 Factory。要确认 Chapter08 的计划、批量调用和请求提交不会抵消收益，运行固定请求队列实验：
+
+```bash
+bash code/chapter09_performance/scripts/run_qwen15_moe_scheduling_ab.sh
+```
+
+EXP-CPU-17 为四个请求各生成四个词元，Prefill 位于计时区间外，随后计时三个连续调度步。逐行与分组中位数分别为 `29.261 s` 和 `17.019 s`，比例为 `0.582`；四个请求的完整生成序列、三次模型批量调用和十二个批量请求推进均一致。该实验验证固定队列的持续批量执行，不包含运行中动态加入请求，因此还不能代表完整 continuous batching 到达过程或 Chapter10 服务吞吐。
+
+### MoE 服务层复核
+
+Chapter10 实验先让两个请求完成 Prefill，再在它们 Decode 期间加入两个新请求，覆盖动态 admission、混合阶段调度和统一终态释放：
+
+```bash
+bash code/chapter09_performance/scripts/run_qwen15_moe_service_ab.sh
+```
+
+EXP-CPU-18 的逐行与分组中位数分别为 `32.334 s` 和 `22.347 s`，比例为 `0.691`。两轮反向顺序配对都保持四请求完整输出一致，accepted、completed、released 和批量执行形状一致。计时不包含最初两个请求的 Prefill，但包含新增请求 admission、后续 Prefill/Decode 调度、模型执行和终态释放；固定四请求的闭环实验仍不等于开放环到达率或真实 HTTP 并发吞吐。
 
 ### 真实实验
 

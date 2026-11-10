@@ -1,0 +1,17 @@
+experiment_id=EXP-CPU-12
+workload_id=WL-CPU-QWEN15-MOE-LAYER-CACHE-V1
+date=2026-11-10
+model=Qwen1.5-MoE-A2.7B-Chat-Q3_K_M
+backend=CPU
+build_type=Release
+host_memory_gib=30
+prompt_token_count=1
+decode_steps=1
+cache_capacity_layers=24
+independent_runs=2
+path_orders=uncached-first,cached-first
+statistic=single-sample-per-path-order
+correctness=tokens-match
+cached_resident_bytes=7042826240
+decision=KEEP_OPTIONAL_DEFAULT_DISABLED
+decision_reason=decode-improves-but-full-cache-costs-about-6.56-GiB-and-sample-count-is-exploratory

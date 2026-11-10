@@ -1,0 +1,21 @@
+paired_iteration=1 path_order=row-wise-first row_wise_ms=151.825 grouped_ms=90.7434
+paired_iteration=2 path_order=grouped-first row_wise_ms=151.911 grouped_ms=90.6969
+paired_iteration=3 path_order=row-wise-first row_wise_ms=151.87 grouped_ms=90.6747
+paired_iteration=4 path_order=grouped-first row_wise_ms=151.601 grouped_ms=90.6374
+paired_iteration=5 path_order=row-wise-first row_wise_ms=151.607 grouped_ms=90.7013
+model_architecture: qwen2moe
+layer: 0
+batch: 2
+warmup: 1
+iterations: 5
+active_experts: 7
+assignments: 8
+maximum_tokens_per_expert: 2
+row_wise_median_ms: 151.825
+grouped_median_ms: 90.6969
+grouped_to_row_wise_ratio: 0.597377
+maximum_output_error: 6.1118e-10
+routes_match: true
+row_wise_samples_ms: 151.825 151.911 151.87 151.601 151.607
+grouped_samples_ms: 90.7434 90.6969 90.6747 90.6374 90.7013
+correctness: PASS

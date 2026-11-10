@@ -1,0 +1,11 @@
+paired_iteration=1 path_order=row-wise-first row_wise_ms=33205.2 grouped_ms=22536.1
+paired_iteration=2 path_order=grouped-first row_wise_ms=31463.1 grouped_ms=22157.9
+requests: 4
+new_tokens: 4
+iterations: 2
+row_wise_median_ms: 32334.1
+grouped_median_ms: 22347
+grouped_to_row_wise_ratio: 0.691126
+outputs_match: true
+lifecycle_match: true
+correctness: PASS

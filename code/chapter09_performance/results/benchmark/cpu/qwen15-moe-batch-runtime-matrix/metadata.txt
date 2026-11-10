@@ -1,0 +1,14 @@
+experiment_id=EXP-CPU-15
+workload_id=WL-CPU-QWEN15-MOE-RUNTIME-MATRIX-V1
+model=Qwen1.5-MoE-A2.7B-Chat-Q3_K_M
+backend=CPU
+build_type=Release
+batches=1,2,4
+decode_steps=1
+iterations=2
+cache_layers=24
+baseline=row-wise-moe
+experiment=grouped-by-expert-moe
+timing_scope=24-layer-decode-and-lm-head
+Linux 6.5.0-41-generic x86_64 GNU/Linux
+c++ (Ubuntu 13.1.0-8ubuntu1~22.04) 13.1.0

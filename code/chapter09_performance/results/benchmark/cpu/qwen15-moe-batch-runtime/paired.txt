@@ -1,0 +1,14 @@
+paired_iteration=1 path_order=row-wise-first row_wise_ms=4729.22 grouped_ms=3268.16
+paired_iteration=2 path_order=grouped-first row_wise_ms=4564.28 grouped_ms=3267.1
+paired_iteration=3 path_order=row-wise-first row_wise_ms=4542.51 grouped_ms=3122.89
+batch: 2
+iterations: 3
+cache_layers: 24
+row_wise_median_ms: 4564.28
+grouped_median_ms: 3267.1
+grouped_to_row_wise_ratio: 0.715797
+maximum_logits_error: 3.19481e-05
+tokens_match: true
+row_wise_samples_ms: 4729.22 4564.28 4542.51
+grouped_samples_ms: 3268.16 3267.1 3122.89
+correctness: PASS

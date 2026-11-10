@@ -1,0 +1,15 @@
+path_order: cached-first
+uncached_prefill_ms: 4572.89
+uncached_decode_ms: 4287.3
+uncached_cache_hits: 0
+uncached_cache_misses: 48
+uncached_resident_layers: 0
+uncached_resident_bytes: 0
+cached_prefill_ms: 4751.59
+cached_decode_ms: 2331.36
+cached_cache_hits: 24
+cached_cache_misses: 24
+cached_resident_layers: 24
+cached_resident_bytes: 7042826240
+tokens_match: true
+qwen15_moe_layer_cache_benchmark: PASS

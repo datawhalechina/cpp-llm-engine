@@ -1,0 +1,18 @@
+iterations: 2
+cache_layers: 24
+matrix_sample batch=1 decode_steps=1 iteration=1 path_order=row-wise-first row_wise_ms=2417.17 grouped_ms=2127
+matrix_sample batch=1 decode_steps=1 iteration=2 path_order=grouped-first row_wise_ms=2272.42 grouped_ms=2126.41
+matrix_cell batch=1 decode_steps=1 row_wise_median_ms=2344.79 grouped_median_ms=2126.71 grouped_to_row_wise_ratio=0.906992 maximum_logits_error=3.19481e-05 tokens_match=true correctness=PASS
+row_wise_samples_ms: 2417.17 2272.42
+grouped_samples_ms: 2127 2126.41
+matrix_sample batch=2 decode_steps=1 iteration=1 path_order=row-wise-first row_wise_ms=4762.34 grouped_ms=3259.19
+matrix_sample batch=2 decode_steps=1 iteration=2 path_order=grouped-first row_wise_ms=4801.3 grouped_ms=3321.69
+matrix_cell batch=2 decode_steps=1 row_wise_median_ms=4781.82 grouped_median_ms=3290.44 grouped_to_row_wise_ratio=0.688115 maximum_logits_error=3.19481e-05 tokens_match=true correctness=PASS
+row_wise_samples_ms: 4762.34 4801.3
+grouped_samples_ms: 3259.19 3321.69
+matrix_sample batch=4 decode_steps=1 iteration=1 path_order=row-wise-first row_wise_ms=9005.49 grouped_ms=5314.46
+matrix_sample batch=4 decode_steps=1 iteration=2 path_order=grouped-first row_wise_ms=9575.77 grouped_ms=5483.89
+matrix_cell batch=4 decode_steps=1 row_wise_median_ms=9290.63 grouped_median_ms=5399.18 grouped_to_row_wise_ratio=0.581142 maximum_logits_error=3.19481e-05 tokens_match=true correctness=PASS
+row_wise_samples_ms: 9005.49 9575.77
+grouped_samples_ms: 5314.46 5483.89
+matrix_correctness: PASS
