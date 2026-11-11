@@ -25,7 +25,7 @@ TinyLlama 的 `block_count=22` 对应 `blk.0` 到 `blk.21`。每个解码器块�
 
 ![TinyLlama 22 个解码器块的层级结构](../assets/diagrams/chapter01-tinyllama-decoder-hierarchy.svg)
 
-真实执行代码位于 <a href="../_code/model/src/real_llama_cpu_decoder.cpp"><code>code/model/real_llama_cpu_decoder.cpp</code></a>。`RealLlamaCpuModel` 持有共享只读权重，`RealLlamaCpuContext` 保存单个请求的位置、分层 K/V 和注意力统计。
+真实执行代码位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/src/real_llama_cpu_decoder.cpp"><code>code/model/real_llama_cpu_decoder.cpp</code></a>。`RealLlamaCpuModel` 持有共享只读权重，`RealLlamaCpuContext` 保存单个请求的位置、分层 K/V 和注意力统计。
 
 | 对象 | 保存内容 | 生命周期 |
 | --- | --- | --- |
@@ -37,7 +37,7 @@ TinyLlama 的 `block_count=22` 对应 `blk.0` 到 `blk.21`。每个解码器块�
 
 ## 完成 Chapter05 后的跨章数值证据
 
-跨章验收使用同一组 6 个词元分别运行自研 CPU 解码器和 llama.cpp。程序在每次运行时计算下列指标并打印实际值；正文只保存稳定门槛，避免把某台机器的一次输出当成长期结论。判定实现位于 <a href="../_code/model/examples/gguf_decoder_multilayer.cpp"><code>gguf_decoder_multilayer.cpp</code></a>。
+跨章验收使用同一组 6 个词元分别运行自研 CPU 解码器和 llama.cpp。程序在每次运行时计算下列指标并打印实际值；正文只保存稳定门槛，避免把某台机器的一次输出当成长期结论。判定实现位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/examples/gguf_decoder_multilayer.cpp"><code>gguf_decoder_multilayer.cpp</code></a>。
 
 | 指标 | 验收门槛 | 回答的问题 |
 | --- | --- | --- |

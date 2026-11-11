@@ -1,6 +1,6 @@
 # 10.2 在执行前处理准入、容量和排队
 
-准入回答“这个请求现在能否由服务接管”。<a href="../../_code/chapter10_serving/src/service_core.cpp"><code>ServiceCore::admit()</code></a> 先检查 request ID、请求状态和实例容量，再把请求加入 waiting 队列；模型是否在当前 step 执行由 Chapter08 决定。
+准入回答“这个请求现在能否由服务接管”。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/src/service_core.cpp"><code>ServiceCore::admit()</code></a> 先检查 request ID、请求状态和实例容量，再把请求加入 waiting 队列；模型是否在当前 step 执行由 Chapter08 决定。
 
 ## 准入结果
 

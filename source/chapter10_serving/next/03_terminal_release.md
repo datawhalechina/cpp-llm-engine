@@ -1,6 +1,6 @@
 # 10.3 让取消、超时和失败走同一释放路径
 
-请求可能正常完成，也可能在 waiting、Prefill、Decode 或写回阶段停止。每种终态都要进入<a href="../../_code/chapter10_serving/src/service_core.cpp"><code>release_terminal()</code></a>，防止 Request、Executor、K/V block 或 Adapter 记录残留。
+请求可能正常完成，也可能在 waiting、Prefill、Decode 或写回阶段停止。每种终态都要进入<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/src/service_core.cpp"><code>release_terminal()</code></a>，防止 Request、Executor、K/V block 或 Adapter 记录残留。
 
 ## 终态来源
 
@@ -27,4 +27,4 @@
 
 ## 验证幂等释放
 
-运行 `bash code/chapter10_serving/scripts/run.sh`。<a href="../../_code/chapter10_serving/tests/terminal_release_test.cpp"><code>chapter10_terminal_release_test</code></a> 检查取消、超时、Executor 失败、重复释放和分页块归还，最终 `inflight` 与已占用块数都回到预期值。`10.4` 开始把这组终态映射到网络连接。
+运行 `bash code/chapter10_serving/scripts/run.sh`。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/tests/terminal_release_test.cpp"><code>chapter10_terminal_release_test</code></a> 检查取消、超时、Executor 失败、重复释放和分页块归还，最终 `inflight` 与已占用块数都回到预期值。`10.4` 开始把这组终态映射到网络连接。

@@ -6,7 +6,7 @@
 
 写入操作接收请求、层号、逻辑词元位置和一行 K/V，经过页表定位后写入 `[layer, physical_block, slot, kv_head, head_dimension]`。`written_` 记录每个“层、物理块、槽位”是否写完，用于阻止不完整数据提交。
 
-实现会拒绝越界层号、空指针、错误行宽、未预留位置以及覆盖已提交历史。源码见 <a href="/_code/chapter07_kv_cache/src/paged_kv_cache.cpp"><code>paged_kv_cache.cpp</code></a>。
+实现会拒绝越界层号、空指针、错误行宽、未预留位置以及覆盖已提交历史。源码见 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter07_kv_cache/src/paged_kv_cache.cpp"><code>paged_kv_cache.cpp</code></a>。
 
 | 动作 | 页表 | K/V 数据 | 写入标记 |
 | --- | --- | --- | --- |

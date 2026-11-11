@@ -17,7 +17,7 @@ new_shape[axis] = count;
 
 ## 从视图导出非拥有引用
 
-<a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> 中的 `try_slice()` 分别检查起点、长度、范围和地址计算溢出。`contract()` 将结果导出为：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> 中的 `try_slice()` 分别检查起点、长度、范围和地址计算溢出。`contract()` 将结果导出为：
 
 ```text
 shape + strides + storage_offset_elements

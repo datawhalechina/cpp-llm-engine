@@ -53,7 +53,7 @@ Chapter04 同时消费前三章的稳定产物：
 
 结构对象回答“一层由什么组成”，请求 Context 回答“当前序列已经处理到哪里”。Chapter04 用单层 Context 讲清连续 K/V 的数值语义，真实模型再用 Core `DecoderExecutionContext` 管理全部层。共享权重不随请求变化，位置和 K/V 由每个请求独占。
 
-实现入口是 <a href="../_code/chapter04_attention/src/decoder_layer.cpp"><code>decoder_layer.cpp</code></a> 和 <a href="../_code/chapter04_attention/src/decoder_context.cpp"><code>decoder_context.cpp</code></a>，注意力与组合测试分别位于 <a href="../_code/chapter04_attention/src/attention.cpp"><code>attention.cpp</code></a> 和 <a href="../_code/chapter04_attention/tests/chapter04_attention_test.cpp"><code>chapter04_attention_test.cpp</code></a>。
+实现入口是 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/decoder_layer.cpp"><code>decoder_layer.cpp</code></a> 和 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/decoder_context.cpp"><code>decoder_context.cpp</code></a>，注意力与组合测试分别位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/attention.cpp"><code>attention.cpp</code></a> 和 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/tests/chapter04_attention_test.cpp"><code>chapter04_attention_test.cpp</code></a>。
 
 ## 验证与衔接
 

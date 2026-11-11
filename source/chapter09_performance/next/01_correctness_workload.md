@@ -26,7 +26,7 @@
 
 ## 工作负载固定什么
 
-`workload_id` 代表一组可重复的输入条件，不是随意填写的实验名称。改变模型、prompt 集合、输入/输出长度、请求数或到达方式时，应使用新的 workload 身份。实验名称回答“这次运行是什么”，工作负载身份回答“执行了什么”；量化、后端和调度策略等待验证因素写入实验身份与检查项。<a href="../../_code/chapter09_performance/include/chapter09_performance/evidence_record.h"><code>EvidenceRecord</code></a> 同时保存 workload、环境和正确性检查，比较器会逐项核对，而不是只相信相同的 `workload_id`。
+`workload_id` 代表一组可重复的输入条件，不是随意填写的实验名称。改变模型、prompt 集合、输入/输出长度、请求数或到达方式时，应使用新的 workload 身份。实验名称回答“这次运行是什么”，工作负载身份回答“执行了什么”；量化、后端和调度策略等待验证因素写入实验身份与检查项。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/include/chapter09_performance/evidence_record.h"><code>EvidenceRecord</code></a> 同时保存 workload、环境和正确性检查，比较器会逐项核对，而不是只相信相同的 `workload_id`。
 
 | 条件 | 为什么会改变结果 |
 | --- | --- |

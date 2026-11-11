@@ -19,7 +19,7 @@ y_i = (x_i - mean) / sqrt(variance + epsilon) * gamma_i + beta_i
 | `epsilon` | 默认 `1e-5` | 防止方差接近零时除零 |
 | `gamma`、`beta` | `[D]` | 当前构造函数分别初始化为 `1` 和 `0` |
 
-LayerNorm 在推理时仍使用当前输入计算统计量，不读取 BatchNorm 式的 running mean/variance。<a href="../_code/chapter04_attention/src/layer_norm.cpp"><code>layer_norm.cpp</code></a> 中的三段循环依次计算均值、方差和输出，正好对应上面的公式。
+LayerNorm 在推理时仍使用当前输入计算统计量，不读取 BatchNorm 式的 running mean/variance。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/layer_norm.cpp"><code>layer_norm.cpp</code></a> 中的三段循环依次计算均值、方差和输出，正好对应上面的公式。
 
 `forward()` 保留 Chapter04 教学张量入口，`try_forward()` 接收公共只读输入视图和可写输出视图。两条入口都要求 CPU Float32、二维连续布局、输入列数等于 `dim`，并保持输入输出形状一致。计算先写入临时结果，全部成功后再提交到输出，因此错误形状不会破坏调用方已有数据。
 
@@ -47,7 +47,7 @@ SiLU(x) = x / (1 + exp(-x))
 | FFN 激活 | ReLU | SiLU 门控 |
 | 作用 | 建立可读组合结构 | 匹配真实模型配置和权重 |
 
-`apply_activation()` 位于 <a href="../_code/chapter04_attention/src/feed_forward.cpp"><code>feed_forward.cpp</code></a>，当前枚举包含教学路径实际执行的 ReLU。TinyLlama 的 RMSNorm 和 SwiGLU 位于真实 CPU 解码器路径，并读取对应 GGUF 权重。
+`apply_activation()` 位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/feed_forward.cpp"><code>feed_forward.cpp</code></a>，当前枚举包含教学路径实际执行的 ReLU。TinyLlama 的 RMSNorm 和 SwiGLU 位于真实 CPU 解码器路径，并读取对应 GGUF 权重。
 
 ## 验证与衔接
 

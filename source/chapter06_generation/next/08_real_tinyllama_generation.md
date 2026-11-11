@@ -13,7 +13,7 @@
 | 3 | `Runtime::generate()` | 执行 Prefill、Greedy、Decode 和停止判断 |
 | 4 | 真实 Tokenizer | 生成 token IDs 还原为文本 |
 
-可执行入口位于 <a href="/_code/engine/examples/real_tinyllama_generation_smoke.cpp"><code>real_tinyllama_generation_smoke.cpp</code></a>。同一个 `RealLlamaEngine` 连续生成两次时会创建两份请求 Context，权重可以共享，位置和模型 K/V 不能共享。
+可执行入口位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/engine/examples/real_tinyllama_generation_smoke.cpp"><code>real_tinyllama_generation_smoke.cpp</code></a>。同一个 `RealLlamaEngine` 连续生成两次时会创建两份请求 Context，权重可以共享，位置和模型 K/V 不能共享。
 
 ## 固定模型与结果
 

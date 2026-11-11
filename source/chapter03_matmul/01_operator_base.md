@@ -4,7 +4,7 @@
 
 ## 为什么保留统一调用入口
 
-<a href="../_code/chapter03_matmul/include/chapter03_matmul/operator.h"><code>operator.h</code></a> 定义双输入、单输出接口：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/include/chapter03_matmul/operator.h"><code>operator.h</code></a> 定义双输入、单输出接口：
 
 ```cpp
 class Operator {
@@ -29,7 +29,7 @@ public:
 | `MutableTensorViewRef` | 引用可写共享存储 | 接收矩阵乘法输出 |
 | `TensorContract` | 保存形状、步长、偏移、类型和设备 | 检查视图是否能安全参与计算 |
 
-<a href="../_code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> 把视图首地址和二维形状整理成矩阵乘法请求。这样可以先用 `Matrix` 学会算法，再用同一套地址检查处理 Chapter02 的真实视图。
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> 把视图首地址和二维形状整理成矩阵乘法请求。这样可以先用 `Matrix` 学会算法，再用同一套地址检查处理 Chapter02 的真实视图。
 
 ## 动手验证
 

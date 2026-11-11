@@ -17,7 +17,7 @@
 | `Initial` | 上下文预算不满足 | `Rejected` | 不调用模型 |
 | 任意非终态 | 模型调用失败 | `Failed` | `failure_reason` 保存原因 |
 
-状态实现位于 <a href="/_code/chapter06_generation/src/request.cpp"><code>request.cpp</code></a>。`terminal()` 将五种结束状态统一为“不可继续执行”，而 `finished()` 只表示正常完成。
+状态实现位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/request.cpp"><code>request.cpp</code></a>。`terminal()` 将五种结束状态统一为“不可继续执行”，而 `finished()` 只表示正常完成。
 
 下图把可推进阶段、正常结束和四种异常终态放在同一状态机中。终态会阻止后续推进，但不会自动释放模型 Context 或物理缓存。
 

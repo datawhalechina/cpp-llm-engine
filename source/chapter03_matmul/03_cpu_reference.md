@@ -28,7 +28,7 @@ for (std::size_t i = 0; i < M; ++i) {
 
 ## 请求怎样进入 CPU 内核
 
-`MatMulOp::try_compute()` 将矩阵适配为 `MatmulRequest`；`try_compute_tensor_views_into()` 接收 Chapter02 的两个只读输入视图和一个可写输出视图；`CpuReferenceMatmulBackend` 负责分派；<a href="../_code/chapter03_matmul/src/cpu_kernel.cpp"><code>cpu_kernel.cpp</code></a> 校验指针和尺寸后执行循环。返回 `Matrix` 的 `try_compute_tensor_views()` 继续作为教学兼容入口。
+`MatMulOp::try_compute()` 将矩阵适配为 `MatmulRequest`；`try_compute_tensor_views_into()` 接收 Chapter02 的两个只读输入视图和一个可写输出视图；`CpuReferenceMatmulBackend` 负责分派；<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/src/cpu_kernel.cpp"><code>cpu_kernel.cpp</code></a> 校验指针和尺寸后执行循环。返回 `Matrix` 的 `try_compute_tensor_views()` 继续作为教学兼容入口。
 
 SIMD、分块和 GPU 可以换一种更快的计算方法，但输出仍要与这段循环比较。
 

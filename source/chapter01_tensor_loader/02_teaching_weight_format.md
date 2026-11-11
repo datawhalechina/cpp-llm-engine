@@ -4,7 +4,7 @@
 
 ## CIE1 文件布局
 
-<a href="../_code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> 按照测试数据写入器的字段顺序读取数据：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> 按照测试数据写入器的字段顺序读取数据：
 
 | 区域 | 字段 | 作用 |
 | --- | --- | --- |

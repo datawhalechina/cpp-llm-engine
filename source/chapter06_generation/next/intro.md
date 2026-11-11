@@ -28,12 +28,12 @@ Chapter04 已经固定 Decoder 的计算顺序，Chapter05 让真实量化权重
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
-| 1 | A/B 公共 | [`06.1 请求状态与模型调用`](./01_request_contract.md)–[`06.3 单请求循环`](./03_single_request_loop.md) | <a href="../../_code/chapter06_generation/src/runtime.cpp"><code>runtime.cpp</code></a> | prompt 怎样经过 Prefill 和 Decode 产生输出 |
-| 2 | A/B 公共 | [`06.4 请求状态`](./04_request_lifecycle.md) | <a href="../../_code/chapter06_generation/src/request.cpp"><code>request.cpp</code></a> | 五种终态为什么不能再次推进 |
-| 3 | A | [`06.5 采样与停止`](./05_sampling_stop.md) | <a href="../../_code/chapter06_generation/src/sampler.cpp"><code>sampler.cpp</code></a> | 固定 logits 怎样得到固定词元并结束请求 |
-| 4 | A/B 公共 | [`06.6 单请求 K/V 语义`](./06_single_request_kv_semantics.md) | <a href="../../_code/chapter06_generation/include/chapter06_generation/model_executor.h"><code>model_executor.h</code></a> | 词元历史与模型分层 K/V 为什么不是同一对象 |
-| 5 | A/B 公共 | [`06.7 流式与错误`](./07_streaming_errors.md) | <a href="../../_code/chapter06_generation/src/runtime.cpp"><code>runtime.cpp</code></a> | 词元提交、回调和失败状态的先后顺序 |
-| 6 | B | [`06.8 真实模型`](./08_real_tinyllama_generation.md)、[`06.9 框架对照`](./09_framework_comparison.md) | <a href="../../_code/engine/examples/real_tinyllama_generation_smoke.cpp"><code>real_tinyllama_generation_smoke.cpp</code></a>、<a href="../../_code/engine/src/real_deepseek2_executor_factory.cpp"><code>real_deepseek2_executor_factory.cpp</code></a> | 四种模型怎样复用同一生成控制流 |
+| 1 | A/B 公共 | [`06.1 请求状态与模型调用`](./01_request_contract.md)–[`06.3 单请求循环`](./03_single_request_loop.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/runtime.cpp"><code>runtime.cpp</code></a> | prompt 怎样经过 Prefill 和 Decode 产生输出 |
+| 2 | A/B 公共 | [`06.4 请求状态`](./04_request_lifecycle.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/request.cpp"><code>request.cpp</code></a> | 五种终态为什么不能再次推进 |
+| 3 | A | [`06.5 采样与停止`](./05_sampling_stop.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/sampler.cpp"><code>sampler.cpp</code></a> | 固定 logits 怎样得到固定词元并结束请求 |
+| 4 | A/B 公共 | [`06.6 单请求 K/V 语义`](./06_single_request_kv_semantics.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/include/chapter06_generation/model_executor.h"><code>model_executor.h</code></a> | 词元历史与模型分层 K/V 为什么不是同一对象 |
+| 5 | A/B 公共 | [`06.7 流式与错误`](./07_streaming_errors.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/runtime.cpp"><code>runtime.cpp</code></a> | 词元提交、回调和失败状态的先后顺序 |
+| 6 | B | [`06.8 真实模型`](./08_real_tinyllama_generation.md)、[`06.9 框架对照`](./09_framework_comparison.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/engine/examples/real_tinyllama_generation_smoke.cpp"><code>real_tinyllama_generation_smoke.cpp</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/engine/src/real_deepseek2_executor_factory.cpp"><code>real_deepseek2_executor_factory.cpp</code></a> | 四种模型怎样复用同一生成控制流 |
 
 ## 验证与下一步
 

@@ -17,7 +17,7 @@
 
 ## 从教学 Tokenizer 到真实模型规则
 
-教学接口位于 <a href="../_code/chapter01_tensor_loader/src/tokenizer.h"><code>tokenizer.h</code></a>：
+教学接口位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/tokenizer.h"><code>tokenizer.h</code></a>：
 
 ```cpp
 class Tokenizer {
@@ -30,7 +30,7 @@ public:
 
 默认 `Tokenizer` 用固定字母映射建立最小闭环：字母转换为整数，未知字符转换为 `0`。它适合验证接口、越界行为和编码/解码，但这些整数不构成 TinyLlama 的真实分词结果。
 
-`RealTokenizer` 位于 <a href="../_code/chapter01_tensor_loader/src/real_tokenizer.cpp"><code>real_tokenizer.cpp</code></a>。它读取真实 GGUF vocabulary，并调用 llama.cpp tokenizer API 执行模型规定的规则：
+`RealTokenizer` 位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/real_tokenizer.cpp"><code>real_tokenizer.cpp</code></a>。它读取真实 GGUF vocabulary，并调用 llama.cpp tokenizer API 执行模型规定的规则：
 
 分词器只负责文本与词元编号之间的转换；聊天模板先把 system、user、assistant 等角色整理为模型约定的文本，再交给分词器。当前 TinyLlama golden 使用固定原始 prompt，没有在自研 Runtime 中自动套用聊天模板。接入 Qwen 等模型时，模板版本、特殊词元和停止词元必须与模型配置一起建立新基线，不能只替换 GGUF 文件。
 
@@ -42,7 +42,7 @@ public:
 | BOS、EOS、PAD、UNK | 决定序列起止和异常输入行为 |
 | 对话模板 | 决定对话角色和生成提示怎样进入词元序列 |
 
-`ModelConfig` 位于 <a href="../_code/chapter01_tensor_loader/src/model_config.h"><code>model_config.h</code></a>，保存 `vocab_size`、`hidden_size`、`max_position`、`layer_count` 和 `max_new_tokens`。进入 Decoder 前至少满足：
+`ModelConfig` 位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/model_config.h"><code>model_config.h</code></a>，保存 `vocab_size`、`hidden_size`、`max_position`、`layer_count` 和 `max_new_tokens`。进入 Decoder 前至少满足：
 
 ```text
 ModelConfig.vocab_size == Tokenizer.vocab_size

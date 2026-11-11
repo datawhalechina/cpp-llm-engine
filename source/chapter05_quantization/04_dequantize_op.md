@@ -8,15 +8,15 @@
 
 | 格式 | 每个 block 的权重数 | 当前布局重点 | 参考实现 |
 | --- | ---: | --- | --- |
-| Q8_0 | 32 | 2 字节 half scale 与 32 个 8-bit quant | <a href="../_code/chapter05_quantization/src/q8_0_dequantize.cpp"><code>q8_0_dequantize.cpp</code></a> |
-| Q4_K | 256 | 144 字节内保存总 scale、minimum、分组参数和 4-bit quant | <a href="../_code/chapter05_quantization/src/q4k_dequantize.cpp"><code>q4k_dequantize.cpp</code></a> |
-| Q6_K | 256 | 210 字节内组合低 4 bit、高 2 bit、分组 scale 和总 scale | <a href="../_code/chapter05_quantization/src/q6k_dequantize.cpp"><code>q6k_dequantize.cpp</code></a> |
-| Q3_K | 256 | 110 字节内组合低 2 bit、高位掩码、6-bit 分组 scale 和总 scale | <a href="../_code/chapter05_quantization/src/q3k_dequantize.cpp"><code>q3k_dequantize.cpp</code></a> |
-| Q5_0 | 32 | 22 字节内保存 scale、低 4 bit 和第五位表，恢复后减 16 | <a href="../_code/chapter05_quantization/src/q5_0_dequantize.cpp"><code>q5_0_dequantize.cpp</code></a> |
-| Q5_1 | 32 | 24 字节内保存 scale、minimum、低 4 bit 和第五位表 | <a href="../_code/chapter05_quantization/src/q5_1_dequantize.cpp"><code>q5_1_dequantize.cpp</code></a> |
-| Q5_K | 256 | 176 字节内保存总 scale/minimum、八组参数、低 4 bit 和第五位表 | <a href="../_code/chapter05_quantization/src/q5k_linear.cpp"><code>q5k_linear.cpp</code></a> |
-| Q2_K | 256 | 84 字节内保存 2-bit quant、16 组 scale/minimum 和两个全局缩放参数 | <a href="../_code/chapter05_quantization/src/q2k_dequantize.cpp"><code>q2k_dequantize.cpp</code></a> |
-| IQ4_NL | 32 | 18 字节内保存 half scale 与 16 个 4-bit 索引，索引查非均匀码表 | <a href="../_code/chapter05_quantization/src/iq4nl_dequantize.cpp"><code>iq4nl_dequantize.cpp</code></a> |
+| Q8_0 | 32 | 2 字节 half scale 与 32 个 8-bit quant | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q8_0_dequantize.cpp"><code>q8_0_dequantize.cpp</code></a> |
+| Q4_K | 256 | 144 字节内保存总 scale、minimum、分组参数和 4-bit quant | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q4k_dequantize.cpp"><code>q4k_dequantize.cpp</code></a> |
+| Q6_K | 256 | 210 字节内组合低 4 bit、高 2 bit、分组 scale 和总 scale | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q6k_dequantize.cpp"><code>q6k_dequantize.cpp</code></a> |
+| Q3_K | 256 | 110 字节内组合低 2 bit、高位掩码、6-bit 分组 scale 和总 scale | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q3k_dequantize.cpp"><code>q3k_dequantize.cpp</code></a> |
+| Q5_0 | 32 | 22 字节内保存 scale、低 4 bit 和第五位表，恢复后减 16 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q5_0_dequantize.cpp"><code>q5_0_dequantize.cpp</code></a> |
+| Q5_1 | 32 | 24 字节内保存 scale、minimum、低 4 bit 和第五位表 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q5_1_dequantize.cpp"><code>q5_1_dequantize.cpp</code></a> |
+| Q5_K | 256 | 176 字节内保存总 scale/minimum、八组参数、低 4 bit 和第五位表 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q5k_linear.cpp"><code>q5k_linear.cpp</code></a> |
+| Q2_K | 256 | 84 字节内保存 2-bit quant、16 组 scale/minimum 和两个全局缩放参数 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q2k_dequantize.cpp"><code>q2k_dequantize.cpp</code></a> |
+| IQ4_NL | 32 | 18 字节内保存 half scale 与 16 个 4-bit 索引，索引查非均匀码表 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/iq4nl_dequantize.cpp"><code>iq4nl_dequantize.cpp</code></a> |
 
 下图用 Q8_0、Q4_K 和 Q6_K 展示三类典型 block 字段。量化码必须与同一 block 内的 scale、minimum 或高位数据一起解释，不能把 payload 当作普通整数数组逐元素读取。
 
@@ -72,7 +72,7 @@ def dequantize_q4k(super_block):
 
 ## 参考实现与线性层接口
 
-INT8 教学路径由 <a href="../_code/chapter05_quantization/src/dequantize_op.cpp"><code>dequantize_op.cpp</code></a> 输出 Float32 Tensor。Q2_K、Q3_K、Q4_K、Q5_0、Q5_1、Q5_K、Q6_K、Q8_0 和 IQ4_NL reference 路径则按 block 还原完整浮点权重或等价参考结果，为 fused backend 提供独立数值基线。
+INT8 教学路径由 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/dequantize_op.cpp"><code>dequantize_op.cpp</code></a> 输出 Float32 Tensor。Q2_K、Q3_K、Q4_K、Q5_0、Q5_1、Q5_K、Q6_K、Q8_0 和 IQ4_NL reference 路径则按 block 还原完整浮点权重或等价参考结果，为 fused backend 提供独立数值基线。
 
 反量化保持为独立 reference 的原因不是要求生产路径始终创建完整浮点权重，而是让格式解析可以单独验证。下一节的 fused Linear 会边解码边累加，省去中间数组，但每个量化值的还原规则不能改变。
 

@@ -4,7 +4,7 @@
 
 ## 数据类型与存储
 
-<a href="../_code/chapter05_quantization/include/chapter05_quantization/tensor.h"><code>tensor.h</code></a> 当前只声明两种数据类型：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/include/chapter05_quantization/tensor.h"><code>tensor.h</code></a> 当前只声明两种数据类型：
 
 ```cpp
 enum class DType {

@@ -29,6 +29,6 @@ Prefill 一次处理多个输入词元，常表现为较大的矩阵计算；Dec
 
 ## 把指标放入同一样本
 
-<a href="../../_code/chapter09_performance/include/chapter09_performance/evidence_record.h"><code>MeasurementSample</code></a> 在一轮测量中同时保存总时间、Prefill、Decode、TTFT、ITL、吞吐和峰值内存。这使同一请求的阶段数据共享 workload 和环境身份，不需要在多个文件中猜测它们是否来自同一次运行。
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/include/chapter09_performance/evidence_record.h"><code>MeasurementSample</code></a> 在一轮测量中同时保存总时间、Prefill、Decode、TTFT、ITL、吞吐和峰值内存。这使同一请求的阶段数据共享 workload 和环境身份，不需要在多个文件中猜测它们是否来自同一次运行。
 
 运行 `bash code/chapter09_performance/scripts/run.sh` 后，`chapter09_evidence_contract_test` 应确认所有样本都是非负有限值，且总时间和吞吐为正。指标语义固定后，`09.4` 再对重复样本进行聚合。

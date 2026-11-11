@@ -25,7 +25,7 @@ def generate_one(request, executor, sampler, config):
     return request.generated
 ```
 
-真实 C++ 路径把第一次 Prefill 和采样封装在 `prefill_chunk()`，后续循环调用 `decode_one()`。实现位于 <a href="/_code/chapter06_generation/src/runtime.cpp"><code>runtime.cpp</code></a>，确定性采样位于 <a href="/_code/chapter06_generation/src/sampler.cpp"><code>sampler.cpp</code></a>。
+真实 C++ 路径把第一次 Prefill 和采样封装在 `prefill_chunk()`，后续循环调用 `decode_one()`。实现位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/runtime.cpp"><code>runtime.cpp</code></a>，确定性采样位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/sampler.cpp"><code>sampler.cpp</code></a>。
 
 ## 每一步检查什么
 

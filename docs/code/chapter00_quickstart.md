@@ -15,11 +15,11 @@ run_real_inference.sh -> llama-simple + GGUF -> generated tokens
 
 | 顺序 | 代码入口 | 观察重点 |
 | --- | --- | --- |
-| 1 | <a href="/_code/chapter00_quickstart/run.sh"><code>run.sh</code></a> | 临时构建目录和 CTest 入口 |
-| 2 | <a href="/_code/chapter00_quickstart/examples/main_quick.cpp"><code>main_quick.cpp</code></a> | 环境检查与可选模型路径检查 |
-| 3 | <a href="/_code/chapter00_quickstart/run_real_inference.sh"><code>run_real_inference.sh</code></a> | llama.cpp、GGUF、推理参数和生成结果检查 |
-| 4 | <a href="/_code/chapter00_quickstart/tests/run_real_inference_contract.sh"><code>run_real_inference_contract.sh</code></a> | 不依赖模型的脚本成功与失败分支 |
-| 5 | <a href="/_code/chapter00_quickstart/CMakeLists.txt"><code>CMakeLists.txt</code></a> | C++17 target 与测试登记 |
+| 1 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter00_quickstart/run.sh"><code>run.sh</code></a> | 临时构建目录和 CTest 入口 |
+| 2 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter00_quickstart/examples/main_quick.cpp"><code>main_quick.cpp</code></a> | 环境检查与可选模型路径检查 |
+| 3 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter00_quickstart/run_real_inference.sh"><code>run_real_inference.sh</code></a> | llama.cpp、GGUF、推理参数和生成结果检查 |
+| 4 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter00_quickstart/tests/run_real_inference_contract.sh"><code>run_real_inference_contract.sh</code></a> | 不依赖模型的脚本成功与失败分支 |
+| 5 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter00_quickstart/CMakeLists.txt"><code>CMakeLists.txt</code></a> | C++17 target 与测试登记 |
 
 ## 运行与验证
 

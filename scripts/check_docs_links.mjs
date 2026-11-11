@@ -85,7 +85,10 @@ if (sourceMissing.length > 0) {
 }
 
 const codeLinkMissing = []
-const codeLinkPattern = /href="(?:\.\.\/|\/)\_code\/([^"#?]+)(?:[?#][^"]*)?"/g
+const legacyCodeLinkPattern =
+  /href="(?:\.\.\/)+_code\/|href="\/_code\//
+const codeLinkPattern =
+  /href="https:\/\/github\.com\/datawhalechina\/cpp-llm-engine\/blob\/main\/code\/([^"#?]+)(?:[?#][^"]*)?"/g
 const codeLinkMarkdownFiles = [
   ...sourceMarkdownFiles.filter((file) => !file.startsWith('source/maintenance/')),
   ...codeIndexMarkdownFiles,
@@ -94,12 +97,17 @@ let checkedCodeLinks = 0
 
 for (const file of codeLinkMarkdownFiles) {
   const markdown = readFileSync(file, 'utf8')
+  if (legacyCodeLinkPattern.test(markdown)) {
+    codeLinkMissing.push(
+      `${file}: legacy _code link cannot be opened from GitHub source view`,
+    )
+  }
   for (const match of markdown.matchAll(codeLinkPattern)) {
     checkedCodeLinks += 1
     const linkedPath = decodeURIComponent(match[1])
     const target = resolve('code', linkedPath)
     if (!existsSync(target)) {
-      codeLinkMissing.push(`${file}: /_code/${linkedPath} -> ${target}`)
+      codeLinkMissing.push(`${file}: repository code/${linkedPath} -> ${target}`)
     }
   }
 }

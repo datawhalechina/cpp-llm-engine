@@ -17,11 +17,11 @@ Tensor：共享 Storage + shape + strides + offset
 
 | 文件 | 作用 |
 | --- | --- |
-| <a href="/_code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> | 公开 View 操作、Storage 所有权和 Core 引用接口 |
-| <a href="/_code/chapter02_tensor_ops/src/tensor.cpp"><code>src/tensor.cpp</code></a> | N 维地址计算、View 变换、连续化与失败提交 |
-| <a href="/_code/chapter02_tensor_ops/examples/main_tensor_ops.cpp"><code>examples/main_tensor_ops.cpp</code></a> | 二维视图和三维 Q/K/V 布局示例 |
-| <a href="/_code/chapter02_tensor_ops/tests/chapter02_tensor_ops_test.cpp"><code>tests/chapter02_tensor_ops_test.cpp</code></a> | 二维兼容接口、生命周期和失败路径 |
-| <a href="/_code/chapter02_tensor_ops/tests/chapter02_nd_tensor_test.cpp"><code>tests/chapter02_nd_tensor_test.cpp</code></a> | 1D、3D、4D 与原地失败原子性 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> | 公开 View 操作、Storage 所有权和 Core 引用接口 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/src/tensor.cpp"><code>src/tensor.cpp</code></a> | N 维地址计算、View 变换、连续化与失败提交 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/examples/main_tensor_ops.cpp"><code>examples/main_tensor_ops.cpp</code></a> | 二维视图和三维 Q/K/V 布局示例 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/tests/chapter02_tensor_ops_test.cpp"><code>tests/chapter02_tensor_ops_test.cpp</code></a> | 二维兼容接口、生命周期和失败路径 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/tests/chapter02_nd_tensor_test.cpp"><code>tests/chapter02_nd_tensor_test.cpp</code></a> | 1D、3D、4D 与原地失败原子性 |
 
 ## 运行与验证
 

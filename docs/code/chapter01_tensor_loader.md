@@ -17,11 +17,11 @@ Reader 解析外部结构，Adapter 转换配置，Tensor Loader 读取 payload�
 
 | 顺序 | 代码入口 | 观察重点 |
 | --- | --- | --- |
-| 1 | <a href="/_code/chapter01_tensor_loader/src/tensor.h"><code>tensor.h</code></a>、<a href="/_code/chapter01_tensor_loader/src/tensor.cpp"><code>tensor.cpp</code></a> | shape、dtype、storage 和类型化访问检查 |
-| 2 | <a href="/_code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> | CIE1 记录校验与失败原子性 |
-| 3 | <a href="/_code/chapter01_tensor_loader/src/gguf_reader.cpp"><code>gguf_reader.cpp</code></a>、<a href="/_code/chapter01_tensor_loader/src/gguf_tensor_loader.cpp"><code>gguf_tensor_loader.cpp</code></a> | 索引解析与 payload 读取分离 |
-| 4 | <a href="/_code/chapter01_tensor_loader/src/model_metadata_adapter.cpp"><code>model_metadata_adapter.cpp</code></a>、<a href="/_code/chapter01_tensor_loader/src/tokenizer_metadata.cpp"><code>tokenizer_metadata.cpp</code></a> | 外部字段到内部契约 |
-| 5 | <a href="/_code/chapter01_tensor_loader/src/model_builder.cpp"><code>model_builder.cpp</code></a> | schema 检查与模型装配 |
+| 1 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/tensor.h"><code>tensor.h</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/tensor.cpp"><code>tensor.cpp</code></a> | shape、dtype、storage 和类型化访问检查 |
+| 2 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> | CIE1 记录校验与失败原子性 |
+| 3 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/gguf_reader.cpp"><code>gguf_reader.cpp</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/gguf_tensor_loader.cpp"><code>gguf_tensor_loader.cpp</code></a> | 索引解析与 payload 读取分离 |
+| 4 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/model_metadata_adapter.cpp"><code>model_metadata_adapter.cpp</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/tokenizer_metadata.cpp"><code>tokenizer_metadata.cpp</code></a> | 外部字段到内部契约 |
+| 5 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/model_builder.cpp"><code>model_builder.cpp</code></a> | schema 检查与模型装配 |
 
 ## 运行与验证
 

@@ -4,7 +4,7 @@
 
 ## Greedy 采样基线
 
-当前默认实现是 Greedy Sampler，代码位于 <a href="/_code/chapter06_generation/src/sampler.cpp"><code>sampler.cpp</code></a>。它返回最大 logit 所在的索引：
+当前默认实现是 Greedy Sampler，代码位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/sampler.cpp"><code>sampler.cpp</code></a>。它返回最大 logit 所在的索引：
 
 ```text
 logits = [0.1, 0.9, 0.2]

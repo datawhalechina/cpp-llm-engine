@@ -1,6 +1,6 @@
 # 03.4 接入 cuBLAS 计算后端
 
-CPU 内核按行优先读取矩阵，cuBLAS 默认按列优先解释内存。本节跟踪 `CublasMatmulBackend` 怎样交换输入矩阵和维度参数，在不复制数据的情况下得到相同输出。实现和测试分别位于 <a href="../_code/cuda/src/cublas_matmul_backend.cpp"><code>cublas_matmul_backend.cpp</code></a> 与 <a href="../_code/cuda/tests/cuda_cublas_matmul_test.cu"><code>cuda_cublas_matmul_test.cu</code></a>。
+CPU 内核按行优先读取矩阵，cuBLAS 默认按列优先解释内存。本节跟踪 `CublasMatmulBackend` 怎样交换输入矩阵和维度参数，在不复制数据的情况下得到相同输出。实现和测试分别位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/src/cublas_matmul_backend.cpp"><code>cublas_matmul_backend.cpp</code></a> 与 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/tests/cuda_cublas_matmul_test.cu"><code>cuda_cublas_matmul_test.cu</code></a>。
 
 ## 行优先布局映射
 

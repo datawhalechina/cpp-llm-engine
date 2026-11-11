@@ -18,7 +18,7 @@
 
 中间维度扩大了单个词元可使用的特征空间，但不会改变词元数。`FeedForward(4,8)` 因此把 `[2,4]` 暂时变为 `[2,8]`，再恢复为 `[2,4]`，以便与残差分支逐元素相加。
 
-<a href="../_code/chapter04_attention/src/feed_forward.cpp"><code>feed_forward.cpp</code></a> 直接表达这三个步骤：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/feed_forward.cpp"><code>feed_forward.cpp</code></a> 直接表达这三个步骤：
 
 ```cpp
 Tensor hidden = fc1_.forward(input);
@@ -26,7 +26,7 @@ Tensor activated = apply_activation(hidden, ActivationKind::Relu);
 return fc2_.forward(activated);
 ```
 
-两个线性层复用 <a href="../_code/chapter04_attention/src/linear_layer.cpp"><code>linear_layer.cpp</code></a>。`forward()` 保留 Chapter04 的教学张量接口；`try_forward()` 接收公共只读输入视图和可写输出视图，因此 Chapter02 张量可以直接进入同一线性计算。两条入口都要求 CPU Float32、二维连续布局和匹配的输入输出形状，不会替调用者隐式连续化。
+两个线性层复用 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/linear_layer.cpp"><code>linear_layer.cpp</code></a>。`forward()` 保留 Chapter04 的教学张量接口；`try_forward()` 接收公共只读输入视图和可写输出视图，因此 Chapter02 张量可以直接进入同一线性计算。两条入口都要求 CPU Float32、二维连续布局和匹配的输入输出形状，不会替调用者隐式连续化。
 
 线性层、LayerNorm、ReLU、残差相加和完整 FFN 均提供公共视图接口。Chapter04 教学张量仍负责旧入口和中间结果的存储所有权，公共视图只负责跨章传递布局与数据引用。
 
@@ -66,7 +66,7 @@ output = selected_output + shared_output
 
 这里的稳定 Top-K 表示分数相同时优先选择编号较小的专家，使测试和不同运行环境得到相同路由。教学实现对选中专家重新归一化，便于观察加权和；Qwen1.5-MoE 和 DeepSeek-V2-Lite 都先对全部专家做 Softmax，再保留 Top-K 概率，因此选中权重之和通常小于 1。Qwen1.5-MoE 用单独门控控制共享专家贡献，DeepSeek-V2-Lite 则把共享专家输出直接相加。真实适配器根据模型元数据选择这两种共享专家语义。
 
-<a href="../_code/chapter04_attention/src/moe_feed_forward.cpp"><code>moe_feed_forward.cpp</code></a> 使用小尺寸 Float32 权重完整执行这条语义链，并把每个词元的专家编号和路由权重保存在 `MoeRoute` 中。真实路径由 <a href="../_code/model/src/real_moe_feed_forward.cpp"><code>real_moe_feed_forward.cpp</code></a> 连接 Chapter01 的三维 packed expert 权重与 Chapter05 的量化 Linear。Qwen1.5-MoE 使用 60 选 4 和 Q3_K/Q5_K 等格式；DeepSeek-V2-Lite 使用 64 选 6，专家 Gate/Up 为 Q2_K、Down 为 IQ4_NL，共享专家输出不经过额外门控。
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/moe_feed_forward.cpp"><code>moe_feed_forward.cpp</code></a> 使用小尺寸 Float32 权重完整执行这条语义链，并把每个词元的专家编号和路由权重保存在 `MoeRoute` 中。真实路径由 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/src/real_moe_feed_forward.cpp"><code>real_moe_feed_forward.cpp</code></a> 连接 Chapter01 的三维 packed expert 权重与 Chapter05 的量化 Linear。Qwen1.5-MoE 使用 60 选 4 和 Q3_K/Q5_K 等格式；DeepSeek-V2-Lite 使用 64 选 6，专家 Gate/Up 为 Q2_K、Down 为 IQ4_NL，共享专家输出不经过额外门控。
 
 ![MoE 路由、专家分发与合并](../assets/diagrams/chapter04-moe-routing.svg)
 

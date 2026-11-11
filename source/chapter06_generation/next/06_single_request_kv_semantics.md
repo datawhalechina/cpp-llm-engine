@@ -9,7 +9,7 @@
 | `Request::history()` | prompt 和已生成词元 ID | 检查历史长度与请求隔离 | `Request` |
 | `RequestModelExecutor` Context | 每层、每个 KV head 的向量 | 增量 Attention | 请求专属执行器 |
 
-词元历史实现位于 <a href="/_code/chapter06_generation/include/chapter06_generation/token_history.h"><code>token_history.h</code></a>。真实执行器通过 `execution_state()` 暴露已提交词元数、K/V 层数以及是否保存实际 K/V 值；物理存储布局从 Chapter07 开始引入。
+词元历史实现位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/include/chapter06_generation/token_history.h"><code>token_history.h</code></a>。真实执行器通过 `execution_state()` 暴露已提交词元数、K/V 层数以及是否保存实际 K/V 值；物理存储布局从 Chapter07 开始引入。
 
 ## Decode 时长度怎样增长
 

@@ -37,7 +37,7 @@ __global__ void add_kernel(const float* a, const float* b, float* c, int n) {
 
 验证顺序：确认设备 -> 配置 CUDA target -> 编译 -> 枚举设备 -> 与 CPU 结果比较。对应练习见 [Foundation 正文与练习映射](./exercise_map.md)，完成 `FQ10`；它验证 kernel 映射，不替代完整环境排查。
 
-仓库的第一条自研 CUDA 路径从 <a href="../_code/cuda/include/cpp_llm_engine/cuda/device_buffer.h"><code>DeviceBuffer</code></a> 开始。它独立于 CPU 默认回归，已经把错误传播、device/pinned host 内存、stream、event 和异步复制串成最小闭环。使用兼容 Toolkit 的宿主环境运行：
+仓库的第一条自研 CUDA 路径从 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/include/cpp_llm_engine/cuda/device_buffer.h"><code>DeviceBuffer</code></a> 开始。它独立于 CPU 默认回归，已经把错误传播、device/pinned host 内存、stream、event 和异步复制串成最小闭环。使用兼容 Toolkit 的宿主环境运行：
 
 ```bash
 CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh

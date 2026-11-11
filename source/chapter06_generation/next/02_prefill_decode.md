@@ -17,7 +17,7 @@
 
 ## Runtime 怎样提交结果
 
-<a href="/_code/chapter06_generation/src/runtime.cpp"><code>runtime.cpp</code></a> 中的 `prefill_chunk()` 依次完成以下动作：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/runtime.cpp"><code>runtime.cpp</code></a> 中的 `prefill_chunk()` 依次完成以下动作：
 
 1. 检查上下文预算、终态和本次 chunk 大小。
 2. 调用执行器，把成功消费的 prompt 数写入 `prefill_offset`。

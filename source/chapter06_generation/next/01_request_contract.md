@@ -4,7 +4,7 @@
 
 ## 请求保存哪些状态
 
-请求创建时接收 prompt，随后只通过明确的状态转换提交进度。<a href="/_code/chapter06_generation/include/chapter06_generation/request.h"><code>request.h</code></a> 暴露读取接口和状态转换，<a href="/_code/chapter06_generation/src/request.cpp"><code>request.cpp</code></a> 保证终态不会再次恢复为运行态。
+请求创建时接收 prompt，随后只通过明确的状态转换提交进度。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/include/chapter06_generation/request.h"><code>request.h</code></a> 暴露读取接口和状态转换，<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/request.cpp"><code>request.cpp</code></a> 保证终态不会再次恢复为运行态。
 
 | 数据 | 代码表示 | 变化时机 |
 | --- | --- | --- |
@@ -21,9 +21,9 @@ Chapter07 命中共享 K/V 前缀时，`adopt_prefilled_prefix()` 会把同一�
 
 ## 配置与模型执行器
 
-生成配置定义停止和准入条件，位于 <a href="/_code/chapter06_generation/include/chapter06_generation/generation_types.h"><code>generation_types.h</code></a>。`max_new_tokens` 限制输出长度，`max_context_tokens` 限制 prompt 与计划输出的总长度，`eos_token_id` 提供提前停止条件。
+生成配置定义停止和准入条件，位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/include/chapter06_generation/generation_types.h"><code>generation_types.h</code></a>。`max_new_tokens` 限制输出长度，`max_context_tokens` 限制 prompt 与计划输出的总长度，`eos_token_id` 提供提前停止条件。
 
-模型执行器（Executor）是 Runtime 调用模型的请求级入口：它持有或引用一个请求的模型 Context，把 Prefill/Decode 输入交给 CPU 或 CUDA 模型，再返回 logits。它不是操作系统线程，不选择下一个词元，也不决定多个请求的先后顺序。接口位于 <a href="/_code/chapter06_generation/include/chapter06_generation/model_executor.h"><code>model_executor.h</code></a>。
+模型执行器（Executor）是 Runtime 调用模型的请求级入口：它持有或引用一个请求的模型 Context，把 Prefill/Decode 输入交给 CPU 或 CUDA 模型，再返回 logits。它不是操作系统线程，不选择下一个词元，也不决定多个请求的先后顺序。接口位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/include/chapter06_generation/model_executor.h"><code>model_executor.h</code></a>。
 
 | 调用 | 输入 | 输出 | 模型侧状态 |
 | --- | --- | --- | --- |

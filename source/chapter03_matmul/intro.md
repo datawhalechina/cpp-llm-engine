@@ -20,9 +20,9 @@ bash code/chapter03_matmul/scripts/run.sh
 
 | 路线 | 阅读顺序 | 先看代码 | 完成后能解释什么 |
 | --- | --- | --- | --- |
-| A/B CPU 主线 | [`03.1`](./01_operator_base.md) → [`03.2`](./02_matmul_design.md) → [`03.3`](./03_cpu_reference.md) → [`03.5`](./05_test_with_pytorch.md) → [`03.6`](./06_complexity_intuition.md) → [`03.7`](./07_runtime_backend_bridge.md) | <a href="../_code/chapter03_matmul/src/cpu_kernel.cpp"><code>cpu_kernel.cpp</code></a>、<a href="../_code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> | 张量视图怎样进入 CPU 循环并安全写回结果 |
-| G GPU 扩展 | 完成 03.3 后选读 [`03.4`](./04_cublas_implement.md) | <a href="../_code/cuda/src/cublas_matmul_backend.cpp"><code>cublas_matmul_backend.cpp</code></a> | 行优先矩阵怎样交给 cuBLAS，并与 CPU 结果比较 |
-| M 多模态复用 | 完成 CPU 主线后查看[多模态学习计划](../guides/multimodal_learning_plan.md) | <a href="../_code/multimodal/src/vision_projector.cpp"><code>vision_projector.cpp</code></a> | 视觉线性层和投影层怎样复用矩阵乘法 |
+| A/B CPU 主线 | [`03.1`](./01_operator_base.md) → [`03.2`](./02_matmul_design.md) → [`03.3`](./03_cpu_reference.md) → [`03.5`](./05_test_with_pytorch.md) → [`03.6`](./06_complexity_intuition.md) → [`03.7`](./07_runtime_backend_bridge.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/src/cpu_kernel.cpp"><code>cpu_kernel.cpp</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> | 张量视图怎样进入 CPU 循环并安全写回结果 |
+| G GPU 扩展 | 完成 03.3 后选读 [`03.4`](./04_cublas_implement.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/src/cublas_matmul_backend.cpp"><code>cublas_matmul_backend.cpp</code></a> | 行优先矩阵怎样交给 cuBLAS，并与 CPU 结果比较 |
+| M 多模态复用 | 完成 CPU 主线后查看[多模态学习计划](../guides/multimodal_learning_plan.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/multimodal/src/vision_projector.cpp"><code>vision_projector.cpp</code></a> | 视觉线性层和投影层怎样复用矩阵乘法 |
 
 ## 验证与下一步
 

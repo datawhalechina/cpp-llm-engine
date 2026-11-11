@@ -4,7 +4,7 @@
 
 ## 从文件恢复 Tensor
 
-<a href="../_code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> 中的 `load()` 每次先清空旧状态，再依次校验魔数、版本和张量数量。每条记录恢复名称、数据类型、设备、形状和权重数据，先放入局部 Tensor Map；只有全部记录成功后才提交结果，失败时不会暴露半加载模型。
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> 中的 `load()` 每次先清空旧状态，再依次校验魔数、版本和张量数量。每条记录恢复名称、数据类型、设备、形状和权重数据，先放入局部 Tensor Map；只有全部记录成功后才提交结果，失败时不会暴露半加载模型。
 
 ## 在最早位置拒绝错误
 

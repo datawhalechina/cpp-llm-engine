@@ -17,7 +17,7 @@
 
 ## 实现与失败状态
 
-<a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> 中的 `try_reshape()` 先验证源张量、连续性、维度和元素数量，再构造共享底层存储的新视图：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> 中的 `try_reshape()` 先验证源张量、连续性、维度和元素数量，再构造共享底层存储的新视图：
 
 ```cpp
 Tensor output;

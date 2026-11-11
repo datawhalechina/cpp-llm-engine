@@ -35,7 +35,7 @@ A/B 实验只改变一个待验证因素。baseline 与 experiment 必须通过�
 
 ## 验证比较器
 
-<a href="../../_code/chapter09_performance/src/comparison.cpp"><code>compare()</code></a> 先检查正确性、环境、workload、预热和测量轮数，再计算主指标与保护指标。执行：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/src/comparison.cpp"><code>compare()</code></a> 先检查正确性、环境、workload、预热和测量轮数，再计算主指标与保护指标。执行：
 
 ```bash
 bash code/chapter09_performance/scripts/run.sh

@@ -1,6 +1,6 @@
 # 10.4 让 Transport 只处理连接和字节
 
-Transport 负责监听、HTTP 解析、响应写出和连接事件；<a href="../../_code/chapter10_serving/include/chapter10_serving/http_adapter.h"><code>HttpAdapter</code></a> 负责路由与参数语义；`ServiceCore` 负责请求生命周期。更换网络库时，后两层契约保持不变。
+Transport 负责监听、HTTP 解析、响应写出和连接事件；<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/include/chapter10_serving/http_adapter.h"><code>HttpAdapter</code></a> 负责路由与参数语义；`ServiceCore` 负责请求生命周期。更换网络库时，后两层契约保持不变。
 
 ## 三层映射
 

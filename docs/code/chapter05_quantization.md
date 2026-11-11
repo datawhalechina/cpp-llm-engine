@@ -12,41 +12,41 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| <a href="/_code/chapter05_quantization/include/chapter05_quantization/tensor.h"><code>tensor.h</code></a> | 量化 Tensor 接口 |
-| <a href="/_code/chapter05_quantization/src/tensor.cpp"><code>src/tensor.cpp</code></a> | 量化 Tensor 实现 |
-| <a href="/_code/chapter05_quantization/src/dequantize_op.cpp"><code>src/dequantize_op.cpp</code></a> | 反量化算子 |
-| <a href="/_code/chapter05_quantization/src/q3k_dequantize.cpp"><code>src/q3k_dequantize.cpp</code></a> | Q3_K CPU reference 反量化 |
-| <a href="/_code/chapter05_quantization/src/q3k_linear.cpp"><code>src/q3k_linear.cpp</code></a> | Q3_K reference 与 scalar fused Linear |
-| <a href="/_code/chapter05_quantization/src/q5_0_dequantize.cpp"><code>src/q5_0_dequantize.cpp</code></a> | Q5_0 有符号 5-bit CPU reference 反量化 |
-| <a href="/_code/chapter05_quantization/src/q5_0_linear.cpp"><code>src/q5_0_linear.cpp</code></a> | Q5_0 scalar fused Linear |
-| <a href="/_code/chapter05_quantization/src/q5_1_dequantize.cpp"><code>src/q5_1_dequantize.cpp</code></a> | Q5_1 CPU reference 反量化 |
-| <a href="/_code/chapter05_quantization/src/q5_1_linear.cpp"><code>src/q5_1_linear.cpp</code></a> | Q5_1 reference 与 scalar fused Linear |
-| <a href="/_code/chapter05_quantization/src/q5k_linear.cpp"><code>src/q5k_linear.cpp</code></a> | Q5_K 分组解码与 scalar Linear |
-| <a href="/_code/chapter05_quantization/src/linear_layer.cpp"><code>src/linear_layer.cpp</code></a> | FP baseline Linear |
-| <a href="/_code/chapter05_quantization/src/quantized_linear.cpp"><code>src/quantized_linear.cpp</code></a> | 量化 Linear |
-| <a href="/_code/chapter05_quantization/include/chapter05_quantization/q4k_dequantize.h"><code>q4k_dequantize.h</code></a> | Q4_K block 解码接口 |
-| <a href="/_code/chapter05_quantization/src/q4k_dequantize.cpp"><code>src/q4k_dequantize.cpp</code></a> | Q4_K CPU reference 反量化 |
-| <a href="/_code/chapter05_quantization/src/q6k_dequantize.cpp"><code>src/q6k_dequantize.cpp</code></a> | Q6_K CPU reference 反量化 |
-| <a href="/_code/chapter05_quantization/src/q6k_linear.cpp"><code>src/q6k_linear.cpp</code></a> | Q6_K reference、scalar fused 和能力探测 |
-| <a href="/_code/chapter05_quantization/src/q6k_linear_avx2.cpp"><code>src/q6k_linear_avx2.cpp</code></a> | Q6_K fused AVX2/FMA backend |
-| <a href="/_code/chapter05_quantization/include/chapter05_quantization/q4k_linear.h"><code>q4k_linear.h</code></a> | Q4_K Linear reference 接口 |
-| <a href="/_code/chapter05_quantization/src/q4k_linear.cpp"><code>src/q4k_linear.cpp</code></a> | Q4_K reference、scalar fused 和能力探测 |
-| <a href="/_code/chapter05_quantization/src/q4k_linear_avx2.cpp"><code>src/q4k_linear_avx2.cpp</code></a> | Q4_K fused AVX2/FMA backend |
-| <a href="/_code/chapter05_quantization/include/chapter05_quantization/quantized_linear_policy.h"><code>quantized_linear_policy.h</code></a> | Q4_K/Q6_K backend policy 与 registry 契约 |
-| <a href="/_code/chapter05_quantization/src/quantized_linear_policy.cpp"><code>src/quantized_linear_policy.cpp</code></a> | 按 weight format 统一选择并调用 backend |
-| <a href="/_code/cuda/include/cpp_llm_engine/cuda/cuda_quantized_matrix.h"><code>cuda_quantized_matrix.h</code></a> | packed Q4_K/Q6_K device 权重 |
-| <a href="/_code/cuda/src/quantized_dequantize_backend.cu"><code>quantized_dequantize_backend.cu</code></a> | CUDA Q4_K/Q6_K 反量化 kernel |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/include/chapter05_quantization/tensor.h"><code>tensor.h</code></a> | 量化 Tensor 接口 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/tensor.cpp"><code>src/tensor.cpp</code></a> | 量化 Tensor 实现 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/dequantize_op.cpp"><code>src/dequantize_op.cpp</code></a> | 反量化算子 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q3k_dequantize.cpp"><code>src/q3k_dequantize.cpp</code></a> | Q3_K CPU reference 反量化 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q3k_linear.cpp"><code>src/q3k_linear.cpp</code></a> | Q3_K reference 与 scalar fused Linear |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q5_0_dequantize.cpp"><code>src/q5_0_dequantize.cpp</code></a> | Q5_0 有符号 5-bit CPU reference 反量化 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q5_0_linear.cpp"><code>src/q5_0_linear.cpp</code></a> | Q5_0 scalar fused Linear |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q5_1_dequantize.cpp"><code>src/q5_1_dequantize.cpp</code></a> | Q5_1 CPU reference 反量化 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q5_1_linear.cpp"><code>src/q5_1_linear.cpp</code></a> | Q5_1 reference 与 scalar fused Linear |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q5k_linear.cpp"><code>src/q5k_linear.cpp</code></a> | Q5_K 分组解码与 scalar Linear |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/linear_layer.cpp"><code>src/linear_layer.cpp</code></a> | FP baseline Linear |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/quantized_linear.cpp"><code>src/quantized_linear.cpp</code></a> | 量化 Linear |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/include/chapter05_quantization/q4k_dequantize.h"><code>q4k_dequantize.h</code></a> | Q4_K block 解码接口 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q4k_dequantize.cpp"><code>src/q4k_dequantize.cpp</code></a> | Q4_K CPU reference 反量化 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q6k_dequantize.cpp"><code>src/q6k_dequantize.cpp</code></a> | Q6_K CPU reference 反量化 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q6k_linear.cpp"><code>src/q6k_linear.cpp</code></a> | Q6_K reference、scalar fused 和能力探测 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q6k_linear_avx2.cpp"><code>src/q6k_linear_avx2.cpp</code></a> | Q6_K fused AVX2/FMA backend |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/include/chapter05_quantization/q4k_linear.h"><code>q4k_linear.h</code></a> | Q4_K Linear reference 接口 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q4k_linear.cpp"><code>src/q4k_linear.cpp</code></a> | Q4_K reference、scalar fused 和能力探测 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/q4k_linear_avx2.cpp"><code>src/q4k_linear_avx2.cpp</code></a> | Q4_K fused AVX2/FMA backend |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/include/chapter05_quantization/quantized_linear_policy.h"><code>quantized_linear_policy.h</code></a> | Q4_K/Q6_K backend policy 与 registry 契约 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/quantized_linear_policy.cpp"><code>src/quantized_linear_policy.cpp</code></a> | 按 weight format 统一选择并调用 backend |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/include/cpp_llm_engine/cuda/cuda_quantized_matrix.h"><code>cuda_quantized_matrix.h</code></a> | packed Q4_K/Q6_K device 权重 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/src/quantized_dequantize_backend.cu"><code>quantized_dequantize_backend.cu</code></a> | CUDA Q4_K/Q6_K 反量化 kernel |
 
 ## 验证与脚本
 
 | 文件 | 作用 |
 | --- | --- |
-| <a href="/_code/chapter05_quantization/examples/main_quantization.cpp"><code>examples/main_quantization.cpp</code></a> | 量化示例 |
-| <a href="/_code/chapter05_quantization/examples/q4k_benchmark.cpp"><code>examples/q4k_benchmark.cpp</code></a> | Q4_K decode + Linear 基线 |
-| <a href="/_code/chapter05_quantization/tests/chapter05_quantization_test.cpp"><code>tests/chapter05_quantization_test.cpp</code></a> | 量化格式、数值误差、后端能力和策略分派测试 |
-| <a href="/_code/chapter05_quantization/tests/chapter02_tensor_quantized_linear_integration_test.cpp"><code>tests/chapter02_tensor_quantized_linear_integration_test.cpp</code></a> | Chapter02 Tensor View 到量化 Linear 的跨章契约测试 |
-| <a href="/_code/cuda/tests/cuda_quantized_linear_test.cu"><code>cuda_quantized_linear_test.cu</code></a> | CPU/CUDA golden、非融合 SGEMM 和计时 |
-| <a href="/_code/chapter05_quantization/scripts/run.sh"><code>scripts/run.sh</code></a> | 运行脚本 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/examples/main_quantization.cpp"><code>examples/main_quantization.cpp</code></a> | 量化示例 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/examples/q4k_benchmark.cpp"><code>examples/q4k_benchmark.cpp</code></a> | Q4_K decode + Linear 基线 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/tests/chapter05_quantization_test.cpp"><code>tests/chapter05_quantization_test.cpp</code></a> | 量化格式、数值误差、后端能力和策略分派测试 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/tests/chapter02_tensor_quantized_linear_integration_test.cpp"><code>tests/chapter02_tensor_quantized_linear_integration_test.cpp</code></a> | Chapter02 Tensor View 到量化 Linear 的跨章契约测试 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/tests/cuda_quantized_linear_test.cu"><code>cuda_quantized_linear_test.cu</code></a> | CPU/CUDA golden、非融合 SGEMM 和计时 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/scripts/run.sh"><code>scripts/run.sh</code></a> | 运行脚本 |
 
 ## 对应文档
 

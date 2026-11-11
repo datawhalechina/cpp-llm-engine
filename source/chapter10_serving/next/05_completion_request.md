@@ -1,6 +1,6 @@
 # 10.5 完成一次同步 Completion 请求
 
-同步 Completion 在响应前跑完请求，适合验证最短服务闭环。应用层先把文本转换为 token ID，再由 <a href="../../_code/chapter10_serving/src/http_adapter.cpp"><code>HttpAdapter</code></a> 创建 Request 和请求专属 Executor，ServiceCore 完成准入、执行与释放。
+同步 Completion 在响应前跑完请求，适合验证最短服务闭环。应用层先把文本转换为 token ID，再由 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/src/http_adapter.cpp"><code>HttpAdapter</code></a> 创建 Request 和请求专属 Executor，ServiceCore 完成准入、执行与释放。
 
 ## 请求路径
 

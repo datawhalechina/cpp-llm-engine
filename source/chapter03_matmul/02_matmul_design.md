@@ -36,7 +36,7 @@ GEMV 是 General Matrix-Vector Multiplication，即通用矩阵向量乘法；GE
 
 ## 从张量视图到输出写回
 
-<a href="../_code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> 按下面的顺序处理 Chapter02 视图：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> 按下面的顺序处理 Chapter02 视图：
 
 | 步骤 | 代码检查或操作 | 目的 |
 | --- | --- | --- |
@@ -63,7 +63,7 @@ CPU 和 CUDA 的输入地址位于不同设备。行优先数据交给 cuBLAS �
 
 输出临时结果用于保证失败原子性：Backend 成功后才覆盖调用者的 Tensor。Workspace 保存 Backend 执行期间的中间数据，例如量化权重解码结果或 GPU 归约空间；二者都不改变输入 Tensor 的所有权。
 
-Workspace 的容量先由 shape 计算并校验，只在不足时增长。异步 GPU 执行还要等使用它的 stream 或 event 完成后才能复用。CPU reference 不模拟 CUDA stream，但必须保留相同的输入输出和失败行为，供设备实现做数值对照。GPU 资源所有者见 <a href="../_code/cuda/include/cpp_llm_engine/cuda/cuda_workspace.h"><code>CudaWorkspace</code></a> 和 <a href="../_code/cuda/include/cpp_llm_engine/cuda/cuda_execution_context.h"><code>CudaExecutionContext</code></a>。
+Workspace 的容量先由 shape 计算并校验，只在不足时增长。异步 GPU 执行还要等使用它的 stream 或 event 完成后才能复用。CPU reference 不模拟 CUDA stream，但必须保留相同的输入输出和失败行为，供设备实现做数值对照。GPU 资源所有者见 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/include/cpp_llm_engine/cuda/cuda_workspace.h"><code>CudaWorkspace</code></a> 和 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/include/cpp_llm_engine/cuda/cuda_execution_context.h"><code>CudaExecutionContext</code></a>。
 
 ## 动手验证
 

@@ -65,7 +65,7 @@ output = softmax(score + causal_mask) @ V
 
 ![MLA 压缩缓存与临时展开数据流](../assets/diagrams/chapter04-mla-cache-flow.svg)
 
-<a href="../_code/chapter04_attention/src/mla_attention.cpp"><code>mla_attention.cpp</code></a> 接收已经投影并完成 RoPE 的 Query、低秩缓存和 K/V 上投影权重。测试先通过低秩路径计算结果，再显式展开完整 K/V 并交给标准 CPU Attention；两条路径逐元素一致。该入口固定 MLA 的算法语义，当前尚未读取真实量化权重，也没有实现生产框架常用的权重吸收与融合 kernel。
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/mla_attention.cpp"><code>mla_attention.cpp</code></a> 接收已经投影并完成 RoPE 的 Query、低秩缓存和 K/V 上投影权重。测试先通过低秩路径计算结果，再显式展开完整 K/V 并交给标准 CPU Attention；两条路径逐元素一致。该入口固定 MLA 的算法语义，当前尚未读取真实量化权重，也没有实现生产框架常用的权重吸收与融合 kernel。
 
 真实 DeepSeek-V2-Lite 对照由 `run_deepseek_v2_lite_layer_capture.sh` 提供。它通过 llama.cpp 回调捕获首层的归一化输入、Query、K/V-A、共享 RoPE Key、压缩 latent、Attention 输出、FFN 输入和层输出。算法测试回答“低秩路径是否正确”，真实捕获回答“固定 GGUF 的节点名称、shape 和参考数值是什么”；自研首层需要同时通过两类证据。
 
@@ -106,12 +106,12 @@ def attention_reference(query, key, value, causal, offset):
 
 | 算法动作 | C++ 对象或位置 | 观察重点 |
 | --- | --- | --- |
-| Q/K/V 与输出投影 | <a href="../_code/chapter04_attention/src/attention.cpp"><code>attention.cpp</code></a> | `[T,D]` 怎样进入和离开计算后端 |
+| Q/K/V 与输出投影 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/attention.cpp"><code>attention.cpp</code></a> | `[T,D]` 怎样进入和离开计算后端 |
 | 查询的绝对位置 | `query_position_offset` | 解码查询怎样读取历史 K/V |
 | 因果判断 | `key_token > query_position` | 未来词元不进入 softmax |
 | 缩放点积 | 注意力 CPU 内核 | 每个注意力头独立计算，默认缩放因子为 `1/sqrt(Dh)` |
 | 稳定 softmax | 最大值、指数、分母三段循环 | 大分数不直接进入 `exp` |
-| 3D/4D 视图适配 | <a href="../_code/chapter04_attention/src/tensor_attention_adapter.cpp"><code>tensor_attention_adapter.cpp</code></a> | 批次指针偏移与连续性检查 |
+| 3D/4D 视图适配 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/tensor_attention_adapter.cpp"><code>tensor_attention_adapter.cpp</code></a> | 批次指针偏移与连续性检查 |
 
 适配器不隐式复制非连续视图。Chapter02 的转置或切片如果破坏连续布局，调用者必须先执行 `contiguous()`，复制成本因此保持可见。`try_compute_tensor_attention_into()` 接收调用方提供的可写输出视图；它先完成全部批次计算，成功后统一提交，因此形状校验或计算后端失败不会覆盖已有输出。返回 Chapter02 张量的旧入口继续作为兼容外壳。
 

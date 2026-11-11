@@ -1,6 +1,6 @@
 # 10.6 处理 SSE、断连和写回背压
 
-SSE 在 headers 发出后持续写入词元事件。<a href="../../_code/chapter10_serving/include/chapter10_serving/response_writer.h"><code>ResponseWriter</code></a> 把正常写入、客户端断开和背压返回为显式结果。此时 HTTP 状态码已经确定，后续断连、超时或模型失败只能通过连接关闭、最终事件和服务指标表达。
+SSE 在 headers 发出后持续写入词元事件。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/include/chapter10_serving/response_writer.h"><code>ResponseWriter</code></a> 把正常写入、客户端断开和背压返回为显式结果。此时 HTTP 状态码已经确定，后续断连、超时或模型失败只能通过连接关闭、最终事件和服务指标表达。
 
 ## Writer 必须保证什么
 

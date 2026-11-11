@@ -1,6 +1,6 @@
 # 10.7 区分连接并发、请求并发和 Tensor Batch
 
-“同时处理多个请求”可能发生在不同层。连接线程并发不等于模型并行，<a href="../../_code/chapter10_serving/src/request_worker.cpp"><code>RequestWorkerPool</code></a> 的请求级重叠也不等于一次 Tensor batch 调用。
+“同时处理多个请求”可能发生在不同层。连接线程并发不等于模型并行，<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/src/request_worker.cpp"><code>RequestWorkerPool</code></a> 的请求级重叠也不等于一次 Tensor batch 调用。
 
 | 并发层级 | 实际发生什么 | 当前证据 |
 | --- | --- | --- |
@@ -28,4 +28,4 @@
 
 ## 验证并发隔离
 
-运行 `bash code/chapter10_serving/scripts/run.sh`。<a href="../../_code/chapter10_serving/tests/request_worker_test.cpp"><code>chapter10_request_worker_test</code></a> 应证明多个请求可以在独立 Context 上并发、结果不串扰，并在不支持的 BlockPool 组合下显式拒绝。`10.8` 从这些请求的状态时间点产生可观测证据。
+运行 `bash code/chapter10_serving/scripts/run.sh`。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/tests/request_worker_test.cpp"><code>chapter10_request_worker_test</code></a> 应证明多个请求可以在独立 Context 上并发、结果不串扰，并在不支持的 BlockPool 组合下显式拒绝。`10.8` 从这些请求的状态时间点产生可观测证据。

@@ -7,10 +7,6 @@ export default defineConfig({
   cleanUrls: false,
   srcExclude: ['maintenance/**/*.md'],
   lastUpdated: true,
-  ignoreDeadLinks: [
-    /^\.\.\/_code\//,
-    /^\.\/\.\.\/_code\//,
-  ],
   vite: {
     publicDir: '.vitepress/public',
     resolve: {

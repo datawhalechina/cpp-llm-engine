@@ -37,7 +37,7 @@
 
 ## 验证样本与聚合值
 
-<a href="../../_code/chapter09_performance/src/statistics.cpp"><code>summarize()</code></a> 对样本副本排序，计算 count、min、max、mean 和 median；<a href="../../_code/chapter09_performance/src/evidence_record.cpp"><code>EvidenceRecord::summary()</code></a> 把同一规则应用到每个指标。执行：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/src/statistics.cpp"><code>summarize()</code></a> 对样本副本排序，计算 count、min、max、mean 和 median；<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/src/evidence_record.cpp"><code>EvidenceRecord::summary()</code></a> 把同一规则应用到每个指标。执行：
 
 ```bash
 bash code/chapter09_performance/scripts/run.sh

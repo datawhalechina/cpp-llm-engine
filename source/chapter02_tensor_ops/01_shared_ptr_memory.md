@@ -22,7 +22,7 @@ Chapter01 的权重张量已经区分逻辑形状和物理字节。Chapter02 使
 | 3 | `[tokens, heads, head_dim]` | `[heads×head_dim, head_dim, 1]` | Q/K/V |
 | 4 | `[batch, tokens, heads, head_dim]` | `[tokens×heads×head_dim, heads×head_dim, head_dim, 1]` | 注意力、KV Cache 执行输入 |
 
-<a href="../_code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> 使用 `shared_ptr<vector<float>>` 保存共享所有权。复制张量只复制视图描述和存储句柄，不复制元素：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> 使用 `shared_ptr<vector<float>>` 保存共享所有权。复制张量只复制视图描述和存储句柄，不复制元素：
 
 ```cpp
 Tensor original(2, 2, 1.0f);

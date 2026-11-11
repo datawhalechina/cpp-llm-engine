@@ -17,7 +17,7 @@
 | `token` | 已经提交的输出词元 ID | 文本编码和 HTTP 数据帧 |
 | `step` | 当前请求内的输出序号 | Scheduler 顺序和全局序号 |
 
-公共回调类型定义在 <a href="/_code/chapter06_generation/include/chapter06_generation/generation_types.h"><code>generation_types.h</code></a>，单请求分发位于 <a href="/_code/chapter06_generation/src/runtime.cpp"><code>runtime.cpp</code></a>。Chapter08 使用带 `request_id` 的 `TokenStreamCallback` 转发多请求结果，但不改变 Generation 的单请求回调契约。
+公共回调类型定义在 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/include/chapter06_generation/generation_types.h"><code>generation_types.h</code></a>，单请求分发位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/runtime.cpp"><code>runtime.cpp</code></a>。Chapter08 使用带 `request_id` 的 `TokenStreamCallback` 转发多请求结果，但不改变 Generation 的单请求回调契约。
 
 ## 错误怎样结束生成
 

@@ -14,14 +14,14 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| <a href="/_code/model/include/cpp_llm_engine/model/real_llama_cpu_decoder.h"><code>real_llama_cpu_decoder.h</code></a> | 真实 Model、请求 Context、结构契约与 profiling 接口 |
-| <a href="/_code/model/src/real_llama_cpu_decoder.cpp"><code>real_llama_cpu_decoder.cpp</code></a> | 22 层 CPU Decoder 与请求级 KV Cache |
-| <a href="/_code/model/include/cpp_llm_engine/model/real_llama_cuda_model.h"><code>real_llama_cuda_model.h</code></a> | CUDA 共享 Model 与请求级 Context 契约 |
-| <a href="/_code/model/src/real_llama_cuda_model.cpp"><code>real_llama_cuda_model.cpp</code></a> | 分层权重上传、多层执行与失败回退 |
-| <a href="/_code/model/examples/gguf_first_layer_forward.cpp"><code>gguf_first_layer_forward.cpp</code></a> | 首层单词元量化前向 |
-| <a href="/_code/model/examples/gguf_first_layer_multitoken.cpp"><code>gguf_first_layer_multitoken.cpp</code></a> | 首层多词元 RoPE、因果注意力与增量 K/V |
-| <a href="/_code/model/examples/gguf_decoder_multilayer.cpp"><code>gguf_decoder_multilayer.cpp</code></a> | 多层 logits、greedy token 与 llama.cpp 对照 |
-| <a href="/_code/model/CMakeLists.txt"><code>CMakeLists.txt</code></a> | Loader、量化后端和真实模型执行目标 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/include/cpp_llm_engine/model/real_llama_cpu_decoder.h"><code>real_llama_cpu_decoder.h</code></a> | 真实 Model、请求 Context、结构契约与 profiling 接口 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/src/real_llama_cpu_decoder.cpp"><code>real_llama_cpu_decoder.cpp</code></a> | 22 层 CPU Decoder 与请求级 KV Cache |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/include/cpp_llm_engine/model/real_llama_cuda_model.h"><code>real_llama_cuda_model.h</code></a> | CUDA 共享 Model 与请求级 Context 契约 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/src/real_llama_cuda_model.cpp"><code>real_llama_cuda_model.cpp</code></a> | 分层权重上传、多层执行与失败回退 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/examples/gguf_first_layer_forward.cpp"><code>gguf_first_layer_forward.cpp</code></a> | 首层单词元量化前向 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/examples/gguf_first_layer_multitoken.cpp"><code>gguf_first_layer_multitoken.cpp</code></a> | 首层多词元 RoPE、因果注意力与增量 K/V |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/examples/gguf_decoder_multilayer.cpp"><code>gguf_decoder_multilayer.cpp</code></a> | 多层 logits、greedy token 与 llama.cpp 对照 |
+| <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/CMakeLists.txt"><code>CMakeLists.txt</code></a> | Loader、量化后端和真实模型执行目标 |
 
 ## 对应文档
 

@@ -24,19 +24,19 @@
 
 | 对象 | 解决的问题 | 首次出现 | 代码入口 | 当前证据 |
 | --- | --- | --- | --- | --- |
-| `TokenSequence`、`TokenizerBackend` | 在文本、词元 ID 和嵌入之间传递输入 | Chapter01 | <a href="../_code/engine/include/cpp_llm_engine/tokenizer_backend.h"><code>tokenizer_backend.h</code></a> | 真实分词器已接入推理引擎 |
-| GGUF 元数据、`ModelConfig` | 保存模型架构、维度和量化布局 | Chapter01 | <a href="../_code/chapter01_tensor_loader/src/gguf_reader.cpp"><code>gguf_reader.cpp</code></a> | 字段模式与真实模型检查 |
-| `Storage`、shape、stride、offset | 表达连续张量和共享存储视图 | Chapter02 | <a href="../_code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> | reshape、slice 与越界契约 |
-| `CudaTensor`、`CudaExecutionContext` | 绑定设备存储并复用 stream、handle 和工作区 | [CPU/GPU 架构](./architecture.md#cpu-主线与-gpu-扩展) | <a href="../_code/cuda/include/cpp_llm_engine/cuda/cuda_execution_context.h"><code>cuda_execution_context.h</code></a> | 真实 CUDA 资源与数值测试 |
-| `DecoderModelContract` | 描述教学层和真实模型共享的解码器结构 | Chapter04 | <a href="../_code/core/include/cpp_llm_engine/core/decoder_contract.h"><code>decoder_contract.h</code></a> | 教学层与 TinyLlama 22 层校验 |
-| `DecoderExecutionContext` | 隔离请求位置、分层 K/V 和执行状态 | Chapter06 | <a href="../_code/model/include/cpp_llm_engine/model/real_llama_cpu_decoder.h"><code>real_llama_cpu_decoder.h</code></a> | 双上下文、生成与服务测试 |
-| `Request`、`TokenHistory` | 保存生成状态和已提交词元 | Chapter06 | <a href="../_code/chapter06_generation/include/chapter06_generation/request.h"><code>request.h</code></a> | 状态迁移、追加和隔离测试 |
-| `RequestModelExecutor`、Factory | 为请求创建上下文并适配模型调用 | Chapter06 | <a href="../_code/chapter06_generation/include/chapter06_generation/model_executor.h"><code>model_executor.h</code></a> | 分块预填充与真实模型服务 |
-| `KvBlockPool`、`BlockTable` | 管理物理块并映射逻辑位置 | Chapter07 | <a href="../_code/chapter07_kv_cache/include/chapter07_kv_cache/block_table.h"><code>block_table.h</code></a> | 预留、回滚、释放和复用 |
-| `CpuPagedKvCache`、`CudaPagedKvCache` | 保存分页 K/V 并按页表读取 | Chapter07 | <a href="../_code/chapter07_kv_cache/include/chapter07_kv_cache/paged_kv_cache.h"><code>paged_kv_cache.h</code></a> | CPU/CUDA 单请求与批次验证 |
-| `StepBatchPlan` | 把等待和运行请求组织为单步计划 | Chapter08 | <a href="../_code/chapter08_scheduling/include/chapter08_scheduling/step_scheduler.h"><code>step_scheduler.h</code></a> | 预算、公平性与失败回滚 |
-| `EvidenceRecord` | 保存工作负载、环境、样本和统计 | Chapter09 | <a href="../_code/chapter09_performance/include/chapter09_performance/evidence_record.h"><code>evidence_record.h</code></a> | 版本化 JSON 与 A/B 决策 |
-| `ResponseWriter`、`ServiceMetrics` | 输出流式事件并记录服务终态 | Chapter10 | <a href="../_code/chapter10_serving/include/chapter10_serving/response_writer.h"><code>response_writer.h</code></a> | HTTP/SSE、取消和资源释放 |
+| `TokenSequence`、`TokenizerBackend` | 在文本、词元 ID 和嵌入之间传递输入 | Chapter01 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/engine/include/cpp_llm_engine/tokenizer_backend.h"><code>tokenizer_backend.h</code></a> | 真实分词器已接入推理引擎 |
+| GGUF 元数据、`ModelConfig` | 保存模型架构、维度和量化布局 | Chapter01 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/gguf_reader.cpp"><code>gguf_reader.cpp</code></a> | 字段模式与真实模型检查 |
+| `Storage`、shape、stride、offset | 表达连续张量和共享存储视图 | Chapter02 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> | reshape、slice 与越界契约 |
+| `CudaTensor`、`CudaExecutionContext` | 绑定设备存储并复用 stream、handle 和工作区 | [CPU/GPU 架构](./architecture.md#cpu-主线与-gpu-扩展) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/include/cpp_llm_engine/cuda/cuda_execution_context.h"><code>cuda_execution_context.h</code></a> | 真实 CUDA 资源与数值测试 |
+| `DecoderModelContract` | 描述教学层和真实模型共享的解码器结构 | Chapter04 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/core/include/cpp_llm_engine/core/decoder_contract.h"><code>decoder_contract.h</code></a> | 教学层与 TinyLlama 22 层校验 |
+| `DecoderExecutionContext` | 隔离请求位置、分层 K/V 和执行状态 | Chapter06 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/include/cpp_llm_engine/model/real_llama_cpu_decoder.h"><code>real_llama_cpu_decoder.h</code></a> | 双上下文、生成与服务测试 |
+| `Request`、`TokenHistory` | 保存生成状态和已提交词元 | Chapter06 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/include/chapter06_generation/request.h"><code>request.h</code></a> | 状态迁移、追加和隔离测试 |
+| `RequestModelExecutor`、Factory | 为请求创建上下文并适配模型调用 | Chapter06 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/include/chapter06_generation/model_executor.h"><code>model_executor.h</code></a> | 分块预填充与真实模型服务 |
+| `KvBlockPool`、`BlockTable` | 管理物理块并映射逻辑位置 | Chapter07 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter07_kv_cache/include/chapter07_kv_cache/block_table.h"><code>block_table.h</code></a> | 预留、回滚、释放和复用 |
+| `CpuPagedKvCache`、`CudaPagedKvCache` | 保存分页 K/V 并按页表读取 | Chapter07 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter07_kv_cache/include/chapter07_kv_cache/paged_kv_cache.h"><code>paged_kv_cache.h</code></a> | CPU/CUDA 单请求与批次验证 |
+| `StepBatchPlan` | 把等待和运行请求组织为单步计划 | Chapter08 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter08_scheduling/include/chapter08_scheduling/step_scheduler.h"><code>step_scheduler.h</code></a> | 预算、公平性与失败回滚 |
+| `EvidenceRecord` | 保存工作负载、环境、样本和统计 | Chapter09 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/include/chapter09_performance/evidence_record.h"><code>evidence_record.h</code></a> | 版本化 JSON 与 A/B 决策 |
+| `ResponseWriter`、`ServiceMetrics` | 输出流式事件并记录服务终态 | Chapter10 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/include/chapter10_serving/response_writer.h"><code>response_writer.h</code></a> | HTTP/SSE、取消和资源释放 |
 
 ## 关键算法
 

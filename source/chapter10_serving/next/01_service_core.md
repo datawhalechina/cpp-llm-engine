@@ -1,6 +1,6 @@
 # 10.1 服务核心（ServiceCore）只编排生命周期
 
-`ServiceCore` 接收请求、保存服务状态并调用 Chapter08 调度器。<a href="../../_code/chapter10_serving/include/chapter10_serving/service_core.h"><code>service_core.h</code></a> 公开准入、单步执行、取消、超时和指标接口；它不计算 logits、不决定 K/V 物理布局，也不解析 socket 字节。
+`ServiceCore` 接收请求、保存服务状态并调用 Chapter08 调度器。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/include/chapter10_serving/service_core.h"><code>service_core.h</code></a> 公开准入、单步执行、取消、超时和指标接口；它不计算 logits、不决定 K/V 物理布局，也不解析 socket 字节。
 
 ## 调用链与所有权
 

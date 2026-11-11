@@ -19,7 +19,7 @@
 | 定期运行 | 固定机器、固定 workload、多轮样本 | 发现趋势与明显回退 |
 | 发布实验 | 环境快照、完整样本、阶段 Profiling、A/B 记录 | 支持优化保留决策 |
 
-实验资产登记表保存结论和结果路径，正文解释方法。当前 AVX2 顺序/并行请求决策见 <a href="../../_code/chapter09_performance/results/evidence/tinyllama_service_core_cpu-avx2-dispatch-decision.json"><code>dispatch-decision.json</code></a>；文件引用两份 evidence，不复制原始样本。正文中的示例数字不能替代可下载、可复查的原始结果。
+实验资产登记表保存结论和结果路径，正文解释方法。当前 AVX2 顺序/并行请求决策见 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/results/evidence/tinyllama_service_core_cpu-avx2-dispatch-decision.json"><code>dispatch-decision.json</code></a>；文件引用两份 evidence，不复制原始样本。正文中的示例数字不能替代可下载、可复查的原始结果。
 
 CUDA 自适应 GEMV 展示了默认路径变更所需的三层证据。EXP-GPU-14 用 NCU 证明小 batch 减少了无效 tile 行工作；EXP-GPU-15 在真实 Decode 中通过正确性与顺序保护指标并输出 `KEEP`；EXP-GPU-16 再用 batch、上下文和 Decode 步数矩阵限定适用范围。任一层缺失时，只能保留候选实现或局部结论，不能直接替换默认路径。
 

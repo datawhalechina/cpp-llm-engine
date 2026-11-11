@@ -24,7 +24,7 @@ Foundation 准备了构建和测试能力；本章先使用 `llama.cpp` 加载 T
 bash code/chapter00_quickstart/run.sh
 ```
 
-看到 `chapter00_quickstart` 输出 `smoke check passed` 后，说明连通性检查已经通过。按表格继续准备 `llama.cpp` 和 TinyLlama，第四步使用 <a href="../_code/chapter00_quickstart/run_real_inference.sh"><code>run_real_inference.sh</code></a> 执行真实模型。
+看到 `chapter00_quickstart` 输出 `smoke check passed` 后，说明连通性检查已经通过。按表格继续准备 `llama.cpp` 和 TinyLlama，第四步使用 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter00_quickstart/run_real_inference.sh"><code>run_real_inference.sh</code></a> 执行真实模型。
 
 | 顺序 | 路线 | 页面 | 读完后应看到什么 |
 | --- | --- | --- | --- |

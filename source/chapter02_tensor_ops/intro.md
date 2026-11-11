@@ -31,9 +31,9 @@ Chapter 01 已经建立模型形状、数据类型和底层存储概念；本章
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
-| 1 | A/B 公共 | [`02.1 共享底层存储`](./01_shared_ptr_memory.md) | <a href="../_code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> | 视图元数据与存储所有权分开 |
-| 2 | A | [`02.2 变形与转置`](./02_reshape.md)、[`02.3 切片`](./03_slice.md) | <a href="../_code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> | 二维地址变化、共享和显式复制可以直接观察 |
-| 3 | B | [`02.4 单元测试`](./04_unit_tests.md) | <a href="../_code/chapter02_tensor_ops/tests/chapter02_nd_tensor_test.cpp"><code>chapter02_nd_tensor_test.cpp</code></a> | 1D、3D、4D 索引与公共视图规则成立 |
+| 1 | A/B 公共 | [`02.1 共享底层存储`](./01_shared_ptr_memory.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/include/chapter02_tensor_ops/tensor.h"><code>tensor.h</code></a> | 视图元数据与存储所有权分开 |
+| 2 | A | [`02.2 变形与转置`](./02_reshape.md)、[`02.3 切片`](./03_slice.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/src/tensor.cpp"><code>tensor.cpp</code></a> | 二维地址变化、共享和显式复制可以直接观察 |
+| 3 | B | [`02.4 单元测试`](./04_unit_tests.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter02_tensor_ops/tests/chapter02_nd_tensor_test.cpp"><code>chapter02_nd_tensor_test.cpp</code></a> | 1D、3D、4D 索引与公共视图规则成立 |
 | 4 | B | [`02.5 张量与视图框架对照`](./05_framework_tensor_comparison.md) | [`教程资产索引`](../reference/tutorial_assets.md) | 在 ggml 和 vLLM 中定位视图与执行布局 |
 
 ## 验证与下一步

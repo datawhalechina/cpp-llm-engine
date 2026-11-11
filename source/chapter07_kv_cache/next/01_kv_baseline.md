@@ -29,7 +29,7 @@ Chapter04 的 `KvCache` 按 `[token, kv_head, head_dimension]` 保存数据。�
 offset = (t * Hkv + h) * Dh + d
 ```
 
-key 和 value 分别使用一块连续 `float` 存储。`append` 只在容量足够时复制新行并增加有效长度；`clear` 将有效长度重置为 0，不必清空全部内存，因为 Attention 只读取有效范围。实现见 <a href="/_code/chapter04_attention/src/kv_cache.cpp"><code>kv_cache.cpp</code></a>。
+key 和 value 分别使用一块连续 `float` 存储。`append` 只在容量足够时复制新行并增加有效长度；`clear` 将有效长度重置为 0，不必清空全部内存，因为 Attention 只读取有效范围。实现见 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/kv_cache.cpp"><code>kv_cache.cpp</code></a>。
 
 真实模型中，`RealLlamaCpuModel` 保存多请求共享的只读权重，`RealLlamaCpuContext` 保存单请求的位置与每层 K/V。连续存储便于核对地址和数值，但不同请求的闲置容量无法直接互相借用，这正是分页缓存要解决的问题。
 
