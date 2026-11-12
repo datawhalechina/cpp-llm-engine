@@ -1,0 +1,15 @@
+paired_sample iteration=1 path_order=sequential-first sequential_ms=31231.4555 grouped_ms=31683.9182
+paired_sample iteration=2 path_order=grouped-first sequential_ms=31962.2024 grouped_ms=31935.7044
+iterations: 2
+batch: 2
+sequential_median_ms: 31596.829
+grouped_median_ms: 31809.8113
+grouped_to_sequential_ratio: 1.00674062
+maximum_logits_error: 4.19616699e-05
+minimum_logits_cosine: 1
+tokens_match: true
+batch_workspace_uses: 2
+grouped_moe_calls: 52
+sequential_samples_ms: 31231.4555 31962.2024
+grouped_samples_ms: 31683.9182 31935.7044
+correctness: PASS

@@ -1,0 +1,12 @@
+Capture range started in the application.
+Capture range ended in the application.
+Generating '/tmp/nsys-report-8d7a.qdstrm'
+[1/1] [0%                          ] grouped-decode.nsys-repProcessing events...
+[1/1] [0%                          ] grouped-decode.nsys-rep[1/1] [===22%                      ] grouped-decode.nsys-rep[1/1] [=========43%                ] grouped-decode.nsys-rep[1/1] [====================85%     ] grouped-decode.nsys-rep[1/1] [========================100%] grouped-decode.nsys-rep[1/1] [========================100%] grouped-decode.nsys-rep
+profile_grouped_ms: 447.938308
+grouped_moe_calls: 26
+active_expert_groups: 156
+multi_row_expert_groups: 156
+profile_correctness: PASS
+Generated:
+    /tmp/cpp-llm-deepseek2-mla3-profile/grouped-decode.nsys-rep

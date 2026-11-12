@@ -1,0 +1,19 @@
+paired_sample iteration=1 path_order=sequential-first sequential_ms=32093.1694 grouped_ms=29668.1064
+paired_sample iteration=2 path_order=grouped-first sequential_ms=31837.9421 grouped_ms=31548.3568
+iterations: 2
+batch: 2
+sequential_median_ms: 31965.5557
+grouped_median_ms: 30608.2316
+grouped_to_sequential_ratio: 0.957537916
+maximum_logits_error: 4.19616699e-05
+minimum_logits_cosine: 1
+tokens_match: true
+batch_workspace_uses: 2
+grouped_moe_calls: 52
+active_expert_groups: 312
+multi_row_expert_groups: 312
+routed_rows: 624
+multi_row_group_ratio: 1
+sequential_samples_ms: 32093.1694 31837.9421
+grouped_samples_ms: 29668.1064 31548.3568
+correctness: PASS

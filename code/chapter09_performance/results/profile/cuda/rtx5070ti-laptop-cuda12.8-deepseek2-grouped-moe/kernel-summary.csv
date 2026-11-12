@@ -1,0 +1,8 @@
+Time (%),Total Time (ns),Instances,Avg (ns),Name
+99.9,32159037640,54,595537734.1,mla_attention_kernel
+0.0,12758230,156,81783.5,quantized_gemv_q2k_batch2
+0.0,9303341,364,25558.6,quantized_gemv_iq4nl_batch2
+0.0,4495292,112,40136.5,quantized_gemv_iq4nl_batch1
+0.0,3190189,54,59077.6,quantized_gemv_q3k_batch1
+0.0,2079566,2,1039783.0,quantized_gemv_q4k_batch1
+0.0,1951922,26,75073.9,quantized_gemv_q3k_batch2

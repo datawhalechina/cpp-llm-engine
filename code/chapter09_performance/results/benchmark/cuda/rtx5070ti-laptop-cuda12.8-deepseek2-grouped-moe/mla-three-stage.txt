@@ -1,0 +1,23 @@
+paired_sample iteration=1 path_order=sequential-first sequential_ms=584.972718 grouped_ms=427.435289
+paired_sample iteration=2 path_order=grouped-first sequential_ms=518.098664 grouped_ms=465.946977
+paired_sample iteration=3 path_order=sequential-first sequential_ms=562.880101 grouped_ms=455.888886
+paired_sample iteration=4 path_order=grouped-first sequential_ms=544.31791 grouped_ms=442.767833
+paired_sample iteration=5 path_order=sequential-first sequential_ms=544.47573 grouped_ms=462.129003
+paired_sample iteration=6 path_order=grouped-first sequential_ms=555.891426 grouped_ms=454.193394
+iterations: 6
+batch: 2
+sequential_median_ms: 550.183578
+grouped_median_ms: 455.04114
+grouped_to_sequential_ratio: 0.827071469
+maximum_logits_error: 7.05718994e-05
+minimum_logits_cosine: 1
+tokens_match: true
+batch_workspace_uses: 6
+grouped_moe_calls: 156
+active_expert_groups: 936
+multi_row_expert_groups: 936
+routed_rows: 1872
+multi_row_group_ratio: 1
+sequential_samples_ms: 584.972718 518.098664 562.880101 544.31791 544.47573 555.891426
+grouped_samples_ms: 427.435289 465.946977 455.888886 442.767833 462.129003 454.193394
+correctness: PASS

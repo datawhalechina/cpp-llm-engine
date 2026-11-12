@@ -1,0 +1,5 @@
+profile_grouped_ms: 31635.161
+grouped_moe_calls: 26
+active_expert_groups: 156
+multi_row_expert_groups: 156
+profile_correctness: PASS

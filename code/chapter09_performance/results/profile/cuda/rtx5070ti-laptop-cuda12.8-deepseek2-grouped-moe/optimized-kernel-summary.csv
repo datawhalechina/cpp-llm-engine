@@ -1,0 +1,20 @@
+Generating SQLite file /tmp/cpp-llm-deepseek2-mla3-profile/grouped-decode.sqlite from /tmp/cpp-llm-deepseek2-mla3-profile/grouped-decode.nsys-rep
+Processing [/tmp/cpp-llm-deepseek2-mla3-profile/grouped-decode.sqlite] with [/opt/nvidia/nsight-systems/2024.6.2/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+82.3,317592545,54,5881343.4,5909735.5,3248636,8810644,1276653.2,"cpp_llm_engine::cuda::<unnamed>::mla_score_kernel(cpp_llm_engine::cuda::CudaMlaAttentionRequest, const float *, const float *, unsigned long)"
+5.4,20746276,156,132988.9,134223.5,124768,136735,2706.8,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(cpp_llm_engine::core::WeightFormat)10, (unsigned long)2>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+3.9,14957350,364,41091.6,36879.5,35200,68672,10732.5,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(cpp_llm_engine::core::WeightFormat)9, (unsigned long)2>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+2.6,10122996,54,187462.9,87472.0,73024,1528318,328948.4,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(cpp_llm_engine::core::WeightFormat)5, (unsigned long)1>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+1.7,6649530,112,59370.8,58368.0,14880,304639,50198.3,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(cpp_llm_engine::core::WeightFormat)9, (unsigned long)1>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+1.4,5439900,54,100738.9,102271.5,91456,107232,5056.6,"cpp_llm_engine::cuda::<unnamed>::mla_value_kernel(cpp_llm_engine::cuda::CudaMlaAttentionRequest, const float *, unsigned long)"
+0.9,3349531,2,1674765.5,1674765.5,1673726,1675805,1470.1,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(cpp_llm_engine::core::WeightFormat)3, (unsigned long)1>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+0.8,3096124,26,119081.7,119024.0,118016,120575,687.4,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(cpp_llm_engine::core::WeightFormat)5, (unsigned long)2>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+0.5,1865149,2,932574.5,932574.5,744063,1121086,266595.5,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(cpp_llm_engine::core::WeightFormat)10, (unsigned long)1>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+0.3,1108829,164,6761.2,7952.0,3008,11520,2614.0,"cpp_llm_engine::cuda::<unnamed>::rms_norm_kernel(const float *, const float *, float *, unsigned long, float)"
+0.1,337599,108,3125.9,3136.0,3008,3232,41.0,"cpp_llm_engine::cuda::<unnamed>::rope_kernel(float *, unsigned long, unsigned long, unsigned long, unsigned long, unsigned long, float, cpp_llm_engine::core::RotaryPairing, cpp_llm_engine::core::YarnRotaryScaling)"
+0.1,329792,184,1792.3,1760.0,1728,4640,214.9,"cpp_llm_engine::cuda::<unnamed>::swiglu_kernel(const float *, const float *, float *, unsigned long)"
+0.0,183519,108,1699.3,1696.0,1440,3456,279.7,"cpp_llm_engine::cuda::<unnamed>::vector_add_kernel(const float *, const float *, float *, unsigned long)"
+0.0,162304,54,3005.6,2912.0,2624,3616,299.4,"cpp_llm_engine::cuda::<unnamed>::mla_softmax_kernel(cpp_llm_engine::cuda::CudaMlaAttentionRequest, unsigned long)"
+0.0,116544,54,2158.2,2144.0,2112,2368,37.6,cpp_llm_engine::cuda::<unnamed>::mla_prepare_kernel(cpp_llm_engine::cuda::CudaMlaPrepareRequest)
+0.0,4224,2,2112.0,2112.0,1760,2464,497.8,"cpp_llm_engine::cuda::<unnamed>::dequantize_q2k_kernel(const unsigned char *, float *, unsigned long)"
+

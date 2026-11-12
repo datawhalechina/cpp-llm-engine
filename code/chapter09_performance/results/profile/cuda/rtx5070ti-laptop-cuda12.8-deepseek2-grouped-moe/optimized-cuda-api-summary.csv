@@ -1,0 +1,12 @@
+Generating SQLite file /tmp/cpp-llm-deepseek2-mla3-profile/grouped-decode.sqlite from /tmp/cpp-llm-deepseek2-mla3-profile/grouped-decode.nsys-rep
+Processing [/tmp/cpp-llm-deepseek2-mla3-profile/grouped-decode.sqlite] with [/opt/nvidia/nsight-systems/2024.6.2/host-linux-x64/reports/cuda_api_sum.py]... 
+Time (%),Total Time (ns),Num Calls,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+79.4,352440847,290,1215313.3,470.0,350,15808412,2738530.9,cudaStreamSynchronize
+19.6,86993318,760,114464.9,3452.0,2575,2100163,303211.8,cudaMemcpyAsync
+0.9,4020788,1498,2684.1,2555.0,2204,47469,1566.0,cudaLaunchKernel
+0.1,251380,18,13965.6,2905.0,1122,174307,40480.3,cudaMalloc
+0.0,29335,1,29335.0,29335.0,29335,29335,0.0,cudaStreamCreateWithFlags
+0.0,6726,18,373.7,210.5,140,2846,621.1,cudaEventCreateWithFlags
+0.0,5049,1,5049.0,5049.0,5049,5049,0.0,cuProfilerStart
+0.0,2444,1,2444.0,2444.0,2444,2444,0.0,cudaFree
+

@@ -1,0 +1,5 @@
+Time (%),Total Time (ns),Calls,Avg (ns),Name
+99.9,31587214084,290,108921427.9,cudaStreamSynchronize
+0.1,36221011,760,47659.2,cudaMemcpyAsync
+0.0,5366472,1390,3860.8,cudaLaunchKernel
+0.0,492100,18,27338.9,cudaMalloc
