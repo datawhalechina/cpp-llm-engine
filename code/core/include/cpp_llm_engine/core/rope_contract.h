@@ -18,6 +18,27 @@ enum class RotaryPairing : std::uint8_t {
     SplitHalf,
 };
 
+struct YarnRotaryScaling final {
+    float factor = 1.0F;
+    std::size_t original_context = 0;
+    float beta_fast = 32.0F;
+    float beta_slow = 1.0F;
+
+    bool enabled() const { return factor > 1.0F; }
+
+    Status validate() const {
+        if (!std::isfinite(factor) || factor < 1.0F ||
+            !std::isfinite(beta_fast) || beta_fast <= 0.0F ||
+            !std::isfinite(beta_slow) || beta_slow <= 0.0F) {
+            return Status::error("YaRN scaling parameters must be finite and positive");
+        }
+        if (enabled() && original_context == 0) {
+            return Status::error("YaRN scaling requires an original context length");
+        }
+        return Status::ok();
+    }
+};
+
 struct RotaryEmbeddingRequest final {
     float* values = nullptr;
     std::size_t token_count = 0;
@@ -27,6 +48,7 @@ struct RotaryEmbeddingRequest final {
     std::size_t position_offset = 0;
     float frequency_base = 10000.0F;
     RotaryPairing pairing = RotaryPairing::Adjacent;
+    YarnRotaryScaling yarn;
 
     Status validate() const {
         if (token_count == 0) return Status::ok();
@@ -42,6 +64,8 @@ struct RotaryEmbeddingRequest final {
             pairing != RotaryPairing::SplitHalf) {
             return Status::error("RoPE pairing is invalid");
         }
+        const Status yarn_status = yarn.validate();
+        if (!yarn_status.is_ok()) return yarn_status;
         if (position_offset > std::numeric_limits<std::size_t>::max() -
                                   (token_count - 1)) {
             return Status::error("RoPE position range overflows");
@@ -64,6 +88,7 @@ struct RotaryEmbeddingBatchRequest final {
     std::size_t rotary_dimension = 0;
     float frequency_base = 10000.0F;
     RotaryPairing pairing = RotaryPairing::Adjacent;
+    YarnRotaryScaling yarn;
 
     Status validate() const {
         if (values == nullptr || positions == nullptr || batch_size == 0 ||
@@ -78,6 +103,8 @@ struct RotaryEmbeddingBatchRequest final {
             pairing != RotaryPairing::SplitHalf) {
             return Status::error("batch RoPE pairing is invalid");
         }
+        const Status yarn_status = yarn.validate();
+        if (!yarn_status.is_ok()) return yarn_status;
         if (head_count > std::numeric_limits<std::size_t>::max() / head_dimension ||
             batch_size > std::numeric_limits<std::size_t>::max() /
                              (head_count * head_dimension)) {

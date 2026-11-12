@@ -1,5 +1,5 @@
 // Core：量化 block 布局契约
-// 职责：统一 Q4_K/Q6_K/Q8_0 的 block 尺寸，并安全计算 row-major 权重字节数。
+// 职责：统一 CUDA/CPU 共用量化格式的 block 尺寸，并安全计算 row-major 权重字节数。
 // 契约：每一行必须由完整 block 组成；本文件不拥有 payload，也不执行解码。
 // 验证：core contract、Chapter05 CPU 测试和 CUDA Quantized Linear 测试。
 #pragma once
@@ -17,6 +17,10 @@ constexpr std::size_t kQ4KBlockBytes = 144;
 constexpr std::size_t kQ6KBlockBytes = 210;
 constexpr std::size_t kQ8_0BlockElements = 32;
 constexpr std::size_t kQ8_0BlockBytes = 34;
+constexpr std::size_t kQ2KBlockBytes = 84;
+constexpr std::size_t kQ3KBlockBytes = 110;
+constexpr std::size_t kIQ4NLBlockElements = 32;
+constexpr std::size_t kIQ4NLBlockBytes = 18;
 
 inline Status quantized_block_layout(WeightFormat format,
                                      std::size_t* elements,
@@ -39,7 +43,22 @@ inline Status quantized_block_layout(WeightFormat format,
         *bytes = kQ8_0BlockBytes;
         return Status::ok();
     }
-    return Status::error("quantized format must be Q4_K, Q6_K, or Q8_0");
+    if (format == WeightFormat::Q2K) {
+        *elements = kQuantizedBlockElements;
+        *bytes = kQ2KBlockBytes;
+        return Status::ok();
+    }
+    if (format == WeightFormat::Q3K) {
+        *elements = kQuantizedBlockElements;
+        *bytes = kQ3KBlockBytes;
+        return Status::ok();
+    }
+    if (format == WeightFormat::IQ4_NL) {
+        *elements = kIQ4NLBlockElements;
+        *bytes = kIQ4NLBlockBytes;
+        return Status::ok();
+    }
+    return Status::error("unsupported quantized block format");
 }
 
 inline Status quantized_block_bytes(WeightFormat format, std::size_t* result) {

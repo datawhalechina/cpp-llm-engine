@@ -133,6 +133,15 @@ int main() {
         CPP_LLM_CHECK(suite, checked_quantized_matrix_bytes(
             WeightFormat::Q8_0, 2, 96, &quantized_bytes).is_ok());
         CPP_LLM_CHECK(suite, quantized_bytes == 6 * kQ8_0BlockBytes);
+        CPP_LLM_CHECK(suite, checked_quantized_matrix_bytes(
+            WeightFormat::Q2K, 2, 512, &quantized_bytes).is_ok());
+        CPP_LLM_CHECK(suite, quantized_bytes == 4 * kQ2KBlockBytes);
+        CPP_LLM_CHECK(suite, checked_quantized_matrix_bytes(
+            WeightFormat::Q3K, 2, 512, &quantized_bytes).is_ok());
+        CPP_LLM_CHECK(suite, quantized_bytes == 4 * kQ3KBlockBytes);
+        CPP_LLM_CHECK(suite, checked_quantized_matrix_bytes(
+            WeightFormat::IQ4_NL, 2, 64, &quantized_bytes).is_ok());
+        CPP_LLM_CHECK(suite, quantized_bytes == 4 * kIQ4NLBlockBytes);
         CPP_LLM_CHECK(suite, !checked_quantized_matrix_bytes(
             WeightFormat::Float32, 1, 256, &quantized_bytes).is_ok());
         CPP_LLM_CHECK(suite, !checked_quantized_matrix_bytes(
@@ -198,6 +207,11 @@ int main() {
         overflow_rope.token_count = 2;
         overflow_rope.position_offset = std::numeric_limits<std::size_t>::max();
         CPP_LLM_CHECK(suite, !overflow_rope.validate().is_ok());
+        auto yarn_rope = rope_request;
+        yarn_rope.yarn = YarnRotaryScaling{4.0F, 4096, 32.0F, 1.0F};
+        CPP_LLM_CHECK(suite, yarn_rope.validate().is_ok());
+        yarn_rope.yarn.original_context = 0;
+        CPP_LLM_CHECK(suite, !yarn_rope.validate().is_ok());
 
         std::size_t rope_positions[2]{0, 7};
         const RotaryEmbeddingBatchRequest rope_batch{
