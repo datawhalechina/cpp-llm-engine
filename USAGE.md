@@ -82,8 +82,8 @@ CMake 选项决定编译哪些 backend，运行参数只选择已经编译的能
 
 | 扩展 | 入口 | 当前范围 |
 | --- | --- | --- |
-| CUDA backend | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备资源、量化 Linear、K/V、GQA 和 Decoder |
-| 真实模型集成 | [`code/engine/README.md`](code/engine/README.md) | TinyLlama CPU/CUDA 模型、运行时、生成和服务 |
+| CUDA backend | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备资源、量化 Linear、K/V、GQA、MLA、Decoder 和 MoE 数据面 |
+| 真实模型集成 | [`code/engine/README.md`](code/engine/README.md) | TinyLlama、Qwen3、Qwen1.5-MoE 与 DeepSeek-V2-Lite 的分阶段入口 |
 | 多模态 | `bash code/multimodal/scripts/run.sh` | SmolVLM CPU 输入、Vision、Projector 和 Decoder golden |
 
 修改 CUDA 后端、真实 CUDA 模型/Context 或服务接入后，依次运行纵向验收：
@@ -94,7 +94,7 @@ bash code/engine/scripts/run_real_cuda_runtime.sh
 bash code/engine/scripts/run_real_cuda_serving.sh
 ```
 
-脚本默认读取 `llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf`，也可通过 `CPP_LLM_ENGINE_MODEL_PATH` 指定模型。各阶段的详细入口、成功条件和当前限制见 [`code/engine/README.md`](code/engine/README.md)；环境准备见 [CUDA 指南](source/guides/setup_cuda.md)，学习顺序见 [GPU 六任务学习计划](source/guides/gpu_learning_plan.md)。
+上面的三条命令以 TinyLlama 展示默认 CUDA 纵向验收。Qwen3、Qwen1.5-MoE、DeepSeek-V2-Lite 和 SmolVLM 应使用各自已登记的脚本，避免只替换模型路径而跳过架构适配。分阶段状态和最小入口见[模型能力与扩展顺序](source/reference/model_support.md)，完整命令与成功条件见 [`code/engine/README.md`](code/engine/README.md)；环境准备见 [CUDA 指南](source/guides/setup_cuda.md)。
 
 ## 判断验证结果
 
@@ -102,6 +102,7 @@ bash code/engine/scripts/run_real_cuda_serving.sh
 
 ```bash
 npm install
+npm run test:check-model-capabilities
 npm run test:regression
 npm run test:release-contracts
 npm run docs:check-links
@@ -111,6 +112,7 @@ npm run docs:check-links
 | --- | --- | --- |
 | 章节测试 | 对应章节 `run.sh` | 当前章节可以独立构建并通过测试 |
 | 默认回归 | `npm run test:regression` | 无外部模型、网络和 GPU 时，主线资产与代码没有退化 |
+| 模型能力登记 | `npm run test:check-model-capabilities` | 能力状态、真实入口和证据路径保持一致；不执行可选模型或 GPU |
 | 发布验收 | `npm run test:release-contracts` | 全新 Release 构建中的测试登记、label 和跨章接口约定成立 |
 | 文档检查 | `npm run docs:check-links` | 链接有效且 VitePress 站点可以完整构建 |
 | 真实环境 | 引擎集成、CUDA 或多模态对应脚本 | 指定模型、设备或输入路径真实运行通过 |

@@ -13,7 +13,7 @@ _A Practical Tutorial for Building a C++ LLM Inference Engine_
 ## 教程特点
 
 - **从 CPU 完成完整主线**：普通 CPU 环境即可学习加载、解码、生成、缓存、调度和服务，再按需进入消费级 GPU 加速路线。
-- **从不同模型理解架构差异**：先用 TinyLlama 掌握 Llama 解码器，再通过 Qwen3 学习另一种稠密架构，通过 Qwen1.5-MoE 学习路由器、Top-K 和共享专家。
+- **从不同模型理解架构差异**：先用 TinyLlama 掌握 Llama 解码器，再通过 Qwen3 学习另一种稠密架构，通过 Qwen1.5-MoE 和 DeepSeek-V2-Lite 学习专家路由与 MLA。
 - **先理解原理，再学习优化**：先在 CPU 或平台无关代码中看清分页 K/V、连续批处理、前缀缓存和在线 Softmax，再观察 CUDA 如何改变数据布局与计算方式。
 - **亲手验证每一步**：使用固定结果、组件测试、真实模型对照和性能实验检查实现，并通过成熟框架对照理解教学代码与生产系统的差距。
 
@@ -83,16 +83,19 @@ Chapter04–05 建立 Attention 与量化 Linear 的数值语义，Chapter07–0
 | Qwen3-0.6B | Q/K Norm、NeoX RoPE、非对称 Q/K/V 头和共享 LM Head | CPU/CUDA 推理服务闭环 |
 | Qwen1.5-MoE-A2.7B | 60 选 4 Router、packed experts、共享专家和混合量化 | CPU 24 层生成、按专家分组批执行、调度与服务闭环 |
 | DeepSeek-R1-Distill-Qwen-1.5B | Qwen2.5 配置、Tokenizer 与聊天模板差异 | 待适配 |
-| DeepSeek-V2-Lite | MoE 与 MLA 组合 | 进阶设计参照，待实现 |
+| DeepSeek-V2-Lite | MLA、混合稠密/MoE 层、64 选 6 Router 与共享专家 | CPU/CUDA 27 层生成、分组批执行和服务核心闭环 |
+| SmolVLM-500M | Vision Encoder、Projector 与视觉词元序列 | CPU 多模态模型与服务生命周期闭环 |
 
-详细模型证据和后续适配顺序见[模型基线与扩展顺序](source/reference/model_support.md)。
+各模型分阶段的完成状态、真实入口和剩余边界见[模型能力与扩展顺序](source/reference/model_support.md)。
 
 ## 当前可学内容
 
-更新时间：**2026-11-10**。下面按最新内容在前排列；需要复现实验或核对具体环境时，再查阅[实验资产表](source/reference/experiment_assets.md)。
+更新时间：**2026-11-12**。下面按最新内容在前排列；需要复现实验或核对具体环境时，再查阅[实验资产表](source/reference/experiment_assets.md)。
 
 | 时间 | 新增学习内容 | 你可以复现什么 |
 | --- | --- | --- |
+| 2026-11-12 | DeepSeek-V2-Lite CUDA 纵向闭环 | 运行三阶段 MLA、量化 MoE、27 层生成、跨请求分组批执行与 ServiceCore |
+| 2026-11-12 | 统一模型能力矩阵 | 按外部基线、加载、CPU/CUDA 模型、批处理和服务阶段核对真实入口与剩余边界 |
 | 2026-11-10 | Qwen1.5-MoE 批处理与服务 | 比较逐词元与按专家分组执行，并观察四个请求在运行中加入、生成和释放资源 |
 | 2026-11-10 | Qwen1.5-MoE 完整生成 | 用真实分词器运行 24 层 MoE 模型，观察 Top-K 专家选择、分层 K/V 和文本生成 |
 | 2026-11-09 | Qwen3 推理服务 | 运行 Qwen3-0.6B 的 28 层 CPU/CUDA 推理、分页缓存、前缀命中以及 HTTP/SSE 输出 |

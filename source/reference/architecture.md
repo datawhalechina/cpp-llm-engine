@@ -90,7 +90,7 @@ flowchart LR
 | FlashAttention | 三阶段参考结果与分块在线 Softmax | tile、片上存储、Warp 归约与融合计算核 | CUDA 候选实现已通过正确性；端到端收益尚不稳定 |
 | Radix Cache | 前缀树、估算/采用、共享块引用和释放 | 复用命中页表读取 K/V | CPU/CUDA Context 采用与缓存感知排序已验证 |
 | MTP / 推测解码 | 候选、接受规则和状态回滚 | 并行验证多个候选词元 | 规划中 |
-| MLA | 压缩 K/V 和位置编码分支的数值参考 | 矩阵计算与专用 Attention 计算核 | 随 DeepSeek 模型路线规划 |
+| MLA | 压缩 K/V、位置编码分支与三阶段参考结果 | CUDA 三阶段 MLA 与请求级压缩 Context | CPU/CUDA 真实模型已验证；分页压缩 MLA 与分块 Tensor Prefill 待建设 |
 | Prefill/Decode 分离 | 实例角色、路由和 K/V 传输协议 | 各实例的阶段执行 | 集群级扩展参照 |
 
 ## 公共接口与验证顺序
