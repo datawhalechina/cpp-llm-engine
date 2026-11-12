@@ -45,6 +45,12 @@
 bash code/chapter10_serving/scripts/run.sh
 ```
 
+`chapter10_terminal_release_test` 在 `executor.prefill` 注入模型失败，`chapter10_http_contract_test` 在 `transport.write` 注入 SSE 写回异常；两者都检查请求终态、指标、inflight 数量和缓存释放。修改失败映射或所有权代码后运行：
+
+```bash
+npm run test:fault-injection
+```
+
 可选 socket 闭环使用：
 
 ```bash

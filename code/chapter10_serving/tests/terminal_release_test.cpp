@@ -12,6 +12,7 @@
 #include "chapter06_generation/transformer.h"
 #include "chapter07_kv_cache/block_table.h"
 #include "cpp_llm_engine/testing/test.h"
+#include "cpp_llm_engine/testing/fault_injector.h"
 
 #include <memory>
 #include <string>
@@ -20,12 +21,18 @@ namespace {
 
 class FailingExecutor final : public chapter06_generation::RequestModelExecutor {
 public:
+    explicit FailingExecutor(cpp_llm_engine::testing::FaultInjector* faults)
+        : faults_(faults) {}
+
     bool prefill(
         const chapter06_generation::TokenSequence&,
         chapter06_generation::Logits*,
         std::string* error) override {
-        if (error != nullptr) *error = "intentional prefill failure";
-        return false;
+        if (faults_ != nullptr && faults_->hit("executor.prefill")) {
+            if (error != nullptr) *error = "intentional prefill failure";
+            return false;
+        }
+        return true;
     }
 
     bool decode(
@@ -35,6 +42,9 @@ public:
         if (error != nullptr) *error = "unexpected decode";
         return false;
     }
+
+private:
+    cpp_llm_engine::testing::FaultInjector* faults_;
 };
 
 }  // namespace
@@ -92,9 +102,12 @@ int main() {
         auto pool = std::make_shared<chapter07_kv_cache::KvBlockPool>(2, 2);
         ServiceCore service(1, 1, ServiceNow{}, pool);
         Request request({4});
+        cpp_llm_engine::testing::FaultInjector faults;
+        faults.arm("executor.prefill");
         CPP_LLM_REQUIRE(
             suite,
-            service.admit(40, request, sampler, std::make_shared<FailingExecutor>())
+            service.admit(
+                40, request, sampler, std::make_shared<FailingExecutor>(&faults))
                 .accepted());
         CPP_LLM_REQUIRE(suite, pool->reserve(40, 1));
         CPP_LLM_REQUIRE(suite, pool->commit_tokens(40, 1));
@@ -107,6 +120,8 @@ int main() {
         CPP_LLM_CHECK_EQ(suite, service.metrics().released_total, 1U);
         CPP_LLM_CHECK_EQ(suite, pool->free_blocks(), pool->total_blocks());
         CPP_LLM_CHECK_EQ(suite, service.inflight_size(), 0U);
+        CPP_LLM_CHECK_EQ(suite, faults.calls("executor.prefill"), 1U);
+        CPP_LLM_CHECK_EQ(suite, faults.failures("executor.prefill"), 1U);
     });
 
     return suite.finish();

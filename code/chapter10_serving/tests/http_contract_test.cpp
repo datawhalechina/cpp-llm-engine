@@ -9,6 +9,7 @@
 #include "chapter06_generation/sampler.h"
 #include "chapter06_generation/transformer.h"
 #include "cpp_llm_engine/testing/test.h"
+#include "cpp_llm_engine/testing/fault_injector.h"
 
 #include <string>
 #include <stdexcept>
@@ -17,12 +18,19 @@ namespace {
 
 class RecordingWriter : public chapter10_serving::ResponseWriter {
 public:
+    explicit RecordingWriter(
+        cpp_llm_engine::testing::FaultInjector* faults = nullptr)
+        : faults_(faults) {}
+
     bool write_headers(const chapter10_serving::ResponseHead& value) override {
         head = value;
         headers_written = true;
         return connected && headers_allowed;
     }
     chapter10_serving::WriteResult write_event(std::string_view event) override {
+        if (faults_ != nullptr && faults_->hit("transport.write")) {
+            throw std::runtime_error("writer failure");
+        }
         if (!connected) return chapter10_serving::WriteResult::client_closed;
         if (blocked) return chapter10_serving::WriteResult::backpressure;
         body += event;
@@ -38,13 +46,9 @@ public:
     bool blocked = false;
     bool headers_written = false;
     bool finished = false;
-};
 
-class ThrowingWriter final : public RecordingWriter {
-public:
-    chapter10_serving::WriteResult write_event(std::string_view) override {
-        throw std::runtime_error("writer failure");
-    }
+private:
+    cpp_llm_engine::testing::FaultInjector* faults_;
 };
 
 }  // namespace
@@ -184,13 +188,17 @@ int main() {
     });
 
     suite.run("writer exception fails and releases the request", [&] {
-        ThrowingWriter writer;
+        cpp_llm_engine::testing::FaultInjector faults;
+        faults.arm("transport.write");
+        RecordingWriter writer(&faults);
         const auto response = adapter.handle_stream({
             "POST", "/v1/completions",
             "{\"request_id\":7,\"prompt_tokens\":[7]}"}, writer);
         CPP_LLM_CHECK_EQ(suite, response.status_code, 500);
         CPP_LLM_CHECK(suite, writer.finished);
         CPP_LLM_CHECK_EQ(suite, service.inflight_size(), 0U);
+        CPP_LLM_CHECK_EQ(suite, faults.calls("transport.write"), 1U);
+        CPP_LLM_CHECK_EQ(suite, faults.failures("transport.write"), 1U);
     });
 
     return suite.finish();
