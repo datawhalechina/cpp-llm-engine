@@ -12,6 +12,7 @@
     "code:check-line-endings": "node scripts/check_line_endings.mjs",
     "test:check-assets": "node scripts/check_test_assets.mjs",
     "test:check-contracts": "node scripts/check_test_contracts.mjs",
+    "test:check-model-capabilities": "node scripts/check_model_capabilities.mjs",
     "test:cpp-quality": "bash scripts/run_cpp_quality_gate.sh",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",

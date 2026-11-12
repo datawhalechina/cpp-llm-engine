@@ -56,6 +56,11 @@ run_and_check \
     "Test contract check passed"
 
 run_and_check \
+    model_capabilities \
+    "cd '${repo_root}' && npm run test:check-model-capabilities" \
+    "Model capability check passed"
+
+run_and_check \
     foundation \
     "cd '${repo_root}' && bash exercises/foundation/run_all.sh"
 

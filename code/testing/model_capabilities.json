@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "allowed_states": ["verified", "partial", "planned", "not_applicable"],
+  "capability_order": [
+    "external_baseline",
+    "loader",
+    "cpu_model_generation",
+    "cpu_batch_serving",
+    "cuda_model_generation",
+    "cuda_batch_serving"
+  ],
+  "models": [
+    {
+      "id": "tinyllama-1.1b",
+      "name": "TinyLlama 1.1B Chat",
+      "family": "Llama dense",
+      "capabilities": {
+        "external_baseline": { "state": "verified", "evidence": ["code/chapter00_quickstart/run_real_inference.sh"] },
+        "loader": { "state": "verified", "evidence": ["code/chapter01_tensor_loader/run.sh"] },
+        "cpu_model_generation": { "state": "verified", "evidence": ["code/chapter06_generation/scripts/run_real_generation.sh"] },
+        "cpu_batch_serving": { "state": "verified", "evidence": ["code/engine/scripts/run_real_http_server.sh"] },
+        "cuda_model_generation": { "state": "verified", "evidence": ["code/engine/scripts/run_real_cuda_generation.sh"] },
+        "cuda_batch_serving": { "state": "verified", "evidence": ["code/engine/scripts/run_real_cuda_serving.sh"] }
+      }
+    },
+    {
+      "id": "qwen3-0.6b",
+      "name": "Qwen3-0.6B",
+      "family": "Qwen3 dense",
+      "capabilities": {
+        "external_baseline": { "state": "verified", "evidence": ["code/chapter00_quickstart/run_qwen3_baseline.sh"] },
+        "loader": { "state": "verified", "evidence": ["code/chapter01_tensor_loader/run_qwen3_baseline.sh"] },
+        "cpu_model_generation": { "state": "verified", "evidence": ["code/chapter06_generation/scripts/run_qwen3_generation.sh"] },
+        "cpu_batch_serving": { "state": "verified", "evidence": ["code/chapter10_serving/scripts/run_qwen3_serving.sh"] },
+        "cuda_model_generation": { "state": "verified", "evidence": ["code/engine/scripts/run_qwen3_cuda_generation.sh"] },
+        "cuda_batch_serving": { "state": "verified", "evidence": ["code/engine/scripts/run_qwen3_cuda_serving.sh"] }
+      }
+    },
+    {
+      "id": "qwen15-moe-a2.7b",
+      "name": "Qwen1.5-MoE-A2.7B-Chat",
+      "family": "Qwen2 MoE",
+      "capabilities": {
+        "external_baseline": { "state": "verified", "evidence": ["code/chapter00_quickstart/run_qwen15_moe_baseline.sh"] },
+        "loader": { "state": "verified", "evidence": ["code/chapter01_tensor_loader/run_qwen15_moe_schema.sh"] },
+        "cpu_model_generation": { "state": "verified", "evidence": ["code/engine/scripts/run_qwen15_moe_generation.sh"] },
+        "cpu_batch_serving": { "state": "verified", "evidence": ["code/chapter09_performance/scripts/run_qwen15_moe_service_ab.sh"] },
+        "cuda_model_generation": { "state": "planned", "evidence": [], "gap": "CUDA MoE expert data plane" },
+        "cuda_batch_serving": { "state": "planned", "evidence": [], "gap": "Depends on CUDA model execution" }
+      }
+    },
+    {
+      "id": "deepseek-v2-lite",
+      "name": "DeepSeek-V2-Lite",
+      "family": "DeepSeek MoE + MLA",
+      "capabilities": {
+        "external_baseline": { "state": "verified", "evidence": ["code/chapter00_quickstart/run_deepseek_v2_lite_baseline.sh"] },
+        "loader": { "state": "verified", "evidence": ["code/chapter01_tensor_loader/run_deepseek_v2_lite_schema.sh"] },
+        "cpu_model_generation": { "state": "verified", "evidence": ["code/engine/scripts/run_deepseek_v2_lite_generation.sh"] },
+        "cpu_batch_serving": { "state": "verified", "evidence": ["code/engine/scripts/run_deepseek_v2_lite_http_server.sh"] },
+        "cuda_model_generation": { "state": "verified", "evidence": ["code/engine/scripts/run_deepseek_v2_lite_cuda_runtime.sh"] },
+        "cuda_batch_serving": { "state": "partial", "evidence": ["code/engine/scripts/run_deepseek_v2_lite_cuda_batch.sh", "code/engine/scripts/run_deepseek_v2_lite_cuda_serving.sh"], "gap": "CUDA HTTP/tokenizer composition and paged compressed MLA" }
+      }
+    },
+    {
+      "id": "smolvlm-500m",
+      "name": "SmolVLM-500M-Instruct",
+      "family": "Vision-language model",
+      "capabilities": {
+        "external_baseline": { "state": "partial", "evidence": ["code/multimodal/scripts/run.sh"], "gap": "Optional local model and mmproj assets are required" },
+        "loader": { "state": "verified", "evidence": ["code/multimodal/scripts/run.sh"] },
+        "cpu_model_generation": { "state": "verified", "evidence": ["code/multimodal/scripts/run.sh"] },
+        "cpu_batch_serving": { "state": "partial", "evidence": ["code/multimodal/scripts/run_real_service_benchmark.sh"], "gap": "Image HTTP transport is not implemented" },
+        "cuda_model_generation": { "state": "planned", "evidence": [], "gap": "CUDA vision encoder and projector" },
+        "cuda_batch_serving": { "state": "planned", "evidence": [], "gap": "Depends on CUDA multimodal execution" }
+      }
+    }
+  ]
+}
