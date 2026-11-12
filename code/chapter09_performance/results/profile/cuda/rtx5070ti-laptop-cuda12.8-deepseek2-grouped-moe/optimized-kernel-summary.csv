@@ -1,5 +1,5 @@
 Generating SQLite file /tmp/cpp-llm-deepseek2-mla3-profile/grouped-decode.sqlite from /tmp/cpp-llm-deepseek2-mla3-profile/grouped-decode.nsys-rep
-Processing [/tmp/cpp-llm-deepseek2-mla3-profile/grouped-decode.sqlite] with [/opt/nvidia/nsight-systems/2024.6.2/host-linux-x64/reports/cuda_gpu_kern_sum.py]... 
+Processing [/tmp/cpp-llm-deepseek2-mla3-profile/grouped-decode.sqlite] with [/opt/nvidia/nsight-systems/2024.6.2/host-linux-x64/reports/cuda_gpu_kern_sum.py]...
 Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
 82.3,317592545,54,5881343.4,5909735.5,3248636,8810644,1276653.2,"cpp_llm_engine::cuda::<unnamed>::mla_score_kernel(cpp_llm_engine::cuda::CudaMlaAttentionRequest, const float *, const float *, unsigned long)"
 5.4,20746276,156,132988.9,134223.5,124768,136735,2706.8,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(cpp_llm_engine::core::WeightFormat)10, (unsigned long)2>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
@@ -17,4 +17,3 @@ Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (n
 0.0,162304,54,3005.6,2912.0,2624,3616,299.4,"cpp_llm_engine::cuda::<unnamed>::mla_softmax_kernel(cpp_llm_engine::cuda::CudaMlaAttentionRequest, unsigned long)"
 0.0,116544,54,2158.2,2144.0,2112,2368,37.6,cpp_llm_engine::cuda::<unnamed>::mla_prepare_kernel(cpp_llm_engine::cuda::CudaMlaPrepareRequest)
 0.0,4224,2,2112.0,2112.0,1760,2464,497.8,"cpp_llm_engine::cuda::<unnamed>::dequantize_q2k_kernel(const unsigned char *, float *, unsigned long)"
-

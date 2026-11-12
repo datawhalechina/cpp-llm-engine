@@ -39,10 +39,14 @@ cmake --build "${build_dir}" \
 
 "${cuda_home}/bin/nsys" stats --force-export=true \
     --report cuda_gpu_kern_sum --format csv \
-    "${profile_base}.nsys-rep" >"${result_dir}/kernel-summary.csv"
+    "${profile_base}.nsys-rep" |
+    sed -e 's/[[:space:]]*$//' -e '/^$/d' \
+        >"${result_dir}/kernel-summary.csv"
 "${cuda_home}/bin/nsys" stats --force-export=true \
     --report cuda_api_sum --format csv \
-    "${profile_base}.nsys-rep" >"${result_dir}/cuda-api-summary.csv"
+    "${profile_base}.nsys-rep" |
+    sed -e 's/[[:space:]]*$//' -e '/^$/d' \
+        >"${result_dir}/cuda-api-summary.csv"
 grep -q 'profile_correctness: PASS' "${result_dir}/program-output.txt"
 echo "deepseek2_cuda_grouped_moe_profile_result_dir=${result_dir}"
 echo "deepseek2_cuda_grouped_moe_profile=PASS"
