@@ -1,4 +1,4 @@
-// CUDA 执行层：声明拥有 packed Q4_K/Q6_K payload 的量化矩阵。
+// CUDA 执行层：声明拥有 packed 量化 payload 的设备矩阵。
 // 职责：绑定 row-major rows/cols、量化格式和 device storage。
 // 验证：Quantized Linear CTest 覆盖上传、移动、格式和字节数错误。
 #pragma once

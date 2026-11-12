@@ -1,4 +1,4 @@
-// CUDA Backend：声明直接读取 Q4_K/Q6_K packed 权重的融合 GEMV。
+// CUDA Backend：声明直接读取 packed 权重的融合 GEMV。
 // 职责：在一个 kernel 中完成单行或批量输入的反量化、点积和行归约。
 // 限制：批量路径最多让 4 个输入行复用一次权重解码，面向小批量 Decode。
 #pragma once

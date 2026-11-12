@@ -14,6 +14,37 @@ namespace {
 
 constexpr std::size_t kBlockSize = 256;
 
+__device__ float yarn_angle(
+    std::size_t pair,
+    std::size_t rotary_dimension,
+    std::size_t position,
+    float frequency_base,
+    core::YarnRotaryScaling yarn) {
+    const float exponent =
+        -2.0F * static_cast<float>(pair) / static_cast<float>(rotary_dimension);
+    const float extrapolated = static_cast<float>(position) *
+        powf(frequency_base, exponent);
+    if (yarn.factor <= 1.0F) return extrapolated;
+
+    constexpr float kTwoPi = 6.28318530717958647692F;
+    const float denominator = 2.0F * logf(frequency_base);
+    const float correction_start = fmaxf(0.0F, floorf(
+        static_cast<float>(rotary_dimension) * logf(
+            static_cast<float>(yarn.original_context) /
+            (yarn.beta_fast * kTwoPi)) / denominator));
+    const float correction_end = fminf(
+        static_cast<float>(rotary_dimension - 1), ceilf(
+            static_cast<float>(rotary_dimension) * logf(
+                static_cast<float>(yarn.original_context) /
+                (yarn.beta_slow * kTwoPi)) / denominator));
+    const float range = fmaxf(0.001F, correction_end - correction_start);
+    const float normalized = fminf(1.0F, fmaxf(
+        0.0F, (static_cast<float>(pair) - correction_start) / range));
+    const float ramp = 1.0F - normalized;
+    const float interpolated = extrapolated / yarn.factor;
+    return interpolated * (1.0F - ramp) + extrapolated * ramp;
+}
+
 __global__ void rope_kernel(
     float* values,
     std::size_t pair_count,
@@ -22,7 +53,8 @@ __global__ void rope_kernel(
     std::size_t rotary_dimension,
     std::size_t position_offset,
     float frequency_base,
-    core::RotaryPairing pairing) {
+    core::RotaryPairing pairing,
+    core::YarnRotaryScaling yarn) {
     const std::size_t index =
         static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= pair_count) return;
@@ -38,10 +70,8 @@ __global__ void rope_kernel(
         ? pair : pair * 2;
     const std::size_t second = pairing == core::RotaryPairing::SplitHalf
         ? pair + pairs_per_head : pair * 2 + 1;
-    const float exponent =
-        -2.0F * static_cast<float>(pair) / static_cast<float>(rotary_dimension);
-    const float angle = static_cast<float>(position_offset + token) *
-                        powf(frequency_base, exponent);
+    const float angle = yarn_angle(
+        pair, rotary_dimension, position_offset + token, frequency_base, yarn);
     float sine = 0.0F;
     float cosine = 0.0F;
     sincosf(angle, &sine, &cosine);
@@ -59,7 +89,8 @@ __global__ void rope_batch_kernel(
     std::size_t head_dimension,
     std::size_t rotary_dimension,
     float frequency_base,
-    core::RotaryPairing pairing) {
+    core::RotaryPairing pairing,
+    core::YarnRotaryScaling yarn) {
     const std::size_t index =
         static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (index >= pair_count) return;
@@ -75,10 +106,8 @@ __global__ void rope_batch_kernel(
         ? pair : pair * 2;
     const std::size_t second = pairing == core::RotaryPairing::SplitHalf
         ? pair + pairs_per_head : pair * 2 + 1;
-    const float exponent =
-        -2.0F * static_cast<float>(pair) / static_cast<float>(rotary_dimension);
-    const float angle = static_cast<float>(positions[row]) *
-                        powf(frequency_base, exponent);
+    const float angle = yarn_angle(
+        pair, rotary_dimension, positions[row], frequency_base, yarn);
     float sine = 0.0F;
     float cosine = 0.0F;
     sincosf(angle, &sine, &cosine);
@@ -138,7 +167,8 @@ CudaStatus CudaRopeBackend::apply(
             request.rotary_dimension,
             request.position_offset,
             request.frequency_base,
-            request.pairing);
+            request.pairing,
+            request.yarn);
     return check_last_cuda_error("rope_kernel launch");
 }
 
@@ -181,7 +211,8 @@ CudaStatus CudaRopeBackend::apply_batch(
             request.head_dimension,
             request.rotary_dimension,
             request.frequency_base,
-            request.pairing);
+            request.pairing,
+            request.yarn);
     return check_last_cuda_error("rope_batch_kernel launch");
 }
 

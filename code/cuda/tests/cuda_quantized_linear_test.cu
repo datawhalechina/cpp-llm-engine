@@ -1,6 +1,9 @@
-// CUDA Quantized Linear：验证 Q4_K/Q6_K 融合 GEMV 和批量 SGEMM 回退。
+// CUDA Quantized Linear：验证 packed 权重的融合 GEMV 与行解码。
 // 职责：与 Chapter05 CPU reference 对照，并覆盖 payload、shape、移动和 workspace。
 // 通过条件：真实 GPU 输出满足误差阈值，且测试不直接管理 DeviceBuffer/stream/handle。
+#include "chapter05_quantization/iq4nl_dequantize.h"
+#include "chapter05_quantization/q2k_dequantize.h"
+#include "chapter05_quantization/q3k_dequantize.h"
 #include "chapter05_quantization/q4k_dequantize.h"
 #include "chapter05_quantization/q6k_dequantize.h"
 #include "cpp_llm_engine/core/linear_contract.h"
@@ -108,6 +111,68 @@ std::vector<std::uint8_t> make_q6k_payload() {
         }
         payload[offset + 208] = 0x00;
         payload[offset + 209] = block == 0 ? 0x3c : 0x38;  // fp16 1.0 / 0.5
+    }
+    return payload;
+}
+
+std::vector<std::uint8_t> make_q2k_payload() {
+    using chapter05_quantization::kQ2KBlockBytes;
+    std::vector<std::uint8_t> payload(2 * kQ2KBlockBytes, 0);
+    for (std::size_t block = 0; block < 2; ++block) {
+        const std::size_t offset = block * kQ2KBlockBytes;
+        for (std::size_t index = 0; index < 16; ++index) {
+            const std::uint8_t scale = static_cast<std::uint8_t>(1 + (index + block) % 7);
+            const std::uint8_t minimum = static_cast<std::uint8_t>((index + 2 * block) % 4);
+            payload[offset + index] = static_cast<std::uint8_t>(scale | (minimum << 4));
+        }
+        for (std::size_t index = 0; index < 64; ++index) {
+            payload[offset + 16 + index] =
+                static_cast<std::uint8_t>((index * 37 + block * 19 + 5) & 0xff);
+        }
+        payload[offset + 80] = 0x00;
+        payload[offset + 81] = block == 0 ? 0x38 : 0x34;  // fp16 0.5 / 0.25
+        payload[offset + 82] = 0x00;
+        payload[offset + 83] = block == 0 ? 0x34 : 0x30;  // fp16 0.25 / 0.125
+    }
+    return payload;
+}
+
+std::vector<std::uint8_t> make_q3k_payload() {
+    using chapter05_quantization::kQ3KBlockBytes;
+    std::vector<std::uint8_t> payload(2 * kQ3KBlockBytes, 0);
+    for (std::size_t block = 0; block < 2; ++block) {
+        const std::size_t offset = block * kQ3KBlockBytes;
+        for (std::size_t index = 0; index < 32; ++index) {
+            payload[offset + index] =
+                static_cast<std::uint8_t>((index * 13 + block * 29 + 7) & 0xff);
+        }
+        for (std::size_t index = 0; index < 64; ++index) {
+            payload[offset + 32 + index] =
+                static_cast<std::uint8_t>((index * 31 + block * 17 + 3) & 0xff);
+        }
+        for (std::size_t index = 0; index < 12; ++index) {
+            payload[offset + 96 + index] =
+                static_cast<std::uint8_t>((index * 19 + block * 11 + 5) & 0xff);
+        }
+        payload[offset + 108] = 0x00;
+        payload[offset + 109] = block == 0 ? 0x34 : 0x30;  // fp16 0.25 / 0.125
+    }
+    return payload;
+}
+
+std::vector<std::uint8_t> make_iq4nl_payload() {
+    using chapter05_quantization::kIQ4NLBlockBytes;
+    constexpr std::size_t block_count = 512 / 32;
+    std::vector<std::uint8_t> payload(block_count * kIQ4NLBlockBytes, 0);
+    for (std::size_t block = 0; block < block_count; ++block) {
+        const std::size_t offset = block * kIQ4NLBlockBytes;
+        payload[offset] = 0x00;
+        payload[offset + 1] = block % 2 == 0 ? 0x2c : 0x30;  // fp16 0.0625 / 0.125
+        for (std::size_t index = 0; index < 16; ++index) {
+            const std::uint8_t low = static_cast<std::uint8_t>((index + block) % 16);
+            const std::uint8_t high = static_cast<std::uint8_t>((15 - index + block) % 16);
+            payload[offset + 2 + index] = static_cast<std::uint8_t>(low | (high << 4));
+        }
     }
     return payload;
 }
@@ -311,6 +376,89 @@ int main() {
     }
     CHECK(context.workspace_capacity_bytes() == 0);
     CHECK(context.workspace_allocation_count() == 0);
+
+    const std::vector<std::uint8_t> q2k_payload = make_q2k_payload();
+    std::vector<float> q2k_decoded;
+    CHECK(chapter05_quantization::dequantize_q2_k(
+        q2k_payload.data(), q2k_payload.size(), 512, &q2k_decoded, &error));
+    const auto q2k_expected = cpu_linear(q2k_decoded, 2, 256, input_host);
+    const auto q2k_batch_expected = cpu_linear_batch(
+        q2k_decoded, 2, 256, batch_input_host, batch_size);
+    CudaQuantizedMatrix q2k_weights;
+    CHECK(CudaQuantizedMatrix::create(2, 256, WeightFormat::Q2K, &q2k_weights).is_ok());
+    CHECK(context.upload(&q2k_weights, q2k_payload.data(), q2k_payload.size()).is_ok());
+    CHECK(context.quantized_linear(q2k_weights, input, &output).is_ok());
+    CHECK(context.download(output, output_host.data(), output_host.size() * sizeof(float)).is_ok());
+    CHECK(context.quantized_linear_batch(q2k_weights, batch_input, &batch_output).is_ok());
+    CHECK(context.download(
+        batch_output,
+        batch_output_host.data(),
+        batch_output_host.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    CHECK(close_enough(output_host[0], q2k_expected[0]));
+    CHECK(close_enough(output_host[1], q2k_expected[1]));
+    for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
+        CHECK(close_enough(batch_output_host[index], q2k_batch_expected[index]));
+    }
+
+    const std::vector<std::uint8_t> q3k_payload = make_q3k_payload();
+    std::vector<float> q3k_decoded;
+    CHECK(chapter05_quantization::dequantize_q3_k(
+        q3k_payload.data(), q3k_payload.size(), 512, &q3k_decoded, &error));
+    const auto q3k_expected = cpu_linear(q3k_decoded, 2, 256, input_host);
+    const auto q3k_batch_expected = cpu_linear_batch(
+        q3k_decoded, 2, 256, batch_input_host, batch_size);
+    CudaQuantizedMatrix q3k_weights;
+    CHECK(CudaQuantizedMatrix::create(2, 256, WeightFormat::Q3K, &q3k_weights).is_ok());
+    CHECK(context.upload(&q3k_weights, q3k_payload.data(), q3k_payload.size()).is_ok());
+    CHECK(context.quantized_linear(q3k_weights, input, &output).is_ok());
+    CHECK(context.download(output, output_host.data(), output_host.size() * sizeof(float)).is_ok());
+    CHECK(context.quantized_linear_batch(q3k_weights, batch_input, &batch_output).is_ok());
+    CHECK(context.download(
+        batch_output,
+        batch_output_host.data(),
+        batch_output_host.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    CHECK(close_enough(output_host[0], q3k_expected[0]));
+    CHECK(close_enough(output_host[1], q3k_expected[1]));
+    for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
+        CHECK(close_enough(batch_output_host[index], q3k_batch_expected[index]));
+    }
+
+    const std::vector<std::uint8_t> iq4nl_payload = make_iq4nl_payload();
+    std::vector<float> iq4nl_decoded;
+    CHECK(chapter05_quantization::dequantize_iq4_nl(
+        iq4nl_payload.data(), iq4nl_payload.size(), 512, &iq4nl_decoded, &error));
+    const auto iq4nl_expected = cpu_linear(iq4nl_decoded, 2, 256, input_host);
+    const auto iq4nl_batch_expected = cpu_linear_batch(
+        iq4nl_decoded, 2, 256, batch_input_host, batch_size);
+    CudaQuantizedMatrix iq4nl_weights;
+    CHECK(CudaQuantizedMatrix::create(
+        2, 256, WeightFormat::IQ4_NL, &iq4nl_weights).is_ok());
+    CHECK(context.upload(
+        &iq4nl_weights, iq4nl_payload.data(), iq4nl_payload.size()).is_ok());
+    CHECK(context.quantized_linear(iq4nl_weights, input, &output).is_ok());
+    CHECK(context.download(output, output_host.data(), output_host.size() * sizeof(float)).is_ok());
+    CHECK(context.quantized_linear_batch(
+        iq4nl_weights, batch_input, &batch_output).is_ok());
+    CHECK(context.download(
+        batch_output,
+        batch_output_host.data(),
+        batch_output_host.size() * sizeof(float)).is_ok());
+    CHECK(context.embedding_lookup(iq4nl_weights, 1, &embedding_row).is_ok());
+    CHECK(context.download(
+        embedding_row,
+        embedding_host.data(),
+        embedding_host.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    CHECK(close_enough(output_host[0], iq4nl_expected[0]));
+    CHECK(close_enough(output_host[1], iq4nl_expected[1]));
+    for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
+        CHECK(close_enough(batch_output_host[index], iq4nl_batch_expected[index]));
+    }
+    for (std::size_t index = 0; index < embedding_host.size(); ++index) {
+        CHECK(close_enough(embedding_host[index], iq4nl_decoded[256 + index]));
+    }
 
     CudaTensor wrong_input;
     CudaTensor wrong_output;

@@ -11,8 +11,10 @@
 #include "cpp_llm_engine/cuda/elementwise_backend.h"
 #include "cpp_llm_engine/cuda/decoder_elementwise_backend.h"
 #include "cpp_llm_engine/cuda/cuda_kv_cache.h"
+#include "cpp_llm_engine/cuda/cuda_mla_cache.h"
 #include "cpp_llm_engine/cuda/cuda_paged_kv_cache.h"
 #include "cpp_llm_engine/cuda/gqa_attention_backend.h"
+#include "cpp_llm_engine/cuda/mla_attention_backend.h"
 #include "cpp_llm_engine/cuda/quantized_dequantize_backend.h"
 #include "cpp_llm_engine/cuda/quantized_gemv_backend.h"
 #include "cpp_llm_engine/cuda/rope_backend.h"
@@ -487,12 +489,127 @@ core::Status CudaExecutionContext::embedding_lookup(
         stream_).to_core_status();
 }
 
+core::Status CudaExecutionContext::dequantize(
+    const CudaQuantizedMatrix& matrix,
+    CudaTensor* output) const {
+    if (!valid() || matrix.empty() || output == nullptr) {
+        return core::Status::error("dequantize context, matrix or output is invalid");
+    }
+    const core::Status output_status = validate_tensor(*output, "dequantize output");
+    if (!output_status.is_ok()) return output_status;
+    std::size_t elements = 0;
+    if (!output->contract().shape.checked_numel(&elements).is_ok() ||
+        elements != matrix.rows() * matrix.cols()) {
+        return core::Status::error("dequantize output size does not match matrix");
+    }
+    return cuda_quantized_dequantize_backend().dequantize(
+        matrix, static_cast<float*>(output->data()), elements, stream_)
+        .to_core_status();
+}
+
+core::Status CudaExecutionContext::prepare_mla(
+    const CudaTensor& query,
+    const CudaTensor& compressed_kv,
+    CudaTensor* query_nope,
+    CudaTensor* query_rope,
+    CudaTensor* latent,
+    CudaTensor* key_rope) const {
+    if (!valid() || query_nope == nullptr || query_rope == nullptr ||
+        latent == nullptr || key_rope == nullptr) {
+        return core::Status::error("MLA prepare context or output is invalid");
+    }
+    for (const auto& item : {
+             std::pair<const CudaTensor*, const char*>{&query, "MLA query"},
+             {&compressed_kv, "MLA compressed K/V"},
+             {query_nope, "MLA query nope"}, {query_rope, "MLA query rope"},
+             {latent, "MLA latent"}, {key_rope, "MLA key rope"}}) {
+        const core::Status status = validate_tensor(*item.first, item.second);
+        if (!status.is_ok()) return status;
+    }
+    const auto& query_shape = query.contract().shape.dimensions;
+    const auto& nope_shape = query_nope->contract().shape.dimensions;
+    const auto& rope_shape = query_rope->contract().shape.dimensions;
+    const auto& latent_shape = latent->contract().shape.dimensions;
+    const auto& key_shape = key_rope->contract().shape.dimensions;
+    const auto& compressed_shape = compressed_kv.contract().shape.dimensions;
+    if (query_shape.size() != 2 || nope_shape.size() != 2 ||
+        rope_shape.size() != 3 || rope_shape[0] != 1 ||
+        latent_shape.size() != 1 || key_shape.size() != 3 ||
+        key_shape[0] != 1 || key_shape[1] != 1 ||
+        compressed_shape.size() != 1 || query_shape[0] != nope_shape[0] ||
+        query_shape[0] != rope_shape[1] ||
+        query_shape[1] != nope_shape[1] + rope_shape[2] ||
+        key_shape[2] != rope_shape[2] ||
+        compressed_shape[0] != latent_shape[0] + key_shape[2]) {
+        return core::Status::error("MLA prepare Tensor shapes are inconsistent");
+    }
+    const CudaMlaPrepareRequest request{
+        static_cast<const float*>(query.data()),
+        static_cast<const float*>(compressed_kv.data()),
+        static_cast<float*>(query_nope->data()),
+        static_cast<float*>(query_rope->data()),
+        static_cast<float*>(latent->data()),
+        static_cast<float*>(key_rope->data()),
+        query_shape[0], nope_shape[1], rope_shape[2], latent_shape[0]};
+    return cuda_mla_attention_backend().prepare(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::mla_attention(
+    const CudaTensor& query_nope,
+    const CudaTensor& query_rope,
+    const CudaTensor& kv_b,
+    const CudaMlaCache& cache,
+    CudaTensor* probabilities,
+    CudaTensor* output,
+    float scale) const {
+    if (!valid() || probabilities == nullptr || output == nullptr) {
+        return core::Status::error("MLA attention context or output is invalid");
+    }
+    const auto& nope_shape = query_nope.contract().shape.dimensions;
+    const auto& rope_shape = query_rope.contract().shape.dimensions;
+    const auto& kv_shape = kv_b.contract().shape.dimensions;
+    const auto& probability_shape = probabilities->contract().shape.dimensions;
+    const auto& output_shape = output->contract().shape.dimensions;
+    if (nope_shape.size() != 2 || rope_shape.size() != 3 ||
+        rope_shape[0] != 1 || kv_shape.size() != 2 ||
+        probability_shape.size() != 2 || output_shape.size() != 2 ||
+        probability_shape[0] != nope_shape[0] ||
+        probability_shape[1] < cache.size_tokens() ||
+        nope_shape[0] != rope_shape[1] ||
+        nope_shape[0] != output_shape[0] || kv_shape[1] != cache.latent_dimension() ||
+        rope_shape[2] != cache.rope_dimension() ||
+        kv_shape[0] != nope_shape[0] * (nope_shape[1] + output_shape[1])) {
+        return core::Status::error("MLA attention Tensor shapes are inconsistent");
+    }
+    const CudaMlaAttentionRequest request{
+        static_cast<const float*>(query_nope.data()),
+        static_cast<const float*>(query_rope.data()),
+        static_cast<const float*>(kv_b.data()),
+        static_cast<float*>(probabilities->data()),
+        static_cast<float*>(output->data()), nope_shape[0], nope_shape[1],
+        rope_shape[2], output_shape[1], kv_shape[1], probability_shape[1],
+        scale};
+    return cuda_mla_attention_backend().compute(request, cache, stream_)
+        .to_core_status();
+}
+
+core::Status CudaExecutionContext::append_mla(
+    CudaMlaCache* cache,
+    const CudaTensor& latent,
+    const CudaTensor& key_rope) const {
+    if (!valid() || cache == nullptr) {
+        return core::Status::error("MLA append context or cache is invalid");
+    }
+    return cache->append(latent, key_rope, stream_);
+}
+
 core::Status CudaExecutionContext::rope(
     CudaTensor* values,
     std::size_t position_offset,
     std::size_t rotary_dimension,
     float frequency_base,
-    core::RotaryPairing pairing) const {
+    core::RotaryPairing pairing,
+    const core::YarnRotaryScaling& yarn) const {
     if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
     if (values == nullptr) return core::Status::error("RoPE tensor is null");
     const core::Status tensor_status = validate_tensor(*values, "RoPE tensor");
@@ -509,7 +626,8 @@ core::Status CudaExecutionContext::rope(
         rotary_dimension,
         position_offset,
         frequency_base,
-        pairing};
+        pairing,
+        yarn};
     return cuda_rope_backend().apply(request, stream_).to_core_status();
 }
 
@@ -518,7 +636,8 @@ core::Status CudaExecutionContext::rope_batch(
     const std::vector<std::size_t>& positions,
     std::size_t rotary_dimension,
     float frequency_base,
-    core::RotaryPairing pairing) {
+    core::RotaryPairing pairing,
+    const core::YarnRotaryScaling& yarn) {
     if (!valid()) return core::Status::error("CudaExecutionContext is invalid");
     if (values == nullptr || positions.empty()) {
         return core::Status::error("batch RoPE values or positions are empty");
@@ -546,7 +665,8 @@ core::Status CudaExecutionContext::rope_batch(
     const core::RotaryEmbeddingBatchRequest request{
         static_cast<float*>(values->data()),
         static_cast<const std::size_t*>(workspace_.data()),
-        shape[0], shape[1], shape[2], rotary_dimension, frequency_base, pairing};
+        shape[0], shape[1], shape[2], rotary_dimension, frequency_base, pairing,
+        yarn};
     return cuda_rope_backend().apply_batch(request, stream_).to_core_status();
 }
 

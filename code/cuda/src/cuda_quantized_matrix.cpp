@@ -1,4 +1,4 @@
-// CUDA 执行层：实现 packed Q4_K/Q6_K 矩阵的 device storage 所有权。
+// CUDA 执行层：实现 packed 量化矩阵的 device storage 所有权。
 // 契约：创建时使用 core block contract 校验 shape，上传必须匹配完整 payload。
 // 验证：cpp_llm_engine_cuda_quantized_linear_test。
 #include "cpp_llm_engine/cuda/cuda_quantized_matrix.h"

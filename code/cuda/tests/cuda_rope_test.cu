@@ -12,6 +12,7 @@
 
 #include <cuda_runtime_api.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <iostream>
@@ -32,6 +33,7 @@ namespace {
 using cpp_llm_engine::core::DType;
 using cpp_llm_engine::core::RotaryPairing;
 using cpp_llm_engine::core::RotaryEmbeddingRequest;
+using cpp_llm_engine::core::YarnRotaryScaling;
 using cpp_llm_engine::cuda::CudaEvent;
 using cpp_llm_engine::cuda::CudaExecutionContext;
 using cpp_llm_engine::cuda::CudaStream;
@@ -46,7 +48,8 @@ void apply_cpu_rope(
     std::size_t rotary_dimension,
     std::size_t position_offset,
     float frequency_base,
-    RotaryPairing pairing) {
+    RotaryPairing pairing,
+    YarnRotaryScaling yarn = {}) {
     for (std::size_t token = 0; token < tokens; ++token) {
         for (std::size_t head = 0; head < heads; ++head) {
             float* vector = values->data() +
@@ -55,8 +58,31 @@ void apply_cpu_rope(
                 const float exponent =
                     -2.0F * static_cast<float>(pair) /
                     static_cast<float>(rotary_dimension);
-                const float angle = static_cast<float>(position_offset + token) *
-                                    std::pow(frequency_base, exponent);
+                const float extrapolated =
+                    static_cast<float>(position_offset + token) *
+                    std::pow(frequency_base, exponent);
+                float angle = extrapolated;
+                if (yarn.enabled()) {
+                    constexpr float kTwoPi = 6.28318530717958647692F;
+                    const float denominator = 2.0F * std::log(frequency_base);
+                    const float correction_start = std::max(0.0F, std::floor(
+                        static_cast<float>(rotary_dimension) * std::log(
+                            static_cast<float>(yarn.original_context) /
+                            (yarn.beta_fast * kTwoPi)) / denominator));
+                    const float correction_end = std::min(
+                        static_cast<float>(rotary_dimension - 1), std::ceil(
+                            static_cast<float>(rotary_dimension) * std::log(
+                                static_cast<float>(yarn.original_context) /
+                                (yarn.beta_slow * kTwoPi)) / denominator));
+                    const float range = std::max(
+                        0.001F, correction_end - correction_start);
+                    const float normalized = std::clamp(
+                        (static_cast<float>(pair) - correction_start) / range,
+                        0.0F, 1.0F);
+                    const float ramp = 1.0F - normalized;
+                    angle = extrapolated / yarn.factor * (1.0F - ramp) +
+                        extrapolated * ramp;
+                }
                 const float cosine = std::cos(angle);
                 const float sine = std::sin(angle);
                 const std::size_t first = pairing == RotaryPairing::SplitHalf
@@ -70,6 +96,48 @@ void apply_cpu_rope(
             }
         }
     }
+}
+
+bool run_yarn_case() {
+    constexpr std::size_t tokens = 2;
+    constexpr std::size_t heads = 3;
+    constexpr std::size_t dimensions = 64;
+    constexpr std::size_t position = 8192;
+    constexpr float frequency_base = 100000.0F;
+    const YarnRotaryScaling yarn{4.0F, 4096, 32.0F, 1.0F};
+    std::vector<float> input(tokens * heads * dimensions);
+    for (std::size_t index = 0; index < input.size(); ++index) {
+        input[index] = static_cast<float>(static_cast<int>(index % 37) - 18) *
+            0.03125F;
+    }
+    std::vector<float> golden = input;
+    apply_cpu_rope(
+        &golden, tokens, heads, dimensions, dimensions, position,
+        frequency_base, RotaryPairing::Adjacent, yarn);
+
+    CudaExecutionContext context;
+    CudaTensor tensor;
+    CHECK(CudaExecutionContext::create(&context).is_ok());
+    CHECK(CudaTensor::create_contiguous(
+        {tokens, heads, dimensions}, DType::Float32, &tensor).is_ok());
+    CHECK(context.upload(
+        &tensor, input.data(), input.size() * sizeof(float)).is_ok());
+    CHECK(context.rope(
+        &tensor, position, dimensions, frequency_base,
+        RotaryPairing::Adjacent, yarn).is_ok());
+    std::vector<float> output(input.size());
+    CHECK(context.download(
+        tensor, output.data(), output.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    for (std::size_t index = 0; index < output.size(); ++index) {
+        CHECK(std::fabs(output[index] - golden[index]) <= 5.0e-4F);
+    }
+
+    const YarnRotaryScaling invalid{2.0F, 0, 32.0F, 1.0F};
+    CHECK(!context.rope(
+        &tensor, position, dimensions, frequency_base,
+        RotaryPairing::Adjacent, invalid).is_ok());
+    return true;
 }
 
 void apply_cpu_rope_positions(
@@ -282,6 +350,7 @@ int main() {
     if (!run_correctness_case(257, 3, 10, 8, 31)) return 1;
     if (!run_correctness_case(
             3, 2, 128, 128, 5, RotaryPairing::SplitHalf)) return 1;
+    if (!run_yarn_case()) return 1;
     if (!run_batch_position_case()) return 1;
     if (!run_batch_position_case(RotaryPairing::SplitHalf)) return 1;
     if (!run_benchmark()) return 1;

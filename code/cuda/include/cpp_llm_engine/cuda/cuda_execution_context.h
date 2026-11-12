@@ -24,6 +24,7 @@ enum class CudaAttentionPath {
 };
 
 class CudaKvCache;
+class CudaMlaCache;
 class CudaPagedKvCache;
 
 class CudaExecutionContext final {
@@ -102,18 +103,42 @@ public:
         const CudaQuantizedMatrix& table,
         std::size_t row,
         CudaTensor* output) const;
+    core::Status dequantize(
+        const CudaQuantizedMatrix& matrix,
+        CudaTensor* output) const;
+    core::Status prepare_mla(
+        const CudaTensor& query,
+        const CudaTensor& compressed_kv,
+        CudaTensor* query_nope,
+        CudaTensor* query_rope,
+        CudaTensor* latent,
+        CudaTensor* key_rope) const;
+    core::Status mla_attention(
+        const CudaTensor& query_nope,
+        const CudaTensor& query_rope,
+        const CudaTensor& kv_b,
+        const CudaMlaCache& cache,
+        CudaTensor* probabilities,
+        CudaTensor* output,
+        float scale) const;
+    core::Status append_mla(
+        CudaMlaCache* cache,
+        const CudaTensor& latent,
+        const CudaTensor& key_rope) const;
     core::Status rope(
         CudaTensor* values,
         std::size_t position_offset,
         std::size_t rotary_dimension,
         float frequency_base,
-        core::RotaryPairing pairing = core::RotaryPairing::Adjacent) const;
+        core::RotaryPairing pairing = core::RotaryPairing::Adjacent,
+        const core::YarnRotaryScaling& yarn = {}) const;
     core::Status rope_batch(
         CudaTensor* values,
         const std::vector<std::size_t>& positions,
         std::size_t rotary_dimension,
         float frequency_base,
-        core::RotaryPairing pairing = core::RotaryPairing::Adjacent);
+        core::RotaryPairing pairing = core::RotaryPairing::Adjacent,
+        const core::YarnRotaryScaling& yarn = {});
     core::Status append_kv(
         CudaKvCache* cache,
         const CudaTensor& key,
