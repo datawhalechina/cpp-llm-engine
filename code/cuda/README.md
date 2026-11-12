@@ -21,9 +21,9 @@
 | `cuda_workspace.h/.cpp` | 只在容量不足时增长的可复用临时显存 |
 | `cuda_execution_context.h/.cpp` | 统一持有 stream、cuBLAS handle、workspace 和 backend 调度 |
 | `cuda_execution_context_test.cu` | Tensor 复制、批量行打包/拆包、算子调度、workspace 复用和移动测试 |
-| `cuda_quantized_matrix.h/.cpp` | packed Q4_K/Q6_K row-major device 权重 |
-| `quantized_dequantize_backend.h/.cu` | Q4_K/Q6_K 到 Float32 workspace 的 CUDA 解码 |
-| `quantized_gemv_backend.h/.cu` | 单 token Q4_K/Q6_K 解码、点积与行归约融合 |
+| `cuda_quantized_matrix.h/.cpp` | packed Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL row-major device 权重 |
+| `quantized_dequantize_backend.h/.cu` | 五种 packed 格式到 Float32 workspace 的 CUDA 解码 |
+| `quantized_gemv_backend.h/.cu` | 五种 packed 格式的解码、点积与行归约融合 |
 | `cuda_quantized_linear_test.cu` | CPU reference、融合 GEMV、批量回退、错误路径和固定 workload 计时 |
 | `quantized_gemv_matrix.cu` | Q4_K/Q6_K 的 batch=1/2/4/8 专项矩阵与逐行正确性对照 |
 | `core/rope_contract.h` | 固定原地 RoPE 的连续布局、旋转维度、位置和频率参数 |
@@ -36,6 +36,7 @@
 | `core/gqa_attention_contract.h` | 固定 Q/KV head 映射、causal position、scale 和布局 |
 | `gqa_attention_backend.h/.cu` | score、稳定 softmax、value aggregation 三阶段 CUDA backend |
 | `cuda_gqa_attention_test.cu` | prefill/decode CPU golden、错误路径和 event 计时 |
+| `cuda_mla_cache.h/.cpp`、`mla_attention_backend.h/.cu` | 保存压缩 latent/位置 Key，并直接执行 DeepSeek MLA |
 | `core/decoder_elementwise_contract.h` | RMSNorm 与 SwiGLU 连续向量契约 |
 | `decoder_elementwise_backend.h/.cu` | 单 block RMSNorm 和逐元素 SwiGLU kernel |
 | `cuda_decoder_elementwise_test.cu` | 257/2048 宽度 CPU golden 与错误 shape |
@@ -86,7 +87,9 @@
 
 ## Quantized Linear
 
-`CudaQuantizedMatrix` 保存 packed Q4_K/Q6_K 权重。单 token 的 `quantized_linear()` 由一个 CUDA block 负责一个输出行，在同一 kernel 内解码、乘加和归约，不创建完整 Float32 权重矩阵。Warp 内使用 shuffle，8 个 Warp 的部分和再由首个 Warp 合并。`quantized_linear_batch()` 接收 `[B,K]` 输入和 `[N,K]` 权重，把最多 4 个输入行组成一个 tile；同一线程解码一次权重后更新多行累加器，直接生成 `[B,N]`。该路径面向教学中的小批量 Decode，更大的 tile 需要继续核对寄存器压力和占用率。
+`CudaQuantizedMatrix` 保存 packed Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL 权重。单 token 的 `quantized_linear()` 由一个 CUDA block 负责一个输出行，在同一 kernel 内解码、乘加和归约，不创建完整 Float32 权重矩阵。Warp 内使用 shuffle，8 个 Warp 的部分和再由首个 Warp 合并。`quantized_linear_batch()` 接收 `[B,K]` 输入和 `[N,K]` 权重，把最多 4 个输入行组成一个 tile；同一线程解码一次权重后更新多行累加器，直接生成 `[B,N]`。该路径面向教学中的小批量 Decode，更大的 tile 需要继续核对寄存器压力和占用率。DeepSeek 的 K/V-B 在模型加载阶段反量化一次，供压缩 MLA 重复读取；该权重属于模型，不随请求复制。
+
+Q2_K、Q3_K 与 Q4_K/Q6_K 一样使用 256 线程映射一个 256 元素超块；IQ4_NL 每个 block 只有 32 个元素，当前由首个 Warp 按非线性码表解码，其余 Warp 参与跨 block 累加后的统一归约。这是 DeepSeek-V2-Lite CUDA 接入的正确性基线，尚未做 Q3_K/IQ4_NL 专用线程块优化。测试分别覆盖单向量、批量输入和量化 embedding 行读取，并与 Chapter05 CPU reference 逐项对照。
 
 NCU 基线显示 Q4_K kernel 的 L1TEX 等待明显，而 DRAM 吞吐和 occupancy 不是首要限制。EXP-GPU-09 的 Warp 元数据广播、EXP-GPU-10 的 shared payload 和 EXP-GPU-11 的显式 FMA 分别回退约 `10.1%`、`1.6%` 和 `4.3%` cycles，代码不保留这些候选。EXP-GPU-12 使用 `__ushort_as_half` 与 `__half2float` 替换手写 FP16 位解码，cycles 约减少 `28.8%`，真实双请求 logits 保持一致；当前代码保留原生 half 转换，后续优化重新聚焦 L1/TEX payload 访问。
 
@@ -102,7 +105,7 @@ EXP-GPU-16 进一步覆盖 batch 1/2、上下文 `16/128` 和 Decode `1/8` 步�
 
 ## RoPE Kernel
 
-RoPE 请求使用连续 `[tokens, heads, head_dim]` 布局，在原 Tensor 上旋转前 `rotary_dimension` 个分量。`RotaryPairing::Adjacent` 处理 Llama 的相邻维配对，`RotaryPairing::SplitHalf` 处理 Qwen3 的 NeoX 半维配对；每个 CUDA 线程负责一个分量对。连续序列使用 `position_offset + token_index`，Decode batch 使用另一入口显式上传 `positions[B]`，让不同长度请求在 `[B,heads,head_dim]` 中保持各自位置。`rotary_dimension` 可以小于 `head_dim`，未参与旋转的尾部保持不变。
+RoPE 请求使用连续 `[tokens, heads, head_dim]` 布局，在原 Tensor 上旋转前 `rotary_dimension` 个分量。`RotaryPairing::Adjacent` 处理 Llama 的相邻维配对，`RotaryPairing::SplitHalf` 处理 Qwen3 的 NeoX 半维配对；DeepSeek 显式传入 YaRN factor、原始上下文长度和 correction range。每个 CUDA 线程负责一个分量对。连续序列使用 `position_offset + token_index`，Decode batch 使用另一入口显式上传 `positions[B]`，让不同长度请求在 `[B,heads,head_dim]` 中保持各自位置。`rotary_dimension` 可以小于 `head_dim`，未参与旋转的尾部保持不变。
 
 测试先用同构 CPU 公式生成 golden，再覆盖两种配对、多 token、多 head、Qwen3 的 128 维头空间、局部旋转维度、非连续位置 `{0,7,31}`、非法参数和 `CudaExecutionContext` shape 检查。RTX 5070 Ti Laptop GPU / CUDA 12.8 上，`257 x 32 x 64`、warmup 1 次、测量 10 次的本次 kernel event 均值为 `0.0083808 ms`；该数字只用于确认计时闭环，不是跨设备性能基线。
 
@@ -154,7 +157,7 @@ Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续�
 
 首个测试使用 `D=8、Hq/Hkv=4/2、Dh=2、FFN=12` 的可读合成权重，逐项检查 Attention Norm、GQA context、FFN Norm、SwiGLU 和最终 hidden。它固定整层执行顺序和请求状态语义。
 
-真实权重接入使用 `CudaLinearWeight` 隔离格式差异：Float32 权重按 `[input, output]` Tensor 解释，Q4_K/Q6_K 按 `rows=output、cols=input` 的 packed Matrix 解释。量化 Linear 依据连续输入/输出的元素数校验 shape，因此 Q/K/V 可以直接写入 rank-3 Tensor；单 token 与批量融合路径都不创建完整反量化矩阵。
+真实权重接入使用 `CudaLinearWeight` 隔离格式差异：Float32 权重按 `[input, output]` Tensor 解释，量化权重按 `rows=output、cols=input` 的 packed Matrix 解释。量化 Linear 依据连续输入/输出的元素数校验 shape，因此 Q/K/V 可以直接写入 rank-3 Tensor；单 token 与批量融合路径都不创建完整反量化矩阵。
 
 ## 真实层权重上传
 
@@ -182,6 +185,35 @@ CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_qwen3_cuda_decoder.s
 CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_qwen3_cuda_runtime.sh
 CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_qwen3_cuda_generation.sh
 CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_qwen3_cuda_serving.sh
+```
+
+### DeepSeek-V2-Lite CUDA 分阶段接入
+
+DeepSeek-V2-Lite 的 CUDA 稠密首层已连接 Q2_K/Q3_K/IQ4_NL、YaRN partial RoPE、压缩 MLA Cache、稳定 Softmax、SwiGLU 和双残差。请求只保存每个词元的 512 维 latent K/V 与 64 维位置 Key，K/V-B 展开权重由模型共享。真实 Q2_K GGUF 的双词元 CPU/CUDA 对照最大绝对误差为 `5.01e-6`，平均误差为 `1.70e-7`。
+
+首版 MLA reference kernel 每个 head 使用一个线程，并在每个 Value 维重复计算 score。EXP-GPU-17 对一次双请求 Decode 的捕获中，54 次 MLA kernel 总计约 `32.16 s`，占 GPU kernel 时间 `99.9%`。当前实现已改为 score、Softmax、Value aggregation 三阶段：请求层按最大上下文持有概率工作区，每个 `(head, token)` 只计算一次 score，再由 `(head, value)` 并行聚合输出。真实双词元最大误差为 `5.01e-6`，完整 27 层 logits 余弦为 `1`。
+
+优化后 6 轮 batch=2 配对实验中，顺序与 grouped Decode 中位数分别为 `550.2 ms` 和 `455.0 ms`，grouped 路径改善约 `17.3%`。一次限定范围的 Nsight Systems 捕获显示，54 次 score kernel 合计约 `317.6 ms`、占 kernel 时间 `82.3%`；Value 聚合约 `5.44 ms`，Softmax 约 `0.16 ms`。下一轮优化应在 score 阶段并行 latent 投影与规约，而不是继续融合已非主瓶颈的 MoE。
+
+MoE 路径由 Host 完成 Router 与稳定 Top-K，CUDA 执行命中的 Top-6 路由专家和共享专家。单独 FFN 与 CPU 的最大绝对误差为 `5.82e-10`；连接压缩 MLA、双残差和请求缓存后，真实第 1 层双词元最大误差为 `9.83e-7`。跨请求路径会按专家打包输入行，让 Gate、Up、Down 调用批量量化 Linear，并让共享专家一次处理完整批次。设备端 Top-K、加权拆回融合和单 kernel grouped-MoE 仍属于后续性能路径。
+
+`RealDeepSeek2CudaModel` 已将第 0 层稠密权重、后续 26 层 MoE 权重、Embedding、最终归一化和 LM Head 常驻设备。请求 Context 独占 27 层压缩缓存，并在全层成功后统一推进位置。单词元 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`。`RealDeepSeek2CudaExecutorFactory` 已接入 Chapter06 Runtime、Chapter08 `ExecutorBatchRunner` 和 Chapter10 ServiceCore；固定词元生成、重复请求隔离、分块 Prefill、跨请求专家 batch、服务动态组批、流式回调、取消与资源释放均通过。HTTP/Tokenizer 组合继续沿该 Factory 扩展。
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_dense_layer.sh
+
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_model.sh
+
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_runtime.sh
+
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_batch.sh
+
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_serving.sh
 ```
 
 ## 运行与验证

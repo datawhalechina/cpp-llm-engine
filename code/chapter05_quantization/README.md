@@ -55,7 +55,7 @@ bash code/chapter05_quantization/scripts/run.sh
 bash code/chapter05_quantization/scripts/run_real_decoder.sh
 ```
 
-Q2_K/IQ4_NL 已完成 CPU block reference、scalar fused 和统一 policy，为 DeepSeek-V2-Lite 稠密首层提供数值基础。Q3_K/Q5_1/Q5_K 支撑 Qwen1.5-MoE 专家权重；Q3_K/Q5_K 还提供多输入行共享块解码。以上格式的 AVX2 与 CUDA 尚未实现。Q4_K/Q6_K 已完成 CPU block reference、scalar fused、AVX2/FMA fused backend，以及 GPU 单 token/批量融合 GEMV。Q8_0 已完成 CPU block reference、scalar fused、统一 policy 和真实 SmolVLM 32 层 Decoder/LM Head 对照。`QuantizedLinearPolicy` 管理 CPU backend，GPU 路径由 `CudaExecutionContext` 编排。
+Q2_K/Q3_K/IQ4_NL 已完成 CPU block reference、scalar fused、统一 policy，以及 CUDA 完整反量化、单 token/批量融合 GEMV 和行读取，为 DeepSeek-V2-Lite 的设备执行提供量化基础；三种格式的 AVX2 尚未实现。Q3_K/Q5_1/Q5_K 同时支撑 Qwen1.5-MoE 专家权重，Q3_K/Q5_K 的 CPU backend 还提供多输入行共享块解码。Q4_K/Q6_K 已完成 CPU block reference、scalar fused、AVX2/FMA fused backend，以及 GPU 单 token/批量融合 GEMV。Q8_0 已完成 CPU block reference、scalar fused、统一 policy 和真实 SmolVLM 32 层 Decoder/LM Head 对照。`QuantizedLinearPolicy` 管理 CPU backend，GPU 路径由 `CudaExecutionContext` 编排。
 
 ## 扩展入口
 

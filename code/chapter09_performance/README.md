@@ -94,6 +94,8 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
 | 自适应 tile 的局部原因指标是否成立 | `scripts/run_cuda_adaptive_gemv_ab.sh` |
 | 自适应 tile 是否改善真实 Decode | `scripts/run_cuda_adaptive_gemv_runtime_ab.sh` |
 | 收益能否跨 batch、上下文和 Decode 步数保持 | `scripts/run_cuda_adaptive_gemv_runtime_matrix.sh` |
+| DeepSeek 跨请求 grouped MoE 是否改善完整 CUDA Decode | `scripts/run_deepseek2_cuda_grouped_moe_ab.sh` |
+| DeepSeek grouped Decode 的时间落在哪些 Kernel 与同步点 | `scripts/run_deepseek2_cuda_grouped_moe_profile.sh` |
 
 CUDA 入口需要相应模型、CUDA Toolkit，性能剖析入口还需要 Nsight Systems 或 Nsight Compute。Profiler 附件用于解释原因，不能替代端到端 A/B 决策。已归档 CUDA 结果与默认路径结论见[实验资产登记表](../../source/reference/experiment_assets.md#多模态cuda-与正确性资产)。
 

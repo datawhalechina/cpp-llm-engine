@@ -1,13 +1,13 @@
-# Repository Engine First Success 首个纵向切片
+# 推理引擎纵向集成层
 
-`code/engine` 把本教程的 CPU 主线和可选 CUDA 后端串成可运行纵向切片，不替代 Chapter 00 的 llama.cpp 真实模型基线，也不是生产级推理服务。
+`code/engine` 把本教程的 CPU 主线和可选 CUDA 后端连接成真实模型纵向闭环。它负责装配 Model、Executor、Runtime、Scheduler 与 ServiceCore；Chapter00 的 llama.cpp 基线继续承担外部参考结果。
 
 ## 对象与所有权
 
 | 概念 | 代码角色 | 生命周期与所有权 |
 | --- | --- | --- |
 | 模型（Model） | 真实 CPU/CUDA Model | 长期复用，保存配置和共享只读权重 |
-| 执行器工厂（Factory） | `RealLlamaExecutorFactory`、`RealLlamaCudaExecutorFactory` | 长期复用，共享 Model、块池或批量工作区，并创建请求执行器 |
+| 执行器工厂（Factory） | Llama、Qwen、DeepSeek 的 CPU/CUDA Factory | 长期复用，共享 Model、块池或批量工作区，并创建请求执行器 |
 | 请求执行器（Executor） | `RequestModelExecutor` 实现 | 每个请求独立，把 Prefill/Decode 转交给 Model 和 Context |
 | 模型执行上下文（Context） | CPU/CUDA Context | 每个请求独立，保存或绑定位置、分层 K/V 和后端状态 |
 | 批量工作区（Batch Workspace） | CUDA batch workspace | Factory 共享，只保存可复用临时张量，不保存请求历史 |
@@ -24,9 +24,9 @@ Factory 的名称表示它负责按统一规则创建和装配 Executor，而不
 
 | 资产 | 作用 |
 | --- | --- |
-| `include/` | toy Engine、真实 Llama/Qwen3 CPU Engine、Tokenizer 和执行器工厂接口 |
-| `src/` | prompt、Tokenizer backend、教学 decoder 与真实 CPU Model/Context 适配 |
-| `tests/` | core contract、engine、embedding Runtime 与 ServiceCore 集成测试 |
+| `include/` | 教学 Engine、Tokenizer 适配器，以及 Llama、Qwen、MoE、DeepSeek 的 CPU/CUDA 执行器工厂接口 |
+| `src/` | prompt、Tokenizer backend、真实模型 Runtime/Batch 适配与服务装配 |
+| `tests/` | Engine、真实模型、批处理、生成与 ServiceCore 的分层集成测试 |
 | `EmbeddingRequestExecutor` | 预计算 text/visual embedding -> Chapter06 每请求执行器 |
 | `examples/` | First Success、真实生成/服务/HTTP smoke 和真实服务 benchmark |
 | `scripts/run.sh` | 默认隔离构建、demo 和 CTest 入口 |
@@ -35,7 +35,7 @@ Factory 的名称表示它负责按统一规则创建和装配 Executor，而不
 | `scripts/run_real_decoder_profile.sh` | 可选 TinyLlama Decoder 子阶段计时与结果归档 |
 | `scripts/run_real_http_server.sh` | 启动真实 TinyLlama HTTP server，或以 `--check` 执行 curl 闭环 |
 | `scripts/run_deepseek_v2_lite_http_server.sh` | 启动 DeepSeek-V2-Lite HTTP server，或执行本地 Completion/SSE 回环 |
-| `CMakeLists.txt` | CPU 集成构建，以及显式启用的 CUDA 权重适配测试 |
+| `CMakeLists.txt` | CPU 集成构建，以及显式启用的 CUDA Model、Runtime、Batch 和 Serving 目标 |
 
 ## 运行与验证
 
@@ -146,6 +146,8 @@ ctest --test-dir /tmp/cpp-llm-engine-real-generation \
 Qwen1.5-MoE 使用独立的 `RealQwen2MoeExecutorFactory`，共享模型索引和全局权重，为每个请求创建 24 层 K/V Context。Factory 同时实现 `ExecutorBatchRunner`：校验请求 ID、Context 和位置后，按层合并多个请求的 MoE 分发，任一层失败时恢复整批 Context。`real_qwen15_moe_scheduling_smoke` 已验证 Chapter08 用一次 batch runner 调用推进两个请求。Factory 的类型化 `RealQwen2MoeBatchMode` 可在同一二进制中选择逐行基线或按专家分组执行，默认使用分组路径；EXP-CPU-13～18 已依次覆盖 MoE 子层、完整 Decode、batch 与多步范围、Chapter08 固定队列和 Chapter10 动态准入，并保持数值、词元与生命周期闸门。Factory 还可设置 LRU 层权重缓存容量并读取命中、未命中和常驻字节；默认关闭，避免 7.4 GB GGUF 的专家层长期占用 CPU 内存。
 
 DeepSeek-V2-Lite 使用 `RealDeepSeek2ExecutorFactory` 进入同一个 Chapter06 Runtime。Factory 共享 GGUF 索引、embedding、最终归一化和 LM Head；每个执行器持有独立的 27 层压缩 MLA Context。Prefill 按层加载权重并处理该层的全部 prompt 词元，Decode 继续同一分层历史。Factory 可配置有界层权重缓存并读取命中与常驻字节，默认关闭以控制内存。`run_deepseek_v2_lite_generation.sh` 已固定 `Hello` 生成 `11 304`、文本 `, I`，并检查默认两轮模型执行产生 54 次层读取且没有常驻副本。Factory 还实现 Chapter08 `ExecutorBatchRunner`：每层先按请求推进独立 MLA，再把同层 FFN 输入按专家分组执行；失败时恢复整批 Context。真实双请求调度固定生成 `185 85770`。Factory 的类型化模式可选择逐请求基线或专家分组；EXP-CPU-19 在 batch 2、单步 Decode 下记录到 `0.943` 的中位数比例。Chapter10 已验证四请求动态准入、两次双请求组批与终态释放，并通过通用 `HttpAdapter` 核对同步 Completion、SSE 和指标。HTTP Adapter 当前顺序执行请求；融合 Tensor kernel 和并发 socket 服务仍是独立扩展。
+
+`RealDeepSeek2CudaExecutorFactory` 复用同一个 Chapter06 执行器接口：Factory 共享 27 层设备权重，每个 Executor 独占压缩 MLA Context。Prefill 按词元推进完整模型，Decode 继续同一 Context；固定输入词元 `11` 生成 `207`，重复请求和分块 Prefill 已通过真实 GPU 测试。Factory 同时实现 Chapter08 `ExecutorBatchRunner`：各请求先读取自己的 MLA 历史，再按专家打包 FFN 输入；Gate、Up、Down 与共享专家执行真实批量量化 Linear，精确批量大小的工作区由 Factory 持久复用。重复请求 ID 会在执行前拒绝，整批失败恢复全部 Context。当前 Router、Top-K、加权拆回和最终 LM Head 仍在 Host 或逐请求路径完成，压缩 MLA payload 尚未分页。Chapter10 已验证两个活跃请求由 ServiceCore 进入一次 CUDA batch，同时覆盖流式回调、执行前取消和终态释放；DeepSeek HTTP/Tokenizer 组合仍是后续入口。
 
 启用分页 K/V 后，CPU 和 CUDA Factory 都持有 `RadixPrefixCache`。请求结束时，完整物理块在释放请求页表前发布到前缀索引；新请求准入只估算可复用长度，获得运行槽时才重新查询并同步共享 `BlockTable`、Request 的 Prefill 进度和 CPU/CUDA Context 位置。`PrefixBlockStore` 让索引共用匹配和淘汰算法，同时保留两种 payload 的清理时序。容量不足时，数据面先回收最久未使用的索引独占叶端块，再重试预留；真实 CPU 和 CUDA 测试都使用相同四词元前缀比较冷启动与缓存命中路径，验证 logits 或首个生成词元一致。
 

@@ -2,6 +2,8 @@
 
 本目录连接 Chapter01 产生的模型配置、权重和 Tokenizer 资产，以及 Chapter05 提供的量化 Linear 后端。Chapter04 使用这里的真实稠密 Decoder 解释 RMSNorm、RoPE、GQA、SwiGLU、分层 K/V Cache 和 LM Head。
 
+## 代码架构
+
 | 资产 | 职责 |
 | --- | --- |
 | `RealLlamaCpuModel` | 持有共享只读权重和模型结构规则 |
@@ -26,12 +28,49 @@
 | `run_deepseek2_moe_token_layer` | 复用同一 MLA/Context 主体，连接后续 MoE 层和双残差 |
 | `RealDeepSeek2CpuModel` | 共享 GGUF 索引、embedding、最终归一化和 LM Head，按层执行 1 个稠密层与 26 个 MoE 层 |
 | `RealDeepSeek2CpuContext` | 保存单个请求的位置和 27 层压缩 MLA 历史，支持 Prefill、Decode 和 reset |
+| `CudaDeepSeek2DenseLayerWeights` | 完整上传稠密首层的 Q2_K/Q3_K/IQ4_NL Linear 与 Float32 Norm 后替换输出对象，提供 MLA CUDA 只读权重视图 |
+| `CudaDeepSeek2MoeWeights` | 在加载阶段切分并上传 64 个 packed experts 与共享专家，保留 Host Router 控制面 |
+| `CudaDeepSeek2MoeFeedForward` | 执行 Top-6 命中专家和共享专家的 CUDA Gate/Up/Down，并在完整成功后写入输出 |
+| `CudaDeepSeek2MoeBatchWorkspace` | 按专家打包多个请求的 FFN 输入，复用批量 Gate/Up/Down 与共享专家临时张量 |
+| `CudaDeepSeek2MoeLayer` | 连接压缩 MLA、Host Top-6、CUDA 专家执行、双残差和请求级缓存回退 |
+| `RealDeepSeek2CudaModel` | 常驻第 0 层稠密权重、26 层 MoE 权重、Embedding、最终归一化和 LM Head |
+| `RealDeepSeek2CudaBatchWorkspace` | 在 27 层 Model 上复用各 MoE 层的跨请求批量工作区，并记录执行次数 |
+| `RealDeepSeek2CudaContext` | 独占执行流、中间 Tensor 与 27 层压缩 MLA 历史，整组提交或回退 |
+| `CudaDeepSeek2DenseLayer` | 在请求级压缩 MLA Cache 上执行 YaRN、稠密 FFN 与双残差，并在失败时回退位置 |
+
+## 所有权与执行边界
 
 CPU 类型暂时保留在 `chapter01` 命名空间，以兼容已有引擎和多模态调用方；CUDA 类型使用 `cpp_llm_engine::model`。两条路径都遵守“模型共享权重、Context 隔离请求状态”的结构。
 
 DeepSeek2 的稠密层和 MoE 层共享同一个按词元执行主体。Q 的 64 维位置分支和共享 Key 使用 GGUF 中的 YaRN factor、原始上下文长度与 log multiplier；归一化后的 512 维 latent K/V 和旋转后的共享 Key 只在整层成功后追加。第 0 层注入稠密 SwiGLU，后续 26 层注入全路由 Softmax、Top-6 和无门控共享专家；FFN 或残差失败时不提交 K/V、层输出或路由。Prefill 按层加载一次权重并顺序处理该层的全部词元，Context 只保存请求自己的压缩历史。`deepseek_v2_lite_layer_capture` 还会执行完整 27 层、最终 RMSNorm 和 LM Head；双词元 logits 与 llama.cpp 的余弦相似度为 `0.999616`，贪心词元同为 `185`。
 
+CUDA 稠密首层保持相同状态边界。`CudaDeepSeek2DenseLayerWeights` 在模型加载阶段上传 packed Linear，并只为 K/V-B 建立一份共享 Float32 展开矩阵；`CudaDeepSeek2DenseLayer` 为请求保存中间 Tensor 和压缩历史。真实双词元 CPU/CUDA 层输出最大误差为 `5.01e-6`。
+
+CUDA MoE 把 Router 和稳定 Top-K 留在 Host 控制面，将命中的 Top-6 路由专家与共享专家放到设备执行。模型加载阶段把三维 packed expert 切成独立设备矩阵，单请求工作区完成 Gate、Up、SwiGLU 和 Down；所有专家成功后才提交结果。真实第 1 层的专家索引与 CPU 一致，路由权重误差为 `0`，FFN 输出最大绝对误差为 `5.82e-10`。完整 MLA+MoE 层的双词元最大误差为 `9.83e-7`、平均误差为 `1.36e-7`，压缩缓存只在整层成功后推进。
+
+跨请求路径在每层先分别完成 MLA，再由 `CudaDeepSeek2MoeBatchWorkspace` 按专家收集请求行。Gate、Up 和 Down 调用批量量化 Linear，共享专家一次处理完整批次，Host 最后按路由权重拆回请求输出。真实 batch=2 测试证明一个持久化工作区可连续服务 26 个 MoE 层，批量结果与相同输入的顺序路径一致。工作区还累计活跃专家组、多行专家组和路由行数；EXP-GPU-17 中两个相同请求的专家组全部形成双行批次。消除 MLA score 重算后，6 轮完整 Decode 配对中 grouped 路径比顺序路径改善约 `17.3%`。设备端 Top-K、加权拆回融合和单 kernel grouped-MoE 仍属于后续候选，但当前 profile 不支持把它们列为下一热点。
+
+完整 CUDA Model 在共享对象中常驻 27 层只读权重，在每个请求 Context 中创建 27 份压缩 MLA Cache。单词元依次经过第 0 层稠密 FFN、后续 26 层 MoE、最终 RMSNorm 和 LM Head；任一层失败时，所有已推进层回退到调用前位置。真实 Q2_K 模型的 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`。Chapter06 Runtime、Chapter08 batch runner 和 Chapter10 ServiceCore 已分别验证生成状态、跨请求专家批执行和服务终态。
+
 `RealDeepSeek2CpuModel` 提供有界 LRU 层权重缓存，统计容量、常驻层、常驻字节、命中和未命中。默认容量为 0，执行后立即释放当层权重。完整 Decode 固定按 0–26 层顺序访问，容量小于 27 时层的复用距离大于缓存容量，下一轮通常仍全部未命中；容量 27 可以消除后续 GGUF 层读取，但会额外常驻接近整套 Decoder 权重。该缓存管理模型权重，不保存请求 K/V。
+
+## 阅读顺序与验证
+
+先从 Llama/Qwen 的稠密模型建立 `Model -> Context -> Decoder Layer` 关系，再阅读 Qwen1.5-MoE 的 packed expert View，最后进入 DeepSeek 的压缩 MLA 与跨请求专家分组。每一步都先运行较小的层级入口，再运行完整模型、Runtime 和服务入口。
+
+| 阶段 | 主要入口 | 观察重点 |
+| --- | --- | --- |
+| 稠密 Decoder | `bash code/chapter04_attention/scripts/run.sh` | RMSNorm、Attention、FFN、残差和连续 K/V |
+| Qwen3 CUDA | `bash code/engine/scripts/run_qwen3_cuda_decoder.sh` | Q/K Norm、NeoX RoPE、28 层 hidden/K/V/logits |
+| Qwen1.5-MoE CPU | `bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh` | Router、Top-K、packed expert 和共享专家 |
+| DeepSeek CPU | `bash code/chapter04_attention/scripts/run_deepseek_v2_lite_layer_capture.sh` | YaRN、压缩 MLA、稠密/MoE 混合层 |
+| DeepSeek CUDA 层级 | `bash code/engine/scripts/run_deepseek_v2_lite_cuda_dense_layer.sh` | CPU/CUDA 首层数值与压缩缓存增长 |
+| DeepSeek CUDA 全模型 | `bash code/engine/scripts/run_deepseek_v2_lite_cuda_model.sh` | 27 层 logits、位置提交与失败回退 |
+| DeepSeek CUDA 批处理 | `bash code/engine/scripts/run_deepseek_v2_lite_cuda_batch.sh` | 请求级 MLA 隔离、专家分组和工作区复用 |
+
+以上 CUDA 命令可用 `CUDA_HOME` 指定 Toolkit。真实模型路径由对应脚本的环境变量或默认教程路径提供，运行前先阅读脚本开头的参数说明。
+
+## 扩展入口
 
 首层示例和 CPU 模型同时接受 Llama 与 Qwen3 布局。Qwen3 路径根据元数据使用 16 个 Q 头、8 个 K/V 头和 128 维头空间，在 RoPE 前对每个 Q/K 头独立执行 RMSNorm，并使用前半维与后半维配对的 NeoX RoPE。运行 `bash code/chapter04_attention/scripts/run_qwen3_first_layer.sh` 可观察首层数据流；运行 `bash code/chapter04_attention/scripts/run_qwen3_decoder.sh` 可验证 28 层 logits 和连续四步贪心解码。
 
@@ -53,7 +92,7 @@ EXP-CPU-13～18 从第一层 MoE 子层逐步扩展到完整 Decoder、batch 1/2
 
 多请求 Decode 采用按层交错：每个请求先从自己的历史 K/V 计算 Attention，再把该层所有请求的归一化 FFN 输入交给同一张专家 assignment 表，最后按请求拆回输出。全部请求完成后才提交本层 K/V；后续层或 LM Head 失败时，Model 恢复整批请求的 24 层状态。层级测试将该路径与逐请求执行逐元素对照。
 
-DeepSeek-V2-Lite 使用相同的分组原则，但 Attention 侧保存的是各请求独立的压缩 latent K/V 和位置 Key。每层先逐请求完成 MLA，再把 64 选 6 的 FFN 输入交给共同的专家分发表；无门控共享专家仍按请求执行并直接相加。该路径复用量化专家 View 和 batch Linear，属于 CPU 分组语义实现，不等同于 GPU grouped GEMM。
+DeepSeek-V2-Lite 的 CPU 与 CUDA 路径使用相同分组原则：Attention 保存各请求独立的压缩 latent K/V 和位置 Key，每层先逐请求完成 MLA，再把 64 选 6 的 FFN 输入交给共同的专家分发表。CPU 路径复用量化专家 View 和 batch Linear；CUDA 路径把同一专家的请求行交给设备端批量量化 Linear，并让共享专家处理完整批次。两者都保留 Host 路由与加权拆回，因此不等同于成熟框架的融合 grouped-MoE kernel。
 
 24 层对照按层加载权重，避免 60 个专家的全部层权重同时常驻内存。局部路径使用 llama.cpp 上一层输出，24 层 Top-K 专家集合全部一致，最大局部 MAE 为 `0.0418066`、最低余弦相似度为 `0.999857`。累计路径保留教程输出，量化误差在 3 个词元位置触发路由分叉，最终 hidden MAE 为 `0.136931`、余弦相似度为 `0.997824`。最终 RMSNorm 与 Q6_K LM Head 已接入统一 Linear；累计 logits 余弦相似度为 `0.999401`，Top-5 前四项与贪心词元 `151643` 匹配 llama.cpp。
 

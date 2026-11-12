@@ -81,6 +81,15 @@ EXP-CPU-18 检查完整生成序列、服务生命周期和分组 MoE 性能；T
 bash code/chapter10_serving/scripts/run_deepseek_v2_lite_service.sh
 ```
 
+有 NVIDIA GPU 时，可以把 DeepSeek CUDA Executor 接入同一 `ServiceCore`，验证真实生成、双请求专家 batch、流式回调、取消和终态释放：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_serving.sh
+```
+
+该入口使用固定词元请求，不经过 Tokenizer 或 HTTP Adapter。两个活跃请求先各自完成 Prefill，再由 Chapter08 把 Decode 交给一次 CUDA batch runner；测试同时检查持久化工作区、26 层专家批执行和取消请求释放。
+
 该入口先用 ServiceCore 接纳两组请求，检查两次双请求 Decode 组批、固定生成结果和资源归零；随后把同一 Factory 注入 `HttpAdapter`，分别验证同步 Completion 与 SSE 的固定词元、指标和释放。Adapter 测试不创建 socket；两个 HTTP 请求顺序执行，因此不作为并发 HTTP 组批证据。
 
 需要继续观察真实 HTTP 字节与 SSE chunk 时运行：

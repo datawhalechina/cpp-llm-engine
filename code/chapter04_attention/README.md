@@ -46,7 +46,7 @@ MLA Attention
 
 连续 K/V 在本章表达数值和请求状态语义；Chapter07 将相同逻辑位置映射到分页存储。
 
-DeepSeek-V2-Lite 当前包含三层证据：`src/mla_attention.cpp` 用小尺寸 Float32 数据核对低秩缓存语义；`code/model/src/real_deepseek2_dense_layer.cpp` 连接稠密层与 MoE 层共用的归一化、YaRN partial RoPE、压缩历史 Attention 和双残差；`code/model/src/real_moe_feed_forward.cpp` 连接 64 选 6 路由、Q2_K/IQ4_NL 专家和共享专家。
+DeepSeek-V2-Lite 当前包含四层证据：`src/mla_attention.cpp` 用小尺寸 Float32 数据核对低秩缓存语义；`code/model/src/real_deepseek2_dense_layer.cpp` 连接 CPU 归一化、YaRN partial RoPE、压缩历史 Attention 和双残差；`code/cuda/src/mla_attention_backend.cu` 保持同一压缩 Cache 契约并通过真实双词元稠密首层对照；`code/model/src/real_moe_feed_forward.cpp` 连接 64 选 6 路由、Q2_K/IQ4_NL 专家和共享专家。
 
 完整 GGUF 可用时，先捕获 llama.cpp 首层逐节点参考：
 
