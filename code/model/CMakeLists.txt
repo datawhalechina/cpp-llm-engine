@@ -87,7 +87,12 @@ endif()
 
 if(TARGET cpp_llm_engine_cuda)
     add_library(cpp_llm_engine_model_cuda
+        src/cuda_deepseek2_moe_feed_forward.cpp
+        src/cuda_deepseek2_moe_layer.cpp
+        src/cuda_deepseek2_dense_layer_weights.cpp
+        src/cuda_deepseek2_dense_layer.cpp
         src/cuda_llama_layer_weights.cpp
+        src/real_deepseek2_cuda_model.cpp
         src/real_llama_cuda_model.cpp
     )
     target_include_directories(cpp_llm_engine_model_cuda
