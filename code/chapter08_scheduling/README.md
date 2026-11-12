@@ -64,6 +64,12 @@ Planner 不修改请求和缓存；同优先级、同等待时间的 Prefill 请
 bash code/chapter08_scheduling/scripts/run.sh
 ```
 
+`chapter08_cache_transaction_test` 使用公共故障注入器在 `executor.prefill_chunk` 和 `paged_kv.after_write` 精确触发失败，并同时检查命中次数、Request 终态、已提交词元和空闲块恢复。修改事务或失败恢复后运行包含严格警告与 Sanitizer 的专项门禁：
+
+```bash
+npm run test:fault-injection
+```
+
 有 TinyLlama GGUF 和已构建的 llama.cpp 时，再验证真实 Decode batch：
 
 ```bash

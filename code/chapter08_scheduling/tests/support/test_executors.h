@@ -4,6 +4,7 @@
 #pragma once
 
 #include "chapter06_generation/model_executor.h"
+#include "cpp_llm_engine/testing/fault_injector.h"
 
 #include <cstddef>
 #include <string>
@@ -56,8 +57,8 @@ class ChunkedTokenExecutor final : public chapter06_generation::RequestModelExec
 public:
     explicit ChunkedTokenExecutor(
         chapter06_generation::TokenId token,
-        bool fail_first_chunk = false)
-        : token_(token), fail_first_chunk_(fail_first_chunk) {}
+        cpp_llm_engine::testing::FaultInjector* faults = nullptr)
+        : token_(token), faults_(faults) {}
 
     bool prefill(
         const chapter06_generation::TokenSequence& prompt,
@@ -75,7 +76,7 @@ public:
         chapter06_generation::Logits* logits,
         std::string* error) override {
         chunk_sizes.push_back(prompt.size());
-        if (fail_first_chunk_ && chunk_sizes.size() == 1) {
+        if (faults_ != nullptr && faults_->hit("executor.prefill_chunk")) {
             if (error != nullptr) *error = "synthetic chunk failure";
             return false;
         }
@@ -110,7 +111,7 @@ public:
 
 private:
     chapter06_generation::TokenId token_;
-    bool fail_first_chunk_ = false;
+    cpp_llm_engine::testing::FaultInjector* faults_ = nullptr;
     std::size_t committed_tokens_ = 0;
 };
 

@@ -9,6 +9,7 @@
 #include "chapter07_kv_cache/block_table.h"
 #include "chapter07_kv_cache/paged_kv_cache.h"
 #include "cpp_llm_engine/testing/test.h"
+#include "cpp_llm_engine/testing/fault_injector.h"
 #include "support/test_executors.h"
 
 #include <memory>
@@ -21,8 +22,9 @@ class PartialPagedWriteFailure final
     : public chapter06_generation::ExecutorBatchRunner {
 public:
     explicit PartialPagedWriteFailure(
-        chapter07_kv_cache::CpuPagedKvCache* cache)
-        : cache_(cache) {}
+        chapter07_kv_cache::CpuPagedKvCache* cache,
+        cpp_llm_engine::testing::FaultInjector* faults)
+        : cache_(cache), faults_(faults) {}
 
     bool decode_batch(
         const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>&,
@@ -45,12 +47,16 @@ public:
                 error)) {
             return false;
         }
-        if (error != nullptr) *error = "synthetic paged decode failure";
-        return false;
+        if (faults_ != nullptr && faults_->hit("paged_kv.after_write")) {
+            if (error != nullptr) *error = "synthetic paged decode failure";
+            return false;
+        }
+        return true;
     }
 
 private:
     chapter07_kv_cache::CpuPagedKvCache* cache_;
+    cpp_llm_engine::testing::FaultInjector* faults_;
 };
 
 class CountingBatchRunner final : public chapter06_generation::ExecutorBatchRunner {
@@ -130,7 +136,9 @@ int main() {
         Runtime runtime(config);
         GreedySampler sampler;
         Request request({1, 2, 3, 4});
-        auto executor = std::make_shared<testing::ChunkedTokenExecutor>(6, true);
+        cpp_llm_engine::testing::FaultInjector faults;
+        faults.arm("executor.prefill_chunk");
+        auto executor = std::make_shared<testing::ChunkedTokenExecutor>(6, &faults);
         chapter07_kv_cache::KvBlockPool pool(2, 2);
 
         const auto failed = ContinuousBatchScheduler{}.run_step(
@@ -139,6 +147,8 @@ int main() {
         CPP_LLM_CHECK(suite, request.failed());
         CPP_LLM_CHECK(suite, !pool.contains(50));
         CPP_LLM_CHECK(suite, pool.free_blocks() == 2);
+        CPP_LLM_CHECK_EQ(suite, faults.calls("executor.prefill_chunk"), 1U);
+        CPP_LLM_CHECK_EQ(suite, faults.failures("executor.prefill_chunk"), 1U);
         CPP_LLM_CHECK(
             suite, inspect_request_execution_state(50, request, executor.get(), &pool).consistent());
     });
@@ -224,7 +234,9 @@ int main() {
         CPP_LLM_REQUIRE(suite, cache.reserve(70, 1));
         write_all_layers(suite, cache, 70, 0);
         CPP_LLM_REQUIRE(suite, cache.commit_tokens(70, 1));
-        PartialPagedWriteFailure batch_runner(&cache);
+        cpp_llm_engine::testing::FaultInjector faults;
+        faults.arm("paged_kv.after_write");
+        PartialPagedWriteFailure batch_runner(&cache, &faults);
 
         const auto failed = ContinuousBatchScheduler{}.run_step(
             runtime,
@@ -240,6 +252,8 @@ int main() {
         CPP_LLM_CHECK(suite, request.failed());
         CPP_LLM_CHECK(suite, cache.token_count(70) == 1);
         CPP_LLM_CHECK(suite, cache.block_count(70) == 1);
+        CPP_LLM_CHECK_EQ(suite, faults.calls("paged_kv.after_write"), 1U);
+        CPP_LLM_CHECK_EQ(suite, faults.failures("paged_kv.after_write"), 1U);
 
         CPP_LLM_REQUIRE(suite, cache.reserve(71, 1));
         const float key[] = {0.0f, 1.0f};
