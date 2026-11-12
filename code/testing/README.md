@@ -7,11 +7,18 @@
 | 资产 | 职责 |
 | --- | --- |
 | `include/cpp_llm_engine/testing/test.h` | 提供不受 `NDEBUG` 影响的命名检查、前置条件和异常断言 |
+| `include/cpp_llm_engine/testing/fault_injector.h` | 按命名故障点和调用次数触发一次性或持续失败 |
 | `cmake/CppLlmTesting.cmake` | 为测试目标接入公共头文件，并登记 owner、证据层级和迁移状态标签 |
 | `chapter_test_contracts.json` | 记录测试源码、CMake target、所属章节、依赖章节和证据层级 |
 | `tests/testing_self_test.cpp` | 验证公共断言自身在 Release 构建中仍然工作 |
 
 `CHECK` 记录失败后继续当前用例，`REQUIRE` 在前置条件失败时停止当前用例，避免后续索引或解引用掩盖最初错误。CTest label 用于筛选证据范围，不作为测试是否通过的替代条件。
+
+## 故障注入边界
+
+`FaultInjector` 只由测试夹具持有。生产代码继续返回原有状态或错误信息，测试执行器、缓存适配器和 Transport writer 在指定交接点调用 `hit()`。故障点使用 `对象.阶段` 命名，例如 `executor.prefill_chunk`、`paged_kv.after_write` 和 `transport.write`。
+
+一次性模式用于验证某一步失败后的回滚，持续模式用于验证重复故障下的资源守恒。测试还应断言命中次数、请求终态和资源计数，不能只检查函数返回失败。并发测试可以共享一个注入器；内部计数受互斥锁保护。
 
 ## 新增测试的顺序
 
@@ -35,8 +42,11 @@
 ```bash
 npm run test:check-assets
 npm run test:check-contracts
+npm run test:fault-injection
 npm run test:regression
 npm run test:release-contracts
 ```
 
 日常修改先运行所属章节入口；默认回归不下载模型、不访问网络、不要求 GPU。真实 GGUF、CUDA、Socket 和性能实验按 [`USAGE.md`](../../USAGE.md) 的专项入口执行，提交要求见 [`CONTRIBUTING.md`](../../CONTRIBUTING.md)。
+
+`test:fault-injection` 对公共注入器、Chapter08 缓存事务和 Chapter10 终态释放执行严格警告与 UBSan。需要同时检查地址错误时设置 `CPP_LLM_ENABLE_ASAN=1`；该专项门禁会重复构建三个最小测试范围，适合修改失败恢复或所有权代码后运行。

@@ -81,6 +81,8 @@
 
 新策略保留 reference，通过相同 workload 的正确性对照后再测性能；状态型策略还需验证资源不足、部分成功、取消和重复终态。公共接口、dtype、policy 或 target 变化执行直接 owner、相邻集成和默认回归；Runtime/Serving 变化增加发布验收。发现错误、状态污染、旧路径回退或声明超前时，修复或撤回能力声明。
 
+失败恢复测试使用 `code/testing` 的命名故障点，在指定调用次数触发一次性或持续失败。故障注入器由测试夹具持有，生产接口只暴露真实错误返回；断言同时覆盖命中次数、请求终态、缓存提交量和资源释放量。
+
 ## 8. 问题等级与两轮审核
 
 | 等级 | 判断标准 | 处理要求 |
@@ -101,6 +103,8 @@
 ```bash
 npm run test:cpp-quality -- code/chapter04_attention \
   '^(chapter04_attention_test|chapter02_tensor_attention_integration_test)$'
+
+npm run test:fault-injection
 ```
 
 脚本默认运行严格警告和 UBSan；环境支持时可增加 `CPP_LLM_ENABLE_ASAN=1`。CUDA 仍需单独记录 `nvcc` 编译、设备执行和 CPU 对照。完整测试注册和证据层级见 [`code/testing/README.md`](../../code/testing/README.md)。
