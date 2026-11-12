@@ -235,6 +235,7 @@ add_library(cpp_llm_engine
 
 if(CPP_LLM_ENGINE_ENABLE_CUDA)
     add_library(cpp_llm_engine_cuda_runtime
+        src/real_deepseek2_cuda_executor_factory.cpp
         src/real_llama_cuda_executor_factory.cpp
     )
     target_include_directories(cpp_llm_engine_cuda_runtime
@@ -247,9 +248,56 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
     add_executable(cuda_llama_layer_weights_test
         tests/cuda_llama_layer_weights_test.cpp
     )
+    add_executable(cuda_deepseek2_dense_layer_weights_test
+        tests/cuda_deepseek2_dense_layer_weights_test.cpp
+    )
     target_link_libraries(cuda_llama_layer_weights_test
         PRIVATE cpp_llm_engine_model_cuda)
+    target_link_libraries(cuda_deepseek2_dense_layer_weights_test
+        PRIVATE cpp_llm_engine_model_cuda)
     cpp_llm_prepare_test(cuda_llama_layer_weights_test)
+    cpp_llm_prepare_test(cuda_deepseek2_dense_layer_weights_test)
+    if(TARGET cpp_llm_engine_model AND CPP_LLM_ENGINE_DEEPSEEK2_MODEL)
+        add_executable(real_deepseek2_cuda_dense_layer_test
+            tests/real_deepseek2_cuda_dense_layer_test.cpp)
+        add_executable(real_deepseek2_cuda_moe_feed_forward_test
+            tests/real_deepseek2_cuda_moe_feed_forward_test.cpp)
+        add_executable(real_deepseek2_cuda_moe_layer_test
+            tests/real_deepseek2_cuda_moe_layer_test.cpp)
+        add_executable(real_deepseek2_cuda_model_test
+            tests/real_deepseek2_cuda_model_test.cpp)
+        add_executable(real_deepseek2_cuda_runtime_test
+            tests/real_deepseek2_cuda_runtime_test.cpp)
+        add_executable(real_deepseek2_cuda_batch_runtime_test
+            tests/real_deepseek2_cuda_batch_runtime_test.cpp)
+        add_executable(real_deepseek2_cuda_serving_test
+            tests/real_deepseek2_cuda_serving_test.cpp)
+        add_executable(real_deepseek2_cuda_grouped_moe_benchmark
+            examples/real_deepseek2_cuda_grouped_moe_benchmark.cpp)
+        target_link_libraries(real_deepseek2_cuda_dense_layer_test
+            PRIVATE cpp_llm_engine_model cpp_llm_engine_model_cuda)
+        target_link_libraries(real_deepseek2_cuda_moe_feed_forward_test
+            PRIVATE cpp_llm_engine_model cpp_llm_engine_model_cuda)
+        target_link_libraries(real_deepseek2_cuda_moe_layer_test
+            PRIVATE cpp_llm_engine_model cpp_llm_engine_model_cuda)
+        target_link_libraries(real_deepseek2_cuda_model_test
+            PRIVATE cpp_llm_engine_model cpp_llm_engine_model_cuda)
+        target_link_libraries(real_deepseek2_cuda_runtime_test
+            PRIVATE cpp_llm_engine_cuda_runtime)
+        target_link_libraries(real_deepseek2_cuda_batch_runtime_test
+            PRIVATE cpp_llm_engine_cuda_runtime)
+        target_link_libraries(real_deepseek2_cuda_serving_test
+            PRIVATE cpp_llm_engine_cuda_runtime chapter10_serving)
+        target_link_libraries(real_deepseek2_cuda_grouped_moe_benchmark
+            PRIVATE cpp_llm_engine_cuda_runtime)
+        cpp_llm_prepare_test(real_deepseek2_cuda_dense_layer_test)
+        cpp_llm_prepare_test(real_deepseek2_cuda_moe_feed_forward_test)
+        cpp_llm_prepare_test(real_deepseek2_cuda_moe_layer_test)
+        cpp_llm_prepare_test(real_deepseek2_cuda_model_test)
+        cpp_llm_prepare_test(real_deepseek2_cuda_runtime_test)
+        cpp_llm_prepare_test(real_deepseek2_cuda_batch_runtime_test)
+        cpp_llm_prepare_test(real_deepseek2_cuda_serving_test)
+    endif()
     if(TARGET chapter05_quantization)
         add_executable(real_tinyllama_cuda_first_layer_test
             tests/real_tinyllama_cuda_first_layer_test.cpp
@@ -466,6 +514,85 @@ cpp_llm_set_test_labels(embedding_request_service_test integration engine servin
 if(CPP_LLM_ENGINE_ENABLE_CUDA)
     add_test(NAME cuda_llama_layer_weights_test COMMAND cuda_llama_layer_weights_test)
     cpp_llm_set_test_labels(cuda_llama_layer_weights_test cuda integration)
+    add_test(NAME cuda_deepseek2_dense_layer_weights_test
+        COMMAND cuda_deepseek2_dense_layer_weights_test)
+    cpp_llm_set_test_labels(
+        cuda_deepseek2_dense_layer_weights_test cuda deepseek integration)
+    cpp_llm_set_test_contract(
+        cuda_deepseek2_dense_layer_weights_test
+        OWNER 05 LEVEL integration STATUS active)
+    if(TARGET real_deepseek2_cuda_dense_layer_test)
+        add_test(
+            NAME real_deepseek2_cuda_dense_layer_test
+            COMMAND real_deepseek2_cuda_dense_layer_test
+                "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}")
+        cpp_llm_set_test_labels(
+            real_deepseek2_cuda_dense_layer_test
+            real_model slow cuda deepseek attention integration)
+        cpp_llm_set_test_contract(
+            real_deepseek2_cuda_dense_layer_test
+            OWNER 04 LEVEL real_model STATUS active)
+        add_test(
+            NAME real_deepseek2_cuda_moe_feed_forward_test
+            COMMAND real_deepseek2_cuda_moe_feed_forward_test
+                "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}")
+        cpp_llm_set_test_labels(
+            real_deepseek2_cuda_moe_feed_forward_test
+            real_model slow cuda deepseek moe quantization integration)
+        cpp_llm_set_test_contract(
+            real_deepseek2_cuda_moe_feed_forward_test
+            OWNER 05 LEVEL real_model STATUS active)
+        add_test(
+            NAME real_deepseek2_cuda_moe_layer_test
+            COMMAND real_deepseek2_cuda_moe_layer_test
+                "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}")
+        cpp_llm_set_test_labels(
+            real_deepseek2_cuda_moe_layer_test
+            real_model slow cuda deepseek attention moe integration)
+        cpp_llm_set_test_contract(
+            real_deepseek2_cuda_moe_layer_test
+            OWNER 04 LEVEL real_model STATUS active)
+        add_test(
+            NAME real_deepseek2_cuda_model_test
+            COMMAND real_deepseek2_cuda_model_test
+                "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}")
+        cpp_llm_set_test_labels(
+            real_deepseek2_cuda_model_test
+            real_model slow cuda deepseek generation integration)
+        cpp_llm_set_test_contract(
+            real_deepseek2_cuda_model_test
+            OWNER 06 LEVEL real_model STATUS active)
+        add_test(
+            NAME real_deepseek2_cuda_runtime_test
+            COMMAND real_deepseek2_cuda_runtime_test
+                "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}")
+        cpp_llm_set_test_labels(
+            real_deepseek2_cuda_runtime_test
+            real_model slow cuda deepseek generation integration)
+        cpp_llm_set_test_contract(
+            real_deepseek2_cuda_runtime_test
+            OWNER 06 LEVEL real_model STATUS active)
+        add_test(
+            NAME real_deepseek2_cuda_batch_runtime_test
+            COMMAND real_deepseek2_cuda_batch_runtime_test
+                "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}")
+        cpp_llm_set_test_labels(
+            real_deepseek2_cuda_batch_runtime_test
+            real_model slow cuda deepseek scheduler batch moe integration)
+        cpp_llm_set_test_contract(
+            real_deepseek2_cuda_batch_runtime_test
+            OWNER 08 LEVEL real_model STATUS active)
+        add_test(
+            NAME real_deepseek2_cuda_serving_test
+            COMMAND real_deepseek2_cuda_serving_test
+                "${CPP_LLM_ENGINE_DEEPSEEK2_MODEL}")
+        cpp_llm_set_test_labels(
+            real_deepseek2_cuda_serving_test
+            real_model slow cuda deepseek serving streaming integration)
+        cpp_llm_set_test_contract(
+            real_deepseek2_cuda_serving_test
+            OWNER 10 LEVEL real_model STATUS active)
+    endif()
     if(CPP_LLM_ENGINE_CUDA_REAL_MODEL)
         if(NOT EXISTS "${CPP_LLM_ENGINE_CUDA_REAL_MODEL}")
             message(FATAL_ERROR "CPP_LLM_ENGINE_CUDA_REAL_MODEL does not exist")
