@@ -40,7 +40,8 @@
 | 5 | G | [`GPU 实验资产`](../../reference/experiment_assets.md#exp-gpu-02) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_cuda_profile.sh"><code>run_cuda_profile.sh</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_cuda_attention_ab.sh"><code>run_cuda_attention_ab.sh</code></a> | kernel profile 为什么不能替代真实 Prefill/Decode A/B 决策 |
 | 6 | G | [`自适应 GEMV 决策`](../../reference/experiment_assets.md#exp-gpu-14) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_cuda_adaptive_gemv_ab.sh"><code>局部原因</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_cuda_adaptive_gemv_runtime_ab.sh"><code>真实 Decode</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_cuda_adaptive_gemv_runtime_matrix.sh"><code>范围矩阵</code></a> | 局部优化怎样经过端到端决策和适用范围验证后进入默认路径 |
 | 7 | B/MoE | [`MoE 分组实验`](../../reference/experiment_assets.md#exp-cpu-13) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_qwen15_moe_grouped_batch_ab.sh"><code>run_qwen15_moe_grouped_batch_ab.sh</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_deepseek2_moe_batch_runtime_ab.sh"><code>DeepSeek Runtime A/B</code></a> | 怎样从局部专家计算逐步验证完整解码、调度和服务收益 |
-| 8 | 扩展 | [`09.9 框架对照`](./09_framework_comparison.md) | 生态卡 | 教学证据链与成熟框架工具链的对应关系 |
+| 8 | G/MoE | [`DeepSeek CUDA 分组实验`](../../reference/experiment_assets.md#exp-gpu-17) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_deepseek2_cuda_grouped_moe_ab.sh"><code>run_deepseek2_cuda_grouped_moe_ab.sh</code></a> | 正确的跨请求批执行为什么仍可能没有端到端收益 |
+| 9 | 扩展 | [`09.9 框架对照`](./09_framework_comparison.md) | 生态卡 | 教学证据链与成熟框架工具链的对应关系 |
 
 ## 验证与下一步
 
@@ -58,6 +59,7 @@
 | L10 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 两轮独立 Prefill/Decode 样本和正确性检查完整；不稳定收益不会进入默认路径 | 调优融合 Attention 时必做 |
 | L11 CUDA 自适应 GEMV 原因 | `bash code/chapter09_performance/scripts/run_cuda_adaptive_gemv_ab.sh` | 固定 4 行与自适应 tile 的正确性、cycles、指令和共享内存指标完整 | 调整量化 GEMV 策略时必做 |
 | L12 CUDA 自适应 GEMV 决策 | `bash code/chapter09_performance/scripts/run_cuda_adaptive_gemv_runtime_ab.sh`、`run_cuda_adaptive_gemv_runtime_matrix.sh` | 真实 Decode 输出 `KEEP`，batch/context/step 矩阵全部通过正确性和配对顺序检查 | 改变默认路径前必做 |
+| L13 DeepSeek CUDA grouped MoE A/B | `bash code/chapter09_performance/scripts/run_deepseek2_cuda_grouped_moe_ab.sh` | 两轮反向顺序配对通过 logits、余弦、词元和 grouped 调用计数门禁 | 优化 DeepSeek 专家执行时必做 |
 
 L1 构建证据记录、统计和比较器，并运行六项测试；它证明记录格式、校验规则与决策逻辑可用，不代表当前机器上的性能数字可以直接推广到其他环境。
 

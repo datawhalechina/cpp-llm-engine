@@ -31,6 +31,8 @@ Q4_K CPU reference 使用真实 TinyLlama `token_embd.weight` 与 llama.cpp refe
 
 Q2_K 与 IQ4_NL 先用固定 block 检查分组参数和非线性码表，再进入 DeepSeek-V2-Lite 的真实稠密层、MoE 层和 27 层 Decoder。双词元第 1 层输出余弦相似度为 `0.999859`，完整 logits 余弦相似度为 `0.999616`，贪心词元与 llama.cpp 一致。
 
+CUDA MoE 对照进一步检查量化格式进入专家执行后的组合误差。第一版由 Host 计算 Router 与稳定 Top-K，CUDA 只执行命中的 Q2_K Gate/Up、IQ4_NL Down 和共享专家；真实第 1 层路由与 CPU 完全一致，单独 FFN 输出最大绝对误差为 `5.82e-10`。连接 MLA 与双残差后的整层最大误差为 `9.83e-7`。运行 `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_moe.sh` 可以复现两级结果。
+
 | 验证对象 | 当前证据 | 通过标准 |
 | --- | --- | --- |
 | INT8 教学格式 | 固定整数、scale 和预期浮点值 | `q * scale` 与预期一致 |

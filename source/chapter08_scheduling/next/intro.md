@@ -8,7 +8,7 @@ Chapter06 固定单请求生成语义，Chapter07 提供可提交和回滚的 K/
 | --- | --- | --- |
 | A 选择与事务 | 从 Round-robin 升级到 token budget、Continuous Batching、优先级和 Chunked Prefill | 固定候选顺序、老化、公平性与失败回滚 |
 | B 批量执行 | 把 Step batch 转成 Executor/Tensor batch，再接入稠密模型或 MoE 的多 Context | 顺序/批量结果一致、位置校验和整批回滚 |
-| G GPU 扩展坐标 | 保留计划与事务契约，把 Executor batch 交给设备后端和完成事件 | 当前只有 Overlap 状态校验，尚未实现设备执行重叠 |
+| G GPU 扩展坐标 | 保留计划与事务契约，把 Executor batch 交给设备后端 | TinyLlama 批量 Linear 与 DeepSeek 按专家分组执行已接入；设备执行重叠仍只验证计划状态 |
 | M 多模态扩展坐标 | 将视觉输入产生的词元和阶段成本纳入调度预算 | 当前多模态请求复用服务终态，尚未接入本章预算策略 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
@@ -49,4 +49,5 @@ bash code/chapter08_scheduling/scripts/run.sh
 | L4 稠密模型 batch | `bash code/chapter08_scheduling/scripts/run_real_batch.sh` | TinyLlama 顺序/批量 logits 与固定词元一致，错误位置不提交 | 有模型时必做 |
 | L5 MoE 请求 batch | `bash code/chapter08_scheduling/scripts/run_qwen15_moe_batch.sh` | Qwen1.5-MoE 两个 Context 在一次 batch runner 调用中共同推进，固定词元一致 | 学习 MoE 调度时选做 |
 | L5 MLA-MoE 请求 batch | `bash code/chapter08_scheduling/scripts/run_deepseek_v2_lite_batch.sh` | DeepSeek 两个 Context 在一次按层 batch 调用中生成固定词元 `185 85770` | 学习 MLA 调度时选做 |
+| L6 CUDA MLA-MoE batch | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_batch.sh` | 两个请求共享一个持久化批量工作区，26 个 MoE 层分别完成一次专家批执行；非法重复 ID 不推进位置 | 有 NVIDIA GPU 时选做 |
 | L5 Overlap 控制面 | 同 L1 入口中的 `chapter08_overlap_scheduler_test` | 同步结果一致，取消和状态变化使旧计划失效，关闭后同步回退 | 必做 |

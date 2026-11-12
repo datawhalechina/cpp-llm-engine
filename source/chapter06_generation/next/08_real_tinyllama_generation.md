@@ -36,6 +36,8 @@ Qwen1.5-MoE 仍把词元、logits 和停止状态交给 Chapter06。区别位于
 
 DeepSeek-V2-Lite 使用相同边界。`RealDeepSeek2ExecutorFactory` 共享 GGUF 索引和全局权重，每个执行器独占 27 层 Context；Context 在每层保存 512 维 latent K/V 与 64 维位置 Key。Runtime 仍只观察 logits、已提交词元数和停止状态，不感知 MLA、64 选 6 路由或首层稠密 FFN。
 
+CUDA Model 沿用相同的所有权划分。`RealDeepSeek2CudaModel` 常驻一层稠密权重、26 层 MoE 权重和输出权重；`RealDeepSeek2CudaContext` 独占执行流、中间 Tensor 与每层压缩历史。`RealDeepSeek2CudaExecutorFactory` 把这组对象适配为 Chapter06 的 Prefill/Decode 接口。单词元 CPU/CUDA logits 余弦相似度为 `1`，固定输入词元 `11` 的贪心结果同为 `207`；重复请求和分块 Prefill 继续检查 Context 隔离与位置提交。
+
 模型权重缓存与请求 Context 是两个对象。DeepSeek Factory 默认逐层读取并释放权重，因此消费内存较低；将缓存容量设为 27 后，后续 Decode 可以复用全部层权重，但会增加接近整套 Decoder 的常驻内存。容量小于 27 的普通 LRU 对顺序扫描通常没有命中，因为同一层再次出现前已经访问了其余 26 层。无论是否缓存权重，请求位置和 MLA 历史始终保存在各自 Context 中。
 
 Factory 同时提供跨请求 Decode 接口。它按层加载一次权重，每个请求先从自己的压缩 MLA 历史计算 Attention，再把同层 FFN 输入按专家分组执行，最后拆回各请求。整批成功后才提交 Context；任一层失败都会恢复批次开始前的状态。当前 CPU 路径已经实现专家分组，MLA、共享专家和 LM Head 仍按请求计算，融合 Tensor 执行留给后续优化。
@@ -82,3 +84,15 @@ bash code/engine/scripts/run_deepseek_v2_lite_generation.sh
 ```
 
 默认输入 `Hello`，生成词元 `11 304`，解码为 `, I`。`golden_tokens_match: true` 核对固定结果，`deepseek2_text_generation: PASS` 表示 Tokenizer、27 层 Decoder、LM Head、Runtime 和请求 Context 已经连通。
+
+有 NVIDIA GPU 时，先运行完整模型数值对照，再运行 Chapter06 Runtime：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_model.sh
+
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_runtime.sh
+```
+
+第二个入口输出 `generated_token: 207`、`chunked_prefill_position: 2` 和 `context_isolation_match: true`。这组结果证明 CUDA Model 已进入单请求生成状态机；跨请求 Tensor Batch 和服务生命周期分别由 Chapter08、Chapter10 验证。

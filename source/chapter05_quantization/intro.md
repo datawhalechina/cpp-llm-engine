@@ -6,13 +6,13 @@ Chapter 04 已经固定 Decoder、Attention 和 FFN 的计算结构；本章在 
 
 | 本章实现 | 成熟系统继续增加 | 深入入口 |
 | --- | --- | --- |
-| INT8 教学路径、九种 GGUF 量化格式的 CPU reference/fused、可选 SIMD，以及 Q4_K/Q6_K CUDA GEMV | 校准、混合精度、更高吞吐量化 GEMM 和多格式调度 | [`05.7 量化框架对照`](./07_tensorrt_gemma_vllm_comparison.md) |
+| INT8 教学路径、九种 GGUF 量化格式的 CPU reference/fused、可选 SIMD，以及 Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL CUDA GEMV | 校准、混合精度、更高吞吐量化 GEMM 和多格式调度 | [`05.7 量化框架对照`](./07_tensorrt_gemma_vllm_comparison.md) |
 
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
 | A 教学证据线 | 用小型 INT8 与九种 GGUF block 的 CPU reference 看清 scale、反量化与误差 | 固定反量化数值、浮点/量化输出误差和失败状态 |
 | B 真实执行线 | 读取 GGUF packed 权重，将 TinyLlama、Qwen1.5-MoE 和 DeepSeek-V2-Lite 所需格式接入统一 Linear | 与 llama.cpp 对照 logits 数值指标、专家选择和 greedy token 序列 |
-| G GPU 执行线 | 保持 packed 权重和 Linear 语义不变，单 token 与小批量路径融合解码、点积和归约 | Q4_K/Q6_K 设备端结果、真实生成 token 与性能证据 |
+| G GPU 执行线 | 保持 packed 权重和 Linear 语义不变，单 token 与小批量路径融合解码、点积和归约 | Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL 设备端结果；TinyLlama/Qwen3 真实生成与性能证据 |
 | M 多模态复用线 | 复用 Q8_0 解码与 Linear 契约处理 SmolVLM 视觉权重 | 视觉 Encoder、Projector 和语言模型权重通过真实模型测试 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |

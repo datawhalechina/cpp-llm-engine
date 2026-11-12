@@ -98,7 +98,7 @@ metadata adapter -> ModelMetadata -> ModelConfig
 | --- | --- | --- |
 | 读取哪个模型 | 命令行模型路径或 `CPP_LLM_ENGINE_MODEL_PATH` | 调用者选择 GGUF 文件 |
 | 使用哪种模型架构 | GGUF 的 `general.architecture` | Loader 自动识别 `llama`、`qwen3`、`qwen2moe` 或 `deepseek2`，并选择对应结构约束 |
-| 在哪里执行 | CPU/CUDA 入口或后续设备配置 | Qwen3 已接入 CPU/CUDA；Qwen1.5-MoE 与 DeepSeek2 已接入 CPU；DeepSeek2 CUDA 待建设 |
+| 在哪里执行 | CPU/CUDA 入口或后续设备配置 | Qwen3 已接入 CPU/CUDA；Qwen1.5-MoE 与 DeepSeek2 已接入 CPU；DeepSeek2 CUDA 已完成稠密首层，MoE 与全模型执行继续由后续章节接入 |
 
 架构由模型文件声明，正常运行不需要额外传入 `--architecture`。显式架构参数容易让配置与真实权重冲突，因此只应作为诊断断言，而不应覆盖 GGUF。稠密模型按架构选择 Llama 或 Qwen3 数学路径；Qwen2MoE 与 DeepSeek2 分别使用独立的 CPU Model 和执行器工厂。Chapter01 只识别架构并交付元数据与权重布局；DeepSeek2 的 MLA、MoE 和完整 27 层执行由 Chapter04–06 与 `code/model` 接续。
 

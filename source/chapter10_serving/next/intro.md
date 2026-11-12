@@ -8,7 +8,7 @@ Chapter06 定义单请求生成，Chapter07 管理 K/V 资源，Chapter08 选择
 | --- | --- | --- |
 | A 服务生命周期 | 从 admission 进入 waiting/running，再处理取消、超时、失败和统一释放 | 固定状态转换、容量结果和资源归零 |
 | B 网络与并发 | 把 Completion/SSE 映射到 ServiceCore；比较稠密、MoE 和 MLA-MoE 模型怎样复用服务生命周期 | TinyLlama/Qwen3 HTTP 闭环、Qwen1.5-MoE 动态准入、DeepSeek HTTP/SSE 与指标契约 |
-| G GPU 扩展坐标 | 保持 ServiceCore 与 HTTP 契约不变，把 Executor 替换为设备后端 | TinyLlama 与 Qwen3 均已通过 CUDA 服务闭环 |
+| G GPU 扩展坐标 | 保持 ServiceCore 生命周期不变，把 Executor 替换为设备后端 | TinyLlama、Qwen3 已通过 HTTP 闭环；DeepSeek 已通过固定词元服务与跨请求专家 batch |
 | M 多模态扩展坐标 | 在 Adapter 前构造图文 embedding Executor，再复用同一服务生命周期 | 已有引擎集成测试；图片 HTTP body 与多模态 Transport 尚未实现 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
@@ -44,5 +44,6 @@ Chapter06 定义单请求生成，Chapter07 管理 K/V 资源，Chapter08 选择
 | L5 Qwen3 CUDA 服务 | `bash code/engine/scripts/run_qwen3_cuda_serving.sh` | Qwen3 Completion/SSE golden、Tensor Batch 和终态资源归零 | 完成 Qwen3 CUDA Generation 后执行 |
 | L5 Qwen1.5-MoE 动态准入 | `bash code/chapter09_performance/scripts/run_qwen15_moe_service_ab.sh` | 运行中加入请求后，输出、批量执行和终态释放一致 | 学习 MoE 服务时选做 |
 | L6 DeepSeek 服务 | `bash code/chapter10_serving/scripts/run_deepseek_v2_lite_service.sh` | 动态准入与双请求组批成立；同步 Completion、SSE、指标和终态释放一致 | 学习 MLA 与 MoE 服务时选做 |
+| L6 DeepSeek CUDA 服务 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_serving.sh` | 双请求 Decode 进入一次专家 batch；流式回调、取消、指标和资源释放通过 | 学习 MLA-MoE GPU 服务时选做 |
 
 L1 入口会构建 Chapter06–08 依赖与 `chapter10_serving`，再运行 ServiceCore、终态释放、HTTP/SSE 契约和请求 Worker 四个测试。

@@ -38,7 +38,7 @@ GEMV 是通用矩阵向量乘法（General Matrix-Vector Multiplication）。Dec
 y[r] = sum(W[r,k] * x[k]), k = 0 ... K-1
 ```
 
-基线路径先把整个 packed 权重矩阵写成 Float32 workspace，再由 cuBLAS 重新读取；融合路径让一个 CUDA block 负责一个输出行。线程从该行的 Q4_K/Q6_K block 读取量化值，在寄存器中完成解码和乘加，只把最终的 `y[r]` 写回显存。
+基线路径先把整个 packed 权重矩阵写成 Float32 workspace，再由 cuBLAS 重新读取；融合路径让一个 CUDA block 负责一个输出行。线程从该行的 packed block 读取量化值，在寄存器中完成解码和乘加，只把最终的 `y[r]` 写回显存。Q4_K/Q6_K 是 TinyLlama 与 Qwen3 的性能主线；Q2_K/Q3_K/IQ4_NL 先作为 DeepSeek-V2-Lite 的设备正确性基线接入同一输出契约。
 
 批量 Decode 的输入是 `[B,K]`，数学上已经是矩阵矩阵乘法。这里仍称 batched GEMV，是因为代码从单向量 kernel 扩展而来，只让少量输入行共享权重读取与解码；它没有采用面向大矩阵的通用 GEMM 分块策略。批量融合路径把最多 4 个输入行组成一个 tile，一个 block 负责同一输出行在该 tile 内的多个结果。同一线程解码一个 packed 权重后，连续更新各输入行的累加器；这样既省去完整 Float32 权重副本和后续 SGEMM，也避免在相邻请求之间重复读取和解码权重。
 
@@ -67,7 +67,7 @@ Q4_K 和 Q6_K 的一个 super-block 都表示 256 个权重。当前映射使用
 
 ## 计算后端策略与统一接口
 
-`Q4KLinearAvx2` 和 `Q6KLinearAvx2` 在读取 block 时直接用 AVX2/FMA 累加。CUDA 由 `CudaQuantizedMatrix` 保存 packed payload；单 token 和小批量 Decode 都直接读取 Q4_K/Q6_K block，完整反量化加 cuBLAS 保留为数值与性能对照。Q2_K、IQ4_NL 与 Q8_0 当前使用 portable scalar fused；请求不存在的 AVX2 实现会返回明确 `Status`，不会静默回退。
+`Q4KLinearAvx2` 和 `Q6KLinearAvx2` 在读取 block 时直接用 AVX2/FMA 累加。CUDA 由 `CudaQuantizedMatrix` 保存 packed payload；单 token 和小批量 Decode 可直接读取 Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL block，完整反量化路径保留为独立数值对照。Q2_K、Q3_K、IQ4_NL 与 Q8_0 的 CPU 路径当前使用 portable scalar fused；请求不存在的 AVX2 实现会返回明确 `Status`，不会静默回退。
 
 ```cpp
 chapter05_quantization::QuantizedLinearPolicy policy{

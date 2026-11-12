@@ -69,6 +69,17 @@ output = softmax(score + causal_mask) @ V
 
 真实 DeepSeek-V2-Lite 对照由 `run_deepseek_v2_lite_layer_capture.sh` 提供。它通过 llama.cpp 回调捕获首层的归一化输入、Query、K/V-A、共享 RoPE Key、压缩 latent、Attention 输出、FFN 输入和层输出。算法测试回答“低秩路径是否正确”，真实捕获回答“固定 GGUF 的节点名称、shape 和参考数值是什么”；自研首层需要同时通过两类证据。
 
+CUDA 路径继续保留这份压缩状态。`CudaMlaCache` 按请求保存 latent K/V 与共享位置 Key；K/V-B 展开矩阵由模型权重对象持有，避免每个请求重复反量化。首版 MLA kernel 按 head 直接读取压缩历史，在求最大值、Softmax 分母和每个 Value 维聚合时重复计算 score。它先固定了数学结果，但计算量随 Value 维数重复放大。
+
+当前 CUDA 实现把计算拆成三个阶段：先为每个 `(head, token)` 计算一次 score，再按 head 原地归一化为概率，最后让 `(head, value)` 并行复用概率完成 Value 聚合。每层 Context 按最大上下文一次性创建 `[head, capacity]` 概率工作区，Decode 时不再动态分配。这样既保留压缩缓存，也避免在每个 Value 维重新执行非位置 Key 投影。
+
+EXP-GPU-17 中，参考 kernel 占一次双请求 Decode 的 `99.9%` GPU kernel 时间；三阶段实现将完整 grouped Decode 从约 `31.8 s` 降到约 `0.45 s`。真实双词元 CPU/CUDA 层输出最大绝对误差为 `5.01e-6`，完整 27 层 logits 余弦为 `1`、贪心词元一致。优化后 score kernel 仍占 kernel 时间 `82.3%`，所以接下来应细分 score 内部的 latent 投影，而不是绕过数值门禁继续堆叠融合。
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_dense_layer.sh
+```
+
 自研入口先在位置 0 验证量化投影、维度拆分、输出投影、SwiGLU 和双残差，再用位置 1 读取两项历史。请求 Context 持久保存归一化后的 512 维 latent K/V 和已旋转的 64 维共享 Key；Q 与共享 Key 都按照 GGUF 的 YaRN 参数执行 partial RoPE。双词元对照同时验证缓存追加、位置偏移和历史聚合，最终层输出与 llama.cpp 的余弦相似度为 `0.999883`。
 
 通用资料常写 `[B,H,T,Dh]`。本教程的跨章适配器使用词元优先（token-major）布局 `[B,T,H,Dh]`，让同一个词元的所有注意力头连续存放。阅读下图时从左到右追踪形状，再在下半部分比较预填充与逐词元解码的请求差异。

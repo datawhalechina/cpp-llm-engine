@@ -49,6 +49,8 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | L3 可选 Qwen1.5-MoE | `bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh` | 24 层局部 Top-K 全部匹配 llama.cpp，并核对双词元因果 Attention、逐层 hidden、98304 个 K/V 元素、logits 和贪心词元 | 学习 MoE 真实权重时执行 |
 | L3 可选 DeepSeek MLA | `bash code/chapter04_attention/scripts/run.sh` 中的 `chapter04_mla_attention_test` | 低秩 K/V 缓存路径与显式展开 Attention 逐元素一致，非法位置不提交输出 | 学习 MLA 时执行 |
 | L3 可选 DeepSeek 真实模型 | `bash code/chapter04_attention/scripts/run_deepseek_v2_lite_layer_capture.sh` | 双词元前两层中间节点、完整 27 层 logits 和贪心词元与 llama.cpp 对齐 | 学习 MLA 与混合 Dense/MoE 层时执行 |
+| L3 可选 DeepSeek CUDA 首层 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_dense_layer.sh` | 双词元压缩 MLA 历史和稠密首层输出匹配 CPU 参考 | 学习 MLA 设备执行时选做 |
+| L3 可选 DeepSeek CUDA MoE | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_moe.sh` | 第 1 层压缩 MLA、Top-6、量化专家、双残差与缓存提交匹配 CPU 参考 | 学习 MoE 设备执行时选做 |
 | L3 可选 CUDA | `bash code/engine/scripts/run_real_cuda_decoder.sh` | TinyLlama 2 层与 22 层 hidden、分层 K/V 匹配 CPU 参考实现 | 有 NVIDIA GPU 和模型时选做 |
 | L3 可选 Qwen3 CUDA | `bash code/engine/scripts/run_qwen3_cuda_decoder.sh` | Qwen3 28 层 hidden、分层 K/V、logits、融合 Attention 与 Tensor Prefill匹配 CPU 参考实现 | 验收第二种 CUDA 稠密架构时执行 |
 | L4 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 三阶段与融合路径均通过 logits/greedy 检查，并保留两轮 Prefill/Decode 样本；收益不稳定时不切换默认路径 | 调优融合内核时必做 |

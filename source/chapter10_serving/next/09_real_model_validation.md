@@ -79,3 +79,12 @@ bash code/engine/scripts/run_qwen3_cuda_serving.sh
 ```
 
 两个入口都保持 `ServiceCore` 和 `HttpAdapter` 不变，只把每请求 Executor 换成 CUDA Context。TinyLlama 与 Qwen3 均已通过正常 Completion、SSE、客户端取消和超时验收，四个请求释放后 `inflight`、`waiting`、`running` 全部归零。
+
+DeepSeek-V2-Lite 的 CUDA 路径先验证服务核心：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_serving.sh
+```
+
+该入口把 `RealDeepSeek2CudaExecutorFactory` 作为 batch runner 注入 `ServiceCore`。两个活跃请求分别完成 Prefill 后，共同进入一次 CUDA Decode batch；每个请求保留自己的压缩 MLA 历史，26 个 MoE 层复用同一个批量工作区执行专家 Gate、Up 和 Down。第三个请求在执行前取消。测试检查首个词元 `207`、两请求生成一致、流式顺序、批量调用计数、指标和三个终态的 Executor 释放。Tokenizer 与 HTTP Adapter 组合仍需单独验收。

@@ -31,7 +31,12 @@
 | --- | --- | --- | --- |
 | TinyLlama | 每请求标准 GQA K/V | Q/K/V、输出投影、FFN 与 LM Head 的多行 Linear | CPU/CUDA 已绑定 Chapter07 BlockTable |
 | Qwen1.5-MoE | 每请求分层标准 K/V | 同层权重只加载一次，MoE 输入按专家重新分组 | Context 连续保存，尚未迁移到 Chapter07 |
-| DeepSeek-V2-Lite | 每请求低秩 MLA K/V 与共享位置 Key | 同层权重只加载一次，64 选 6 的 FFN 输入按专家分组 | MLA Context 连续保存，需要新的分页 payload 适配 |
+| DeepSeek-V2-Lite CPU | 每请求低秩 MLA K/V 与共享位置 Key | 同层权重只加载一次，64 选 6 的 FFN 输入按专家分组 | MLA Context 连续保存，需要新的分页 payload 适配 |
+| DeepSeek-V2-Lite CUDA | 每请求设备压缩 MLA K/V 与位置 Key | 同一专家的请求行共同执行 Gate/Up/Down，共享专家处理完整批次 | 设备 Context 连续保存，尚未迁移到 Chapter07 |
+
+DeepSeek CUDA batch 保留了“Attention 隔离、FFN 合并”的边界。每个请求先在自己的执行流和压缩 MLA 历史上完成 Attention；所有请求到达 FFN 后，批量工作区读取 Router 结果，把命中同一专家的输入行打包，再调用 `quantized_linear_batch()` 完成 Gate、Up 和 Down。共享专家直接处理整个批次，结果按请求加权拆回。批量大小相同时，Factory 会复用同一个工作区，避免 26 个 MoE 层和后续 Decode step 重复分配临时张量。
+
+这条路径已经执行真实跨请求量化计算，但仍保留三项清晰边界：Router、稳定 Top-K 和加权拆回在 Host 完成；最终归一化与 LM Head 按请求执行；压缩 MLA payload 尚未分页。它也不等于设备执行重叠或单个融合 grouped-MoE kernel。
 
 ## 为什么批量临时张量需要复用
 
@@ -79,6 +84,8 @@ DeepSeek-V2-Lite 的 batch 先按层加载一次权重，各请求使用自己�
 bash code/chapter08_scheduling/scripts/run.sh
 bash code/chapter08_scheduling/scripts/run_real_batch.sh
 bash code/chapter08_scheduling/scripts/run_deepseek_v2_lite_batch.sh
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_batch.sh
 ```
 
 | 环境 | 必须通过 |
@@ -87,3 +94,4 @@ bash code/chapter08_scheduling/scripts/run_deepseek_v2_lite_batch.sh
 | 本地 TinyLlama | 真实 batch golden、批量 Linear、失败回滚和分页计数一致 |
 | 本地 Qwen1.5-MoE | 独立 K/V、跨请求专家分组、连续批量调用和完整生成序列一致 |
 | 本地 DeepSeek-V2-Lite | 独立 MLA 历史、一次按层 batch 调用、固定词元与位置同步推进 |
+| 本地 DeepSeek-V2-Lite + CUDA | 两个请求共享一个 batch workspace，26 层各执行一次 grouped MoE，重复 ID 失败时位置保持不变 |

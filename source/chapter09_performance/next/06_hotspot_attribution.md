@@ -30,3 +30,7 @@
 先运行 `bash code/chapter09_performance/scripts/run_real_evidence.sh profile`，确认阶段文件含有 `WL-CPU-TINYLLAMA-DECODER-PHASE-V1`；需要继续下钻 CPU 函数时，再对同一可执行文件和输入使用 `perf record`。归因结果应在[实验资产索引](../../reference/experiment_assets.md#exp-cpu-04)中指向原始文件和复现入口，而不是只保留截图。
 
 当阶段、函数和硬件指标支持同一个优化假设时，进入 `09.7`；若不能回指相同 workload，不得进入 A/B 结论。
+
+DeepSeek CUDA 的 grouped MoE 实验展示了为什么必须逐层下钻。EXP-GPU-17 的首轮结果中，专家路由重叠率为 `100%`，但端到端收益方向不稳定。使用 CUDA Profiler capture range 只捕获一次 grouped Decode 后，Nsight Systems 记录到 54 次 MLA kernel，总时间约 `32.16 s`，占 GPU kernel 时间 `99.9%`。`cudaStreamSynchronize` 的 Host 等待也接近同一总量，表示 Host 在等待 MLA 完成，而不是同步调用自身消耗了这些计算时间。
+
+依据该证据，CUDA MLA 改为 score、Softmax、Value 聚合三阶段，并让概率在 Value 维之间复用。优化后 6 轮反向顺序配对中，顺序与 grouped Decode 中位数分别为 `550.2 ms` 和 `455.0 ms`，logits 与词元门禁通过。新的单次捕获中，score kernel 合计约 `317.6 ms`、占 kernel 时间 `82.3%`，Value 聚合约 `5.44 ms`。这次复测同时回答了两个问题：三阶段 MLA 应保留；下一轮应继续拆解 score 的 latent 投影，而不是优先融合 MoE。
