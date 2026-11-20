@@ -141,6 +141,7 @@ struct RealDeepSeek2CudaContext::Impl final {
     std::vector<cuda::CudaTensor> prefill_rows;
     CudaDeepSeek2DensePrefillWorkspace prefill_workspace;
     CudaDeepSeek2MoeBatchWorkspace prefill_moe_workspace;
+    CudaMoePrefillPath moe_prefill_path = CudaMoePrefillPath::RowCopies;
     std::size_t prefill_token_count = 0;
     std::size_t position = 0;
     std::size_t capacity_tokens = 0;
@@ -259,6 +260,7 @@ struct RealDeepSeek2CudaContext::Impl final {
             status = moe[index].prefill_sequence(
                 &execution, model->moe[index], &prefill_hidden, position,
                 &prefill_workspace, &prefill_moe_workspace, &routes,
+                moe_prefill_path,
                 mla_data_plane == nullptr ? nullptr : &view);
         }
         if (status.is_ok() && mla_data_plane != nullptr) {
@@ -395,7 +397,8 @@ std::unique_ptr<RealDeepSeek2CudaContext>
 RealDeepSeek2CudaModel::create_context(
     std::size_t capacity_tokens,
     std::string* error,
-    cuda::CudaMlaComputePath mla_path) const {
+    cuda::CudaMlaComputePath mla_path,
+    CudaMoePrefillPath moe_prefill_path) const {
     if (capacity_tokens == 0 || capacity_tokens > impl_->metadata.max_position) {
         if (error != nullptr) *error = "DeepSeek2 CUDA context capacity is invalid";
         return nullptr;
@@ -403,6 +406,7 @@ RealDeepSeek2CudaModel::create_context(
     auto context = std::make_unique<RealDeepSeek2CudaContext::Impl>();
     context->model = impl_;
     context->capacity_tokens = capacity_tokens;
+    context->moe_prefill_path = moe_prefill_path;
     core::Status status = cuda::CudaExecutionContext::create(&context->execution);
     if (status.is_ok()) status = cuda::CudaTensor::create_contiguous(
         {impl_->metadata.hidden_size}, core::DType::Float32, &context->hidden);

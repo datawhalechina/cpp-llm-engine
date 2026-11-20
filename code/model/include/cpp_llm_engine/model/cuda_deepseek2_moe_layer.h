@@ -41,6 +41,7 @@ public:
         CudaDeepSeek2DensePrefillWorkspace* workspace,
         CudaDeepSeek2MoeBatchWorkspace* moe_workspace,
         std::vector<CudaDeepSeek2MoeRoute>* routes,
+        CudaMoePrefillPath moe_path = CudaMoePrefillPath::RowCopies,
         const CudaDeepSeek2PagedMlaBatchView* paged = nullptr);
     core::Status finish_moe(
         cuda::CudaExecutionContext* context,

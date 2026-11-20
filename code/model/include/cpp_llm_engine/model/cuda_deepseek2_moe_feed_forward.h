@@ -17,6 +17,11 @@ namespace cpp_llm_engine::cuda { class CudaExecutionContext; }
 
 namespace cpp_llm_engine::model {
 
+enum class CudaMoePrefillPath {
+    RowCopies,
+    PackedDispatch,
+};
+
 struct CudaDeepSeek2MoeConfig final {
     std::size_t hidden_size = 0;
     std::size_t expert_hidden_size = 0;
@@ -129,6 +134,12 @@ public:
         const CudaDeepSeek2MoeWeights& weights,
         const std::vector<const cuda::CudaTensor*>& normalized_hidden,
         const std::vector<cuda::CudaTensor*>& output,
+        std::vector<CudaDeepSeek2MoeRoute>* routes);
+    core::Status forward_packed(
+        cuda::CudaExecutionContext* context,
+        const CudaDeepSeek2MoeWeights& weights,
+        const cuda::CudaTensor& normalized_hidden,
+        cuda::CudaTensor* output,
         std::vector<CudaDeepSeek2MoeRoute>* routes);
     std::size_t batch_size() const;
     std::size_t use_count() const;

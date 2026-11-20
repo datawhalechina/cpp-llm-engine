@@ -286,6 +286,24 @@ core::Status run_expert_batch(
     return status;
 }
 
+core::Status run_expert_batch_device(
+    cuda::CudaExecutionContext* context,
+    const cuda::CudaTensor& input,
+    const cuda::CudaQuantizedMatrix& gate_weights,
+    const cuda::CudaQuantizedMatrix& up_weights,
+    const cuda::CudaQuantizedMatrix& down_weights,
+    BatchLinearWorkspace* workspace) {
+    core::Status status = context->quantized_linear_batch(
+        gate_weights, input, &workspace->gate);
+    if (status.is_ok()) status = context->quantized_linear_batch(
+        up_weights, input, &workspace->up);
+    if (status.is_ok()) status = context->swiglu(
+        workspace->gate, workspace->up, &workspace->activated);
+    if (status.is_ok()) status = context->quantized_linear_batch(
+        down_weights, workspace->activated, &workspace->output);
+    return status;
+}
+
 }  // namespace
 
 core::Status CudaDeepSeek2MoeConfig::validate() const {
@@ -677,6 +695,92 @@ core::Status CudaDeepSeek2MoeBatchWorkspace::forward(
     }
     status = context->synchronize();
     if (!status.is_ok()) return status;
+    *routes = std::move(built_routes);
+    ++impl_->use_count;
+    impl_->active_expert_groups += active_expert_groups;
+    impl_->multi_row_expert_groups += multi_row_expert_groups;
+    impl_->routed_rows += impl_->batch_size * impl_->config.top_k;
+    return core::Status::ok();
+}
+
+core::Status CudaDeepSeek2MoeBatchWorkspace::forward_packed(
+    cuda::CudaExecutionContext* context,
+    const CudaDeepSeek2MoeWeights& weights,
+    const cuda::CudaTensor& normalized_hidden,
+    cuda::CudaTensor* output,
+    std::vector<CudaDeepSeek2MoeRoute>* routes) {
+    if (impl_ == nullptr || context == nullptr || output == nullptr ||
+        routes == nullptr || !weights.valid() ||
+        normalized_hidden.contract().shape.dimensions !=
+            std::vector<std::size_t>{
+                impl_->batch_size, impl_->config.hidden_size} ||
+        output->contract().shape.dimensions !=
+            normalized_hidden.contract().shape.dimensions) {
+        return core::Status::error(
+            "DeepSeek2 CUDA packed MoE input is invalid");
+    }
+
+    std::vector<float> hidden(
+        impl_->batch_size * impl_->config.hidden_size);
+    core::Status status = context->download(
+        normalized_hidden, hidden.data(), hidden.size() * sizeof(float));
+    if (status.is_ok()) status = context->synchronize();
+    if (!status.is_ok()) return status;
+
+    std::vector<CudaDeepSeek2MoeRoute> built_routes(impl_->batch_size);
+    for (std::size_t row = 0; row < impl_->batch_size; ++row) {
+        const auto first = hidden.begin() +
+            static_cast<std::ptrdiff_t>(row * impl_->config.hidden_size);
+        const std::vector<float> row_hidden(
+            first, first + static_cast<std::ptrdiff_t>(impl_->config.hidden_size));
+        status = build_route(
+            impl_->config, weights.router(), row_hidden, &built_routes[row]);
+        if (!status.is_ok()) return status;
+    }
+
+    struct Assignment { std::size_t row; float weight; };
+    std::vector<std::vector<Assignment>> assignments(impl_->config.expert_count);
+    for (std::size_t row = 0; row < built_routes.size(); ++row) {
+        for (std::size_t slot = 0;
+             slot < built_routes[row].expert_indices.size(); ++slot) {
+            assignments[built_routes[row].expert_indices[slot]].push_back(
+                {row, built_routes[row].weights[slot]});
+        }
+    }
+
+    status = context->zero(output);
+    std::size_t active_expert_groups = 0;
+    std::size_t multi_row_expert_groups = 0;
+    for (std::size_t expert = 0;
+         status.is_ok() && expert < assignments.size(); ++expert) {
+        const auto& group = assignments[expert];
+        if (group.empty()) continue;
+        ++active_expert_groups;
+        if (group.size() > 1) ++multi_row_expert_groups;
+        std::vector<std::size_t> rows;
+        std::vector<float> route_weights;
+        rows.reserve(group.size());
+        route_weights.reserve(group.size());
+        for (const auto assignment : group) {
+            rows.push_back(assignment.row);
+            route_weights.push_back(assignment.weight);
+        }
+        auto& workspace = impl_->expert_groups[group.size() - 1];
+        status = context->gather_rows(
+            normalized_hidden, rows, &workspace.input);
+        if (status.is_ok()) status = run_expert_batch_device(
+            context, workspace.input, weights.expert_gate(expert),
+            weights.expert_up(expert), weights.expert_down(expert), &workspace);
+        if (status.is_ok()) status = context->weighted_scatter_add_rows(
+            workspace.output, rows, route_weights, output);
+    }
+    if (status.is_ok()) status = run_expert_batch_device(
+        context, normalized_hidden, weights.shared_gate(), weights.shared_up(),
+        weights.shared_down(), &impl_->shared);
+    if (status.is_ok()) status = context->vector_add(
+        *output, impl_->shared.output, output);
+    if (!status.is_ok()) return status;
+
     *routes = std::move(built_routes);
     ++impl_->use_count;
     impl_->active_expert_groups += active_expert_groups;

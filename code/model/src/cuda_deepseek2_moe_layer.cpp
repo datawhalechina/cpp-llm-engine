@@ -175,6 +175,7 @@ core::Status CudaDeepSeek2MoeLayer::prefill_sequence(
     CudaDeepSeek2DensePrefillWorkspace* workspace,
     CudaDeepSeek2MoeBatchWorkspace* moe_workspace,
     std::vector<CudaDeepSeek2MoeRoute>* routes,
+    CudaMoePrefillPath moe_path,
     const CudaDeepSeek2PagedMlaBatchView* paged) {
     const bool uses_paged = paged != nullptr;
     const std::size_t tokens = workspace == nullptr ? 0 : workspace->token_count_;
@@ -261,28 +262,34 @@ core::Status CudaDeepSeek2MoeLayer::prefill_sequence(
     RETURN_IF_MOE_PREFILL_ERROR(context->rms_norm_batch(
         workspace->attention_residual_, weights.ffn_norm(),
         &workspace->ffn_norm_, config_.attention.rms_norm_epsilon));
-    std::vector<cuda::CudaTensor*> input_rows;
-    std::vector<const cuda::CudaTensor*> normalized_rows;
-    std::vector<cuda::CudaTensor*> output_rows;
-    input_rows.reserve(tokens);
-    normalized_rows.reserve(tokens);
-    output_rows.reserve(tokens);
-    for (std::size_t index = 0; index < tokens; ++index) {
-        input_rows.push_back(&workspace->moe_input_rows_[index]);
-        normalized_rows.push_back(&workspace->moe_input_rows_[index]);
-        output_rows.push_back(&workspace->moe_output_rows_[index]);
+    if (moe_path == CudaMoePrefillPath::PackedDispatch) {
+        RETURN_IF_MOE_PREFILL_ERROR(moe_workspace->forward_packed(
+            context, weights, workspace->ffn_norm_, &workspace->ffn_output_,
+            routes));
+    } else {
+        std::vector<cuda::CudaTensor*> input_rows;
+        std::vector<const cuda::CudaTensor*> normalized_rows;
+        std::vector<cuda::CudaTensor*> output_rows;
+        input_rows.reserve(tokens);
+        normalized_rows.reserve(tokens);
+        output_rows.reserve(tokens);
+        for (std::size_t index = 0; index < tokens; ++index) {
+            input_rows.push_back(&workspace->moe_input_rows_[index]);
+            normalized_rows.push_back(&workspace->moe_input_rows_[index]);
+            output_rows.push_back(&workspace->moe_output_rows_[index]);
+        }
+        RETURN_IF_MOE_PREFILL_ERROR(context->unpack_rows(
+            workspace->ffn_norm_, input_rows));
+        RETURN_IF_MOE_PREFILL_ERROR(moe_workspace->forward(
+            context, weights, normalized_rows, output_rows, routes));
+        std::vector<const cuda::CudaTensor*> packed_rows;
+        packed_rows.reserve(tokens);
+        for (const auto& row : workspace->moe_output_rows_) {
+            packed_rows.push_back(&row);
+        }
+        RETURN_IF_MOE_PREFILL_ERROR(context->pack_rows(
+            packed_rows, &workspace->ffn_output_));
     }
-    RETURN_IF_MOE_PREFILL_ERROR(context->unpack_rows(
-        workspace->ffn_norm_, input_rows));
-    RETURN_IF_MOE_PREFILL_ERROR(moe_workspace->forward(
-        context, weights, normalized_rows, output_rows, routes));
-    std::vector<const cuda::CudaTensor*> packed_rows;
-    packed_rows.reserve(tokens);
-    for (const auto& row : workspace->moe_output_rows_) {
-        packed_rows.push_back(&row);
-    }
-    RETURN_IF_MOE_PREFILL_ERROR(context->pack_rows(
-        packed_rows, &workspace->ffn_output_));
     RETURN_IF_MOE_PREFILL_ERROR(context->vector_add(
         workspace->attention_residual_, workspace->ffn_output_, hidden));
 #undef RETURN_IF_MOE_PREFILL_ERROR
