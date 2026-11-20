@@ -9,6 +9,10 @@
 #include <memory>
 #include <string>
 
+namespace chapter07_kv_cache {
+class KvCacheTransaction;
+}
+
 namespace cpp_llm_engine {
 
 class RealDeepSeek2CudaExecutorFactory final
@@ -32,6 +36,17 @@ public:
 
     std::shared_ptr<chapter06_generation::RequestModelExecutor>
     create_executor() const;
+    bool configure_paged_mla_cache(
+        std::size_t total_blocks,
+        std::size_t block_size,
+        std::string* error = nullptr);
+    std::shared_ptr<chapter07_kv_cache::KvCacheTransaction>
+    paged_mla_resource() const;
+    bool bind_request(
+        const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+        std::size_t request_id,
+        std::string* error = nullptr) const;
+    void release_request(std::size_t request_id) const;
     bool decode_batch(
         const std::vector<std::shared_ptr<
             chapter06_generation::RequestModelExecutor>>& executors,

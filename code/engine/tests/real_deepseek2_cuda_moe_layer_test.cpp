@@ -82,6 +82,9 @@ int main(int argc, char** argv) {
         {metadata.hidden_size}, cpp_llm_engine::core::DType::Float32,
         &hidden).is_ok());
     cpp_llm_engine::model::RealDeepSeek2LayerContext cpu_context;
+    std::vector<float> batch_input;
+    std::vector<float> batch_golden;
+    std::vector<std::vector<std::size_t>> batch_route_golden;
     float maximum_error = 0.0F;
     double error_sum = 0.0;
     std::size_t compared = 0;
@@ -96,6 +99,10 @@ int main(int argc, char** argv) {
         CHECK(cpp_llm_engine::model::run_deepseek2_moe_token_layer(
             metadata, host_weights, input, &cpu_context, &cpu_result,
             &cpu_route, &error));
+        batch_input.insert(batch_input.end(), input.begin(), input.end());
+        batch_golden.insert(batch_golden.end(), cpu_result.output.begin(),
+            cpu_result.output.end());
+        batch_route_golden.push_back(cpu_route.expert_indices);
         CHECK(context.upload(
             &hidden, input.data(), input.size() * sizeof(float)).is_ok());
         cpp_llm_engine::model::CudaDeepSeek2MoeRoute cuda_route;
@@ -116,12 +123,52 @@ int main(int argc, char** argv) {
         }
     }
     const double mean_error = error_sum / static_cast<double>(compared);
+    cpp_llm_engine::model::CudaDeepSeek2MoeLayer batch_layer;
+    cpp_llm_engine::model::CudaDeepSeek2DensePrefillWorkspace workspace;
+    cpp_llm_engine::model::CudaDeepSeek2MoeBatchWorkspace moe_workspace;
+    cpp_llm_engine::cuda::CudaTensor batch_hidden;
+    CHECK(cpp_llm_engine::model::CudaDeepSeek2MoeLayer::create(
+        {attention, moe}, 2, &batch_layer).is_ok());
+    CHECK(cpp_llm_engine::model::CudaDeepSeek2DensePrefillWorkspace::create(
+        attention, 2, 2, &workspace).is_ok());
+    CHECK(cpp_llm_engine::model::CudaDeepSeek2MoeBatchWorkspace::create(
+        moe, 2, &moe_workspace).is_ok());
+    CHECK(cpp_llm_engine::cuda::CudaTensor::create_contiguous(
+        {2, metadata.hidden_size}, cpp_llm_engine::core::DType::Float32,
+        &batch_hidden).is_ok());
+    CHECK(context.upload(&batch_hidden, batch_input.data(),
+        batch_input.size() * sizeof(float)).is_ok());
+    std::vector<cpp_llm_engine::model::CudaDeepSeek2MoeRoute> batch_routes;
+    const auto prefill_status = batch_layer.prefill_sequence(
+        &context, device_weights, &batch_hidden, 0, &workspace,
+        &moe_workspace, &batch_routes);
+    if (!prefill_status.is_ok()) {
+        std::cerr << "MoE Prefill failed: " << prefill_status.message() << '\n';
+        return 1;
+    }
+    std::vector<float> batch_output(batch_input.size());
+    CHECK(context.download(batch_hidden, batch_output.data(),
+        batch_output.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    float batch_maximum_error = 0.0F;
+    CHECK(batch_routes.size() == 2);
+    for (std::size_t token = 0; token < 2; ++token) {
+        CHECK(batch_routes[token].expert_indices == batch_route_golden[token]);
+    }
+    for (std::size_t value = 0; value < batch_output.size(); ++value) {
+        batch_maximum_error = std::max(batch_maximum_error, std::fabs(
+            batch_output[value] - batch_golden[value]));
+    }
     std::cout << "deepseek_cuda_moe_layer_max_error=" << maximum_error << '\n'
               << "deepseek_cuda_moe_layer_mean_error=" << mean_error << '\n'
-              << "deepseek_cuda_moe_layer_tokens=" << layer.position() << '\n';
+              << "deepseek_cuda_moe_layer_tokens=" << layer.position() << '\n'
+              << "deepseek_cuda_moe_prefill_max_error="
+              << batch_maximum_error << '\n';
     CHECK(layer.position() == 2);
     CHECK(maximum_error <= 0.03F);
     CHECK(mean_error <= 0.003);
+    CHECK(batch_layer.position() == 2);
+    CHECK(batch_maximum_error <= 0.03F);
     return 0;
 }
 

@@ -136,21 +136,166 @@ struct RealDeepSeek2CudaContext::Impl final {
     cuda::CudaTensor logits;
     CudaDeepSeek2DenseLayer dense;
     std::vector<CudaDeepSeek2MoeLayer> moe;
+    std::shared_ptr<RealDeepSeek2CudaMlaDataPlane> mla_data_plane;
+    cuda::CudaTensor prefill_hidden;
+    std::vector<cuda::CudaTensor> prefill_rows;
+    CudaDeepSeek2DensePrefillWorkspace prefill_workspace;
+    CudaDeepSeek2MoeBatchWorkspace prefill_moe_workspace;
+    std::size_t prefill_token_count = 0;
     std::size_t position = 0;
     std::size_t capacity_tokens = 0;
 
     void trim(std::size_t target) {
-        dense.trim(target);
-        for (auto& layer : moe) layer.trim(target);
+        if (mla_data_plane != nullptr) {
+            (void)mla_data_plane->trim(target);
+        } else {
+            dense.trim(target);
+            for (auto& layer : moe) layer.trim(target);
+        }
+    }
+
+    core::Status reserve_paged(
+        std::size_t total_tokens,
+        std::vector<std::size_t>* blocks) {
+        if (blocks == nullptr || mla_data_plane == nullptr ||
+            total_tokens <= position || total_tokens > capacity_tokens ||
+            mla_data_plane->token_count() != position) {
+            return core::Status::error(
+                "DeepSeek2 paged MLA position is not aligned");
+        }
+        std::string error;
+        if (!mla_data_plane->reserve(total_tokens, &error)) {
+            return core::Status::error(error);
+        }
+        *blocks = mla_data_plane->physical_blocks();
+        auto* payload = mla_data_plane->payload();
+        if (payload == nullptr || !payload->valid() || blocks->empty() ||
+            (total_tokens - 1) / payload->block_size() >= blocks->size()) {
+            trim(position);
+            return core::Status::error(
+                "DeepSeek2 paged MLA reservation is invalid");
+        }
+        return core::Status::ok();
+    }
+
+    core::Status reserve_paged(std::vector<std::size_t>* blocks) {
+        return reserve_paged(position + 1, blocks);
+    }
+
+    CudaDeepSeek2PagedMlaView paged_view(
+        std::size_t layer,
+        const std::vector<std::size_t>& blocks) const {
+        auto* payload = mla_data_plane->payload();
+        const std::size_t logical_block = position / payload->block_size();
+        return {
+            payload,
+            &blocks,
+            layer,
+            blocks[logical_block],
+            position % payload->block_size(),
+            position + 1};
+    }
+
+    CudaDeepSeek2PagedMlaBatchView paged_batch_view(
+        std::size_t layer,
+        std::size_t total_tokens,
+        const std::vector<std::size_t>& blocks) const {
+        return {mla_data_plane->payload(), &blocks, layer, total_tokens};
+    }
+
+    core::Status ensure_prefill_workspace(std::size_t token_count) {
+        if (prefill_token_count == token_count) return core::Status::ok();
+        cuda::CudaTensor hidden_batch;
+        core::Status status = cuda::CudaTensor::create_contiguous(
+            {token_count, model->metadata.hidden_size}, core::DType::Float32,
+            &hidden_batch);
+        std::vector<cuda::CudaTensor> rows(token_count);
+        for (std::size_t index = 0; status.is_ok() && index < token_count;
+             ++index) {
+            status = cuda::CudaTensor::create_contiguous(
+                {model->metadata.hidden_size}, core::DType::Float32,
+                &rows[index]);
+        }
+        CudaDeepSeek2DensePrefillWorkspace attention_workspace;
+        if (status.is_ok()) status =
+            CudaDeepSeek2DensePrefillWorkspace::create(
+                model->attention_config, token_count, capacity_tokens,
+                &attention_workspace);
+        CudaDeepSeek2MoeBatchWorkspace moe_workspace;
+        if (status.is_ok() && !model->moe_configs.empty()) {
+            status = CudaDeepSeek2MoeBatchWorkspace::create(
+                model->moe_configs.front(), token_count, &moe_workspace);
+        }
+        if (!status.is_ok()) return status;
+        prefill_hidden = std::move(hidden_batch);
+        prefill_rows = std::move(rows);
+        prefill_workspace = std::move(attention_workspace);
+        prefill_moe_workspace = std::move(moe_workspace);
+        prefill_token_count = token_count;
+        return core::Status::ok();
+    }
+
+    core::Status forward_layers_batch() {
+        const std::size_t total_tokens = position + prefill_token_count;
+        std::vector<std::size_t> blocks;
+        core::Status status = mla_data_plane == nullptr
+            ? core::Status::ok()
+            : reserve_paged(total_tokens, &blocks);
+        CudaDeepSeek2PagedMlaBatchView dense_view;
+        if (status.is_ok() && mla_data_plane != nullptr) {
+            dense_view = paged_batch_view(0, total_tokens, blocks);
+        }
+        if (status.is_ok()) status = dense.prefill_sequence(
+            &execution, model->dense.view(), &prefill_hidden, position,
+            &prefill_workspace,
+            mla_data_plane == nullptr ? nullptr : &dense_view);
+        for (std::size_t index = 0;
+             status.is_ok() && index < moe.size(); ++index) {
+            CudaDeepSeek2PagedMlaBatchView view;
+            if (mla_data_plane != nullptr) {
+                view = paged_batch_view(index + 1, total_tokens, blocks);
+            }
+            std::vector<CudaDeepSeek2MoeRoute> routes;
+            status = moe[index].prefill_sequence(
+                &execution, model->moe[index], &prefill_hidden, position,
+                &prefill_workspace, &prefill_moe_workspace, &routes,
+                mla_data_plane == nullptr ? nullptr : &view);
+        }
+        if (status.is_ok() && mla_data_plane != nullptr) {
+            std::string error;
+            if (!mla_data_plane->commit(total_tokens, &error)) {
+                status = core::Status::error(error);
+            }
+        }
+        if (!status.is_ok()) trim(position);
+        return status;
     }
 
     core::Status forward_layers() {
-        core::Status status = dense.forward(
-            &execution, model->dense.view(), &hidden, position);
+        std::vector<std::size_t> blocks;
+        core::Status status = mla_data_plane == nullptr
+            ? core::Status::ok()
+            : reserve_paged(&blocks);
+        CudaDeepSeek2PagedMlaView dense_view;
+        if (status.is_ok() && mla_data_plane != nullptr) {
+            dense_view = paged_view(0, blocks);
+        }
+        if (status.is_ok()) status = dense.forward(
+            &execution, model->dense.view(), &hidden, position,
+            mla_data_plane == nullptr ? nullptr : &dense_view);
         for (std::size_t index = 0; status.is_ok() && index < moe.size(); ++index) {
             CudaDeepSeek2MoeRoute route;
+            CudaDeepSeek2PagedMlaView view;
+            if (mla_data_plane != nullptr) view = paged_view(index + 1, blocks);
             status = moe[index].forward(
-                &execution, model->moe[index], &hidden, position, &route);
+                &execution, model->moe[index], &hidden, position, &route,
+                mla_data_plane == nullptr ? nullptr : &view);
+        }
+        if (status.is_ok() && mla_data_plane != nullptr) {
+            std::string error;
+            if (!mla_data_plane->commit(position + 1, &error)) {
+                status = core::Status::error(error);
+            }
         }
         if (!status.is_ok()) trim(position);
         return status;
@@ -352,23 +497,40 @@ bool RealDeepSeek2CudaModel::decode_batch(
     };
 
     core::Status status = core::Status::ok();
+    std::vector<std::vector<std::size_t>> paged_blocks(items.size());
+    for (std::size_t index = 0; status.is_ok() && index < items.size(); ++index) {
+        auto& context = *items[index].context->impl_;
+        if (context.mla_data_plane != nullptr) {
+            status = context.reserve_paged(&paged_blocks[index]);
+        }
+    }
     for (std::size_t index = 0; status.is_ok() && index < items.size(); ++index) {
         auto& context = *items[index].context->impl_;
         status = context.execution.embedding_lookup(
             impl_->embedding, static_cast<std::size_t>(items[index].token),
             &context.hidden);
+        CudaDeepSeek2PagedMlaView view;
+        if (status.is_ok() && context.mla_data_plane != nullptr) {
+            view = context.paged_view(0, paged_blocks[index]);
+        }
         if (status.is_ok()) status = context.dense.forward(
             &context.execution, impl_->dense.view(), &context.hidden,
-            positions[index]);
+            positions[index],
+            context.mla_data_plane == nullptr ? nullptr : &view);
     }
     for (std::size_t layer = 0;
          status.is_ok() && layer < impl_->moe.size(); ++layer) {
         for (std::size_t index = 0;
              status.is_ok() && index < items.size(); ++index) {
             auto& context = *items[index].context->impl_;
+            CudaDeepSeek2PagedMlaView view;
+            if (context.mla_data_plane != nullptr) {
+                view = context.paged_view(layer + 1, paged_blocks[index]);
+            }
             status = context.moe[layer].forward_attention(
                 &context.execution, impl_->moe[layer], &context.hidden,
-                positions[index]);
+                positions[index],
+                context.mla_data_plane == nullptr ? nullptr : &view);
             if (status.is_ok()) status = context.execution.synchronize();
         }
         std::vector<const cuda::CudaTensor*> normalized;
@@ -406,6 +568,15 @@ bool RealDeepSeek2CudaModel::decode_batch(
             built[index].size() * sizeof(float));
         if (status.is_ok()) status = context.execution.synchronize();
     }
+    for (std::size_t index = 0; status.is_ok() && index < items.size(); ++index) {
+        auto& context = *items[index].context->impl_;
+        if (context.mla_data_plane == nullptr) continue;
+        std::string commit_error;
+        if (!context.mla_data_plane->commit(
+                positions[index] + 1, &commit_error)) {
+            status = core::Status::error(commit_error);
+        }
+    }
     if (!status.is_ok()) {
         rollback();
         if (error != nullptr) *error = status.message();
@@ -423,6 +594,12 @@ std::size_t RealDeepSeek2CudaModel::layer_count() const {
 }
 std::size_t RealDeepSeek2CudaModel::hidden_size() const {
     return impl_->metadata.hidden_size;
+}
+std::size_t RealDeepSeek2CudaModel::mla_latent_dimension() const {
+    return impl_->attention_config.latent_dimension;
+}
+std::size_t RealDeepSeek2CudaModel::mla_rope_dimension() const {
+    return impl_->attention_config.rope_dimension;
 }
 std::size_t RealDeepSeek2CudaModel::vocab_size() const {
     return impl_->metadata.vocab_size;
@@ -520,10 +697,97 @@ core::Status RealDeepSeek2CudaContext::forward_token(
     return core::Status::ok();
 }
 
+core::Status RealDeepSeek2CudaContext::forward_tokens(
+    const std::vector<std::int32_t>& tokens,
+    std::vector<float>* logits) {
+    if (logits == nullptr || tokens.empty() ||
+        tokens.size() > impl_->capacity_tokens - impl_->position) {
+        return core::Status::error(
+            "DeepSeek2 CUDA token chunk input is invalid");
+    }
+    for (const std::int32_t token : tokens) {
+        if (token < 0 ||
+            static_cast<std::size_t>(token) >=
+                impl_->model->metadata.vocab_size) {
+            return core::Status::error(
+                "DeepSeek2 CUDA token chunk contains an invalid token");
+        }
+    }
+    core::Status status = impl_->ensure_prefill_workspace(tokens.size());
+    std::vector<const cuda::CudaTensor*> rows;
+    rows.reserve(tokens.size());
+    for (std::size_t index = 0; status.is_ok() && index < tokens.size();
+         ++index) {
+        status = impl_->execution.embedding_lookup(
+            impl_->model->embedding, static_cast<std::size_t>(tokens[index]),
+            &impl_->prefill_rows[index]);
+        rows.push_back(&impl_->prefill_rows[index]);
+    }
+    if (status.is_ok()) status = impl_->execution.pack_rows(
+        rows, &impl_->prefill_hidden);
+    if (status.is_ok()) status = impl_->forward_layers_batch();
+    std::vector<cuda::CudaTensor*> output_rows;
+    output_rows.reserve(impl_->prefill_rows.size());
+    for (auto& row : impl_->prefill_rows) output_rows.push_back(&row);
+    if (status.is_ok()) status = impl_->execution.unpack_rows(
+        impl_->prefill_hidden, output_rows);
+    if (status.is_ok()) status = impl_->execution.copy(
+        impl_->prefill_rows.back(), &impl_->hidden);
+    if (status.is_ok()) status = impl_->execution.rms_norm(
+        impl_->hidden, impl_->model->output_norm, &impl_->final_hidden,
+        impl_->model->metadata.rms_norm_epsilon);
+    if (status.is_ok()) status = impl_->execution.quantized_linear(
+        impl_->model->output_weight, impl_->final_hidden, &impl_->logits);
+    std::vector<float> result(impl_->model->metadata.vocab_size);
+    if (status.is_ok()) status = impl_->execution.download(
+        impl_->logits, result.data(), result.size() * sizeof(float));
+    if (status.is_ok()) status = impl_->execution.synchronize();
+    if (!status.is_ok()) {
+        impl_->trim(impl_->position);
+        return status;
+    }
+    impl_->position += tokens.size();
+    *logits = std::move(result);
+    return core::Status::ok();
+}
+
 void RealDeepSeek2CudaContext::reset() {
-    impl_->dense.reset();
-    for (auto& layer : impl_->moe) layer.reset();
+    if (impl_->mla_data_plane != nullptr) {
+        (void)impl_->mla_data_plane->trim(0);
+    } else {
+        impl_->dense.reset();
+        for (auto& layer : impl_->moe) layer.reset();
+    }
     impl_->position = 0;
+}
+bool RealDeepSeek2CudaContext::attach_mla_data_plane(
+    std::shared_ptr<RealDeepSeek2CudaMlaDataPlane> data_plane,
+    std::string* error) {
+    auto* payload = data_plane == nullptr ? nullptr : data_plane->payload();
+    if (data_plane == nullptr || payload == nullptr || !payload->valid() ||
+        impl_->mla_data_plane != nullptr || data_plane->token_count() != 0 ||
+        impl_->position != 0 ||
+        payload->layer_count() != 1 + impl_->moe.size() ||
+        payload->latent_dimension() !=
+            impl_->model->attention_config.latent_dimension ||
+        payload->rope_dimension() !=
+            impl_->model->attention_config.rope_dimension) {
+        if (error != nullptr) {
+            *error = "DeepSeek2 paged MLA data plane is incompatible";
+        }
+        return false;
+    }
+    impl_->mla_data_plane = std::move(data_plane);
+    if (error != nullptr) error->clear();
+    return true;
+}
+bool RealDeepSeek2CudaContext::uses_external_mla() const {
+    return impl_->mla_data_plane != nullptr;
+}
+bool RealDeepSeek2CudaContext::uses_external_mla_for(
+    std::size_t request_id) const {
+    return impl_->mla_data_plane != nullptr &&
+        impl_->mla_data_plane->request_id() == request_id;
 }
 std::size_t RealDeepSeek2CudaContext::position() const {
     return impl_->position;

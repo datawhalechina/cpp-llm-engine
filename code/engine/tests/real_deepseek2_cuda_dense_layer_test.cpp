@@ -77,6 +77,8 @@ int main(int argc, char** argv) {
         &cuda_hidden).is_ok());
 
     cpp_llm_engine::model::RealDeepSeek2LayerContext cpu_context;
+    std::vector<float> batch_input;
+    std::vector<float> batch_golden;
     float maximum_error = 0.0F;
     double error_sum = 0.0;
     std::size_t compared = 0;
@@ -90,6 +92,10 @@ int main(int argc, char** argv) {
         cpp_llm_engine::model::RealDeepSeek2LayerResult cpu_result;
         CHECK(cpp_llm_engine::model::run_deepseek2_dense_token_layer(
             metadata, host_weights, input, &cpu_context, &cpu_result, &error));
+        batch_input.insert(batch_input.end(), input.begin(), input.end());
+        batch_golden.insert(
+            batch_golden.end(), cpu_result.output.begin(),
+            cpu_result.output.end());
         CHECK(cuda_context.upload(
             &cuda_hidden, input.data(), input.size() * sizeof(float)).is_ok());
         CHECK(cuda_layer.forward(
@@ -109,12 +115,45 @@ int main(int argc, char** argv) {
         }
     }
     const double mean_error = error_sum / static_cast<double>(compared);
+    cpp_llm_engine::model::CudaDeepSeek2DenseLayer batch_layer;
+    cpp_llm_engine::model::CudaDeepSeek2DensePrefillWorkspace workspace;
+    cpp_llm_engine::cuda::CudaTensor batch_hidden;
+    CHECK(cpp_llm_engine::model::CudaDeepSeek2DenseLayer::create(
+        config, 2, &batch_layer).is_ok());
+    CHECK(cpp_llm_engine::model::CudaDeepSeek2DensePrefillWorkspace::create(
+        config, 2, 2, &workspace).is_ok());
+    CHECK(cpp_llm_engine::cuda::CudaTensor::create_contiguous(
+        {2, metadata.hidden_size}, cpp_llm_engine::core::DType::Float32,
+        &batch_hidden).is_ok());
+    CHECK(cuda_context.upload(&batch_hidden, batch_input.data(),
+        batch_input.size() * sizeof(float)).is_ok());
+    const auto prefill_status = batch_layer.prefill_sequence(
+        &cuda_context, cuda_weights.view(), &batch_hidden, 0, &workspace);
+    if (!prefill_status.is_ok()) {
+        std::cerr << "dense Prefill failed: " << prefill_status.message()
+                  << '\n';
+        return 1;
+    }
+    std::vector<float> batch_output(batch_input.size());
+    CHECK(cuda_context.download(batch_hidden, batch_output.data(),
+        batch_output.size() * sizeof(float)).is_ok());
+    CHECK(cuda_context.synchronize().is_ok());
+    float batch_maximum_error = 0.0F;
+    for (std::size_t index_value = 0; index_value < batch_output.size();
+         ++index_value) {
+        batch_maximum_error = std::max(batch_maximum_error, std::fabs(
+            batch_output[index_value] - batch_golden[index_value]));
+    }
     std::cout << "deepseek_cuda_dense_layer_max_error=" << maximum_error << '\n'
               << "deepseek_cuda_dense_layer_mean_error=" << mean_error << '\n'
-              << "deepseek_cuda_dense_layer_tokens=" << cuda_layer.position() << '\n';
+              << "deepseek_cuda_dense_layer_tokens=" << cuda_layer.position() << '\n'
+              << "deepseek_cuda_dense_prefill_max_error="
+              << batch_maximum_error << '\n';
     CHECK(cuda_layer.position() == 2);
     CHECK(maximum_error <= 0.02F);
     CHECK(mean_error <= 0.002);
+    CHECK(batch_layer.position() == 2);
+    CHECK(batch_maximum_error <= 0.02F);
     return 0;
 }
 

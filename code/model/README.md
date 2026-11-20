@@ -37,6 +37,8 @@
 | `RealDeepSeek2CudaBatchWorkspace` | 在 27 层 Model 上复用各 MoE 层的跨请求批量工作区，并记录执行次数 |
 | `RealDeepSeek2CudaContext` | 独占执行流、中间 Tensor 与 27 层压缩 MLA 历史，整组提交或回退 |
 | `CudaDeepSeek2DenseLayer` | 在请求级压缩 MLA Cache 上执行 YaRN、稠密 FFN 与双残差，并在失败时回退位置 |
+| `RealDeepSeek2CudaMlaDataPlane` | 把请求级 position 与 Chapter07 页表、预留、提交和裁剪连接到 CUDA Context |
+| `CudaDeepSeek2PagedMlaView` | 向单层传递共享分页载荷、层号、物理槽位和可见词元范围 |
 
 ## 所有权与执行边界
 
@@ -50,7 +52,7 @@ CUDA MoE 把 Router 和稳定 Top-K 留在 Host 控制面，将命中的 Top-6 �
 
 跨请求路径在每层先分别完成 MLA，再由 `CudaDeepSeek2MoeBatchWorkspace` 按专家收集请求行。Gate、Up 和 Down 调用批量量化 Linear，共享专家一次处理完整批次，Host 最后按路由权重拆回请求输出。真实 batch=2 测试证明一个持久化工作区可连续服务 26 个 MoE 层，批量结果与相同输入的顺序路径一致。工作区还累计活跃专家组、多行专家组和路由行数；EXP-GPU-17 中两个相同请求的专家组全部形成双行批次。消除 MLA score 重算后，6 轮完整 Decode 配对中 grouped 路径比顺序路径改善约 `17.3%`。设备端 Top-K、加权拆回融合和单 kernel grouped-MoE 仍属于后续候选，但当前 profile 不支持把它们列为下一热点。
 
-完整 CUDA Model 在共享对象中常驻 27 层只读权重，在每个请求 Context 中创建 27 份压缩 MLA Cache。单词元依次经过第 0 层稠密 FFN、后续 26 层 MoE、最终 RMSNorm 和 LM Head；任一层失败时，所有已推进层回退到调用前位置。真实 Q2_K 模型的 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`。Chapter06 Runtime、Chapter08 batch runner 和 Chapter10 ServiceCore 已分别验证生成状态、跨请求专家批执行和服务终态。
+完整 CUDA Model 在共享对象中常驻 27 层只读权重。Context 默认创建连续压缩 MLA Cache，绑定 `RealDeepSeek2CudaMlaDataPlane` 后则让全部层共享同一请求页表，并用层号选择各自的压缩载荷。单词元依次经过第 0 层稠密 FFN、后续 26 层 MoE、最终 RMSNorm 和 LM Head；所有层成功后才提交页表位置，任一层、下载或同步失败都裁剪到调用前位置。批执行先为每个请求预留槽位，整批成功后逐一提交，失败时统一回滚。分块 Prefill 把 `[T,D]` hidden 送过全部 27 层，稠密层批量执行 MLA 与 FFN，MoE 层在 Router 边界按行分组后重新打包；连续与分页缓存共享同一计算路径。真实 Q2_K 模型的 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`；分页数值、双请求提交和终态释放均已通过专用 Runtime 验收。
 
 `RealDeepSeek2CpuModel` 提供有界 LRU 层权重缓存，统计容量、常驻层、常驻字节、命中和未命中。默认容量为 0，执行后立即释放当层权重。完整 Decode 固定按 0–26 层顺序访问，容量小于 27 时层的复用距离大于缓存容量，下一轮通常仍全部未命中；容量 27 可以消除后续 GGUF 层读取，但会额外常驻接近整套 Decoder 权重。该缓存管理模型权重，不保存请求 K/V。
 
@@ -93,6 +95,8 @@ EXP-CPU-13～18 从第一层 MoE 子层逐步扩展到完整 Decoder、batch 1/2
 多请求 Decode 采用按层交错：每个请求先从自己的历史 K/V 计算 Attention，再把该层所有请求的归一化 FFN 输入交给同一张专家 assignment 表，最后按请求拆回输出。全部请求完成后才提交本层 K/V；后续层或 LM Head 失败时，Model 恢复整批请求的 24 层状态。层级测试将该路径与逐请求执行逐元素对照。
 
 DeepSeek-V2-Lite 的 CPU 与 CUDA 路径使用相同分组原则：Attention 保存各请求独立的压缩 latent K/V 和位置 Key，每层先逐请求完成 MLA，再把 64 选 6 的 FFN 输入交给共同的专家分发表。CPU 路径复用量化专家 View 和 batch Linear；CUDA 路径把同一专家的请求行交给设备端批量量化 Linear，并让共享专家处理完整批次。两者都保留 Host 路由与加权拆回，因此不等同于成熟框架的融合 grouped-MoE kernel。
+
+CUDA Model Context 可以绑定连续 MLA Cache，也可以绑定 Engine 注入的分页 MLA 数据面。Model 只根据当前层、逻辑位置和页表 View 读写压缩载荷，不分配物理块；Chapter07 块池和 Engine Factory 负责请求绑定、预留、提交、裁剪与释放。27 层全部成功后才推进 Context 位置，批执行中的任一路径失败会把所有请求裁剪到调用前位置。
 
 24 层对照按层加载权重，避免 60 个专家的全部层权重同时常驻内存。局部路径使用 llama.cpp 上一层输出，24 层 Top-K 专家集合全部一致，最大局部 MAE 为 `0.0418066`、最低余弦相似度为 `0.999857`。累计路径保留教程输出，量化误差在 3 个词元位置触发路由分叉，最终 hidden MAE 为 `0.136931`、余弦相似度为 `0.997824`。最终 RMSNorm 与 Q6_K LM Head 已接入统一 Linear；累计 logits 余弦相似度为 `0.999401`，Top-5 前四项与贪心词元 `151643` 匹配 llama.cpp。
 

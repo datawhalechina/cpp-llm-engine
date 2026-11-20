@@ -25,12 +25,23 @@ public:
         const CudaDeepSeek2MoeWeights& weights,
         cuda::CudaTensor* hidden,
         std::size_t position,
-        CudaDeepSeek2MoeRoute* route);
+        CudaDeepSeek2MoeRoute* route,
+        const CudaDeepSeek2PagedMlaView* paged = nullptr);
     core::Status forward_attention(
         cuda::CudaExecutionContext* context,
         const CudaDeepSeek2MoeWeights& weights,
         cuda::CudaTensor* hidden,
-        std::size_t position);
+        std::size_t position,
+        const CudaDeepSeek2PagedMlaView* paged = nullptr);
+    core::Status prefill_sequence(
+        cuda::CudaExecutionContext* context,
+        const CudaDeepSeek2MoeWeights& weights,
+        cuda::CudaTensor* hidden,
+        std::size_t position_offset,
+        CudaDeepSeek2DensePrefillWorkspace* workspace,
+        CudaDeepSeek2MoeBatchWorkspace* moe_workspace,
+        std::vector<CudaDeepSeek2MoeRoute>* routes,
+        const CudaDeepSeek2PagedMlaBatchView* paged = nullptr);
     core::Status finish_moe(
         cuda::CudaExecutionContext* context,
         cuda::CudaTensor* hidden);

@@ -2,6 +2,9 @@
 #include "cpp_llm_engine/real_deepseek2_cuda_executor_factory.h"
 
 #include "cpp_llm_engine/model/real_deepseek2_cuda_model.h"
+#include "chapter07_kv_cache/block_table.h"
+#include "cpp_llm_engine/cuda/cuda_paged_mla_cache.h"
+#include "cpp_llm_engine/cuda/cuda_stream.h"
 
 #include <mutex>
 #include <set>
@@ -10,6 +13,59 @@
 
 namespace cpp_llm_engine {
 namespace {
+
+class CudaPagedMlaDataPlane final
+    : public model::RealDeepSeek2CudaMlaDataPlane {
+public:
+    CudaPagedMlaDataPlane(
+        std::size_t request_id,
+        std::shared_ptr<chapter07_kv_cache::KvBlockPool> pool,
+        std::shared_ptr<cuda::CudaPagedMlaCache> payload,
+        std::shared_ptr<std::mutex> mutex)
+        : request_id_(request_id),
+          pool_(std::move(pool)),
+          payload_(std::move(payload)),
+          mutex_(std::move(mutex)) {}
+
+    std::size_t request_id() const override { return request_id_; }
+    std::size_t token_count() const override {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return pool_->token_count(request_id_);
+    }
+    bool reserve(std::size_t total_tokens, std::string* error) override {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        if (pool_->reserve(request_id_, total_tokens)) {
+            if (error != nullptr) error->clear();
+            return true;
+        }
+        if (error != nullptr) *error = "CUDA paged MLA reserve failed";
+        return false;
+    }
+    bool commit(std::size_t total_tokens, std::string* error) override {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        if (pool_->commit_tokens(request_id_, total_tokens)) {
+            if (error != nullptr) error->clear();
+            return true;
+        }
+        if (error != nullptr) *error = "CUDA paged MLA commit failed";
+        return false;
+    }
+    bool trim(std::size_t total_tokens) override {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return pool_->trim_to_tokens(request_id_, total_tokens);
+    }
+    std::vector<std::size_t> physical_blocks() const override {
+        std::lock_guard<std::mutex> lock(*mutex_);
+        return pool_->physical_blocks(request_id_);
+    }
+    cuda::CudaPagedMlaCache* payload() const override { return payload_.get(); }
+
+private:
+    std::size_t request_id_ = 0;
+    std::shared_ptr<chapter07_kv_cache::KvBlockPool> pool_;
+    std::shared_ptr<cuda::CudaPagedMlaCache> payload_;
+    std::shared_ptr<std::mutex> mutex_;
+};
 
 class RealDeepSeek2CudaRequestExecutor final
     : public chapter06_generation::RequestModelExecutor {
@@ -51,13 +107,11 @@ public:
         }
 
         chapter06_generation::Logits current;
-        for (const auto token : prompt) {
-            const auto status = context_->forward_token(token, &current);
-            if (!status.is_ok()) {
-                context_->reset();
-                if (error != nullptr) *error = status.message();
-                return false;
-            }
+        const auto status = context_->forward_tokens(prompt, &current);
+        if (!status.is_ok()) {
+            context_->reset();
+            if (error != nullptr) *error = status.message();
+            return false;
         }
         if (produce_logits) *logits = std::move(current);
         if (error != nullptr) error->clear();
@@ -96,6 +150,11 @@ struct RealDeepSeek2CudaExecutorFactory::Impl final {
         std::size_t,
         std::unique_ptr<model::RealDeepSeek2CudaBatchWorkspace>>
         batch_workspaces;
+    std::shared_ptr<std::mutex> paged_mutex = std::make_shared<std::mutex>();
+    std::shared_ptr<chapter07_kv_cache::KvBlockPool> paged_pool;
+    std::shared_ptr<cuda::CudaPagedMlaCache> paged_payload;
+    cuda::CudaStream release_stream;
+    std::set<std::size_t> bound_request_ids;
 };
 
 std::unique_ptr<RealDeepSeek2CudaExecutorFactory>
@@ -137,6 +196,99 @@ RealDeepSeek2CudaExecutorFactory::create_executor() const {
     if (context == nullptr) return {};
     return std::make_shared<RealDeepSeek2CudaRequestExecutor>(
         std::move(context));
+}
+
+bool RealDeepSeek2CudaExecutorFactory::configure_paged_mla_cache(
+    std::size_t total_blocks,
+    std::size_t block_size,
+    std::string* error) {
+    if (total_blocks == 0 || block_size == 0 || impl_->paged_pool != nullptr) {
+        if (error != nullptr) {
+            *error = "CUDA paged MLA configuration is invalid";
+        }
+        return false;
+    }
+    auto payload = std::make_shared<cuda::CudaPagedMlaCache>();
+    core::Status status = cuda::CudaPagedMlaCache::create(
+        impl_->model->layer_count(),
+        total_blocks,
+        block_size,
+        impl_->model->mla_latent_dimension(),
+        impl_->model->mla_rope_dimension(),
+        payload.get());
+    if (status.is_ok()) {
+        status = cuda::CudaStream::create(&impl_->release_stream).to_core_status();
+    }
+    if (!status.is_ok()) {
+        if (error != nullptr) *error = status.message();
+        return false;
+    }
+    impl_->paged_pool = std::make_shared<chapter07_kv_cache::KvBlockPool>(
+        total_blocks, block_size);
+    impl_->paged_payload = std::move(payload);
+    if (error != nullptr) error->clear();
+    return true;
+}
+
+std::shared_ptr<chapter07_kv_cache::KvCacheTransaction>
+RealDeepSeek2CudaExecutorFactory::paged_mla_resource() const {
+    return impl_->paged_pool;
+}
+
+bool RealDeepSeek2CudaExecutorFactory::bind_request(
+    const std::shared_ptr<chapter06_generation::RequestModelExecutor>& executor,
+    std::size_t request_id,
+    std::string* error) const {
+    auto* real = executor == nullptr ? nullptr
+        : dynamic_cast<RealDeepSeek2CudaRequestExecutor*>(
+            executor->underlying_executor());
+    {
+        std::lock_guard<std::mutex> lock(*impl_->paged_mutex);
+        if (real == nullptr || impl_->paged_pool == nullptr ||
+            impl_->paged_payload == nullptr ||
+            !impl_->bound_request_ids.insert(request_id).second) {
+            if (error != nullptr) *error = "CUDA paged MLA binding is invalid";
+            return false;
+        }
+    }
+    const bool attached = real->context()->attach_mla_data_plane(
+        std::make_shared<CudaPagedMlaDataPlane>(
+            request_id,
+            impl_->paged_pool,
+            impl_->paged_payload,
+            impl_->paged_mutex),
+        error);
+    if (!attached) {
+        std::lock_guard<std::mutex> lock(*impl_->paged_mutex);
+        impl_->bound_request_ids.erase(request_id);
+    }
+    return attached;
+}
+
+void RealDeepSeek2CudaExecutorFactory::release_request(
+    std::size_t request_id) const {
+    std::lock_guard<std::mutex> lock(*impl_->paged_mutex);
+    if (impl_->paged_pool == nullptr ||
+        impl_->bound_request_ids.find(request_id) ==
+            impl_->bound_request_ids.end()) {
+        return;
+    }
+    if (!impl_->paged_pool->contains(request_id)) {
+        impl_->bound_request_ids.erase(request_id);
+        return;
+    }
+    const bool released = chapter07_kv_cache::release_after_payload_cleanup(
+        *impl_->paged_pool,
+        request_id,
+        [&](std::size_t block) {
+            return impl_->paged_payload
+                ->clear_block(block, impl_->release_stream)
+                .is_ok();
+        },
+        [&] { return impl_->release_stream.synchronize().is_ok(); });
+    if (released) {
+        impl_->bound_request_ids.erase(request_id);
+    }
 }
 
 bool RealDeepSeek2CudaExecutorFactory::decode_batch(

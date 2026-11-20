@@ -9,10 +9,26 @@
 #include <string>
 #include <vector>
 
+namespace cpp_llm_engine::cuda {
+class CudaPagedMlaCache;
+}
+
 namespace cpp_llm_engine::model {
 
 class RealDeepSeek2CudaContext;
 class RealDeepSeek2CudaBatchWorkspace;
+
+class RealDeepSeek2CudaMlaDataPlane {
+public:
+    virtual ~RealDeepSeek2CudaMlaDataPlane() = default;
+    virtual std::size_t request_id() const = 0;
+    virtual std::size_t token_count() const = 0;
+    virtual bool reserve(std::size_t total_tokens, std::string* error) = 0;
+    virtual bool commit(std::size_t total_tokens, std::string* error) = 0;
+    virtual bool trim(std::size_t total_tokens) = 0;
+    virtual std::vector<std::size_t> physical_blocks() const = 0;
+    virtual cuda::CudaPagedMlaCache* payload() const = 0;
+};
 
 struct RealDeepSeek2CudaBatchItem final {
     RealDeepSeek2CudaContext* context = nullptr;
@@ -45,6 +61,8 @@ public:
         std::string* error = nullptr) const;
     std::size_t layer_count() const;
     std::size_t hidden_size() const;
+    std::size_t mla_latent_dimension() const;
+    std::size_t mla_rope_dimension() const;
     std::size_t vocab_size() const;
     std::size_t max_context_tokens() const;
     std::int32_t eos_token_id() const;
@@ -71,7 +89,15 @@ public:
     core::Status forward_token(
         std::int32_t token,
         std::vector<float>* logits);
+    core::Status forward_tokens(
+        const std::vector<std::int32_t>& tokens,
+        std::vector<float>* logits);
     void reset();
+    bool attach_mla_data_plane(
+        std::shared_ptr<RealDeepSeek2CudaMlaDataPlane> data_plane,
+        std::string* error = nullptr);
+    bool uses_external_mla() const;
+    bool uses_external_mla_for(std::size_t request_id) const;
     std::size_t position() const;
     std::size_t layer_count() const;
 
