@@ -1,0 +1,11 @@
+paired_sample length=32 iteration=1 path_order=legacy-first legacy_ms=995.863118 absorbed_ms=520.277742
+paired_sample length=32 iteration=2 path_order=absorbed-first legacy_ms=1024.11398 absorbed_ms=506.871455
+paired_sample length=32 iteration=3 path_order=legacy-first legacy_ms=998.860893 absorbed_ms=531.169382
+paired_sample length=32 iteration=4 path_order=absorbed-first legacy_ms=987.096905 absorbed_ms=495.357504
+matrix_cell length=32 legacy_median_ms=997.362006 absorbed_median_ms=513.574598 absorbed_to_legacy_ratio=0.514932989 maximum_logits_error=5.7220459e-05 tokens_match=true correctness=PASS
+paired_sample length=128 iteration=1 path_order=legacy-first legacy_ms=10341.6947 absorbed_ms=1761.54043
+paired_sample length=128 iteration=2 path_order=absorbed-first legacy_ms=10277.2369 absorbed_ms=1754.24068
+paired_sample length=128 iteration=3 path_order=legacy-first legacy_ms=10250.199 absorbed_ms=1705.76519
+paired_sample length=128 iteration=4 path_order=absorbed-first legacy_ms=10299.6544 absorbed_ms=1729.75187
+matrix_cell length=128 legacy_median_ms=10288.4457 absorbed_median_ms=1741.99628 absorbed_to_legacy_ratio=0.169315787 maximum_logits_error=4.19616699e-05 tokens_match=true correctness=PASS
+absorbed_mla_correctness=PASS
