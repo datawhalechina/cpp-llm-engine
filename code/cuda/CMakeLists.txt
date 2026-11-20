@@ -50,6 +50,7 @@ add_library(cpp_llm_engine_cuda
     src/pinned_host_buffer.cpp
     src/quantized_dequantize_backend.cu
     src/quantized_gemv_backend.cu
+    src/row_dispatch_backend.cu
     src/rope_backend.cu
 )
 target_include_directories(cpp_llm_engine_cuda

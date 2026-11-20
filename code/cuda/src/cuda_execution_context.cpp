@@ -18,12 +18,14 @@
 #include "cpp_llm_engine/cuda/mla_attention_backend.h"
 #include "cpp_llm_engine/cuda/quantized_dequantize_backend.h"
 #include "cpp_llm_engine/cuda/quantized_gemv_backend.h"
+#include "cpp_llm_engine/cuda/row_dispatch_backend.h"
 #include "cpp_llm_engine/cuda/rope_backend.h"
 
 #include <cuda_runtime_api.h>
 
 #include <limits>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -196,6 +198,113 @@ core::Status CudaExecutionContext::unpack_rows(
         if (!status.is_ok()) return status.to_core_status();
     }
     return core::Status::ok();
+}
+
+core::Status CudaExecutionContext::gather_rows(
+    const CudaTensor& source,
+    const std::vector<std::size_t>& row_indices,
+    CudaTensor* output) {
+    if (!valid() || output == nullptr || row_indices.empty()) {
+        return core::Status::error("gather rows input is invalid");
+    }
+    const core::Status source_status = validate_tensor(source, "gather rows source");
+    const core::Status output_status = validate_tensor(*output, "gather rows output");
+    if (!source_status.is_ok()) return source_status;
+    if (!output_status.is_ok()) return output_status;
+    const auto& source_shape = source.contract().shape.dimensions;
+    const auto& output_shape = output->contract().shape.dimensions;
+    if (source_shape.size() != 2 || output_shape.size() != 2 ||
+        output_shape[0] != row_indices.size() ||
+        output_shape[1] != source_shape[1]) {
+        return core::Status::error("gather rows shape mismatch");
+    }
+    for (const std::size_t row : row_indices) {
+        if (row >= source_shape[0]) {
+            return core::Status::error("gather row index is out of range");
+        }
+    }
+    const std::size_t index_bytes = row_indices.size() * sizeof(std::size_t);
+    core::Status status = reserve_workspace(index_bytes);
+    if (!status.is_ok()) return status;
+    CudaStatus cuda_status = CudaStatus::from(cudaMemcpyAsync(
+        workspace_.data(), row_indices.data(), index_bytes,
+        cudaMemcpyHostToDevice, stream_.native_handle()),
+        "gather rows indices upload");
+    if (!cuda_status.is_ok()) return cuda_status.to_core_status();
+    const CudaGatherRowsRequest request{
+        static_cast<const float*>(source.data()),
+        static_cast<const std::size_t*>(workspace_.data()),
+        static_cast<float*>(output->data()), source_shape[0],
+        row_indices.size(), source_shape[1]};
+    return launch_gather_rows(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::weighted_scatter_add_rows(
+    const CudaTensor& source,
+    const std::vector<std::size_t>& destination_rows,
+    const std::vector<float>& weights,
+    CudaTensor* output) {
+    if (!valid() || output == nullptr || destination_rows.empty() ||
+        destination_rows.size() != weights.size()) {
+        return core::Status::error("weighted scatter-add rows input is invalid");
+    }
+    const core::Status source_status =
+        validate_tensor(source, "weighted scatter-add rows source");
+    const core::Status output_status =
+        validate_tensor(*output, "weighted scatter-add rows output");
+    if (!source_status.is_ok()) return source_status;
+    if (!output_status.is_ok()) return output_status;
+    const auto& source_shape = source.contract().shape.dimensions;
+    const auto& output_shape = output->contract().shape.dimensions;
+    if (source_shape.size() != 2 || output_shape.size() != 2 ||
+        source_shape[0] != destination_rows.size() ||
+        source_shape[1] != output_shape[1]) {
+        return core::Status::error("weighted scatter-add rows shape mismatch");
+    }
+    for (const std::size_t row : destination_rows) {
+        if (row >= output_shape[0]) {
+            return core::Status::error(
+                "weighted scatter-add destination is out of range");
+        }
+    }
+    const std::unordered_set<std::size_t> unique_rows(
+        destination_rows.begin(), destination_rows.end());
+    if (unique_rows.size() != destination_rows.size()) {
+        return core::Status::error(
+            "weighted scatter-add destinations must be unique");
+    }
+    const std::size_t index_bytes = destination_rows.size() * sizeof(std::size_t);
+    const std::size_t weight_bytes = weights.size() * sizeof(float);
+    core::Status status = reserve_workspace(index_bytes + weight_bytes);
+    if (!status.is_ok()) return status;
+    auto* workspace = static_cast<unsigned char*>(workspace_.data());
+    CudaStatus cuda_status = CudaStatus::from(cudaMemcpyAsync(
+        workspace, destination_rows.data(), index_bytes,
+        cudaMemcpyHostToDevice, stream_.native_handle()),
+        "weighted scatter-add indices upload");
+    if (cuda_status.is_ok()) cuda_status = CudaStatus::from(cudaMemcpyAsync(
+        workspace + index_bytes, weights.data(), weight_bytes,
+        cudaMemcpyHostToDevice, stream_.native_handle()),
+        "weighted scatter-add weights upload");
+    if (!cuda_status.is_ok()) return cuda_status.to_core_status();
+    const CudaWeightedScatterAddRowsRequest request{
+        static_cast<const float*>(source.data()),
+        reinterpret_cast<const std::size_t*>(workspace),
+        reinterpret_cast<const float*>(workspace + index_bytes),
+        static_cast<float*>(output->data()), destination_rows.size(),
+        output_shape[0], output_shape[1]};
+    return launch_weighted_scatter_add_rows(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::zero(CudaTensor* output) const {
+    if (!valid() || output == nullptr) {
+        return core::Status::error("zero output is invalid");
+    }
+    const core::Status status = validate_tensor(*output, "zero output");
+    if (!status.is_ok()) return status;
+    return CudaStatus::from(cudaMemsetAsync(
+        output->data(), 0, output->size_bytes(), stream_.native_handle()),
+        "zero CUDA Tensor").to_core_status();
 }
 
 core::Status CudaExecutionContext::vector_add(

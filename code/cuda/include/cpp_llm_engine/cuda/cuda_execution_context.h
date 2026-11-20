@@ -59,6 +59,16 @@ public:
     core::Status unpack_rows(
         const CudaTensor& batch,
         const std::vector<CudaTensor*>& rows) const;
+    core::Status gather_rows(
+        const CudaTensor& source,
+        const std::vector<std::size_t>& row_indices,
+        CudaTensor* output);
+    core::Status weighted_scatter_add_rows(
+        const CudaTensor& source,
+        const std::vector<std::size_t>& destination_rows,
+        const std::vector<float>& weights,
+        CudaTensor* output);
+    core::Status zero(CudaTensor* output) const;
     core::Status vector_add(
         const CudaTensor& lhs,
         const CudaTensor& rhs,

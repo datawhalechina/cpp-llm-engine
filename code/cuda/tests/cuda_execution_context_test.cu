@@ -136,6 +136,24 @@ int main() {
     CHECK(!context.pack_rows({&row_a, &row_b}, &batch).is_ok());
     CHECK(!context.unpack_rows(batch, {&row_a, nullptr, &row_c}).is_ok());
 
+    CudaTensor gathered;
+    CudaTensor scattered;
+    CHECK(CudaTensor::create_contiguous({2, 4}, DType::Float32, &gathered).is_ok());
+    CHECK(CudaTensor::create_contiguous({3, 4}, DType::Float32, &scattered).is_ok());
+    CHECK(context.gather_rows(batch, {2, 0}, &gathered).is_ok());
+    CHECK(context.zero(&scattered).is_ok());
+    CHECK(context.weighted_scatter_add_rows(
+        gathered, {1, 2}, {0.5F, 2.0F}, &scattered).is_ok());
+    std::array<float, 12> scattered_host{};
+    CHECK(context.download(
+        scattered, scattered_host.data(), sizeof(scattered_host)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    CHECK((scattered_host == std::array<float, 12>{
+        0, 0, 0, 0, 2, 1.5F, 1, 0.5F, 24, 22, 20, 18}));
+    CHECK(!context.gather_rows(batch, {3}, &gathered).is_ok());
+    CHECK(!context.weighted_scatter_add_rows(
+        gathered, {1, 1}, {1.0F, 1.0F}, &scattered).is_ok());
+
     CudaTensor wrong_shape;
     CHECK(CudaTensor::create_contiguous({256}, DType::Float32, &wrong_shape).is_ok());
     CHECK(!context.copy(output, &wrong_shape).is_ok());
