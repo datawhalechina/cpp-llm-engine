@@ -1,0 +1,21 @@
+paired_sample length=2 iteration=1 path_order=sequential-first sequential_ms=299.185078 tensor_ms=188.272289
+paired_sample length=2 iteration=2 path_order=tensor-first sequential_ms=495.087451 tensor_ms=233.220919
+paired_sample length=2 iteration=3 path_order=sequential-first sequential_ms=513.449805 tensor_ms=314.981802
+paired_sample length=2 iteration=4 path_order=tensor-first sequential_ms=483.413503 tensor_ms=306.47146
+matrix_cell length=2 sequential_median_ms=489.250477 tensor_median_ms=269.846189 tensor_to_sequential_ratio=0.551550182 maximum_logits_error=0 tokens_match=true sequential_samples_ms_299.185078,495.087451,513.449805,483.413503 tensor_samples_ms_188.272289,233.220919,314.981802,306.47146 correctness=PASS
+paired_sample length=8 iteration=1 path_order=sequential-first sequential_ms=2002.44185 tensor_ms=410.990363
+paired_sample length=8 iteration=2 path_order=tensor-first sequential_ms=1461.88722 tensor_ms=440.336455
+paired_sample length=8 iteration=3 path_order=sequential-first sequential_ms=1225.42217 tensor_ms=281.070483
+paired_sample length=8 iteration=4 path_order=tensor-first sequential_ms=1218.38886 tensor_ms=278.074759
+matrix_cell length=8 sequential_median_ms=1343.6547 tensor_median_ms=346.030423 tensor_to_sequential_ratio=0.257529278 maximum_logits_error=0 tokens_match=true sequential_samples_ms_2002.44185,1461.88722,1225.42217,1218.38886 tensor_samples_ms_410.990363,440.336455,281.070483,278.074759 correctness=PASS
+paired_sample length=32 iteration=1 path_order=sequential-first sequential_ms=5280.77854 tensor_ms=973.983928
+paired_sample length=32 iteration=2 path_order=tensor-first sequential_ms=5302.3732 tensor_ms=958.75144
+paired_sample length=32 iteration=3 path_order=sequential-first sequential_ms=5196.76227 tensor_ms=980.661808
+paired_sample length=32 iteration=4 path_order=tensor-first sequential_ms=5389.90052 tensor_ms=956.360654
+matrix_cell length=32 sequential_median_ms=5291.57587 tensor_median_ms=966.367684 tensor_to_sequential_ratio=0.182623798 maximum_logits_error=0 tokens_match=true sequential_samples_ms_5280.77854,5302.3732,5196.76227,5389.90052 tensor_samples_ms_973.983928,958.75144,980.661808,956.360654 correctness=PASS
+paired_sample length=128 iteration=1 path_order=sequential-first sequential_ms=28904.9816 tensor_ms=9815.59939
+paired_sample length=128 iteration=2 path_order=tensor-first sequential_ms=28507.513 tensor_ms=9802.61365
+paired_sample length=128 iteration=3 path_order=sequential-first sequential_ms=28641.5656 tensor_ms=9918.66743
+paired_sample length=128 iteration=4 path_order=tensor-first sequential_ms=28704.8508 tensor_ms=9825.78229
+matrix_cell length=128 sequential_median_ms=28673.2082 tensor_median_ms=9820.69084 tensor_to_sequential_ratio=0.342504081 maximum_logits_error=0 tokens_match=true sequential_samples_ms_28904.9816,28507.513,28641.5656,28704.8508 tensor_samples_ms_9815.59939,9802.61365,9918.66743,9825.78229 correctness=PASS
+tensor_prefill_correctness=PASS
