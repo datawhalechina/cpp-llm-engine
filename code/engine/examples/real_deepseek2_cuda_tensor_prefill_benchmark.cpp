@@ -4,6 +4,7 @@
 
 #include "chapter06_generation/sampler.h"
 
+#include <cuda_profiler_api.h>
 #include <cuda_runtime_api.h>
 
 #include <algorithm>
@@ -118,19 +119,25 @@ void print_samples(const char* name, const std::vector<double>& samples) {
 
 int main(int argc, char** argv) {
     std::cout << std::setprecision(9);
-    if (argc < 2 || argc > 5) {
+    const bool profile_mode =
+        argc == 4 && std::string(argv[2]) == "--profile-tensor";
+    if ((!profile_mode && (argc < 2 || argc > 5)) ||
+        (profile_mode && std::stoul(argv[3]) == 0)) {
         std::cerr << "usage: real_deepseek2_cuda_tensor_prefill_benchmark "
                      "<model.gguf> [lengths=2,8,32,128] [warmup=1] "
-                     "[iterations=4]\n";
+                     "[iterations=4]\n"
+                     "       real_deepseek2_cuda_tensor_prefill_benchmark "
+                     "<model.gguf> --profile-tensor <length>\n";
         return 2;
     }
-    const std::vector<std::size_t> lengths = parse_lengths(
-        argc >= 3 ? argv[2] : "2,8,32,128");
-    const std::size_t warmup = argc >= 4
+    const std::vector<std::size_t> lengths = profile_mode
+        ? std::vector<std::size_t>{static_cast<std::size_t>(std::stoul(argv[3]))}
+        : parse_lengths(argc >= 3 ? argv[2] : "2,8,32,128");
+    const std::size_t warmup = !profile_mode && argc >= 4
         ? static_cast<std::size_t>(std::stoul(argv[3])) : 1;
-    const std::size_t iterations = argc == 5
+    const std::size_t iterations = !profile_mode && argc == 5
         ? static_cast<std::size_t>(std::stoul(argv[4])) : 4;
-    if (lengths.empty() || iterations < 2) {
+    if (lengths.empty() || (!profile_mode && iterations < 2)) {
         std::cerr << "lengths must be positive and iterations at least 2\n";
         return 2;
     }
@@ -148,6 +155,43 @@ int main(int argc, char** argv) {
     if (factory == nullptr) {
         std::cerr << "DeepSeek Tensor Prefill setup failed: " << error << '\n';
         return 1;
+    }
+
+    if (profile_mode) {
+        const auto prompt = make_prompt(lengths.front());
+        Result sequential;
+        Result warm_tensor;
+        Result tensor;
+        if (!run_path(*factory, prompt, false, &sequential, &error) ||
+            !run_path(*factory, prompt, true, &warm_tensor, &error)) {
+            std::cerr << "DeepSeek Tensor Prefill profile warmup failed: "
+                      << error << '\n';
+            return 1;
+        }
+        if (cudaProfilerStart() != cudaSuccess) {
+            std::cerr << "cudaProfilerStart failed\n";
+            return 1;
+        }
+        const bool succeeded = run_path(
+            *factory, prompt, true, &tensor, &error);
+        const cudaError_t stop_status = cudaProfilerStop();
+        if (!succeeded || stop_status != cudaSuccess) {
+            std::cerr << "DeepSeek Tensor Prefill profile failed: "
+                      << (succeeded ? "cudaProfilerStop failed" : error) << '\n';
+            return 1;
+        }
+        const float max_error = maximum_error(sequential.logits, tensor.logits);
+        const bool correct = max_error <= 1.0e-4F &&
+            sequential.greedy_token == tensor.greedy_token;
+        std::cout << "profile_length: " << lengths.front() << '\n'
+                  << "profile_tensor_ms: " << tensor.elapsed_ms << '\n'
+                  << "profile_maximum_logits_error: " << max_error << '\n'
+                  << "profile_tokens_match: "
+                  << (sequential.greedy_token == tensor.greedy_token
+                          ? "true" : "false") << '\n'
+                  << "profile_correctness: "
+                  << (correct ? "PASS" : "FAIL") << '\n';
+        return correct ? 0 : 1;
     }
 
     bool all_correct = true;
