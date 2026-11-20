@@ -278,6 +278,8 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
             examples/real_deepseek2_cuda_paged_mla_benchmark.cpp)
         add_executable(real_deepseek2_cuda_tensor_prefill_benchmark
             examples/real_deepseek2_cuda_tensor_prefill_benchmark.cpp)
+        add_executable(real_deepseek2_cuda_absorbed_mla_benchmark
+            examples/real_deepseek2_cuda_absorbed_mla_benchmark.cpp)
         target_link_libraries(real_deepseek2_cuda_dense_layer_test
             PRIVATE cpp_llm_engine_model cpp_llm_engine_model_cuda)
         target_link_libraries(real_deepseek2_cuda_moe_feed_forward_test
@@ -297,6 +299,8 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
         target_link_libraries(real_deepseek2_cuda_paged_mla_benchmark
             PRIVATE cpp_llm_engine_cuda_runtime)
         target_link_libraries(real_deepseek2_cuda_tensor_prefill_benchmark
+            PRIVATE cpp_llm_engine_cuda_runtime)
+        target_link_libraries(real_deepseek2_cuda_absorbed_mla_benchmark
             PRIVATE cpp_llm_engine_cuda_runtime)
         cpp_llm_prepare_test(real_deepseek2_cuda_dense_layer_test)
         cpp_llm_prepare_test(real_deepseek2_cuda_moe_feed_forward_test)
