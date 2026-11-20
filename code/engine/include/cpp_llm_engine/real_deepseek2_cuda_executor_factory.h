@@ -4,6 +4,7 @@
 
 #include "chapter06_generation/model_executor.h"
 #include "cpp_llm_engine/cuda/mla_attention_backend.h"
+#include "cpp_llm_engine/model/cuda_deepseek2_moe_feed_forward.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -24,7 +25,9 @@ public:
         std::size_t context_capacity,
         std::string* error = nullptr,
         cuda::CudaMlaComputePath mla_path =
-            cuda::CudaMlaComputePath::AbsorbedThreeStage);
+            cuda::CudaMlaComputePath::AbsorbedThreeStage,
+        model::CudaMoePrefillPath moe_prefill_path =
+            model::CudaMoePrefillPath::PackedDispatch);
 
     ~RealDeepSeek2CudaExecutorFactory();
     RealDeepSeek2CudaExecutorFactory(
@@ -41,6 +44,10 @@ public:
     create_executor() const;
     std::shared_ptr<chapter06_generation::RequestModelExecutor>
     create_executor(cuda::CudaMlaComputePath mla_path) const;
+    std::shared_ptr<chapter06_generation::RequestModelExecutor>
+    create_executor(
+        cuda::CudaMlaComputePath mla_path,
+        model::CudaMoePrefillPath moe_prefill_path) const;
     bool configure_paged_mla_cache(
         std::size_t total_blocks,
         std::size_t block_size,
