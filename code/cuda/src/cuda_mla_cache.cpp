@@ -34,6 +34,24 @@ bool is_vector(const CudaTensor& tensor, std::size_t width) {
         contract.storage_offset_elements == 0;
 }
 
+bool is_matrix(
+    const CudaTensor& tensor, std::size_t width, std::size_t* rows) {
+    const auto& contract = tensor.contract();
+    const auto& shape = contract.shape.dimensions;
+    std::size_t elements = 0;
+    if (rows == nullptr || tensor.empty() ||
+        contract.dtype != core::DType::Float32 ||
+        contract.device != core::DeviceKind::CUDA || shape.size() < 2 ||
+        shape[0] == 0 ||
+        !contract.shape.checked_numel(&elements).is_ok() ||
+        elements / shape[0] != width ||
+        contract.storage_offset_elements != 0) {
+        return false;
+    }
+    *rows = shape[0];
+    return true;
+}
+
 }  // namespace
 
 core::Status CudaMlaCache::create(
@@ -87,6 +105,37 @@ core::Status CudaMlaCache::append(
         cudaMemcpyDeviceToDevice, stream.native_handle()), "MLA rope append");
     if (!status.is_ok()) return status.to_core_status();
     ++size_tokens_;
+    return core::Status::ok();
+}
+
+core::Status CudaMlaCache::append_batch(
+    const CudaTensor& latent,
+    const CudaTensor& key_rope,
+    const CudaStream& stream) {
+    std::size_t latent_rows = 0;
+    std::size_t rope_rows = 0;
+    if (!valid() || !stream.valid() ||
+        !is_matrix(latent, latent_dimension_, &latent_rows) ||
+        !is_matrix(key_rope, rope_dimension_, &rope_rows) ||
+        latent_rows != rope_rows ||
+        latent_rows > capacity_tokens_ - size_tokens_) {
+        return core::Status::error("MLA Cache batch append is invalid");
+    }
+    auto* latent_destination = static_cast<float*>(latent_.data()) +
+        size_tokens_ * latent_dimension_;
+    auto* rope_destination = static_cast<float*>(key_rope_.data()) +
+        size_tokens_ * rope_dimension_;
+    CudaStatus status = CudaStatus::from(cudaMemcpyAsync(
+        latent_destination, latent.data(), latent.size_bytes(),
+        cudaMemcpyDeviceToDevice, stream.native_handle()),
+        "MLA latent batch append");
+    if (!status.is_ok()) return status.to_core_status();
+    status = CudaStatus::from(cudaMemcpyAsync(
+        rope_destination, key_rope.data(), key_rope.size_bytes(),
+        cudaMemcpyDeviceToDevice, stream.native_handle()),
+        "MLA rope batch append");
+    if (!status.is_ok()) return status.to_core_status();
+    size_tokens_ += latent_rows;
     return core::Status::ok();
 }
 

@@ -35,6 +35,7 @@ add_library(cpp_llm_engine_cuda
     src/cuda_decoder_layer.cpp
     src/cuda_kv_cache.cpp
     src/cuda_mla_cache.cpp
+    src/cuda_paged_mla_cache.cpp
     src/cuda_paged_kv_cache.cpp
     src/cuda_quantized_matrix.cpp
     src/cuda_status.cpp
@@ -127,6 +128,13 @@ target_link_libraries(
     cpp_llm_engine_cuda_paged_kv_cache_test
     PRIVATE cpp_llm_engine_cuda chapter07_kv_cache)
 
+add_executable(cpp_llm_engine_cuda_paged_mla_cache_test
+    tests/cuda_paged_mla_cache_test.cu
+)
+target_link_libraries(
+    cpp_llm_engine_cuda_paged_mla_cache_test
+    PRIVATE cpp_llm_engine_cuda chapter07_kv_cache)
+
 add_executable(cpp_llm_engine_cuda_gqa_attention_test
     tests/cuda_gqa_attention_test.cu
 )
@@ -159,6 +167,7 @@ cpp_llm_prepare_test(cpp_llm_engine_cuda_quantized_linear_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_rope_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_kv_cache_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_paged_kv_cache_test)
+cpp_llm_prepare_test(cpp_llm_engine_cuda_paged_mla_cache_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_gqa_attention_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_mla_attention_test)
 cpp_llm_prepare_test(cpp_llm_engine_cuda_decoder_elementwise_test)
@@ -189,6 +198,9 @@ add_test(
     NAME cpp_llm_engine_cuda_paged_kv_cache_test
     COMMAND cpp_llm_engine_cuda_paged_kv_cache_test)
 add_test(
+    NAME cpp_llm_engine_cuda_paged_mla_cache_test
+    COMMAND cpp_llm_engine_cuda_paged_mla_cache_test)
+add_test(
     NAME cpp_llm_engine_cuda_gqa_attention_test
     COMMAND cpp_llm_engine_cuda_gqa_attention_test)
 add_test(
@@ -209,6 +221,9 @@ cpp_llm_set_test_labels(cpp_llm_engine_cuda_rope_test unit cuda rope)
 cpp_llm_set_test_labels(cpp_llm_engine_cuda_kv_cache_test component cuda cache)
 cpp_llm_set_test_labels(
     cpp_llm_engine_cuda_paged_kv_cache_test integration cuda cache paged)
+cpp_llm_set_test_labels(
+    cpp_llm_engine_cuda_paged_mla_cache_test
+    integration cuda cache paged mla deepseek)
 cpp_llm_set_test_labels(cpp_llm_engine_cuda_gqa_attention_test component cuda attention)
 cpp_llm_set_test_labels(
     cpp_llm_engine_cuda_mla_attention_test component cuda attention mla deepseek)

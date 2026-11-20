@@ -26,6 +26,7 @@ struct CudaMlaPrepareRequest final {
     std::size_t nope_dimension = 0;
     std::size_t rope_dimension = 0;
     std::size_t latent_dimension = 0;
+    std::size_t token_count = 1;
 
     core::Status validate() const;
 };
@@ -43,6 +44,23 @@ struct CudaMlaAttentionRequest final {
     std::size_t latent_dimension = 0;
     std::size_t probability_capacity_tokens = 0;
     float scale = 0.0F;
+    std::size_t query_count = 1;
+    std::size_t query_position_offset = 0;
+
+    core::Status validate() const;
+};
+
+struct CudaPagedMlaAttentionRequest final {
+    CudaMlaAttentionRequest attention;
+    const float* latent = nullptr;
+    const float* key_rope = nullptr;
+    const std::size_t* physical_blocks = nullptr;
+    std::size_t token_count = 0;
+    std::size_t layer = 0;
+    std::size_t layer_count = 0;
+    std::size_t total_blocks = 0;
+    std::size_t block_size = 0;
+    std::size_t physical_block_count = 0;
 
     core::Status validate() const;
 };
@@ -55,6 +73,9 @@ public:
     CudaStatus compute(
         const CudaMlaAttentionRequest& request,
         const CudaMlaCache& cache,
+        const CudaStream& stream) const;
+    CudaStatus compute_paged(
+        const CudaPagedMlaAttentionRequest& request,
         const CudaStream& stream) const;
     CudaStatus prepare(
         const CudaMlaPrepareRequest& request,

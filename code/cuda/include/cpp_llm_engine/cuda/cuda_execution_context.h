@@ -25,6 +25,7 @@ enum class CudaAttentionPath {
 
 class CudaKvCache;
 class CudaMlaCache;
+class CudaPagedMlaCache;
 class CudaPagedKvCache;
 
 class CudaExecutionContext final {
@@ -113,6 +114,13 @@ public:
         CudaTensor* query_rope,
         CudaTensor* latent,
         CudaTensor* key_rope) const;
+    core::Status prepare_mla_batch(
+        const CudaTensor& query,
+        const CudaTensor& compressed_kv,
+        CudaTensor* query_nope,
+        CudaTensor* query_rope,
+        CudaTensor* latent,
+        CudaTensor* key_rope) const;
     core::Status mla_attention(
         const CudaTensor& query_nope,
         const CudaTensor& query_rope,
@@ -121,8 +129,58 @@ public:
         CudaTensor* probabilities,
         CudaTensor* output,
         float scale) const;
+    core::Status mla_attention_batch(
+        const CudaTensor& query_nope,
+        const CudaTensor& query_rope,
+        const CudaTensor& kv_b,
+        const CudaMlaCache& cache,
+        std::size_t query_position_offset,
+        CudaTensor* probabilities,
+        CudaTensor* output,
+        float scale) const;
+    core::Status paged_mla_attention(
+        const CudaTensor& query_nope,
+        const CudaTensor& query_rope,
+        const CudaTensor& kv_b,
+        const CudaPagedMlaCache& cache,
+        std::size_t layer,
+        const std::vector<std::size_t>& physical_blocks,
+        std::size_t token_count,
+        CudaTensor* probabilities,
+        CudaTensor* output,
+        float scale);
+    core::Status paged_mla_attention_batch(
+        const CudaTensor& query_nope,
+        const CudaTensor& query_rope,
+        const CudaTensor& kv_b,
+        const CudaPagedMlaCache& cache,
+        std::size_t layer,
+        const std::vector<std::size_t>& physical_blocks,
+        std::size_t token_count,
+        std::size_t query_position_offset,
+        CudaTensor* probabilities,
+        CudaTensor* output,
+        float scale);
     core::Status append_mla(
         CudaMlaCache* cache,
+        const CudaTensor& latent,
+        const CudaTensor& key_rope) const;
+    core::Status append_mla_batch(
+        CudaMlaCache* cache,
+        const CudaTensor& latent,
+        const CudaTensor& key_rope) const;
+    core::Status write_paged_mla(
+        CudaPagedMlaCache* cache,
+        std::size_t layer,
+        std::size_t physical_block,
+        std::size_t slot,
+        const CudaTensor& latent,
+        const CudaTensor& key_rope) const;
+    core::Status write_paged_mla_batch(
+        CudaPagedMlaCache* cache,
+        std::size_t layer,
+        const std::vector<std::size_t>& physical_blocks,
+        std::size_t start_position,
         const CudaTensor& latent,
         const CudaTensor& key_rope) const;
     core::Status rope(

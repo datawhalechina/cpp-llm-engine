@@ -33,6 +33,8 @@
 | `cuda_kv_cache_test.cu` | append 偏移、容量、shape、移动、复用和请求隔离 |
 | `cuda_paged_kv_cache.h/.cpp` | 按 layer/block/slot 保存共享设备分页 K/V payload |
 | `cuda_paged_kv_cache_test.cu` | Chapter07 非连续 BlockTable、分页 GQA、清块和 CPU golden |
+| `cuda_paged_mla_cache.h/.cpp` | 按 layer/block/slot 保存 DeepSeek 压缩 latent K/V 与 RoPE key |
+| `cuda_paged_mla_cache_test.cu` | 非连续页表、分页 MLA、连续基线和物理块清理 |
 | `core/gqa_attention_contract.h` | 固定 Q/KV head 映射、causal position、scale 和布局 |
 | `gqa_attention_backend.h/.cu` | score、稳定 softmax、value aggregation 三阶段 CUDA backend |
 | `cuda_gqa_attention_test.cu` | prefill/decode CPU golden、错误路径和 event 计时 |
@@ -145,6 +147,14 @@ EXP-GPU-07 的两轮真实 A/B 中，分页融合 Prefill/Decode 的中位数方
 
 Engine 的 CUDA Factory 用 `PrefixBlockStore` 把同一 `RadixPrefixCache` 算法接到 `KvBlockPool` 和设备 payload。源请求释放时，索引持有的块不会被清空；只有最后一个引用将要释放时，Factory 才在专用 stream 上清理设备块。`RealLlamaCudaContext` 命中后同步推进 position，Executor 通过继续 Prefill 只计算私有后缀。真实 Runtime 测试将该路径与完整冷启动的首个生成词元对照。
 
+## 分页 Device MLA
+
+`CudaPagedMlaCache` 使用 `[layer, physical_block, slot, latent_dimension]` 保存压缩 latent K/V，使用独立的 `rope_dimension` 尾轴保存位置 key。它只拥有设备载荷；请求 ID、页表、已提交词元数和块引用仍由 Chapter07 `KvBlockPool` 管理。
+
+`paged_mla_attention()` 把逻辑词元位置拆成逻辑块和槽位，再经请求页表取得物理块。score 与 value kernel 直接读取压缩载荷，并复用模型常驻的 K/V-B 投影；该路径不会先 gather 成连续缓存，也不会长期展开标准 K/V。`CudaExecutionContext` 只把页表上传到持久工作区，Model Context 负责传入层号、当前物理槽位和可见词元数。
+
+设备测试用非连续物理块顺序比较连续 MLA 与分页 MLA，并覆盖写入、读取和清块。真实模型路径由 DeepSeek Factory 在调用前预留槽位，27 层全部成功后提交；任一层、下载或同步失败都裁剪到原位置，终态释放时再清理最后引用块。真实 DeepSeek-V2-Lite 验收得到 `paged_mla_max_error: 0`、`paged_mla_batch: true` 和 `paged_mla_terminal_release: true`，分别固定数值等价、双请求批事务与终态资源归零。
+
 ## Decoder 逐元素算子
 
 Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续复用 Vector Add。单向量 RMSNorm 用一个 block 分段归约；批量 RMSNorm 把连续 `[...,D]` 的前导维展平成独立行，每行一个 block 并共享同一 `[D]` 权重。因此原有 `[B,D]` 和 Qwen3 Q/K 使用的 `[B,H,D]` 走同一个 kernel。SwiGLU 与 Residual 本身按总元素数执行，可直接处理连续批量 Tensor。测试覆盖非整除宽度 257、TinyLlama hidden size 2048、Qwen3 head size 128 和多行 CPU golden，这些算子已由下一节的 `CudaDecoderLayer` 组装成合成单层 Decoder。
@@ -197,7 +207,7 @@ DeepSeek-V2-Lite 的 CUDA 稠密首层已连接 Q2_K/Q3_K/IQ4_NL、YaRN partial 
 
 MoE 路径由 Host 完成 Router 与稳定 Top-K，CUDA 执行命中的 Top-6 路由专家和共享专家。单独 FFN 与 CPU 的最大绝对误差为 `5.82e-10`；连接压缩 MLA、双残差和请求缓存后，真实第 1 层双词元最大误差为 `9.83e-7`。跨请求路径会按专家打包输入行，让 Gate、Up、Down 调用批量量化 Linear，并让共享专家一次处理完整批次。设备端 Top-K、加权拆回融合和单 kernel grouped-MoE 仍属于后续性能路径。
 
-`RealDeepSeek2CudaModel` 已将第 0 层稠密权重、后续 26 层 MoE 权重、Embedding、最终归一化和 LM Head 常驻设备。请求 Context 独占 27 层压缩缓存，并在全层成功后统一推进位置。单词元 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`。`RealDeepSeek2CudaExecutorFactory` 已接入 Chapter06 Runtime、Chapter08 `ExecutorBatchRunner` 和 Chapter10 ServiceCore；固定词元生成、重复请求隔离、分块 Prefill、跨请求专家 batch、服务动态组批、流式回调、取消与资源释放均通过。HTTP/Tokenizer 组合继续沿该 Factory 扩展。
+`RealDeepSeek2CudaModel` 已将第 0 层稠密权重、后续 26 层 MoE 权重、Embedding、最终归一化和 LM Head 常驻设备。请求 Context 独占 27 层压缩缓存，并在全层成功后统一推进位置。单词元 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`。`RealDeepSeek2CudaExecutorFactory` 已接入 Chapter06 Runtime、Chapter08 `ExecutorBatchRunner` 和 Chapter10 ServiceCore；固定词元生成、重复请求隔离、分块 Tensor Prefill、跨请求专家 batch、服务动态组批、流式回调、取消与资源释放均通过。独立 HTTP 入口再注入真实 Tokenizer，并以文本 `prompt` 验证 Completion、SSE、分页 MLA 和终态释放。
 
 ```bash
 CUDA_HOME=/usr/local/cuda-12.8 \

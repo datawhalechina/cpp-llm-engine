@@ -12,6 +12,7 @@
 #include "cpp_llm_engine/cuda/decoder_elementwise_backend.h"
 #include "cpp_llm_engine/cuda/cuda_kv_cache.h"
 #include "cpp_llm_engine/cuda/cuda_mla_cache.h"
+#include "cpp_llm_engine/cuda/cuda_paged_mla_cache.h"
 #include "cpp_llm_engine/cuda/cuda_paged_kv_cache.h"
 #include "cpp_llm_engine/cuda/gqa_attention_backend.h"
 #include "cpp_llm_engine/cuda/mla_attention_backend.h"
@@ -588,8 +589,287 @@ core::Status CudaExecutionContext::mla_attention(
         static_cast<float*>(probabilities->data()),
         static_cast<float*>(output->data()), nope_shape[0], nope_shape[1],
         rope_shape[2], output_shape[1], kv_shape[1], probability_shape[1],
-        scale};
+        scale, 1, cache.size_tokens() - 1};
     return cuda_mla_attention_backend().compute(request, cache, stream_)
+        .to_core_status();
+}
+
+core::Status CudaExecutionContext::prepare_mla_batch(
+    const CudaTensor& query,
+    const CudaTensor& compressed_kv,
+    CudaTensor* query_nope,
+    CudaTensor* query_rope,
+    CudaTensor* latent,
+    CudaTensor* key_rope) const {
+    if (!valid() || query_nope == nullptr || query_rope == nullptr ||
+        latent == nullptr || key_rope == nullptr) {
+        return core::Status::error(
+            "MLA batch prepare context or output is invalid");
+    }
+    const auto& query_shape = query.contract().shape.dimensions;
+    const auto& compressed_shape = compressed_kv.contract().shape.dimensions;
+    const auto& nope_shape = query_nope->contract().shape.dimensions;
+    const auto& rope_shape = query_rope->contract().shape.dimensions;
+    const auto& latent_shape = latent->contract().shape.dimensions;
+    const auto& key_shape = key_rope->contract().shape.dimensions;
+    if (query_shape.size() != 3 || compressed_shape.size() != 2 ||
+        nope_shape.size() != 3 || rope_shape.size() != 3 ||
+        latent_shape.size() != 2 || key_shape.size() != 3 ||
+        query_shape[0] == 0 || query_shape[0] != compressed_shape[0] ||
+        query_shape[0] != nope_shape[0] ||
+        query_shape[0] != rope_shape[0] ||
+        query_shape[0] != latent_shape[0] ||
+        query_shape[0] != key_shape[0] || key_shape[1] != 1 ||
+        query_shape[1] != nope_shape[1] ||
+        query_shape[1] != rope_shape[1] ||
+        query_shape[2] != nope_shape[2] + rope_shape[2] ||
+        compressed_shape[1] != latent_shape[1] + key_shape[2] ||
+        key_shape[2] != rope_shape[2]) {
+        return core::Status::error(
+            "MLA batch prepare Tensor shapes are inconsistent");
+    }
+    const CudaMlaPrepareRequest request{
+        static_cast<const float*>(query.data()),
+        static_cast<const float*>(compressed_kv.data()),
+        static_cast<float*>(query_nope->data()),
+        static_cast<float*>(query_rope->data()),
+        static_cast<float*>(latent->data()),
+        static_cast<float*>(key_rope->data()),
+        query_shape[1], nope_shape[2], rope_shape[2], latent_shape[1],
+        query_shape[0]};
+    return cuda_mla_attention_backend().prepare(request, stream_)
+        .to_core_status();
+}
+
+core::Status CudaExecutionContext::mla_attention_batch(
+    const CudaTensor& query_nope,
+    const CudaTensor& query_rope,
+    const CudaTensor& kv_b,
+    const CudaMlaCache& cache,
+    std::size_t query_position_offset,
+    CudaTensor* probabilities,
+    CudaTensor* output,
+    float scale) const {
+    if (!valid() || probabilities == nullptr || output == nullptr) {
+        return core::Status::error(
+            "MLA batch attention context or output is invalid");
+    }
+    const auto& nope_shape = query_nope.contract().shape.dimensions;
+    const auto& rope_shape = query_rope.contract().shape.dimensions;
+    const auto& kv_shape = kv_b.contract().shape.dimensions;
+    const auto& probability_shape = probabilities->contract().shape.dimensions;
+    const auto& output_shape = output->contract().shape.dimensions;
+    if (nope_shape.size() != 3 || rope_shape.size() != 3 ||
+        kv_shape.size() != 2 || probability_shape.size() != 3 ||
+        output_shape.size() != 3 || nope_shape[0] == 0 ||
+        rope_shape[0] != nope_shape[0] || rope_shape[1] != nope_shape[1] ||
+        probability_shape[0] != nope_shape[0] ||
+        probability_shape[1] != nope_shape[1] ||
+        probability_shape[2] < cache.size_tokens() ||
+        output_shape[0] != nope_shape[0] ||
+        output_shape[1] != nope_shape[1] ||
+        kv_shape[1] != cache.latent_dimension() ||
+        rope_shape[2] != cache.rope_dimension() ||
+        kv_shape[0] != nope_shape[1] *
+            (nope_shape[2] + output_shape[2])) {
+        return core::Status::error(
+            "MLA batch attention Tensor shapes are inconsistent");
+    }
+    const CudaMlaAttentionRequest request{
+        static_cast<const float*>(query_nope.data()),
+        static_cast<const float*>(query_rope.data()),
+        static_cast<const float*>(kv_b.data()),
+        static_cast<float*>(probabilities->data()),
+        static_cast<float*>(output->data()),
+        nope_shape[1], nope_shape[2], rope_shape[2], output_shape[2],
+        kv_shape[1], probability_shape[2], scale, nope_shape[0],
+        query_position_offset};
+    return cuda_mla_attention_backend().compute(request, cache, stream_)
+        .to_core_status();
+}
+
+core::Status CudaExecutionContext::paged_mla_attention(
+    const CudaTensor& query_nope,
+    const CudaTensor& query_rope,
+    const CudaTensor& kv_b,
+    const CudaPagedMlaCache& cache,
+    std::size_t layer,
+    const std::vector<std::size_t>& physical_blocks,
+    std::size_t token_count,
+    CudaTensor* probabilities,
+    CudaTensor* output,
+    float scale) {
+    if (!valid() || probabilities == nullptr || output == nullptr) {
+        return core::Status::error(
+            "paged MLA attention context or output is invalid");
+    }
+    const auto& nope_shape = query_nope.contract().shape.dimensions;
+    const auto& rope_shape = query_rope.contract().shape.dimensions;
+    const auto& kv_shape = kv_b.contract().shape.dimensions;
+    const auto& probability_shape = probabilities->contract().shape.dimensions;
+    const auto& output_shape = output->contract().shape.dimensions;
+    if (!cache.valid() || layer >= cache.layer_count() || token_count == 0 ||
+        physical_blocks.empty() || nope_shape.size() != 2 ||
+        rope_shape.size() != 3 || rope_shape[0] != 1 || kv_shape.size() != 2 ||
+        probability_shape.size() != 2 || output_shape.size() != 2 ||
+        probability_shape[0] != nope_shape[0] ||
+        probability_shape[1] < token_count || nope_shape[0] != rope_shape[1] ||
+        nope_shape[0] != output_shape[0] ||
+        kv_shape[1] != cache.latent_dimension() ||
+        rope_shape[2] != cache.rope_dimension() ||
+        kv_shape[0] != nope_shape[0] * (nope_shape[1] + output_shape[1])) {
+        return core::Status::error(
+            "paged MLA attention Tensor shapes are inconsistent");
+    }
+    if (physical_blocks.size() >
+            std::numeric_limits<std::size_t>::max() / cache.block_size() ||
+        token_count > physical_blocks.size() * cache.block_size()) {
+        return core::Status::error(
+            "paged MLA tokens exceed the page table");
+    }
+    for (const std::size_t block : physical_blocks) {
+        if (block >= cache.total_blocks()) {
+            return core::Status::error(
+                "paged MLA physical block is out of range");
+        }
+    }
+    if (physical_blocks.size() >
+        std::numeric_limits<std::size_t>::max() / sizeof(std::size_t)) {
+        return core::Status::error("paged MLA page table bytes overflow");
+    }
+    const std::size_t page_bytes =
+        physical_blocks.size() * sizeof(std::size_t);
+    const core::Status workspace_status = reserve_workspace(page_bytes);
+    if (!workspace_status.is_ok()) return workspace_status;
+    const CudaStatus copy_status = CudaStatus::from(
+        cudaMemcpyAsync(
+            workspace_.data(),
+            physical_blocks.data(),
+            page_bytes,
+            cudaMemcpyHostToDevice,
+            stream_.native_handle()),
+        "paged MLA page table H2D");
+    if (!copy_status.is_ok()) return copy_status.to_core_status();
+
+    const CudaMlaAttentionRequest attention{
+        static_cast<const float*>(query_nope.data()),
+        static_cast<const float*>(query_rope.data()),
+        static_cast<const float*>(kv_b.data()),
+        static_cast<float*>(probabilities->data()),
+        static_cast<float*>(output->data()),
+        nope_shape[0],
+        nope_shape[1],
+        rope_shape[2],
+        output_shape[1],
+        kv_shape[1],
+        probability_shape[1],
+        scale,
+        1,
+        token_count - 1};
+    const CudaPagedMlaAttentionRequest request{
+        attention,
+        cache.latent_data(),
+        cache.key_rope_data(),
+        static_cast<const std::size_t*>(workspace_.data()),
+        token_count,
+        layer,
+        cache.layer_count(),
+        cache.total_blocks(),
+        cache.block_size(),
+        physical_blocks.size()};
+    return cuda_mla_attention_backend().compute_paged(request, stream_)
+        .to_core_status();
+}
+
+core::Status CudaExecutionContext::paged_mla_attention_batch(
+    const CudaTensor& query_nope,
+    const CudaTensor& query_rope,
+    const CudaTensor& kv_b,
+    const CudaPagedMlaCache& cache,
+    std::size_t layer,
+    const std::vector<std::size_t>& physical_blocks,
+    std::size_t token_count,
+    std::size_t query_position_offset,
+    CudaTensor* probabilities,
+    CudaTensor* output,
+    float scale) {
+    if (!valid() || probabilities == nullptr || output == nullptr) {
+        return core::Status::error(
+            "paged MLA batch attention context or output is invalid");
+    }
+    const auto& nope_shape = query_nope.contract().shape.dimensions;
+    const auto& rope_shape = query_rope.contract().shape.dimensions;
+    const auto& kv_shape = kv_b.contract().shape.dimensions;
+    const auto& probability_shape = probabilities->contract().shape.dimensions;
+    const auto& output_shape = output->contract().shape.dimensions;
+    if (!cache.valid() || layer >= cache.layer_count() || token_count == 0 ||
+        physical_blocks.empty() || nope_shape.size() != 3 ||
+        rope_shape.size() != 3 || kv_shape.size() != 2 ||
+        probability_shape.size() != 3 || output_shape.size() != 3 ||
+        nope_shape[0] == 0 || rope_shape[0] != nope_shape[0] ||
+        rope_shape[1] != nope_shape[1] ||
+        probability_shape[0] != nope_shape[0] ||
+        probability_shape[1] != nope_shape[1] ||
+        probability_shape[2] < token_count ||
+        output_shape[0] != nope_shape[0] ||
+        output_shape[1] != nope_shape[1] ||
+        kv_shape[1] != cache.latent_dimension() ||
+        rope_shape[2] != cache.rope_dimension() ||
+        kv_shape[0] != nope_shape[1] *
+            (nope_shape[2] + output_shape[2]) ||
+        query_position_offset >= token_count ||
+        nope_shape[0] > token_count - query_position_offset) {
+        return core::Status::error(
+            "paged MLA batch attention Tensor shapes are inconsistent");
+    }
+    if (physical_blocks.size() >
+            std::numeric_limits<std::size_t>::max() / cache.block_size() ||
+        token_count > physical_blocks.size() * cache.block_size()) {
+        return core::Status::error(
+            "paged MLA batch tokens exceed the page table");
+    }
+    for (const std::size_t block : physical_blocks) {
+        if (block >= cache.total_blocks()) {
+            return core::Status::error(
+                "paged MLA batch physical block is out of range");
+        }
+    }
+    if (physical_blocks.size() >
+        std::numeric_limits<std::size_t>::max() / sizeof(std::size_t)) {
+        return core::Status::error(
+            "paged MLA batch page table bytes overflow");
+    }
+    const std::size_t page_bytes =
+        physical_blocks.size() * sizeof(std::size_t);
+    const core::Status workspace_status = reserve_workspace(page_bytes);
+    if (!workspace_status.is_ok()) return workspace_status;
+    const CudaStatus copy_status = CudaStatus::from(cudaMemcpyAsync(
+        workspace_.data(), physical_blocks.data(), page_bytes,
+        cudaMemcpyHostToDevice, stream_.native_handle()),
+        "paged MLA batch page table H2D");
+    if (!copy_status.is_ok()) return copy_status.to_core_status();
+
+    const CudaMlaAttentionRequest attention{
+        static_cast<const float*>(query_nope.data()),
+        static_cast<const float*>(query_rope.data()),
+        static_cast<const float*>(kv_b.data()),
+        static_cast<float*>(probabilities->data()),
+        static_cast<float*>(output->data()),
+        nope_shape[1], nope_shape[2], rope_shape[2], output_shape[2],
+        kv_shape[1], probability_shape[2], scale, nope_shape[0],
+        query_position_offset};
+    const CudaPagedMlaAttentionRequest request{
+        attention,
+        cache.latent_data(),
+        cache.key_rope_data(),
+        static_cast<const std::size_t*>(workspace_.data()),
+        token_count,
+        layer,
+        cache.layer_count(),
+        cache.total_blocks(),
+        cache.block_size(),
+        physical_blocks.size()};
+    return cuda_mla_attention_backend().compute_paged(request, stream_)
         .to_core_status();
 }
 
@@ -601,6 +881,47 @@ core::Status CudaExecutionContext::append_mla(
         return core::Status::error("MLA append context or cache is invalid");
     }
     return cache->append(latent, key_rope, stream_);
+}
+
+core::Status CudaExecutionContext::append_mla_batch(
+    CudaMlaCache* cache,
+    const CudaTensor& latent,
+    const CudaTensor& key_rope) const {
+    if (!valid() || cache == nullptr) {
+        return core::Status::error(
+            "MLA batch append context or cache is invalid");
+    }
+    return cache->append_batch(latent, key_rope, stream_);
+}
+
+core::Status CudaExecutionContext::write_paged_mla(
+    CudaPagedMlaCache* cache,
+    std::size_t layer,
+    std::size_t physical_block,
+    std::size_t slot,
+    const CudaTensor& latent,
+    const CudaTensor& key_rope) const {
+    if (!valid() || cache == nullptr) {
+        return core::Status::error(
+            "paged MLA write context or cache is invalid");
+    }
+    return cache->write_token(
+        layer, physical_block, slot, latent, key_rope, stream_);
+}
+
+core::Status CudaExecutionContext::write_paged_mla_batch(
+    CudaPagedMlaCache* cache,
+    std::size_t layer,
+    const std::vector<std::size_t>& physical_blocks,
+    std::size_t start_position,
+    const CudaTensor& latent,
+    const CudaTensor& key_rope) const {
+    if (!valid() || cache == nullptr) {
+        return core::Status::error(
+            "paged MLA batch write context or cache is invalid");
+    }
+    return cache->write_tokens(
+        layer, physical_blocks, start_position, latent, key_rope, stream_);
 }
 
 core::Status CudaExecutionContext::rope(

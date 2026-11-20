@@ -25,6 +25,10 @@ public:
         const CudaTensor& latent,
         const CudaTensor& key_rope,
         const CudaStream& stream);
+    core::Status append_batch(
+        const CudaTensor& latent,
+        const CudaTensor& key_rope,
+        const CudaStream& stream);
     core::Status copy_to_host_async(
         float* latent,
         float* key_rope,
