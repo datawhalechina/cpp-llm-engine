@@ -35,4 +35,4 @@ DeepSeek CUDA 的 grouped MoE 实验展示了为什么必须逐层下钻。EXP-G
 
 依据该证据，CUDA MLA 改为 score、Softmax、Value 聚合三阶段，并让概率在 Value 维之间复用。优化后 6 轮反向顺序配对中，顺序与 grouped Decode 中位数分别为 `550.2 ms` 和 `455.0 ms`，logits 与词元门禁通过。新的单次捕获中，score kernel 合计约 `317.6 ms`、占 kernel 时间 `82.3%`，Value 聚合约 `5.44 ms`。这次复测同时回答了两个问题：三阶段 MLA 应保留；下一轮应继续拆解 score 的 latent 投影，而不是优先融合 MoE。
 
-长度矩阵还能提示热点何时迁移。[EXP-GPU-19](../../reference/experiment_assets.md#exp-gpu-19) 固定模型、连续 MLA 和 27 层计时范围，只改变 Prefill 长度。Tensor/逐词元比例从长度 2 的 `0.552` 降到长度 32 的 `0.183`，说明权重复用和批量执行先占主导；长度 128 时比例回升到 `0.343`，说明长上下文下因果 Attention 的计算与访存开始抵消一部分收益。这个趋势用于确定下一次 profile 的输入长度，不能只凭端到端比例断言具体 Kernel 已成为热点。
+长度矩阵还能提示热点何时迁移。[EXP-GPU-19](../../reference/experiment_assets.md#exp-gpu-19) 固定模型、连续 MLA 和 27 层计时范围，只改变 Prefill 长度。Tensor/逐词元比例从长度 2 的 `0.552` 降到长度 32 的 `0.183`，长度 128 时回升到 `0.343`。随后只捕获一次 Tensor Prefill：长度 32 的 MLA score/value 占 Kernel 时间约 `62.2%`，量化 GEMV 约占 `37.6%`；长度 128 时两者变为约 `88.5%` 和 `11.4%`。这组原因指标确认长上下文下因果 Attention 正在抵消一部分权重复用收益，下一轮应优化 score/value 的数据复用，而不是继续优先优化 MoE GEMV。
