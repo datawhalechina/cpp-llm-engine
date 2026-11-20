@@ -9,6 +9,22 @@ model_path="${1:-${CPP_LLM_ENGINE_DEEPSEEK2_MODEL_PATH:-${repo_root}/llama.cpp/m
 build_dir="${CHAPTER09_DEEPSEEK2_TENSOR_PREFILL_BUILD_DIR:-${TMPDIR:-/tmp}/cpp-llm-chapter09-deepseek2-tensor-prefill-build}"
 result_dir="${CHAPTER09_DEEPSEEK2_TENSOR_PREFILL_PROFILE_RESULT_DIR:-${TMPDIR:-/tmp}/cpp-llm-chapter09-deepseek2-tensor-prefill-profile}"
 lengths="${CHAPTER09_DEEPSEEK2_TENSOR_PREFILL_PROFILE_LENGTHS:-32,128}"
+mla_path="${CHAPTER09_DEEPSEEK2_TENSOR_PREFILL_PROFILE_MLA_PATH:-absorbed}"
+
+case "${mla_path}" in
+    legacy)
+        experiment_id="EXP-GPU-19"
+        attachment="deepseek2-tensor-prefill-length-profile"
+        ;;
+    absorbed)
+        experiment_id="EXP-GPU-20"
+        attachment="deepseek2-absorbed-mla-post-profile"
+        ;;
+    *)
+        echo "MLA path must be legacy or absorbed: ${mla_path}" >&2
+        exit 2
+        ;;
+esac
 
 if [[ ! -x "${cuda_home}/bin/nvcc" ||
       ! -x "${cuda_home}/bin/nsys" || ! -f "${model_path}" ]]; then
@@ -27,13 +43,14 @@ cmake --build "${build_dir}" \
     --target real_deepseek2_cuda_tensor_prefill_benchmark --parallel 2
 
 cat >"${result_dir}/metadata.txt" <<EOF
-experiment_id=EXP-GPU-19
-attachment=deepseek2-tensor-prefill-length-profile
+experiment_id=${experiment_id}
+attachment=${attachment}
 workload_id=WL-GPU-DEEPSEEK2-TENSOR-PREFILL-PROFILE-V1
 model=DeepSeek-V2-Lite-Chat-Q2_K
 backend=CUDA
 build_type=Release
 profile_lengths=${lengths}
+mla_path=${mla_path}
 capture_range=one-complete-tensor-prefill
 cache=continuous-compressed-mla
 timing_scope=27-layer-prefill-and-lm-head
@@ -59,7 +76,7 @@ for length in "${profile_lengths[@]}"; do
         --force-overwrite=true \
         --output="${profile_base}" \
         "${build_dir}/real_deepseek2_cuda_tensor_prefill_benchmark" \
-        "${model_path}" --profile-tensor "${length}" \
+        "${model_path}" --profile-tensor "${length}" "${mla_path}" \
         >"${result_dir}/program-output-${length}.txt"
 
     "${cuda_home}/bin/nsys" stats --force-export=true \
@@ -74,6 +91,18 @@ for length in "${profile_lengths[@]}"; do
         sed -n '/^Time (%)/,$p' |
         sed -e 's/[[:space:]]*$//' -e '/^$/d' \
             >"${result_dir}/cuda-api-summary-${length}.csv"
+    "${cuda_home}/bin/nsys" stats --force-export=true \
+        --report cuda_gpu_mem_time_sum --format csv \
+        "${profile_base}.nsys-rep" |
+        sed -n '/^Time (%)/,$p' |
+        sed -e 's/[[:space:]]*$//' -e '/^$/d' \
+            >"${result_dir}/memory-time-summary-${length}.csv"
+    "${cuda_home}/bin/nsys" stats --force-export=true \
+        --report cuda_gpu_mem_size_sum --format csv \
+        "${profile_base}.nsys-rep" |
+        sed -n '/^Total/,$p' |
+        sed -e 's/[[:space:]]*$//' -e '/^$/d' \
+            >"${result_dir}/memory-size-summary-${length}.csv"
     grep -q 'profile_correctness: PASS' \
         "${result_dir}/program-output-${length}.txt"
 done

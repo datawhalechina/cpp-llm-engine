@@ -19,6 +19,7 @@
 namespace {
 
 using Clock = std::chrono::steady_clock;
+using cpp_llm_engine::cuda::CudaMlaComputePath;
 
 struct Result {
     double elapsed_ms = 0.0;
@@ -53,9 +54,10 @@ bool run_path(
     cpp_llm_engine::RealDeepSeek2CudaExecutorFactory& factory,
     const chapter06_generation::TokenSequence& prompt,
     bool tensor_path,
+    CudaMlaComputePath mla_path,
     Result* result,
     std::string* error) {
-    auto executor = factory.create_executor();
+    auto executor = factory.create_executor(mla_path);
     if (executor == nullptr || result == nullptr) {
         if (error != nullptr) *error = "failed to create prefill executor";
         return false;
@@ -119,17 +121,28 @@ void print_samples(const char* name, const std::vector<double>& samples) {
 
 int main(int argc, char** argv) {
     std::cout << std::setprecision(9);
-    const bool profile_mode =
-        argc == 4 && std::string(argv[2]) == "--profile-tensor";
+    const bool profile_mode = (argc == 4 || argc == 5) &&
+        std::string(argv[2]) == "--profile-tensor";
     if ((!profile_mode && (argc < 2 || argc > 5)) ||
         (profile_mode && std::stoul(argv[3]) == 0)) {
         std::cerr << "usage: real_deepseek2_cuda_tensor_prefill_benchmark "
                      "<model.gguf> [lengths=2,8,32,128] [warmup=1] "
                      "[iterations=4]\n"
                      "       real_deepseek2_cuda_tensor_prefill_benchmark "
-                     "<model.gguf> --profile-tensor <length>\n";
+                     "<model.gguf> --profile-tensor <length> "
+                     "[legacy|absorbed]\n";
         return 2;
     }
+    const std::string profile_path =
+        profile_mode && argc == 5 ? argv[4] : "absorbed";
+    if (profile_mode && profile_path != "legacy" &&
+        profile_path != "absorbed") {
+        std::cerr << "profile MLA path must be legacy or absorbed\n";
+        return 2;
+    }
+    const CudaMlaComputePath mla_path = profile_path == "legacy"
+        ? CudaMlaComputePath::LegacyThreeStage
+        : CudaMlaComputePath::AbsorbedThreeStage;
     const std::vector<std::size_t> lengths = profile_mode
         ? std::vector<std::size_t>{static_cast<std::size_t>(std::stoul(argv[3]))}
         : parse_lengths(argc >= 3 ? argv[2] : "2,8,32,128");
@@ -162,8 +175,8 @@ int main(int argc, char** argv) {
         Result sequential;
         Result warm_tensor;
         Result tensor;
-        if (!run_path(*factory, prompt, false, &sequential, &error) ||
-            !run_path(*factory, prompt, true, &warm_tensor, &error)) {
+        if (!run_path(*factory, prompt, false, mla_path, &sequential, &error) ||
+            !run_path(*factory, prompt, true, mla_path, &warm_tensor, &error)) {
             std::cerr << "DeepSeek Tensor Prefill profile warmup failed: "
                       << error << '\n';
             return 1;
@@ -173,7 +186,7 @@ int main(int argc, char** argv) {
             return 1;
         }
         const bool succeeded = run_path(
-            *factory, prompt, true, &tensor, &error);
+            *factory, prompt, true, mla_path, &tensor, &error);
         const cudaError_t stop_status = cudaProfilerStop();
         if (!succeeded || stop_status != cudaSuccess) {
             std::cerr << "DeepSeek Tensor Prefill profile failed: "
@@ -184,6 +197,7 @@ int main(int argc, char** argv) {
         const bool correct = max_error <= 1.0e-4F &&
             sequential.greedy_token == tensor.greedy_token;
         std::cout << "profile_length: " << lengths.front() << '\n'
+                  << "profile_mla_path: " << profile_path << '\n'
                   << "profile_tensor_ms: " << tensor.elapsed_ms << '\n'
                   << "profile_maximum_logits_error: " << max_error << '\n'
                   << "profile_tokens_match: "
@@ -200,8 +214,12 @@ int main(int argc, char** argv) {
         for (std::size_t index = 0; index < warmup; ++index) {
             Result sequential;
             Result tensor;
-            if (!run_path(*factory, prompt, false, &sequential, &error) ||
-                !run_path(*factory, prompt, true, &tensor, &error)) {
+            if (!run_path(*factory, prompt, false,
+                    CudaMlaComputePath::AbsorbedThreeStage,
+                    &sequential, &error) ||
+                !run_path(*factory, prompt, true,
+                    CudaMlaComputePath::AbsorbedThreeStage,
+                    &tensor, &error)) {
                 std::cerr << "DeepSeek Tensor Prefill warmup failed: "
                           << error << '\n';
                 return 1;
@@ -217,9 +235,13 @@ int main(int argc, char** argv) {
             Result first;
             Result second;
             if (!run_path(
-                    *factory, prompt, tensor_first, &first, &error) ||
+                    *factory, prompt, tensor_first,
+                    CudaMlaComputePath::AbsorbedThreeStage,
+                    &first, &error) ||
                 !run_path(
-                    *factory, prompt, !tensor_first, &second, &error)) {
+                    *factory, prompt, !tensor_first,
+                    CudaMlaComputePath::AbsorbedThreeStage,
+                    &second, &error)) {
                 std::cerr << "DeepSeek Tensor Prefill A/B failed: "
                           << error << '\n';
                 return 1;
