@@ -3,6 +3,7 @@
 // 验证入口：chapter07_block_pool_test。
 #include "chapter07_kv_cache/block_table.h"
 
+#include "cpp_llm_engine/testing/fault_injector.h"
 #include "cpp_llm_engine/testing/test.h"
 
 #include <limits>
@@ -123,6 +124,69 @@ int main() {
         CPP_LLM_CHECK(suite, pool.reserve(31, 2));
         CPP_LLM_REQUIRE(suite, !released.empty());
         CPP_LLM_CHECK(suite, pool.physical_blocks(31).front() == released.front());
+    });
+
+    suite.run("payload clear failure preserves ownership for retry", [&] {
+        KvBlockPool pool(3, 2);
+        CPP_LLM_CHECK(suite, pool.reserve(32, 3));
+        CPP_LLM_CHECK(suite, pool.commit_tokens(32, 3));
+        cpp_llm_engine::testing::FaultInjector faults;
+        faults.arm("paged_payload.clear", 2);
+        std::size_t synchronizations = 0;
+        const auto clear = [&](std::size_t) {
+            return !faults.hit("paged_payload.clear");
+        };
+        const auto synchronize = [&] {
+            ++synchronizations;
+            return true;
+        };
+
+        CPP_LLM_CHECK(
+            suite,
+            !chapter07_kv_cache::release_after_payload_cleanup(
+                pool, 32, clear, synchronize));
+        CPP_LLM_CHECK(suite, pool.contains(32));
+        CPP_LLM_CHECK(suite, pool.used_blocks() == 2);
+        CPP_LLM_CHECK(suite, synchronizations == 0);
+
+        CPP_LLM_CHECK(
+            suite,
+            chapter07_kv_cache::release_after_payload_cleanup(
+                pool, 32, clear, synchronize));
+        CPP_LLM_CHECK(suite, !pool.contains(32));
+        CPP_LLM_CHECK(suite, pool.used_blocks() == 0);
+        CPP_LLM_CHECK(suite, synchronizations == 1);
+    });
+
+    suite.run("payload synchronization failure can be retried", [&] {
+        KvBlockPool pool(2, 2);
+        CPP_LLM_CHECK(suite, pool.reserve(33, 2));
+        CPP_LLM_CHECK(suite, pool.commit_tokens(33, 2));
+        cpp_llm_engine::testing::FaultInjector faults;
+        faults.arm("paged_payload.synchronize");
+        std::size_t clears = 0;
+        const auto clear = [&](std::size_t) {
+            ++clears;
+            return true;
+        };
+        const auto synchronize = [&] {
+            return !faults.hit("paged_payload.synchronize");
+        };
+
+        CPP_LLM_CHECK(
+            suite,
+            !chapter07_kv_cache::release_after_payload_cleanup(
+                pool, 33, clear, synchronize));
+        CPP_LLM_CHECK(suite, pool.contains(33));
+        CPP_LLM_CHECK(suite, pool.used_blocks() == 1);
+
+        CPP_LLM_CHECK(
+            suite,
+            chapter07_kv_cache::release_after_payload_cleanup(
+                pool, 33, clear, synchronize));
+        CPP_LLM_CHECK(suite, !pool.contains(33));
+        CPP_LLM_CHECK(suite, pool.used_blocks() == 0);
+        CPP_LLM_CHECK(suite, clears == 2);
     });
 
     suite.run("uncommitted locations cannot be read", [&] {

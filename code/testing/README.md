@@ -16,7 +16,7 @@
 
 ## 故障注入边界
 
-`FaultInjector` 只由测试夹具持有。生产代码继续返回原有状态或错误信息，测试执行器、缓存适配器和 Transport writer 在指定交接点调用 `hit()`。故障点使用 `对象.阶段` 命名，例如 `executor.prefill_chunk`、`paged_kv.after_write` 和 `transport.write`。
+`FaultInjector` 只由测试夹具持有。生产代码继续返回原有状态或错误信息，测试执行器、缓存适配器和 Transport writer 在指定交接点调用 `hit()`。故障点使用 `对象.阶段` 命名，例如 `executor.prefill_chunk`、`paged_kv.after_write`、`paged_payload.clear` 和 `transport.write`。
 
 一次性模式用于验证某一步失败后的回滚，持续模式用于验证重复故障下的资源守恒。测试还应断言命中次数、请求终态和资源计数，不能只检查函数返回失败。并发测试可以共享一个注入器；内部计数受互斥锁保护。
 

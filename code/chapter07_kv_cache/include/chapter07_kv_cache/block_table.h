@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <unordered_map>
 #include <vector>
 
@@ -114,5 +115,13 @@ private:
     std::vector<std::size_t> block_ref_counts_;
     std::unordered_map<std::size_t, BlockTable> tables_;
 };
+
+// Clear payload owned only by this request before returning its physical blocks.
+// clear_block must be idempotent because a failed attempt can be retried.
+bool release_after_payload_cleanup(
+    KvBlockPool& pool,
+    std::size_t request_id,
+    const std::function<bool(std::size_t)>& clear_block,
+    const std::function<bool()>& synchronize);
 
 }  // namespace chapter07_kv_cache

@@ -12,6 +12,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/../testing/cmake/CppLlmTesting.cmake)
 
 add_library(chapter07_kv_cache
     src/block_table.cpp
+    src/paged_mla_cache.cpp
     src/paged_kv_cache.cpp
     src/radix_prefix_cache.cpp
 )
@@ -41,6 +42,12 @@ add_chapter07_test(
     chapter07_paged_kv_cache_test
     tests/paged_kv_cache_test.cpp
     "cache;transaction"
+    component
+)
+add_chapter07_test(
+    chapter07_paged_mla_cache_test
+    tests/paged_mla_cache_test.cpp
+    "cache;transaction;mla;deepseek"
     component
 )
 add_chapter07_test(

@@ -15,6 +15,11 @@ bash "${quality_gate}" \
     code/chapter08_scheduling \
     '^chapter08_cache_transaction_test$'
 
+echo "[fault-injection] paged payload release retry"
+bash "${quality_gate}" \
+    code/chapter07_kv_cache \
+    '^chapter07_block_pool_test$'
+
 echo "[fault-injection] serving terminal release"
 bash "${quality_gate}" \
     code/chapter10_serving \

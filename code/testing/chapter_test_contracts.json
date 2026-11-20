@@ -362,6 +362,15 @@
       "status": "active"
     },
     {
+      "target": "chapter07_paged_mla_cache_test",
+      "source": "code/chapter07_kv_cache/tests/paged_mla_cache_test.cpp",
+      "owner": "07",
+      "level": "component",
+      "dependencies": ["04", "07"],
+      "status": "active",
+      "note": "验证 MLA 压缩 latent K/V 与 RoPE key 的分页载荷和提交原子性"
+    },
+    {
       "target": "chapter07_radix_prefix_cache_test",
       "source": "code/chapter07_kv_cache/tests/radix_prefix_cache_test.cpp",
       "owner": "07",

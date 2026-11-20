@@ -252,4 +252,21 @@ void KvBlockPool::release_block(std::size_t physical_block) {
     --block_ref_counts_[physical_block];
 }
 
+bool release_after_payload_cleanup(
+    KvBlockPool& pool,
+    std::size_t request_id,
+    const std::function<bool(std::size_t)>& clear_block,
+    const std::function<bool()>& synchronize) {
+    if (!pool.contains(request_id) || !clear_block || !synchronize) return false;
+
+    bool submitted = false;
+    for (const std::size_t block : pool.physical_blocks(request_id)) {
+        if (pool.block_ref_count(block) != 1) continue;
+        if (!clear_block(block)) return false;
+        submitted = true;
+    }
+    if (submitted && !synchronize()) return false;
+    return pool.release(request_id);
+}
+
 }  // namespace chapter07_kv_cache
