@@ -40,6 +40,8 @@ CUDA Model 沿用相同的所有权划分。`RealDeepSeek2CudaModel` 常驻一�
 
 分块 Prefill 接收一段词元后，先逐行查 embedding 并打包为 `[T,D]`，再让这个 Tensor 穿过 27 层。稠密层使用多 Query 因果 MLA 与批量 FFN；MoE 层在 Router 边界暂时拆成行，按专家分组执行后再打包。连续与分页 MLA 共用这条计算路径，只替换历史数据的地址解释。整个 chunk 成功后才推进位置，任一层失败都恢复 hidden 与缓存。这样验证的是一次多词元模型前向，而不是在 `prefill_chunk()` 内隐藏逐词元 Decode 循环。
 
+整段 Tensor Prefill 的价值不只来自接口调用更少。逐词元基线会让 27 层权重、工作区准备和 Kernel 启动随词元数重复；Tensor 路径把 `[T,D]` 保持到层边界，在一次层前向中复用权重并并行处理多个 Query。[EXP-GPU-19](../../reference/experiment_assets.md#exp-gpu-19) 使用相同模型、连续 MLA 和最终 logits，对长度 `2/8/32/128` 做反向顺序配对。Tensor/逐词元中位数比例依次为 `0.552/0.258/0.183/0.343`，全部 logits 最大误差为 `0`。长度 128 的比例回升说明因果 Attention 随上下文增长后的占比已经上升，但 Tensor 路径仍明显快于逐词元调用。
+
 模型权重缓存与请求 Context 是两个对象。DeepSeek Factory 默认逐层读取并释放权重，因此消费内存较低；将缓存容量设为 27 后，后续 Decode 可以复用全部层权重，但会增加接近整套 Decoder 的常驻内存。容量小于 27 的普通 LRU 对顺序扫描通常没有命中，因为同一层再次出现前已经访问了其余 26 层。无论是否缓存权重，请求位置和 MLA 历史始终保存在各自 Context 中。
 
 Factory 同时提供跨请求 Decode 接口。它按层加载一次权重，每个请求先从自己的压缩 MLA 历史计算 Attention，再把同层 FFN 输入按专家分组执行，最后拆回各请求。整批成功后才提交 Context；任一层失败都会恢复批次开始前的状态。当前 CPU 路径已经实现专家分组，MLA、共享专家和 LM Head 仍按请求计算，融合 Tensor 执行留给后续优化。
