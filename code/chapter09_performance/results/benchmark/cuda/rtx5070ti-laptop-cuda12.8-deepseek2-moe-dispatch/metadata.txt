@@ -1,0 +1,14 @@
+experiment_id=EXP-GPU-21
+workload_id=WL-GPU-DEEPSEEK2-MOE-DISPATCH-AB-V1
+model=DeepSeek-V2-Lite-Chat-Q2_K
+backend=CUDA
+build_type=Release
+lengths=32,128
+warmup=1
+iterations=4
+mla_path=absorbed
+baseline=row-copies
+candidate=packed-dispatch
+timing_scope=27-layer-prefill-and-lm-head
+excludes=model-load-context-create
+NVIDIA GeForce RTX 5070 Ti Laptop GPU, 580.178.04, 12227 MiB
