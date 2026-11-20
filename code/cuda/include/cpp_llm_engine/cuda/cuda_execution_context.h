@@ -11,6 +11,7 @@
 #include "cpp_llm_engine/cuda/cuda_stream.h"
 #include "cpp_llm_engine/cuda/cuda_tensor.h"
 #include "cpp_llm_engine/cuda/cuda_workspace.h"
+#include "cpp_llm_engine/cuda/mla_attention_backend.h"
 #include "cpp_llm_engine/cuda/quantized_gemv_backend.h"
 
 #include <cstddef>
@@ -128,7 +129,9 @@ public:
         const CudaMlaCache& cache,
         CudaTensor* probabilities,
         CudaTensor* output,
-        float scale) const;
+        float scale,
+        CudaMlaComputePath path =
+            CudaMlaComputePath::LegacyThreeStage) const;
     core::Status mla_attention_batch(
         const CudaTensor& query_nope,
         const CudaTensor& query_rope,
@@ -137,7 +140,9 @@ public:
         std::size_t query_position_offset,
         CudaTensor* probabilities,
         CudaTensor* output,
-        float scale) const;
+        float scale,
+        CudaMlaComputePath path =
+            CudaMlaComputePath::LegacyThreeStage) const;
     core::Status paged_mla_attention(
         const CudaTensor& query_nope,
         const CudaTensor& query_rope,
@@ -148,7 +153,9 @@ public:
         std::size_t token_count,
         CudaTensor* probabilities,
         CudaTensor* output,
-        float scale);
+        float scale,
+        CudaMlaComputePath path =
+            CudaMlaComputePath::LegacyThreeStage);
     core::Status paged_mla_attention_batch(
         const CudaTensor& query_nope,
         const CudaTensor& query_rope,
@@ -160,7 +167,9 @@ public:
         std::size_t query_position_offset,
         CudaTensor* probabilities,
         CudaTensor* output,
-        float scale);
+        float scale,
+        CudaMlaComputePath path =
+            CudaMlaComputePath::LegacyThreeStage);
     core::Status append_mla(
         CudaMlaCache* cache,
         const CudaTensor& latent,

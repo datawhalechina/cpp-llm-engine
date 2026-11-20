@@ -169,6 +169,13 @@ bool run_mla_case() {
     for (std::size_t index = 0; index < output.size(); ++index) {
         CHECK(std::fabs(output[index] - golden[index]) <= 1.0e-5F);
     }
+    CHECK(backend.compute_absorbed(request, cache, stream).is_ok());
+    CHECK(output_device.copy_to_host_async(
+        output.data(), output.size() * sizeof(float), stream).is_ok());
+    CHECK(stream.synchronize().is_ok());
+    for (std::size_t index = 0; index < output.size(); ++index) {
+        CHECK(std::fabs(output[index] - golden[index]) <= 1.0e-5F);
+    }
 
     CHECK(upload(&latent_device, latent_second, stream));
     CHECK(upload(&rope_device, rope_second, stream));
@@ -187,6 +194,13 @@ bool run_mla_case() {
     golden = cpu_mla(
         query_nope, query_rope, kv_b, latent_history, rope_history, 2,
         heads, nope, rope, value, latent, scale);
+    for (std::size_t index = 0; index < output.size(); ++index) {
+        CHECK(std::fabs(output[index] - golden[index]) <= 1.0e-5F);
+    }
+    CHECK(backend.compute_absorbed(request, cache, stream).is_ok());
+    CHECK(output_device.copy_to_host_async(
+        output.data(), output.size() * sizeof(float), stream).is_ok());
+    CHECK(stream.synchronize().is_ok());
     for (std::size_t index = 0; index < output.size(); ++index) {
         CHECK(std::fabs(output[index] - golden[index]) <= 1.0e-5F);
     }
@@ -332,6 +346,29 @@ bool run_batched_mla_case() {
         heads, nope, rope, value, latent, tokens, scale, tokens, 0};
     CHECK(backend.compute(request, cache, stream).is_ok());
     std::vector<float> output(tokens * heads * value);
+    CHECK(output_device.copy_to_host_async(
+        output.data(), output.size() * sizeof(float), stream).is_ok());
+    CHECK(stream.synchronize().is_ok());
+    for (std::size_t token = 0; token < tokens; ++token) {
+        const std::vector<float> token_query_nope(
+            query_nope.begin() +
+                static_cast<std::ptrdiff_t>(token * heads * nope),
+            query_nope.begin() +
+                static_cast<std::ptrdiff_t>((token + 1) * heads * nope));
+        const std::vector<float> token_query_rope(
+            query_rope.begin() +
+                static_cast<std::ptrdiff_t>(token * heads * rope),
+            query_rope.begin() +
+                static_cast<std::ptrdiff_t>((token + 1) * heads * rope));
+        const auto golden = cpu_mla(
+            token_query_nope, token_query_rope, kv_b, latent_history,
+            rope_history, token + 1, heads, nope, rope, value, latent, scale);
+        for (std::size_t index = 0; index < golden.size(); ++index) {
+            CHECK(std::fabs(output[token * heads * value + index] -
+                golden[index]) <= 1.0e-5F);
+        }
+    }
+    CHECK(backend.compute_absorbed(request, cache, stream).is_ok());
     CHECK(output_device.copy_to_host_async(
         output.data(), output.size() * sizeof(float), stream).is_ok());
     CHECK(stream.synchronize().is_ok());

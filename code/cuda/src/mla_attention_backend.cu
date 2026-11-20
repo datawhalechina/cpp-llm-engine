@@ -194,6 +194,87 @@ __global__ void mla_value_kernel(
         (query_head * request.value_dimension) + value] = result;
 }
 
+__global__ void mla_absorbed_score_kernel(
+    CudaMlaAttentionRequest request,
+    const float* latent_cache,
+    const float* rope_cache,
+    std::size_t token_count) {
+    extern __shared__ float projected_query[];
+    const std::size_t query_head = blockIdx.x;
+    const std::size_t head = query_head % request.head_count;
+    const std::size_t matrix_head_offset =
+        head * (request.nope_dimension + request.value_dimension) *
+        request.latent_dimension;
+    const float* query_nope = request.query_nope +
+        query_head * request.nope_dimension;
+    for (std::size_t latent = threadIdx.x;
+         latent < request.latent_dimension; latent += blockDim.x) {
+        float value = 0.0F;
+        for (std::size_t nope = 0; nope < request.nope_dimension; ++nope) {
+            value += query_nope[nope] * request.kv_b[
+                matrix_head_offset + nope * request.latent_dimension + latent];
+        }
+        projected_query[latent] = value;
+    }
+    __syncthreads();
+
+    const float* query_rope = request.query_rope +
+        query_head * request.rope_dimension;
+    for (std::size_t token = threadIdx.x;
+         token < token_count; token += blockDim.x) {
+        const float* latent =
+            latent_cache + token * request.latent_dimension;
+        const float* key_rope =
+            rope_cache + token * request.rope_dimension;
+        float score = 0.0F;
+        for (std::size_t index = 0; index < request.latent_dimension; ++index) {
+            score += projected_query[index] * latent[index];
+        }
+        for (std::size_t index = 0; index < request.rope_dimension; ++index) {
+            score += query_rope[index] * key_rope[index];
+        }
+        request.probabilities[
+            query_head * request.probability_capacity_tokens + token] =
+            score * request.scale;
+    }
+}
+
+__global__ void mla_absorbed_value_kernel(
+    CudaMlaAttentionRequest request,
+    const float* latent_cache,
+    std::size_t token_count) {
+    extern __shared__ float latent_context[];
+    const std::size_t query_head = blockIdx.x;
+    const std::size_t query = query_head / request.head_count;
+    const std::size_t head = query_head % request.head_count;
+    const float* probabilities = request.probabilities +
+        query_head * request.probability_capacity_tokens;
+    const std::size_t visible_tokens = minimum_size(
+        token_count, request.query_position_offset + query + 1);
+    for (std::size_t latent = threadIdx.x;
+         latent < request.latent_dimension; latent += blockDim.x) {
+        float value = 0.0F;
+        for (std::size_t token = 0; token < visible_tokens; ++token) {
+            value += probabilities[token] *
+                latent_cache[token * request.latent_dimension + latent];
+        }
+        latent_context[latent] = value;
+    }
+    __syncthreads();
+
+    const std::size_t matrix_head_offset =
+        head * (request.nope_dimension + request.value_dimension) *
+        request.latent_dimension;
+    for (std::size_t output = threadIdx.x;
+         output < request.value_dimension; output += blockDim.x) {
+        const float* value_row = request.kv_b + matrix_head_offset +
+            (request.nope_dimension + output) * request.latent_dimension;
+        request.output[query_head * request.value_dimension + output] =
+            latent_projection(
+                value_row, latent_context, request.latent_dimension);
+    }
+}
+
 __device__ std::size_t paged_mla_offset(
     const CudaPagedMlaAttentionRequest& request,
     std::size_t token,
@@ -282,6 +363,85 @@ __global__ void paged_mla_value_kernel(
     }
     request.output[
         (query_head * request.value_dimension) + value] = result;
+}
+
+__global__ void paged_mla_absorbed_score_kernel(
+    CudaPagedMlaAttentionRequest paged) {
+    extern __shared__ float projected_query[];
+    const auto request = paged.attention;
+    const std::size_t query_head = blockIdx.x;
+    const std::size_t head = query_head % request.head_count;
+    const std::size_t matrix_head_offset =
+        head * (request.nope_dimension + request.value_dimension) *
+        request.latent_dimension;
+    const float* query_nope = request.query_nope +
+        query_head * request.nope_dimension;
+    for (std::size_t latent = threadIdx.x;
+         latent < request.latent_dimension; latent += blockDim.x) {
+        float value = 0.0F;
+        for (std::size_t nope = 0; nope < request.nope_dimension; ++nope) {
+            value += query_nope[nope] * request.kv_b[
+                matrix_head_offset + nope * request.latent_dimension + latent];
+        }
+        projected_query[latent] = value;
+    }
+    __syncthreads();
+
+    const float* query_rope = request.query_rope +
+        query_head * request.rope_dimension;
+    for (std::size_t token = threadIdx.x;
+         token < paged.token_count; token += blockDim.x) {
+        const float* latent = paged.latent + paged_mla_offset(
+            paged, token, request.latent_dimension);
+        const float* key_rope = paged.key_rope + paged_mla_offset(
+            paged, token, request.rope_dimension);
+        float score = 0.0F;
+        for (std::size_t index = 0; index < request.latent_dimension; ++index) {
+            score += projected_query[index] * latent[index];
+        }
+        for (std::size_t index = 0; index < request.rope_dimension; ++index) {
+            score += query_rope[index] * key_rope[index];
+        }
+        request.probabilities[
+            query_head * request.probability_capacity_tokens + token] =
+            score * request.scale;
+    }
+}
+
+__global__ void paged_mla_absorbed_value_kernel(
+    CudaPagedMlaAttentionRequest paged) {
+    extern __shared__ float latent_context[];
+    const auto request = paged.attention;
+    const std::size_t query_head = blockIdx.x;
+    const std::size_t query = query_head / request.head_count;
+    const std::size_t head = query_head % request.head_count;
+    const float* probabilities = request.probabilities +
+        query_head * request.probability_capacity_tokens;
+    const std::size_t visible_tokens = minimum_size(
+        paged.token_count, request.query_position_offset + query + 1);
+    for (std::size_t latent = threadIdx.x;
+         latent < request.latent_dimension; latent += blockDim.x) {
+        float value = 0.0F;
+        for (std::size_t token = 0; token < visible_tokens; ++token) {
+            const float* token_latent = paged.latent + paged_mla_offset(
+                paged, token, request.latent_dimension);
+            value += probabilities[token] * token_latent[latent];
+        }
+        latent_context[latent] = value;
+    }
+    __syncthreads();
+
+    const std::size_t matrix_head_offset =
+        head * (request.nope_dimension + request.value_dimension) *
+        request.latent_dimension;
+    for (std::size_t output = threadIdx.x;
+         output < request.value_dimension; output += blockDim.x) {
+        const float* value_row = request.kv_b + matrix_head_offset +
+            (request.nope_dimension + output) * request.latent_dimension;
+        request.output[query_head * request.value_dimension + output] =
+            latent_projection(
+                value_row, latent_context, request.latent_dimension);
+    }
 }
 
 }  // namespace
@@ -397,6 +557,52 @@ CudaStatus CudaMlaAttentionBackend::compute(
     return check_last_cuda_error("mla_value_kernel launch");
 }
 
+CudaStatus CudaMlaAttentionBackend::compute_absorbed(
+    const CudaMlaAttentionRequest& request,
+    const CudaMlaCache& cache,
+    const CudaStream& stream) const {
+    constexpr std::size_t kMaximumSharedFloats = 12 * 1024;
+    if (!request.validate().is_ok() || !cache.valid() ||
+        cache.size_tokens() == 0 ||
+        cache.size_tokens() > request.probability_capacity_tokens ||
+        request.query_position_offset >= cache.size_tokens() ||
+        request.query_count >
+            cache.size_tokens() - request.query_position_offset ||
+        cache.latent_dimension() != request.latent_dimension ||
+        cache.rope_dimension() != request.rope_dimension ||
+        request.latent_dimension > kMaximumSharedFloats || !stream.valid()) {
+        return CudaStatus::from(
+            cudaErrorInvalidValue, "absorbed MLA request/cache");
+    }
+    std::size_t query_heads = 0;
+    if (!checked_multiply(request.query_count, request.head_count,
+            &query_heads) ||
+        query_heads > std::numeric_limits<unsigned int>::max()) {
+        return CudaStatus::from(
+            cudaErrorInvalidConfiguration, "absorbed MLA grid");
+    }
+    constexpr unsigned int kThreads = 128;
+    const std::size_t shared_bytes =
+        request.latent_dimension * sizeof(float);
+    mla_absorbed_score_kernel<<<static_cast<unsigned int>(query_heads),
+        kThreads, shared_bytes, stream.native_handle()>>>(
+            request, cache.latent_data(), cache.key_rope_data(),
+            cache.size_tokens());
+    CudaStatus status = check_last_cuda_error(
+        "mla_absorbed_score_kernel launch");
+    if (!status.is_ok()) return status;
+    const std::size_t head_blocks =
+        (query_heads + kThreads - 1) / kThreads;
+    mla_softmax_kernel<<<static_cast<unsigned int>(head_blocks), kThreads, 0,
+        stream.native_handle()>>>(request, cache.size_tokens());
+    status = check_last_cuda_error("mla_absorbed_softmax_kernel launch");
+    if (!status.is_ok()) return status;
+    mla_absorbed_value_kernel<<<static_cast<unsigned int>(query_heads),
+        kThreads, shared_bytes, stream.native_handle()>>>(
+            request, cache.latent_data(), cache.size_tokens());
+    return check_last_cuda_error("mla_absorbed_value_kernel launch");
+}
+
 CudaStatus CudaMlaAttentionBackend::compute_paged(
     const CudaPagedMlaAttentionRequest& request,
     const CudaStream& stream) const {
@@ -447,6 +653,50 @@ CudaStatus CudaMlaAttentionBackend::compute_paged(
     paged_mla_value_kernel<<<static_cast<unsigned int>(value_blocks),
         kThreads, 0, stream.native_handle()>>>(request);
     return check_last_cuda_error("paged_mla_value_kernel launch");
+}
+
+CudaStatus CudaMlaAttentionBackend::compute_paged_absorbed(
+    const CudaPagedMlaAttentionRequest& request,
+    const CudaStream& stream) const {
+    constexpr std::size_t kMaximumSharedFloats = 12 * 1024;
+    if (!request.validate().is_ok() ||
+        request.attention.query_position_offset >= request.token_count ||
+        request.attention.query_count > request.token_count -
+            request.attention.query_position_offset ||
+        request.attention.latent_dimension > kMaximumSharedFloats ||
+        !stream.valid()) {
+        return CudaStatus::from(
+            cudaErrorInvalidValue, "paged absorbed MLA request");
+    }
+    std::size_t query_heads = 0;
+    if (!checked_multiply(request.attention.query_count,
+            request.attention.head_count, &query_heads) ||
+        query_heads > std::numeric_limits<unsigned int>::max()) {
+        return CudaStatus::from(
+            cudaErrorInvalidConfiguration, "paged absorbed MLA grid");
+    }
+    constexpr unsigned int kThreads = 128;
+    const std::size_t shared_bytes =
+        request.attention.latent_dimension * sizeof(float);
+    paged_mla_absorbed_score_kernel<<<
+        static_cast<unsigned int>(query_heads), kThreads, shared_bytes,
+        stream.native_handle()>>>(request);
+    CudaStatus status = check_last_cuda_error(
+        "paged_mla_absorbed_score_kernel launch");
+    if (!status.is_ok()) return status;
+    const std::size_t head_blocks =
+        (query_heads + kThreads - 1) / kThreads;
+    mla_softmax_kernel<<<static_cast<unsigned int>(head_blocks), kThreads, 0,
+        stream.native_handle()>>>(
+            request.attention, request.token_count);
+    status = check_last_cuda_error(
+        "paged_mla_absorbed_softmax_kernel launch");
+    if (!status.is_ok()) return status;
+    paged_mla_absorbed_value_kernel<<<
+        static_cast<unsigned int>(query_heads), kThreads, shared_bytes,
+        stream.native_handle()>>>(request);
+    return check_last_cuda_error(
+        "paged_mla_absorbed_value_kernel launch");
 }
 
 CudaStatus CudaMlaAttentionBackend::prepare(

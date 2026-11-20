@@ -11,6 +11,11 @@
 
 namespace cpp_llm_engine::cuda {
 
+enum class CudaMlaComputePath {
+    LegacyThreeStage,
+    AbsorbedThreeStage,
+};
+
 class CudaMlaCache;
 class CudaStream;
 class CudaTensor;
@@ -74,7 +79,14 @@ public:
         const CudaMlaAttentionRequest& request,
         const CudaMlaCache& cache,
         const CudaStream& stream) const;
+    CudaStatus compute_absorbed(
+        const CudaMlaAttentionRequest& request,
+        const CudaMlaCache& cache,
+        const CudaStream& stream) const;
     CudaStatus compute_paged(
+        const CudaPagedMlaAttentionRequest& request,
+        const CudaStream& stream) const;
+    CudaStatus compute_paged_absorbed(
         const CudaPagedMlaAttentionRequest& request,
         const CudaStream& stream) const;
     CudaStatus prepare(

@@ -562,7 +562,8 @@ core::Status CudaExecutionContext::mla_attention(
     const CudaMlaCache& cache,
     CudaTensor* probabilities,
     CudaTensor* output,
-    float scale) const {
+    float scale,
+    CudaMlaComputePath path) const {
     if (!valid() || probabilities == nullptr || output == nullptr) {
         return core::Status::error("MLA attention context or output is invalid");
     }
@@ -590,8 +591,10 @@ core::Status CudaExecutionContext::mla_attention(
         static_cast<float*>(output->data()), nope_shape[0], nope_shape[1],
         rope_shape[2], output_shape[1], kv_shape[1], probability_shape[1],
         scale, 1, cache.size_tokens() - 1};
-    return cuda_mla_attention_backend().compute(request, cache, stream_)
-        .to_core_status();
+    const auto& backend = cuda_mla_attention_backend();
+    return (path == CudaMlaComputePath::AbsorbedThreeStage
+        ? backend.compute_absorbed(request, cache, stream_)
+        : backend.compute(request, cache, stream_)).to_core_status();
 }
 
 core::Status CudaExecutionContext::prepare_mla_batch(
@@ -649,7 +652,8 @@ core::Status CudaExecutionContext::mla_attention_batch(
     std::size_t query_position_offset,
     CudaTensor* probabilities,
     CudaTensor* output,
-    float scale) const {
+    float scale,
+    CudaMlaComputePath path) const {
     if (!valid() || probabilities == nullptr || output == nullptr) {
         return core::Status::error(
             "MLA batch attention context or output is invalid");
@@ -684,8 +688,10 @@ core::Status CudaExecutionContext::mla_attention_batch(
         nope_shape[1], nope_shape[2], rope_shape[2], output_shape[2],
         kv_shape[1], probability_shape[2], scale, nope_shape[0],
         query_position_offset};
-    return cuda_mla_attention_backend().compute(request, cache, stream_)
-        .to_core_status();
+    const auto& backend = cuda_mla_attention_backend();
+    return (path == CudaMlaComputePath::AbsorbedThreeStage
+        ? backend.compute_absorbed(request, cache, stream_)
+        : backend.compute(request, cache, stream_)).to_core_status();
 }
 
 core::Status CudaExecutionContext::paged_mla_attention(
@@ -698,7 +704,8 @@ core::Status CudaExecutionContext::paged_mla_attention(
     std::size_t token_count,
     CudaTensor* probabilities,
     CudaTensor* output,
-    float scale) {
+    float scale,
+    CudaMlaComputePath path) {
     if (!valid() || probabilities == nullptr || output == nullptr) {
         return core::Status::error(
             "paged MLA attention context or output is invalid");
@@ -777,8 +784,10 @@ core::Status CudaExecutionContext::paged_mla_attention(
         cache.total_blocks(),
         cache.block_size(),
         physical_blocks.size()};
-    return cuda_mla_attention_backend().compute_paged(request, stream_)
-        .to_core_status();
+    const auto& backend = cuda_mla_attention_backend();
+    return (path == CudaMlaComputePath::AbsorbedThreeStage
+        ? backend.compute_paged_absorbed(request, stream_)
+        : backend.compute_paged(request, stream_)).to_core_status();
 }
 
 core::Status CudaExecutionContext::paged_mla_attention_batch(
@@ -792,7 +801,8 @@ core::Status CudaExecutionContext::paged_mla_attention_batch(
     std::size_t query_position_offset,
     CudaTensor* probabilities,
     CudaTensor* output,
-    float scale) {
+    float scale,
+    CudaMlaComputePath path) {
     if (!valid() || probabilities == nullptr || output == nullptr) {
         return core::Status::error(
             "paged MLA batch attention context or output is invalid");
@@ -869,8 +879,10 @@ core::Status CudaExecutionContext::paged_mla_attention_batch(
         cache.total_blocks(),
         cache.block_size(),
         physical_blocks.size()};
-    return cuda_mla_attention_backend().compute_paged(request, stream_)
-        .to_core_status();
+    const auto& backend = cuda_mla_attention_backend();
+    return (path == CudaMlaComputePath::AbsorbedThreeStage
+        ? backend.compute_paged_absorbed(request, stream_)
+        : backend.compute_paged(request, stream_)).to_core_status();
 }
 
 core::Status CudaExecutionContext::append_mla(

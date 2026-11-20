@@ -207,6 +207,24 @@ int main() {
     for (std::size_t index = 0; index < continuous_values.size(); ++index) {
         CHECK(std::fabs(continuous_values[index] - paged_values[index]) <= 1.0e-5F);
     }
+    CHECK(execution.mla_attention(
+        query_nope, query_rope, kv_b, continuous,
+        &continuous_probabilities, &continuous_output, scale,
+        cpp_llm_engine::cuda::CudaMlaComputePath::AbsorbedThreeStage).is_ok());
+    CHECK(execution.paged_mla_attention(
+        query_nope, query_rope, kv_b, cache, 0, blocks, 3,
+        &paged_probabilities, &paged_output, scale,
+        cpp_llm_engine::cuda::CudaMlaComputePath::AbsorbedThreeStage).is_ok());
+    CHECK(execution.download(
+        continuous_output, continuous_values.data(),
+        continuous_values.size() * sizeof(float)).is_ok());
+    CHECK(execution.download(
+        paged_output, paged_values.data(),
+        paged_values.size() * sizeof(float)).is_ok());
+    CHECK(execution.synchronize().is_ok());
+    for (std::size_t index = 0; index < continuous_values.size(); ++index) {
+        CHECK(std::fabs(continuous_values[index] - paged_values[index]) <= 1.0e-5F);
+    }
 
     cpp_llm_engine::cuda::CudaTensor batch_query_nope;
     cpp_llm_engine::cuda::CudaTensor batch_query_rope;
@@ -257,6 +275,25 @@ int main() {
         2 * head_count * value_dimension);
     std::vector<float> paged_batch_values(
         2 * head_count * value_dimension);
+    CHECK(execution.download(continuous_batch_output,
+        continuous_batch_values.data(),
+        continuous_batch_values.size() * sizeof(float)).is_ok());
+    CHECK(execution.download(paged_batch_output, paged_batch_values.data(),
+        paged_batch_values.size() * sizeof(float)).is_ok());
+    CHECK(execution.synchronize().is_ok());
+    for (std::size_t index = 0; index < continuous_batch_values.size();
+         ++index) {
+        CHECK(std::fabs(continuous_batch_values[index] -
+            paged_batch_values[index]) <= 1.0e-5F);
+    }
+    CHECK(execution.mla_attention_batch(
+        batch_query_nope, batch_query_rope, kv_b, continuous, 1,
+        &continuous_batch_probabilities, &continuous_batch_output, scale,
+        cpp_llm_engine::cuda::CudaMlaComputePath::AbsorbedThreeStage).is_ok());
+    CHECK(execution.paged_mla_attention_batch(
+        batch_query_nope, batch_query_rope, kv_b, cache, 0, blocks, 3, 1,
+        &paged_batch_probabilities, &paged_batch_output, scale,
+        cpp_llm_engine::cuda::CudaMlaComputePath::AbsorbedThreeStage).is_ok());
     CHECK(execution.download(continuous_batch_output,
         continuous_batch_values.data(),
         continuous_batch_values.size() * sizeof(float)).is_ok());
