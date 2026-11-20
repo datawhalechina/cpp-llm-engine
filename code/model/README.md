@@ -31,7 +31,7 @@
 | `CudaDeepSeek2DenseLayerWeights` | 完整上传稠密首层的 Q2_K/Q3_K/IQ4_NL Linear 与 Float32 Norm 后替换输出对象，提供 MLA CUDA 只读权重视图 |
 | `CudaDeepSeek2MoeWeights` | 在加载阶段切分并上传 64 个 packed experts 与共享专家，保留 Host Router 控制面 |
 | `CudaDeepSeek2MoeFeedForward` | 执行 Top-6 命中专家和共享专家的 CUDA Gate/Up/Down，并在完整成功后写入输出 |
-| `CudaDeepSeek2MoeBatchWorkspace` | 按专家打包多个请求的 FFN 输入，复用批量 Gate/Up/Down 与共享专家临时张量 |
+| `CudaDeepSeek2MoeBatchWorkspace` | 为跨请求行对象或连续 Prefill Tensor 建立专家分发表，复用批量 Gate/Up/Down 与共享专家临时张量 |
 | `CudaDeepSeek2MoeLayer` | 连接压缩 MLA、Host Top-6、CUDA 专家执行、双残差和请求级缓存回退 |
 | `RealDeepSeek2CudaModel` | 常驻第 0 层稠密权重、26 层 MoE 权重、Embedding、最终归一化和 LM Head |
 | `RealDeepSeek2CudaBatchWorkspace` | 在 27 层 Model 上复用各 MoE 层的跨请求批量工作区，并记录执行次数 |
@@ -50,9 +50,9 @@ CUDA 稠密首层保持相同状态边界。`CudaDeepSeek2DenseLayerWeights` 在
 
 CUDA MoE 把 Router 和稳定 Top-K 留在 Host 控制面，将命中的 Top-6 路由专家与共享专家放到设备执行。模型加载阶段把三维 packed expert 切成独立设备矩阵，单请求工作区完成 Gate、Up、SwiGLU 和 Down；所有专家成功后才提交结果。真实第 1 层的专家索引与 CPU 一致，路由权重误差为 `0`，FFN 输出最大绝对误差为 `5.82e-10`。完整 MLA+MoE 层的双词元最大误差为 `9.83e-7`、平均误差为 `1.36e-7`，压缩缓存只在整层成功后推进。
 
-跨请求路径在每层先分别完成 MLA，再由 `CudaDeepSeek2MoeBatchWorkspace` 按专家收集请求行。Gate、Up 和 Down 调用批量量化 Linear，共享专家一次处理完整批次，Host 最后按路由权重拆回请求输出。真实 batch=2 测试证明一个持久化工作区可连续服务 26 个 MoE 层，批量结果与相同输入的顺序路径一致。工作区还累计活跃专家组、多行专家组和路由行数；EXP-GPU-17 中两个相同请求的专家组全部形成双行批次。消除 MLA score 重算后，6 轮完整 Decode 配对中 grouped 路径比顺序路径改善约 `17.3%`。设备端 Top-K、加权拆回融合和单 kernel grouped-MoE 仍属于后续候选，但当前 profile 不支持把它们列为下一热点。
+跨请求路径在每层先分别完成 MLA，再由 `CudaDeepSeek2MoeBatchWorkspace` 按专家收集请求行。Gate、Up 和 Down 调用批量量化 Linear，共享专家一次处理完整批次，Host 最后按路由权重拆回请求输出。真实 batch=2 测试证明一个持久化工作区可连续服务 26 个 MoE 层，批量结果与相同输入的顺序路径一致。工作区还累计活跃专家组、多行专家组和路由行数；EXP-GPU-17 中两个相同请求的专家组全部形成双行批次。消除 MLA score 重算后，6 轮完整 Decode 配对中 grouped 路径比顺序路径改善约 `17.3%`。
 
-完整 CUDA Model 在共享对象中常驻 27 层只读权重。Context 默认创建连续压缩 MLA Cache，绑定 `RealDeepSeek2CudaMlaDataPlane` 后则让全部层共享同一请求页表，并用层号选择各自的压缩载荷。单词元依次经过第 0 层稠密 FFN、后续 26 层 MoE、最终 RMSNorm 和 LM Head；所有层成功后才提交页表位置，任一层、下载或同步失败都裁剪到调用前位置。批执行先为每个请求预留槽位，整批成功后逐一提交，失败时统一回滚。分块 Prefill 把 `[T,D]` hidden 送过全部 27 层，稠密层批量执行 MLA 与 FFN，MoE 层在 Router 边界按行分组后重新打包；连续与分页缓存共享同一计算路径。Factory 默认使用权重吸收 MLA，测试和 benchmark 可显式创建 legacy Context。真实 Q2_K 模型的 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`；分页数值、双请求提交和终态释放均已通过专用 Runtime 验收。
+完整 CUDA Model 在共享对象中常驻 27 层只读权重。Context 默认创建连续压缩 MLA Cache，绑定 `RealDeepSeek2CudaMlaDataPlane` 后则让全部层共享同一请求页表，并用层号选择各自的压缩载荷。单词元依次经过第 0 层稠密 FFN、后续 26 层 MoE、最终 RMSNorm 和 LM Head；所有层成功后才提交页表位置，任一层、下载或同步失败都裁剪到调用前位置。批执行先为每个请求预留槽位，整批成功后逐一提交，失败时统一回滚。分块 Prefill 把 `[T,D]` hidden 送过全部 27 层；`CudaMoePrefillPath` 可在逐行复制基线与设备端索引收集、加权散回之间切换。Factory 默认使用权重吸收 MLA 和 packed dispatch，测试与 benchmark 保留两条旧路径。真实 Q2_K 模型的 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`；分页数值、双请求提交和终态释放均已通过专用 Runtime 验收。
 
 `RealDeepSeek2CpuModel` 提供有界 LRU 层权重缓存，统计容量、常驻层、常驻字节、命中和未命中。默认容量为 0，执行后立即释放当层权重。完整 Decode 固定按 0–26 层顺序访问，容量小于 27 时层的复用距离大于缓存容量，下一轮通常仍全部未命中；容量 27 可以消除后续 GGUF 层读取，但会额外常驻接近整套 Decoder 权重。该缓存管理模型权重，不保存请求 K/V。
 

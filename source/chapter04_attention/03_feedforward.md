@@ -87,6 +87,8 @@ token hidden
 
 多个请求一起 Decode 时，每个请求保持独立序列，并从自己的历史 K/V 计算 Attention。教程先按请求完成当前解码层的 Attention，再把同一解码层的 FFN 输入放进共同的专家分发表；专家输出随后按请求拆回。这样可以跨请求复用专家权重，同时保持请求之间的 K/V 隔离。
 
+CUDA Tensor Prefill 还要处理数据布局。逐行基线先把连续 `[T,D]` Tensor 拆成 `T` 个行对象，再为每个专家重新打包，最后把专家输出下载到 Host 完成加权合并。`packed-dispatch` 保持 `[T,D]` 连续：Router 一次读取整批，设备按行索引收集命中同一专家的词元，Gate、Up、Down 完成后再按路由权重散回原行。两条路径的 Router 与 Top-K 语义相同，差别只在专家分发和合并发生的位置，因此可以直接做数值与性能 A/B。
+
 在解码器中，注意力和 FFN 各自位于一条残差支路：
 
 ```text
@@ -105,6 +107,8 @@ bash code/chapter04_attention/scripts/run.sh
 ```
 
 `chapter04_attention_test` 构造 `FeedForward(4,8)`，输入 `[2,4]` 后检查输出仍为 `[2,4]`。跨章测试还把 Chapter02 的 `[1,2]` 张量送入 `LinearLayer(2,3)` 和 `FeedForward(2,3)`，分别验证 `[0.05,0.10,0.15]` 与 `[0.007,0.014]`。`chapter04_moe_feed_forward_test` 使用三个专家、Top-2 和共享专家，固定检查并列分数的选择顺序、归一化权重、合并结果与失败时输出不变。模型组件测试另外要求分组执行与逐词元执行一致，并核对专家分发表统计和失败原子性。
+
+CUDA 组件测试继续固定乱序行收集、加权散回、重复目标拒绝和索引越界。真实模型实验在长度 32/128 下比较 `row-copies` 与 `packed-dispatch`，最大 logits 误差不超过 `3.25e-5`，贪心词元一致。
 
 准备 Qwen1.5-MoE 后，可继续运行：
 

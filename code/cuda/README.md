@@ -20,7 +20,7 @@
 | `cuda_tensor.h/.cpp` | 连续 Float32 CUDA Tensor 与公共 Tensor contract |
 | `cuda_workspace.h/.cpp` | 只在容量不足时增长的可复用临时显存 |
 | `cuda_execution_context.h/.cpp` | 统一持有 stream、cuBLAS handle、workspace 和 backend 调度 |
-| `cuda_execution_context_test.cu` | Tensor 复制、批量行打包/拆包、算子调度、workspace 复用和移动测试 |
+| `cuda_execution_context_test.cu` | Tensor 复制、批量行打包/拆包、索引收集、加权散回、算子调度和 workspace 复用测试 |
 | `cuda_quantized_matrix.h/.cpp` | packed Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL row-major device 权重 |
 | `quantized_dequantize_backend.h/.cu` | 五种 packed 格式到 Float32 workspace 的 CUDA 解码 |
 | `quantized_gemv_backend.h/.cu` | 五种 packed 格式的解码、点积与行归约融合 |
@@ -203,9 +203,9 @@ DeepSeek-V2-Lite 的 CUDA 稠密首层已连接 Q2_K/Q3_K/IQ4_NL、YaRN partial 
 
 首版 MLA reference kernel 每个 head 使用一个线程，并在每个 Value 维重复计算 score。EXP-GPU-17 对一次双请求 Decode 的捕获中，54 次 MLA kernel 总计约 `32.16 s`，占 GPU kernel 时间 `99.9%`。三阶段基线让每个 `(head, token)` 只计算一次 score，再由 `(head, value)` 复用概率。权重吸收路径继续把 `q_nope @ W_K` 提前到历史遍历之前，并先聚合概率加权 latent、再执行 `W_V @ c_attended`。连续与分页实现共用 `CudaMlaComputePath` 类型化选择，组件测试覆盖单词元、批量因果查询和非连续物理块。
 
-三阶段实现下，长度 128 的 Tensor Prefill 中 MLA score/value 占 Kernel 时间约 `88.5%`。EXP-GPU-20 完成权重吸收后，长度 32 和 128 的端到端时间比例分别为 `0.515` 和 `0.169`，logits 最大误差不超过 `5.73e-5`。DeepSeek CUDA Factory 默认选择 absorbed 路径；legacy 路径继续用于公式对照和性能回归。
+三阶段实现下，长度 128 的 Tensor Prefill 中 MLA score/value 占 Kernel 时间约 `88.5%`。EXP-GPU-20 完成权重吸收后，长度 32 和 128 的端到端时间比例分别为 `0.515` 和 `0.169`，logits 最大误差不超过 `5.73e-5`。吸收式路径的复测中，MLA score/value 占比降至约 `5.1%/8.0%`。EXP-GPU-21 再用索引收集和加权散回把长度 128 的 Device-to-Device 复制从 `30,290` 次降到 `338` 次，端到端改善约 `5.3%`；量化 GEMV 仍占约 `92%` 的 Kernel 时间。DeepSeek CUDA Factory 默认选择 absorbed 与 packed-dispatch，旧路径继续用于公式和性能回归。
 
-MoE 路径由 Host 完成 Router 与稳定 Top-K，CUDA 执行命中的 Top-6 路由专家和共享专家。单独 FFN 与 CPU 的最大绝对误差为 `5.82e-10`；连接压缩 MLA、双残差和请求缓存后，真实第 1 层双词元最大误差为 `9.83e-7`。跨请求路径会按专家打包输入行，让 Gate、Up、Down 调用批量量化 Linear，并让共享专家一次处理完整批次。设备端 Top-K、加权拆回融合和单 kernel grouped-MoE 仍属于后续性能路径。
+MoE 路径由 Host 完成 Router 与稳定 Top-K，CUDA 执行命中的 Top-6 路由专家和共享专家。单独 FFN 与 CPU 的最大绝对误差为 `5.82e-10`；连接压缩 MLA、双残差和请求缓存后，真实第 1 层双词元最大误差为 `9.83e-7`。跨请求 Decode 继续按行对象分组；Tensor Prefill 保持连续 `[T,D]`，用 `gather_rows_kernel` 收集专家输入，并由 `weighted_scatter_add_rows_kernel` 在设备端合并输出。设备端 Top-K 和单 kernel grouped-MoE 仍属于后续候选。
 
 `RealDeepSeek2CudaModel` 已将第 0 层稠密权重、后续 26 层 MoE 权重、Embedding、最终归一化和 LM Head 常驻设备。请求 Context 独占 27 层压缩缓存，并在全层成功后统一推进位置。单词元 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`。`RealDeepSeek2CudaExecutorFactory` 已接入 Chapter06 Runtime、Chapter08 `ExecutorBatchRunner` 和 Chapter10 ServiceCore；固定词元生成、重复请求隔离、分块 Tensor Prefill、跨请求专家 batch、服务动态组批、流式回调、取消与资源释放均通过。独立 HTTP 入口再注入真实 Tokenizer，并以文本 `prompt` 验证 Completion、SSE、分页 MLA 和终态释放。
 

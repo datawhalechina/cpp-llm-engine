@@ -8,6 +8,8 @@
 
 配置批执行器后，准入顺序是“绑定请求数据面 → 估算缓存前缀 → 进入 waiting”。估算不增加块引用，同优先级请求只用它决定提升顺序；获得运行槽时再重新查询并采用真实前缀，同步块表、Request 和模型 Context，实际长度随后传给 Chapter08 Planner。终态释放顺序是“发布完整缓存块 → 释放请求块引用 → 清理历史与服务条目”。ServiceCore 只调用生命周期钩子，不解析 Radix 树或修改 K/V payload。
 
+绑定钩子允许执行器没有外部分页资源。DeepSeek CUDA 使用连续 MLA Cache 时，`bind_request()` 直接成功且不创建页表；Factory 配置分页 MLA 后，同一钩子才执行请求级块表绑定。ServiceCore 因此不需要知道模型选择了连续缓存还是分页缓存。
+
 | 调用阶段 | 主要对象 | 所有权与失败处理 |
 | --- | --- | --- |
 | 网络接入 | `CppHttplibServer`、`ResponseWriter` | Transport 拥有连接；断连或写回失败转换为取消 |

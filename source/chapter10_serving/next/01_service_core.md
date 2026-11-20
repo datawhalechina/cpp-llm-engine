@@ -27,6 +27,8 @@
 
 准入先让 `ExecutorBatchRunner` 绑定请求级数据面，再估算可复用前缀。估算不修改 Radix 统计、块引用、Request 或模型 Context。请求获得空闲运行槽时，CPU/CUDA Factory 重新查询并采用仍然有效的前缀，同步共享块表、Request Prefill 游标和模型 Context；采用失败会进入失败终态并释放已绑定资源。
 
+“绑定”是可选资源钩子，不表示所有执行器都必须申请分页块。连续 K/V 或连续 MLA Context 可以直接返回成功；只有 Factory 已配置共享块池时，钩子才建立请求 ID、页表和物理载荷之间的关系。
+
 `ServiceCore` 持有一个跨 step 复用的 `PriorityAgingPolicy`。admission 记录基础优先级、估算前缀长度和入队序号。空闲运行槽先选高优先级请求；同级时选估算命中更长者，再用入队序号破平局。进入 running 后，Chapter08 使用实际采用长度继续排序。配置批量执行器时，同一步的 Decode 候选通过一次模型 batch 调用推进。
 
 ## 验证生命周期编排

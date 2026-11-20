@@ -98,10 +98,13 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
 | DeepSeek grouped Decode 的时间落在哪些 Kernel 与同步点 | `scripts/run_deepseek2_cuda_grouped_moe_profile.sh` |
 | DeepSeek 分页 MLA 相对连续 MLA 的端到端代价是多少 | `scripts/run_deepseek2_cuda_paged_mla_ab.sh` |
 | DeepSeek 整段 Tensor Prefill 相对逐词元调用能减少多少时间 | `scripts/run_deepseek2_cuda_tensor_prefill_ab.sh` |
-| DeepSeek 长 Prefill 的时间为何重新向 Attention 集中 | `scripts/run_deepseek2_cuda_tensor_prefill_profile.sh` |
+| DeepSeek 长 Prefill 在指定 MLA 路径下的时间落在哪里 | `CHAPTER09_DEEPSEEK2_TENSOR_PREFILL_PROFILE_MLA_PATH=absorbed bash scripts/run_deepseek2_cuda_tensor_prefill_profile.sh` |
 | MLA 权重吸收能否降低长度 32/128 的完整 Prefill 时间 | `scripts/run_deepseek2_cuda_absorbed_mla_ab.sh` |
+| 设备端行收集与加权散回能否替代 MoE 逐行复制 | `scripts/run_deepseek2_cuda_moe_dispatch_ab.sh` |
 
 CUDA 入口需要相应模型、CUDA Toolkit，性能剖析入口还需要 Nsight Systems 或 Nsight Compute。Profiler 附件用于解释原因，不能替代端到端 A/B 决策。已归档 CUDA 结果与默认路径结论见[实验资产登记表](../../source/reference/experiment_assets.md#多模态cuda-与正确性资产)。
+
+DeepSeek Tensor Prefill 剖析入口通过 `CHAPTER09_DEEPSEEK2_TENSOR_PREFILL_PROFILE_MLA_PATH=legacy|absorbed` 显式选择路径，默认值为 `absorbed`。结果元数据会记录该选择，避免把优化前后的 Kernel 分布混在同一结论中。
 
 ## 结果目录
 
