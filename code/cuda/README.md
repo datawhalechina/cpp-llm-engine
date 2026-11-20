@@ -201,9 +201,9 @@ CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_qwen3_cuda_serving.s
 
 DeepSeek-V2-Lite 的 CUDA 稠密首层已连接 Q2_K/Q3_K/IQ4_NL、YaRN partial RoPE、压缩 MLA Cache、稳定 Softmax、SwiGLU 和双残差。请求只保存每个词元的 512 维 latent K/V 与 64 维位置 Key，K/V-B 展开权重由模型共享。真实 Q2_K GGUF 的双词元 CPU/CUDA 对照最大绝对误差为 `5.01e-6`，平均误差为 `1.70e-7`。
 
-首版 MLA reference kernel 每个 head 使用一个线程，并在每个 Value 维重复计算 score。EXP-GPU-17 对一次双请求 Decode 的捕获中，54 次 MLA kernel 总计约 `32.16 s`，占 GPU kernel 时间 `99.9%`。当前实现已改为 score、Softmax、Value aggregation 三阶段：请求层按最大上下文持有概率工作区，每个 `(head, token)` 只计算一次 score，再由 `(head, value)` 并行聚合输出。真实双词元最大误差为 `5.01e-6`，完整 27 层 logits 余弦为 `1`。
+首版 MLA reference kernel 每个 head 使用一个线程，并在每个 Value 维重复计算 score。EXP-GPU-17 对一次双请求 Decode 的捕获中，54 次 MLA kernel 总计约 `32.16 s`，占 GPU kernel 时间 `99.9%`。三阶段基线让每个 `(head, token)` 只计算一次 score，再由 `(head, value)` 复用概率。权重吸收路径继续把 `q_nope @ W_K` 提前到历史遍历之前，并先聚合概率加权 latent、再执行 `W_V @ c_attended`。连续与分页实现共用 `CudaMlaComputePath` 类型化选择，组件测试覆盖单词元、批量因果查询和非连续物理块。
 
-优化后 6 轮 batch=2 配对实验中，顺序与 grouped Decode 中位数分别为 `550.2 ms` 和 `455.0 ms`，grouped 路径改善约 `17.3%`。一次限定范围的 Nsight Systems 捕获显示，54 次 score kernel 合计约 `317.6 ms`、占 kernel 时间 `82.3%`；Value 聚合约 `5.44 ms`，Softmax 约 `0.16 ms`。下一轮优化应在 score 阶段并行 latent 投影与规约，而不是继续融合已非主瓶颈的 MoE。
+三阶段实现下，长度 128 的 Tensor Prefill 中 MLA score/value 占 Kernel 时间约 `88.5%`。EXP-GPU-20 完成权重吸收后，长度 32 和 128 的端到端时间比例分别为 `0.515` 和 `0.169`，logits 最大误差不超过 `5.73e-5`。DeepSeek CUDA Factory 默认选择 absorbed 路径；legacy 路径继续用于公式对照和性能回归。
 
 MoE 路径由 Host 完成 Router 与稳定 Top-K，CUDA 执行命中的 Top-6 路由专家和共享专家。单独 FFN 与 CPU 的最大绝对误差为 `5.82e-10`；连接压缩 MLA、双残差和请求缓存后，真实第 1 层双词元最大误差为 `9.83e-7`。跨请求路径会按专家打包输入行，让 Gate、Up、Down 调用批量量化 Linear，并让共享专家一次处理完整批次。设备端 Top-K、加权拆回融合和单 kernel grouped-MoE 仍属于后续性能路径。
 

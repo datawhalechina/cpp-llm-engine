@@ -65,15 +65,27 @@ output = softmax(score + causal_mask) @ V
 
 ![MLA 压缩缓存与临时展开数据流](../assets/diagrams/chapter04-mla-cache-flow.svg)
 
-<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/mla_attention.cpp"><code>mla_attention.cpp</code></a> 接收已经投影并完成 RoPE 的 Query、低秩缓存和 K/V 上投影权重。测试先通过低秩路径计算结果，再显式展开完整 K/V 并交给标准 CPU Attention；两条路径逐元素一致。该入口固定 MLA 的算法语义，当前尚未读取真实量化权重，也没有实现生产框架常用的权重吸收与融合 kernel。
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/mla_attention.cpp"><code>mla_attention.cpp</code></a> 接收已经投影并完成 RoPE 的 Query、低秩缓存和 K/V 上投影权重。测试先通过低秩路径计算结果，再显式展开完整 K/V 并交给标准 CPU Attention；两条路径逐元素一致。该 CPU 入口固定 MLA 的算法语义，真实量化权重和权重吸收由 Model/CUDA 路径继续连接。
 
 真实 DeepSeek-V2-Lite 对照由 `run_deepseek_v2_lite_layer_capture.sh` 提供。它通过 llama.cpp 回调捕获首层的归一化输入、Query、K/V-A、共享 RoPE Key、压缩 latent、Attention 输出、FFN 输入和层输出。算法测试回答“低秩路径是否正确”，真实捕获回答“固定 GGUF 的节点名称、shape 和参考数值是什么”；自研首层需要同时通过两类证据。
 
 CUDA 路径继续保留这份压缩状态。`CudaMlaCache` 按请求保存 latent K/V 与共享位置 Key；K/V-B 展开矩阵由模型权重对象持有，避免每个请求重复反量化。首版 MLA kernel 按 head 直接读取压缩历史，在求最大值、Softmax 分母和每个 Value 维聚合时重复计算 score。它先固定了数学结果，但计算量随 Value 维数重复放大。
 
-当前 CUDA 实现把计算拆成三个阶段：先为每个 `(head, token)` 计算一次 score，再按 head 原地归一化为概率，最后让 `(head, value)` 并行复用概率完成 Value 聚合。每层 Context 按最大上下文一次性创建 `[head, capacity]` 概率工作区，Decode 时不再动态分配。这样既保留压缩缓存，也避免在每个 Value 维重新执行非位置 Key 投影。
+三阶段基线先为每个 `(head, token)` 计算一次 score，再按 head 原地归一化为概率，最后让 `(head, value)` 并行复用概率完成 Value 聚合。它避免了按 Value 重算 score，但每个历史词元仍重复执行非位置 Key 上投影，Value 阶段也会为每个输出维重新遍历 latent。
 
-EXP-GPU-17 中，参考 kernel 占一次双请求 Decode 的 `99.9%` GPU kernel 时间；三阶段实现将完整 grouped Decode 从约 `31.8 s` 降到约 `0.45 s`。真实双词元 CPU/CUDA 层输出最大绝对误差为 `5.01e-6`，完整 27 层 logits 余弦为 `1`、贪心词元一致。优化后 score kernel 仍占 kernel 时间 `82.3%`，所以接下来应细分 score 内部的 latent 投影，而不是绕过数值门禁继续堆叠融合。
+权重吸收利用矩阵乘法结合律改变顺序。令 `c_t` 为词元 `t` 的 latent K/V，`W_K` 和 `W_V` 为当前头的 K/V-B 权重：
+
+```text
+q_absorbed = q_nope @ W_K
+score_t = q_absorbed · c_t + q_rope · k_rope_t
+
+c_attended = sum_t(probability_t * c_t)
+value_output = W_V @ c_attended
+```
+
+旧顺序先为每个词元计算 `W_K @ c_t`，新顺序只为每个 Query 计算一次 `q_nope @ W_K`；旧 Value 路径为每个输出维和历史词元重复 latent 点积，新路径先把历史聚合成一个 `c_attended`。CUDA 中一个 `(query, head)` 线程块把 512 维 absorbed Query 或聚合 latent 放入 shared memory，再让线程并行处理历史词元或 Value 维。概率工作区、因果遮罩、RoPE 分支和压缩缓存布局保持不变。
+
+EXP-GPU-17 中，参考 kernel 占一次双请求 Decode 的 `99.9%` GPU kernel 时间；三阶段实现将完整 grouped Decode 从约 `31.8 s` 降到约 `0.45 s`。随后 EXP-GPU-20 在相同 27 层模型中比较三阶段基线和权重吸收：长度 32 的 absorbed/legacy 中位数比例为 `0.515`，长度 128 为 `0.169`；logits 最大误差不超过 `5.73e-5`，贪心词元一致。教程因此把权重吸收设为 DeepSeek CUDA Factory 默认路径，同时保留类型化 legacy 入口用于教学 A/B。
 
 ```bash
 CUDA_HOME=/usr/local/cuda-12.8 \

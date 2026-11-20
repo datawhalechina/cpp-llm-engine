@@ -36,3 +36,5 @@ DeepSeek CUDA 的 grouped MoE 实验展示了为什么必须逐层下钻。EXP-G
 依据该证据，CUDA MLA 改为 score、Softmax、Value 聚合三阶段，并让概率在 Value 维之间复用。优化后 6 轮反向顺序配对中，顺序与 grouped Decode 中位数分别为 `550.2 ms` 和 `455.0 ms`，logits 与词元门禁通过。新的单次捕获中，score kernel 合计约 `317.6 ms`、占 kernel 时间 `82.3%`，Value 聚合约 `5.44 ms`。这次复测同时回答了两个问题：三阶段 MLA 应保留；下一轮应继续拆解 score 的 latent 投影，而不是优先融合 MoE。
 
 长度矩阵还能提示热点何时迁移。[EXP-GPU-19](../../reference/experiment_assets.md#exp-gpu-19) 固定模型、连续 MLA 和 27 层计时范围，只改变 Prefill 长度。Tensor/逐词元比例从长度 2 的 `0.552` 降到长度 32 的 `0.183`，长度 128 时回升到 `0.343`。随后只捕获一次 Tensor Prefill：长度 32 的 MLA score/value 占 Kernel 时间约 `62.2%`，量化 GEMV 约占 `37.6%`；长度 128 时两者变为约 `88.5%` 和 `11.4%`。这组原因指标确认长上下文下因果 Attention 正在抵消一部分权重复用收益，下一轮应优化 score/value 的数据复用，而不是继续优先优化 MoE GEMV。
+
+[EXP-GPU-20](../../reference/experiment_assets.md#exp-gpu-20) 随后只改变 MLA 计算顺序。权重吸收先计算 `q_nope @ W_K`，Value 阶段先聚合概率加权 latent，再执行 `W_V @ c_attended`。长度 32 和 128 的 absorbed/legacy 中位数比例为 `0.515/0.169`，logits 最大误差不超过 `5.73e-5`，词元一致。长序列收益更明显，与被移除的重复计算随历史长度增长相符，因此 absorbed 路径进入默认 Factory，legacy 路径保留为回归基线。
