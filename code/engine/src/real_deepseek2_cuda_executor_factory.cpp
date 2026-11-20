@@ -145,6 +145,8 @@ private:
 struct RealDeepSeek2CudaExecutorFactory::Impl final {
     std::shared_ptr<model::RealDeepSeek2CudaModel> model;
     std::size_t context_capacity = 0;
+    cuda::CudaMlaComputePath mla_path =
+        cuda::CudaMlaComputePath::LegacyThreeStage;
     mutable std::mutex batch_mutex;
     mutable std::unordered_map<
         std::size_t,
@@ -161,7 +163,8 @@ std::unique_ptr<RealDeepSeek2CudaExecutorFactory>
 RealDeepSeek2CudaExecutorFactory::load(
     const std::string& model_path,
     std::size_t context_capacity,
-    std::string* error) {
+    std::string* error,
+    cuda::CudaMlaComputePath mla_path) {
     auto loaded = model::RealDeepSeek2CudaModel::load(model_path, 0, error);
     if (loaded == nullptr) return nullptr;
     if (context_capacity == 0 ||
@@ -175,6 +178,7 @@ RealDeepSeek2CudaExecutorFactory::load(
     impl->model = std::shared_ptr<model::RealDeepSeek2CudaModel>(
         std::move(loaded));
     impl->context_capacity = context_capacity;
+    impl->mla_path = mla_path;
     if (error != nullptr) error->clear();
     return std::unique_ptr<RealDeepSeek2CudaExecutorFactory>(
         new RealDeepSeek2CudaExecutorFactory(std::move(impl)));
@@ -191,8 +195,15 @@ RealDeepSeek2CudaExecutorFactory::operator=(
 
 std::shared_ptr<chapter06_generation::RequestModelExecutor>
 RealDeepSeek2CudaExecutorFactory::create_executor() const {
+    return create_executor(impl_->mla_path);
+}
+
+std::shared_ptr<chapter06_generation::RequestModelExecutor>
+RealDeepSeek2CudaExecutorFactory::create_executor(
+    cuda::CudaMlaComputePath mla_path) const {
     std::string error;
-    auto context = impl_->model->create_context(impl_->context_capacity, &error);
+    auto context = impl_->model->create_context(
+        impl_->context_capacity, &error, mla_path);
     if (context == nullptr) return {};
     return std::make_shared<RealDeepSeek2CudaRequestExecutor>(
         std::move(context));

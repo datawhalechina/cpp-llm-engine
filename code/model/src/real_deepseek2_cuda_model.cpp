@@ -393,7 +393,9 @@ RealDeepSeek2CudaModel& RealDeepSeek2CudaModel::operator=(
 
 std::unique_ptr<RealDeepSeek2CudaContext>
 RealDeepSeek2CudaModel::create_context(
-    std::size_t capacity_tokens, std::string* error) const {
+    std::size_t capacity_tokens,
+    std::string* error,
+    cuda::CudaMlaComputePath mla_path) const {
     if (capacity_tokens == 0 || capacity_tokens > impl_->metadata.max_position) {
         if (error != nullptr) *error = "DeepSeek2 CUDA context capacity is invalid";
         return nullptr;
@@ -409,14 +411,16 @@ RealDeepSeek2CudaModel::create_context(
         &context->final_hidden);
     if (status.is_ok()) status = cuda::CudaTensor::create_contiguous(
         {impl_->metadata.vocab_size}, core::DType::Float32, &context->logits);
+    CudaDeepSeek2DenseLayerConfig attention = impl_->attention_config;
+    attention.mla_compute_path = mla_path;
     if (status.is_ok()) status = CudaDeepSeek2DenseLayer::create(
-        impl_->attention_config, capacity_tokens, &context->dense);
+        attention, capacity_tokens, &context->dense);
     context->moe.reserve(impl_->moe.size());
     for (std::size_t index = 0;
          status.is_ok() && index < impl_->moe.size(); ++index) {
         CudaDeepSeek2MoeLayer layer;
         status = CudaDeepSeek2MoeLayer::create(
-            {impl_->attention_config, impl_->moe_configs[index]},
+            {attention, impl_->moe_configs[index]},
             capacity_tokens, &layer);
         if (status.is_ok()) context->moe.push_back(std::move(layer));
     }

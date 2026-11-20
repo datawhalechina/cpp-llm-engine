@@ -3,6 +3,7 @@
 #pragma once
 
 #include "chapter06_generation/model_executor.h"
+#include "cpp_llm_engine/cuda/mla_attention_backend.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -21,7 +22,9 @@ public:
     static std::unique_ptr<RealDeepSeek2CudaExecutorFactory> load(
         const std::string& model_path,
         std::size_t context_capacity,
-        std::string* error = nullptr);
+        std::string* error = nullptr,
+        cuda::CudaMlaComputePath mla_path =
+            cuda::CudaMlaComputePath::AbsorbedThreeStage);
 
     ~RealDeepSeek2CudaExecutorFactory();
     RealDeepSeek2CudaExecutorFactory(
@@ -36,6 +39,8 @@ public:
 
     std::shared_ptr<chapter06_generation::RequestModelExecutor>
     create_executor() const;
+    std::shared_ptr<chapter06_generation::RequestModelExecutor>
+    create_executor(cuda::CudaMlaComputePath mla_path) const;
     bool configure_paged_mla_cache(
         std::size_t total_blocks,
         std::size_t block_size,

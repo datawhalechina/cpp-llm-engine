@@ -8,6 +8,7 @@
 #include "cpp_llm_engine/cuda/cuda_mla_cache.h"
 #include "cpp_llm_engine/cuda/cuda_paged_mla_cache.h"
 #include "cpp_llm_engine/cuda/cuda_tensor.h"
+#include "cpp_llm_engine/cuda/mla_attention_backend.h"
 
 #include <cstddef>
 #include <vector>
@@ -52,6 +53,8 @@ struct CudaDeepSeek2DenseLayerConfig final {
     float rope_frequency_base = 10000.0F;
     core::YarnRotaryScaling yarn;
     float attention_scale = 0.0F;
+    cuda::CudaMlaComputePath mla_compute_path =
+        cuda::CudaMlaComputePath::LegacyThreeStage;
 
     core::Status validate() const;
 };

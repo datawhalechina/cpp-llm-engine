@@ -146,11 +146,13 @@ core::Status CudaDeepSeek2MoeLayer::forward_attention(
         query_nope_, query_rope_, weights.kv_b_dequantized(), *paged->cache,
         paged->layer, *paged->physical_blocks, paged->token_count,
         &attention_probabilities_, &attention_value_,
-        config_.attention.attention_scale);
+        config_.attention.attention_scale,
+        config_.attention.mla_compute_path);
     if (status.is_ok() && !uses_paged) status = context->mla_attention(
         query_nope_, query_rope_, weights.kv_b_dequantized(), cache_,
         &attention_probabilities_, &attention_value_,
-        config_.attention.attention_scale);
+        config_.attention.attention_scale,
+        config_.attention.mla_compute_path);
     if (status.is_ok()) status = context->linear(
         attention_value_, weights.attention_output(), &attention_output_);
     if (status.is_ok()) status = context->vector_add(
@@ -238,7 +240,8 @@ core::Status CudaDeepSeek2MoeLayer::prefill_sequence(
             weights.kv_b_dequantized(), *paged->cache, paged->layer,
             *paged->physical_blocks, paged->token_count, position_offset,
             &workspace->attention_probabilities_,
-            &workspace->attention_value_, config_.attention.attention_scale));
+            &workspace->attention_value_, config_.attention.attention_scale,
+            config_.attention.mla_compute_path));
     } else {
         RETURN_IF_MOE_PREFILL_ERROR(context->append_mla_batch(
             &cache_, workspace->normalized_latent_, workspace->key_rope_));
@@ -246,7 +249,8 @@ core::Status CudaDeepSeek2MoeLayer::prefill_sequence(
             workspace->query_nope_, workspace->query_rope_,
             weights.kv_b_dequantized(), cache_, position_offset,
             &workspace->attention_probabilities_,
-            &workspace->attention_value_, config_.attention.attention_scale));
+            &workspace->attention_value_, config_.attention.attention_scale,
+            config_.attention.mla_compute_path));
     }
     RETURN_IF_MOE_PREFILL_ERROR(context->linear_batch(
         workspace->attention_value_, weights.attention_output(),
