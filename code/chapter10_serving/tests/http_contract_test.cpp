@@ -66,6 +66,23 @@ int main() {
     GreedySampler sampler;
     ServiceCore service(8, 4);
     HttpAdapter adapter(service, runtime, sampler);
+    ServiceCore text_service(2, 1);
+    std::string tokenized_prompt;
+    HttpAdapter text_adapter(
+        text_service, runtime, sampler, {},
+        [&tokenized_prompt](const std::string& prompt) {
+            tokenized_prompt = prompt;
+            return TokenSequence{10, 11};
+        });
+
+    suite.run("text prompt crosses the optional tokenizer boundary", [&] {
+        const auto completion = text_adapter.handle({
+            "POST", "/v1/completions",
+            "{\"request_id\":10,\"prompt\":\"hello\\nengine\"}"});
+        CPP_LLM_CHECK_EQ(suite, completion.status_code, 200);
+        CPP_LLM_CHECK_EQ(suite, tokenized_prompt, std::string("hello\nengine"));
+        CPP_LLM_CHECK_EQ(suite, text_service.inflight_size(), 0U);
+    });
 
     suite.run("health sync completion and metrics share one service", [&] {
         CPP_LLM_CHECK_EQ(suite, adapter.handle({"GET", "/health", {}}).status_code, 200);

@@ -79,6 +79,64 @@ bool read_tokens(
     return !tokens->empty();
 }
 
+bool read_string(
+    const std::string& body,
+    const std::string& key,
+    std::string* value) {
+    if (value == nullptr) return false;
+    const std::string marker = "\"" + key + "\"";
+    const std::size_t key_position = body.find(marker);
+    if (key_position == std::string::npos) return false;
+    const std::size_t colon = body.find(':', key_position + marker.size());
+    if (colon == std::string::npos) return false;
+    std::size_t position = colon + 1;
+    while (position < body.size() &&
+           std::isspace(static_cast<unsigned char>(body[position]))) {
+        ++position;
+    }
+    if (position >= body.size() || body[position] != '"') return false;
+    ++position;
+    std::string parsed;
+    while (position < body.size()) {
+        const char current = body[position++];
+        if (current == '"') {
+            *value = std::move(parsed);
+            return true;
+        }
+        if (current != '\\') {
+            parsed.push_back(current);
+            continue;
+        }
+        if (position >= body.size()) return false;
+        const char escaped = body[position++];
+        switch (escaped) {
+            case '"': parsed.push_back('"'); break;
+            case '\\': parsed.push_back('\\'); break;
+            case 'n': parsed.push_back('\n'); break;
+            case 'r': parsed.push_back('\r'); break;
+            case 't': parsed.push_back('\t'); break;
+            default: return false;
+        }
+    }
+    return false;
+}
+
+bool read_prompt(
+    const std::string& body,
+    const PromptTokenizer& tokenizer,
+    chapter06_generation::TokenSequence* tokens) {
+    if (read_tokens(body, tokens)) return true;
+    if (!tokenizer) return false;
+    std::string prompt;
+    if (!read_string(body, "prompt", &prompt) || prompt.empty()) return false;
+    try {
+        *tokens = tokenizer(prompt);
+    } catch (...) {
+        tokens->clear();
+    }
+    return !tokens->empty();
+}
+
 HttpResponse admission_error(AdmissionStatus status) {
     switch (status) {
         case AdmissionStatus::queue_full:
@@ -99,11 +157,13 @@ HttpAdapter::HttpAdapter(
     ServiceCore& service,
     chapter06_generation::Runtime& runtime,
     const chapter06_generation::Sampler& sampler,
-    RequestExecutorFactory executor_factory)
+    RequestExecutorFactory executor_factory,
+    PromptTokenizer prompt_tokenizer)
     : service_(service),
       runtime_(runtime),
       sampler_(sampler),
-      executor_factory_(std::move(executor_factory)) {}
+      executor_factory_(std::move(executor_factory)),
+      prompt_tokenizer_(std::move(prompt_tokenizer)) {}
 
 HttpAdapter::~HttpAdapter() = default;
 
@@ -124,7 +184,7 @@ HttpResponse HttpAdapter::handle_completion(const HttpRequest& request) {
     std::size_t request_id = 0;
     chapter06_generation::TokenSequence prompt;
     if (!read_number(request.body, "request_id", &request_id) ||
-        !read_tokens(request.body, &prompt)) {
+        !read_prompt(request.body, prompt_tokenizer_, &prompt)) {
         return json_response(400, "{\"error\":\"invalid_completion_body\"}");
     }
 
@@ -199,7 +259,7 @@ HttpResponse HttpAdapter::handle_stream(
     std::size_t request_id = 0;
     chapter06_generation::TokenSequence prompt;
     if (!read_number(request.body, "request_id", &request_id) ||
-        !read_tokens(request.body, &prompt)) {
+        !read_prompt(request.body, prompt_tokenizer_, &prompt)) {
         return json_response(400, "{\"error\":\"invalid_completion_body\"}");
     }
 

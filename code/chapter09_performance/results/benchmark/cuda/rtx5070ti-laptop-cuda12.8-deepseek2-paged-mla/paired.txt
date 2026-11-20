@@ -1,0 +1,25 @@
+paired_sample iteration=1 path_order=continuous-first continuous_prefill_ms=550.396062 paged_prefill_ms=508.763418 continuous_decode_ms=254.802421 paged_decode_ms=251.505778
+paired_sample iteration=2 path_order=paged-first continuous_prefill_ms=630.965444 paged_prefill_ms=518.415846 continuous_decode_ms=300.786105 paged_decode_ms=250.95711
+paired_sample iteration=3 path_order=continuous-first continuous_prefill_ms=519.639096 paged_prefill_ms=537.944376 continuous_decode_ms=232.450699 paged_decode_ms=244.411062
+paired_sample iteration=4 path_order=paged-first continuous_prefill_ms=524.269845 paged_prefill_ms=516.002668 continuous_decode_ms=282.108538 paged_decode_ms=267.170538
+paired_sample iteration=5 path_order=continuous-first continuous_prefill_ms=603.950042 paged_prefill_ms=537.636361 continuous_decode_ms=268.654216 paged_decode_ms=265.374267
+paired_sample iteration=6 path_order=paged-first continuous_prefill_ms=526.207823 paged_prefill_ms=528.618523 continuous_decode_ms=243.349535 paged_decode_ms=270.878454
+warmup: 1
+iterations: 6
+prompt_tokens: 2
+decode_steps: 1
+continuous_prefill_median_ms: 538.301942
+paged_prefill_median_ms: 523.517184
+paged_to_continuous_prefill_ratio: 0.972534452
+continuous_decode_median_ms: 261.728319
+paged_decode_median_ms: 258.440022
+paged_to_continuous_decode_ratio: 0.987436224
+prefill_maximum_logits_error: 0
+decode_maximum_logits_error: 0
+tokens_match: true
+terminal_blocks_released: true
+continuous_prefill_samples_ms: 550.396062 630.965444 519.639096 524.269845 603.950042 526.207823
+paged_prefill_samples_ms: 508.763418 518.415846 537.944376 516.002668 537.636361 528.618523
+continuous_decode_samples_ms: 254.802421 300.786105 232.450699 282.108538 268.654216 243.349535
+paged_decode_samples_ms: 251.505778 250.95711 244.411062 267.170538 265.374267 270.878454
+correctness: PASS

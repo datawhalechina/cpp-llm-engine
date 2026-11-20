@@ -274,6 +274,8 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
             tests/real_deepseek2_cuda_serving_test.cpp)
         add_executable(real_deepseek2_cuda_grouped_moe_benchmark
             examples/real_deepseek2_cuda_grouped_moe_benchmark.cpp)
+        add_executable(real_deepseek2_cuda_paged_mla_benchmark
+            examples/real_deepseek2_cuda_paged_mla_benchmark.cpp)
         target_link_libraries(real_deepseek2_cuda_dense_layer_test
             PRIVATE cpp_llm_engine_model cpp_llm_engine_model_cuda)
         target_link_libraries(real_deepseek2_cuda_moe_feed_forward_test
@@ -289,6 +291,8 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
         target_link_libraries(real_deepseek2_cuda_serving_test
             PRIVATE cpp_llm_engine_cuda_runtime chapter10_serving)
         target_link_libraries(real_deepseek2_cuda_grouped_moe_benchmark
+            PRIVATE cpp_llm_engine_cuda_runtime)
+        target_link_libraries(real_deepseek2_cuda_paged_mla_benchmark
             PRIVATE cpp_llm_engine_cuda_runtime)
         cpp_llm_prepare_test(real_deepseek2_cuda_dense_layer_test)
         cpp_llm_prepare_test(real_deepseek2_cuda_moe_feed_forward_test)
@@ -451,6 +455,19 @@ if(CHAPTER01_ENABLE_LLAMA_CPP)
         set_target_properties(real_tinyllama_cuda_serving_smoke PROPERTIES
             BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
         )
+        if(TARGET chapter10_cpp_httplib_transport)
+            add_executable(real_deepseek2_cuda_http_server
+                examples/real_deepseek2_cuda_http_server.cpp
+            )
+            target_link_libraries(real_deepseek2_cuda_http_server
+                PRIVATE
+                    cpp_llm_engine_cuda_runtime
+                    chapter10_cpp_httplib_transport
+            )
+            set_target_properties(real_deepseek2_cuda_http_server PROPERTIES
+                BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
+            )
+        endif()
     endif()
     if(TARGET cpp_llm_engine_model)
         target_sources(cpp_llm_engine PRIVATE

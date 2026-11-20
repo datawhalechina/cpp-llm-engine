@@ -15,6 +15,8 @@ namespace chapter10_serving {
 
 using RequestExecutorFactory = std::function<
     std::shared_ptr<chapter06_generation::RequestModelExecutor>()>;
+using PromptTokenizer = std::function<chapter06_generation::TokenSequence(
+    const std::string&)>;
 
 struct HttpRequest {
     std::string method;
@@ -37,7 +39,8 @@ public:
         ServiceCore& service,
         chapter06_generation::Runtime& runtime,
         const chapter06_generation::Sampler& sampler,
-        RequestExecutorFactory executor_factory = {});
+        RequestExecutorFactory executor_factory = {},
+        PromptTokenizer prompt_tokenizer = {});
     ~HttpAdapter();
 
     HttpResponse handle(const HttpRequest& request);
@@ -51,6 +54,7 @@ private:
     chapter06_generation::Runtime& runtime_;
     const chapter06_generation::Sampler& sampler_;
     RequestExecutorFactory executor_factory_;
+    PromptTokenizer prompt_tokenizer_;
     std::unordered_map<std::size_t, std::unique_ptr<chapter06_generation::Request>> requests_;
 };
 
