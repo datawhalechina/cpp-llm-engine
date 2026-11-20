@@ -33,8 +33,8 @@ Planner 不修改请求和缓存；同优先级、同等待时间的 Prefill 请
 | --- | --- | --- | --- |
 | TinyLlama CPU/CUDA | 每请求标准 GQA K/V | 批量 Linear、LM Head，CUDA 还复用批量工作区 | 已接入 BlockTable、分页 payload 与 Radix 前缀 |
 | Qwen1.5-MoE CPU | 每请求分层标准 K/V | 同层权重加载与专家分组 | 当前由模型 Context 持有，尚未绑定分页数据面 |
-| DeepSeek-V2-Lite CPU | 每请求低秩 MLA K/V 与位置 Key | 同层权重加载与 MoE 专家分组 | 当前由 MLA Context 持有，需要专用分页 payload 适配 |
-| DeepSeek-V2-Lite CUDA | 每请求低秩 MLA K/V 与位置 Key | 按专家打包请求行，批量执行 Gate/Up/Down；共享专家处理完整批次 | 当前由设备 Context 连续保存，尚未绑定分页数据面 |
+| DeepSeek-V2-Lite CPU | 每请求低秩 MLA K/V 与位置 Key | 同层权重加载与 MoE 专家分组 | Chapter07 已固定 CPU 分页载荷；真实 CPU Factory 仍使用连续 Context |
+| DeepSeek-V2-Lite CUDA | 每请求低秩 MLA K/V 与位置 Key | 按专家打包请求行，批量执行 Gate/Up/Down；共享专家处理完整批次 | Factory 已绑定分页 MLA 数据面，真实双请求提交与终态释放已验证 |
 
 ## 阅读顺序与资产
 
@@ -103,4 +103,4 @@ bash code/chapter09_performance/scripts/run_qwen15_moe_scheduling_ab.sh
 
 ## 扩展入口
 
-当前实现包含同步 CPU 调度、优先级老化、真实 Radix 命中排序、真实 Decode batch 和 overlap 计划校验。TinyLlama CPU/CUDA、Qwen1.5-MoE CPU、DeepSeek-V2-Lite CPU/CUDA Factory 都实现 `ExecutorBatchRunner`。DeepSeek CUDA 路径先让每个请求从自己的压缩 MLA 历史计算 Attention，再按专家打包同层 FFN 输入；Gate、Up、Down 和共享专家使用真实批量量化 Linear，Router、Top-K、加权拆回和最终 LM Head 仍在 Host 或逐请求路径完成。Chapter10 用估算长度排列 waiting 请求，提升运行时再让 Chapter07 与 Llama/Qwen3 Engine 把真实 CPU/CUDA 命中同步到共享块、Request 和模型 Context。真实多请求 Prefill Tensor batch、MoE/MLA 专用分页数据面、DeepSeek 融合路由与拆回 kernel、Deadline、抢占、设备事件重叠和开放环到达率留给后续扩展。
+当前实现包含同步 CPU 调度、优先级老化、真实 Radix 命中排序、真实 Decode batch 和 overlap 计划校验。TinyLlama CPU/CUDA、Qwen1.5-MoE CPU、DeepSeek-V2-Lite CPU/CUDA Factory 都实现 `ExecutorBatchRunner`。DeepSeek CUDA 路径先让每个请求从自己的压缩 MLA 历史计算 Attention，再按专家打包同层 FFN 输入；Factory 已把请求 Context 接到 Chapter07 页表事务，批次成功时统一提交，失败时统一裁剪。Gate、Up、Down 和共享专家使用真实批量量化 Linear，Router、Top-K、加权拆回和最终 LM Head 仍在 Host 或逐请求路径完成。真实多请求 Prefill Tensor batch、DeepSeek CPU Factory 分页绑定、融合路由与拆回 kernel、Deadline、抢占、设备事件重叠和开放环到达率留给后续扩展。

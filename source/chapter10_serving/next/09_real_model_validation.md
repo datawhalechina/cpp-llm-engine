@@ -87,4 +87,13 @@ CUDA_HOME=/usr/local/cuda-12.8 \
 bash code/engine/scripts/run_deepseek_v2_lite_cuda_serving.sh
 ```
 
-该入口把 `RealDeepSeek2CudaExecutorFactory` 作为 batch runner 注入 `ServiceCore`。两个活跃请求分别完成 Prefill 后，共同进入一次 CUDA Decode batch；每个请求保留自己的压缩 MLA 历史，26 个 MoE 层复用同一个批量工作区执行专家 Gate、Up 和 Down。第三个请求在执行前取消。测试检查首个词元 `207`、两请求生成一致、流式顺序、批量调用计数、指标和三个终态的 Executor 释放。Tokenizer 与 HTTP Adapter 组合仍需单独验收。
+该入口把 `RealDeepSeek2CudaExecutorFactory` 作为 batch runner 注入 `ServiceCore`。两个活跃请求分别完成 Prefill 后，共同进入一次 CUDA Decode batch；每个请求保留自己的压缩 MLA 历史，26 个 MoE 层复用同一个批量工作区执行专家 Gate、Up 和 Down。第三个请求在执行前取消。测试检查首个词元 `207`、两请求生成一致、流式顺序、批量调用计数、指标和三个终态的 Executor 释放。
+
+最后运行文本到网络响应的 CUDA 组合验收：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_http_server.sh --check
+```
+
+进程启动时加载一次真实 Tokenizer、共享 CUDA Model、分页 MLA 块池和 Factory。同步请求与 SSE 请求都从文本 `prompt` 开始，经分词回调创建 Request，并在终态释放 Context、页表与服务条目。当前 Transport 用互斥锁串行调用 Adapter；因此该入口证明文本、设备执行和 HTTP/SSE 可以组合，不作为并发 HTTP batch 的性能证据。

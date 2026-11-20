@@ -83,17 +83,18 @@ Chapter04–05 建立 Attention 与量化 Linear 的数值语义，Chapter07–0
 | Qwen3-0.6B | Q/K Norm、NeoX RoPE、非对称 Q/K/V 头和共享 LM Head | CPU/CUDA 推理服务闭环 |
 | Qwen1.5-MoE-A2.7B | 60 选 4 Router、packed experts、共享专家和混合量化 | CPU 24 层生成、按专家分组批执行、调度与服务闭环 |
 | DeepSeek-R1-Distill-Qwen-1.5B | Qwen2.5 配置、Tokenizer 与聊天模板差异 | 待适配 |
-| DeepSeek-V2-Lite | MLA、混合稠密/MoE 层、64 选 6 Router 与共享专家 | CPU/CUDA 27 层生成、分组批执行和服务核心闭环 |
+| DeepSeek-V2-Lite | MLA、混合稠密/MoE 层、64 选 6 Router 与共享专家 | CPU/CUDA 27 层生成、分页 MLA、分块 Prefill 与文本服务闭环 |
 | SmolVLM-500M | Vision Encoder、Projector 与视觉词元序列 | CPU 多模态模型与服务生命周期闭环 |
 
 各模型分阶段的完成状态、真实入口和剩余边界见[模型能力与扩展顺序](source/reference/model_support.md)。
 
 ## 当前可学内容
 
-更新时间：**2026-11-12**。下面按最新内容在前排列；需要复现实验或核对具体环境时，再查阅[实验资产表](source/reference/experiment_assets.md)。
+更新时间：**2026-11-20**。下面按最新内容在前排列；需要复现实验或核对具体环境时，再查阅[实验资产表](source/reference/experiment_assets.md)。
 
 | 时间 | 新增学习内容 | 你可以复现什么 |
 | --- | --- | --- |
+| 2026-11-20 | DeepSeek 分页 MLA 与文本 CUDA 服务 | 比较连续/分页 MLA，运行 27 层分块 Tensor Prefill，并从文本请求进入 CUDA Completion/SSE |
 | 2026-11-12 | DeepSeek-V2-Lite CUDA 纵向闭环 | 运行三阶段 MLA、量化 MoE、27 层生成、跨请求分组批执行与 ServiceCore |
 | 2026-11-12 | 统一模型能力矩阵 | 按外部基线、加载、CPU/CUDA 模型、批处理和服务阶段核对真实入口与剩余边界 |
 | 2026-11-10 | Qwen1.5-MoE 批处理与服务 | 比较逐词元与按专家分组执行，并观察四个请求在运行中加入、生成和释放资源 |

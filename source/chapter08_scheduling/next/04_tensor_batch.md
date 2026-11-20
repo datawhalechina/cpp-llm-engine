@@ -31,12 +31,12 @@
 | --- | --- | --- | --- |
 | TinyLlama | 每请求标准 GQA K/V | Q/K/V、输出投影、FFN 与 LM Head 的多行 Linear | CPU/CUDA 已绑定 Chapter07 BlockTable |
 | Qwen1.5-MoE | 每请求分层标准 K/V | 同层权重只加载一次，MoE 输入按专家重新分组 | Context 连续保存，尚未迁移到 Chapter07 |
-| DeepSeek-V2-Lite CPU | 每请求低秩 MLA K/V 与共享位置 Key | 同层权重只加载一次，64 选 6 的 FFN 输入按专家分组 | MLA Context 连续保存，需要新的分页 payload 适配 |
-| DeepSeek-V2-Lite CUDA | 每请求设备压缩 MLA K/V 与位置 Key | 同一专家的请求行共同执行 Gate/Up/Down，共享专家处理完整批次 | 设备 Context 连续保存，尚未迁移到 Chapter07 |
+| DeepSeek-V2-Lite CPU | 每请求低秩 MLA K/V 与共享位置 Key | 同层权重只加载一次，64 选 6 的 FFN 输入按专家分组 | CPU 分页载荷已固定，真实 Factory 仍使用连续 Context |
+| DeepSeek-V2-Lite CUDA | 每请求设备压缩 MLA K/V 与位置 Key | 同一专家的请求行共同执行 Gate/Up/Down，共享专家处理完整批次 | Factory 已绑定 Chapter07 页表事务，真实双请求批提交与终态释放已验证 |
 
 DeepSeek CUDA batch 保留了“Attention 隔离、FFN 合并”的边界。每个请求先在自己的执行流和压缩 MLA 历史上完成 Attention；所有请求到达 FFN 后，批量工作区读取 Router 结果，把命中同一专家的输入行打包，再调用 `quantized_linear_batch()` 完成 Gate、Up 和 Down。共享专家直接处理整个批次，结果按请求加权拆回。批量大小相同时，Factory 会复用同一个工作区，避免 26 个 MoE 层和后续 Decode step 重复分配临时张量。
 
-这条路径已经执行真实跨请求量化计算，但仍保留三项清晰边界：Router、稳定 Top-K 和加权拆回在 Host 完成；最终归一化与 LM Head 按请求执行；压缩 MLA payload 尚未分页。它也不等于设备执行重叠或单个融合 grouped-MoE kernel。
+这条路径已经执行真实跨请求量化计算。分页 MLA 只合并地址管理和设备载荷，不合并请求语义：各请求仍使用自己的页表、位置和可见历史。Router、稳定 Top-K 和加权拆回在 Host 完成，最终归一化与 LM Head 按请求执行；当前实现也不等于设备执行重叠或单个融合 grouped-MoE kernel。
 
 ## 为什么批量临时张量需要复用
 
@@ -66,7 +66,7 @@ admission bind request ID
 | 错误 position、无效 token 和 CUDA 双请求分页 batch 共用整批回滚边界 | 更大 batch 的故障注入与容量压力测试 |
 | CUDA 连续两步复用同尺寸 workspace | 多 batch 并发与容量型 workspace |
 | ServiceCore 自动传递 request ID 并选择真实 batch | 协作式抢占和设备事件重叠 |
-| Context position、页表和分页 payload 按整批提交 | MoE/MLA Context 的分页 payload 适配 |
+| DeepSeek CUDA Context、页表和分页 MLA payload 使用整批提交/回滚接口 | DeepSeek CPU Factory 分页绑定与更大 batch 压力测试 |
 
 [CUDA 双请求批执行实验](../../reference/experiment_assets.md#exp-gpu-06)在真实 TinyLlama、分页 K/V 和一次 Decode 下比较顺序执行与 Tensor Batch。两轮 batch/顺序中位数比例为 `0.922/0.919`，逐请求 logits 完全一致；这说明当前小批量融合路径减少了重复执行成本，但尚未回答更大批量和长期服务吞吐。
 

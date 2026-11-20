@@ -36,7 +36,9 @@ Qwen1.5-MoE 仍把词元、logits 和停止状态交给 Chapter06。区别位于
 
 DeepSeek-V2-Lite 使用相同边界。`RealDeepSeek2ExecutorFactory` 共享 GGUF 索引和全局权重，每个执行器独占 27 层 Context；Context 在每层保存 512 维 latent K/V 与 64 维位置 Key。Runtime 仍只观察 logits、已提交词元数和停止状态，不感知 MLA、64 选 6 路由或首层稠密 FFN。
 
-CUDA Model 沿用相同的所有权划分。`RealDeepSeek2CudaModel` 常驻一层稠密权重、26 层 MoE 权重和输出权重；`RealDeepSeek2CudaContext` 独占执行流、中间 Tensor 与每层压缩历史。`RealDeepSeek2CudaExecutorFactory` 把这组对象适配为 Chapter06 的 Prefill/Decode 接口。单词元 CPU/CUDA logits 余弦相似度为 `1`，固定输入词元 `11` 的贪心结果同为 `207`；重复请求和分块 Prefill 继续检查 Context 隔离与位置提交。
+CUDA Model 沿用相同的所有权划分。`RealDeepSeek2CudaModel` 常驻一层稠密权重、26 层 MoE 权重和输出权重；`RealDeepSeek2CudaContext` 独占执行流、中间 Tensor 与每层压缩历史。`RealDeepSeek2CudaExecutorFactory` 把这组对象适配为 Chapter06 的 Prefill/Decode 接口。单词元 CPU/CUDA logits 余弦相似度为 `1`，固定输入词元 `11` 的贪心结果同为 `207`。
+
+分块 Prefill 接收一段词元后，先逐行查 embedding 并打包为 `[T,D]`，再让这个 Tensor 穿过 27 层。稠密层使用多 Query 因果 MLA 与批量 FFN；MoE 层在 Router 边界暂时拆成行，按专家分组执行后再打包。连续与分页 MLA 共用这条计算路径，只替换历史数据的地址解释。整个 chunk 成功后才推进位置，任一层失败都恢复 hidden 与缓存。这样验证的是一次多词元模型前向，而不是在 `prefill_chunk()` 内隐藏逐词元 Decode 循环。
 
 模型权重缓存与请求 Context 是两个对象。DeepSeek Factory 默认逐层读取并释放权重，因此消费内存较低；将缓存容量设为 27 后，后续 Decode 可以复用全部层权重，但会增加接近整套 Decoder 的常驻内存。容量小于 27 的普通 LRU 对顺序扫描通常没有命中，因为同一层再次出现前已经访问了其余 26 层。无论是否缓存权重，请求位置和 MLA 历史始终保存在各自 Context 中。
 

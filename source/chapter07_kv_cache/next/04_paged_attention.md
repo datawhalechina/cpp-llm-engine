@@ -50,9 +50,11 @@ Decode 每次只有一个 Query，位置就是已提交词元数。Prefill 会�
 
 `CpuPagedKvCache::attention()` 是便于阅读和核对的 CPU 参考实现。它逐词元查询页表并使用临时分数数组，不代表生产级融合内核；设备实现可以改变并行方式和数据布局，但必须保持相同输入要求与数值基线。
 
+MLA 的页表寻址相同，读取内容不同。标准 GQA 路径从槽位取得各 KV head 的 key/value；MLA 路径取得压缩 latent K/V 和 RoPE key，再按 Chapter04 的 MLA 公式恢复当前 Attention 所需分量。`CpuPagedMlaCache::gather_layer()` 提供便于核对的连续视图，用来证明跨块顺序正确；`CudaMlaAttentionBackend::compute_paged()` 则在 score 和 value kernel 中直接把逻辑位置映射到物理槽位，不先 gather 连续缓存。
+
 ## 验证连续与分页等价
 
-通过条件包括多 Query 因果遮罩、跨块读取、GQA 头映射、连续与分页结果一致，以及物理块释放复用后无请求串扰。CUDA 专项测试还会把分页 Prefill 与逐词元 Decoder 对照。
+通过条件包括多 Query 因果遮罩、跨块读取、GQA 头映射、连续与分页结果一致，以及物理块释放复用后无请求串扰。CUDA 专项测试使用非连续物理块顺序比较连续与分页 MLA；真实 DeepSeek Runtime 已完成 27 层 logits、双请求批提交和终态块计数验收，连续与分页 logits 最大误差为 `0`。
 
 ```bash
 cmake -S code/chapter07_kv_cache -B /tmp/cpp-llm-chapter07-attention \

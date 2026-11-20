@@ -15,7 +15,7 @@
 
 ## Tokenizer 放在应用组合层
 
-Transport 不认识模型词表，ServiceCore 也不重复实现分词。文本 API 由应用持有真实 Tokenizer，把 token 序列交给稳定的服务契约；教学测试可以直接使用 token ID，隔离模型文件依赖。
+Transport 不认识模型词表，ServiceCore 也不重复实现分词。文本 API 由应用持有真实 Tokenizer，并把一个文本到词元序列的回调注入 `HttpAdapter`；教学测试可以直接使用 token ID，隔离模型文件依赖。这样更换 CPU/CUDA Executor 不会改变协议解析，更换词表也不会侵入请求生命周期。
 
 | 输入形式 | 适用场景 | 谁完成转换 |
 | --- | --- | --- |
@@ -24,4 +24,4 @@ Transport 不认识模型词表，ServiceCore 也不重复实现分词。文本 
 
 ## 验证同步请求
 
-运行 `bash code/chapter10_serving/scripts/run.sh`。`chapter10_http_contract_test` 应检查路由、参数、准入失败和成功 Completion 的状态码与响应字段，并确认请求终态后资源已释放。`10.6` 把同一生命周期改为逐词元写回。
+运行 `bash code/chapter10_serving/scripts/run.sh`。`chapter10_http_contract_test` 应检查 token ID 与文本两种输入、路由、准入失败和成功 Completion 的状态码与响应字段，并确认请求终态后资源已释放。`10.6` 把同一生命周期改为逐词元写回。

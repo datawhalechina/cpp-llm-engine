@@ -59,7 +59,7 @@
         "cpu_model_generation": { "state": "verified", "evidence": ["code/engine/scripts/run_deepseek_v2_lite_generation.sh"] },
         "cpu_batch_serving": { "state": "verified", "evidence": ["code/engine/scripts/run_deepseek_v2_lite_http_server.sh"] },
         "cuda_model_generation": { "state": "verified", "evidence": ["code/engine/scripts/run_deepseek_v2_lite_cuda_runtime.sh"] },
-        "cuda_batch_serving": { "state": "partial", "evidence": ["code/engine/scripts/run_deepseek_v2_lite_cuda_batch.sh", "code/engine/scripts/run_deepseek_v2_lite_cuda_serving.sh"], "gap": "CUDA HTTP/tokenizer composition and paged compressed MLA" }
+        "cuda_batch_serving": { "state": "verified", "evidence": ["code/engine/scripts/run_deepseek_v2_lite_cuda_batch.sh", "code/engine/scripts/run_deepseek_v2_lite_cuda_serving.sh", "code/engine/scripts/run_deepseek_v2_lite_cuda_runtime.sh", "code/engine/scripts/run_deepseek_v2_lite_cuda_http_server.sh"] }
       }
     },
     {

@@ -26,9 +26,21 @@ CUDA Context 对连续和分页数据面使用同一组模型权重与批量 Dec
 | TinyLlama | 每层标准 key/value，多个 Query head 共享 KV head | 已接入标准分页 payload |
 | Qwen3 | 标准 GQA K/V，head 数和 RoPE 参数不同 | 复用 payload 形状，另建模型级分页 golden |
 | Qwen1.5-MoE | Attention 仍使用标准 K/V，MoE 只改变 FFN | 可复用标准 payload，当前 Factory 尚未绑定数据面 |
-| DeepSeek-V2-Lite | 每层保存低秩 latent K/V 与共享位置 Key | 复用 BlockTable/事务，新增 MLA payload 和读取 backend |
+| DeepSeek-V2-Lite | 每层保存低秩 latent K/V 与共享位置 Key | CPU/CUDA payload、直接页表读取和真实 CUDA Context 绑定已实现；27 层真实 GPU 验收已通过 |
 
 DeepSeek 的压缩缓存原理见 [`04.1 多头注意力与 MLA`](../../chapter04_attention/01_multihead_attention.md)。这里不把 latent 强行展开为标准 K/V 再长期保存，因为那会丢失 MLA 降低缓存容量的设计目标。
+
+`chapter07_paged_mla_cache_test` 验证跨块顺序、逐层提交、批量原子性和物理块复用清理。CUDA 专项测试再使用非连续页表比较连续与分页 MLA Attention。`RealDeepSeek2CudaExecutorFactory` 把请求 ID、共享块池、设备压缩载荷和 Context 连接起来；真实模型验收已比较连续与分页的 27 层 logits，并验证双请求批提交和终态资源计数。
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
+CUDA_HOME=/usr/local/cuda-12.8 \
+  bash code/engine/scripts/run_deepseek_v2_lite_cuda_runtime.sh
+```
+
+第二个入口通过时应输出分页 logits 误差、`paged_mla_batch: true` 和 `paged_mla_terminal_release: true`。这些字段分别证明数值等价、跨请求事务和最终物理块回收。
+
+[`EXP-GPU-18`](../../reference/experiment_assets.md#exp-gpu-18) 使用同一 DeepSeek-V2-Lite 模型比较连续与分页 MLA。2-token Prefill 和一步 Decode 的分页/连续中位数比例为 `0.973/0.987`，logits 最大误差为 `0`。逐轮样本仍有波动，因此该结果只说明当前短上下文下两条路径成本同量级；保留分页路径的主要理由是按需分块、跨请求复用和终态回收，而不是已经证明的延迟加速。
 
 ## 为什么要逐级比较
 

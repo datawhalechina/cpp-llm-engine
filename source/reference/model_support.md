@@ -11,7 +11,7 @@
 | TinyLlama 1.1B Chat | 已验证 | 已验证 | 已验证 | 已验证 | 已验证 |
 | Qwen3-0.6B | 已验证 | 已验证 | 已验证 | 已验证 | 已验证 |
 | Qwen1.5-MoE-A2.7B-Chat | 已验证 | 已验证 | 已验证 | 规划 | 规划 |
-| DeepSeek-V2-Lite | 已验证 | 已验证 | 已验证 | 已验证 | 部分完成：已接通 Batch 与 ServiceCore，继续补 HTTP/Tokenizer 与分页压缩 MLA |
+| DeepSeek-V2-Lite | 已验证 | 已验证 | 已验证 | 已验证 | 已验证 |
 | SmolVLM-500M-Instruct | 部分完成：真实资产按需准备 | 已验证 | 部分完成：继续补图片 HTTP 传输 | 规划 | 规划 |
 
 机器可校验的状态和证据路径登记在 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/testing/model_capabilities.json"><code>model_capabilities.json</code></a>，运行 `npm run test:check-model-capabilities` 可检查状态词、入口文件和待办边界。该检查不下载模型，也不执行可选 GPU 路径。
@@ -38,7 +38,7 @@ Qwen3-0.6B 同样使用 RMSNorm、RoPE、分组查询注意力和 SwiGLU，但�
 | Chapter09 | 保存版本化固定结果、正确性比较和性能记录 |
 | Chapter10 | 复用 ServiceCore；只新增模型选择与请求输入验证 |
 
-DeepSeek-R1-Distill-Qwen-1.5B 排在 Qwen 稠密模型之后。它基于 Qwen2.5 架构并调整配置和分词器，用于验证架构适配能否复用。DeepSeek-V2-Lite 已完成外部基线、Loader、MLA reference、27 层混合 Decoder、LM Head、CPU 生成与 HTTP/SSE，以及 CUDA 三阶段 MLA、量化 MoE、完整 Runtime、跨请求分组批执行和 ServiceCore；后续工作集中在分页压缩 MLA、分块 Tensor Prefill 与 CUDA HTTP/Tokenizer 组合。
+DeepSeek-R1-Distill-Qwen-1.5B 排在 Qwen 稠密模型之后。它基于 Qwen2.5 架构并调整配置和分词器，用于验证架构适配能否复用。DeepSeek-V2-Lite 已完成外部基线、Loader、MLA reference、27 层混合 Decoder、LM Head、CPU 生成与 HTTP/SSE，以及 CUDA 三阶段 MLA、量化 MoE、分块 Tensor Prefill、分页压缩 MLA、跨请求分组批执行和文本 HTTP/SSE。分页与连续 MLA 的短上下文 A/B 已归档；当前遗留集中在更长上下文和更大批量压力测试、并发 HTTP 事件循环以及 MLA score kernel 优化。
 
 Gemma 也经过同一条接入链：Chapter01 识别架构、元数据和权重字段模式，Chapter04 根据配置构造对应解码器，Chapter05 核对量化格式。llama.cpp 或 gemma.cpp 的外部结果作为基线，本教程仍需独立完成上述适配与验证。
 

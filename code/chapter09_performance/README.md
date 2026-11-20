@@ -96,6 +96,7 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
 | 收益能否跨 batch、上下文和 Decode 步数保持 | `scripts/run_cuda_adaptive_gemv_runtime_matrix.sh` |
 | DeepSeek 跨请求 grouped MoE 是否改善完整 CUDA Decode | `scripts/run_deepseek2_cuda_grouped_moe_ab.sh` |
 | DeepSeek grouped Decode 的时间落在哪些 Kernel 与同步点 | `scripts/run_deepseek2_cuda_grouped_moe_profile.sh` |
+| DeepSeek 分页 MLA 相对连续 MLA 的端到端代价是多少 | `scripts/run_deepseek2_cuda_paged_mla_ab.sh` |
 
 CUDA 入口需要相应模型、CUDA Toolkit，性能剖析入口还需要 Nsight Systems 或 Nsight Compute。Profiler 附件用于解释原因，不能替代端到端 A/B 决策。已归档 CUDA 结果与默认路径结论见[实验资产登记表](../../source/reference/experiment_assets.md#多模态cuda-与正确性资产)。
 

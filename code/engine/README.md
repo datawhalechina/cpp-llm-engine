@@ -35,6 +35,7 @@ Factory 的名称表示它负责按统一规则创建和装配 Executor，而不
 | `scripts/run_real_decoder_profile.sh` | 可选 TinyLlama Decoder 子阶段计时与结果归档 |
 | `scripts/run_real_http_server.sh` | 启动真实 TinyLlama HTTP server，或以 `--check` 执行 curl 闭环 |
 | `scripts/run_deepseek_v2_lite_http_server.sh` | 启动 DeepSeek-V2-Lite HTTP server，或执行本地 Completion/SSE 回环 |
+| `scripts/run_deepseek_v2_lite_cuda_http_server.sh` | 用文本请求验收 DeepSeek CUDA、真实 Tokenizer、分页 MLA 与 HTTP/SSE |
 | `CMakeLists.txt` | CPU 集成构建，以及显式启用的 CUDA Model、Runtime、Batch 和 Serving 目标 |
 
 ## 运行与验证
@@ -147,7 +148,9 @@ Qwen1.5-MoE 使用独立的 `RealQwen2MoeExecutorFactory`，共享模型索引�
 
 DeepSeek-V2-Lite 使用 `RealDeepSeek2ExecutorFactory` 进入同一个 Chapter06 Runtime。Factory 共享 GGUF 索引、embedding、最终归一化和 LM Head；每个执行器持有独立的 27 层压缩 MLA Context。Prefill 按层加载权重并处理该层的全部 prompt 词元，Decode 继续同一分层历史。Factory 可配置有界层权重缓存并读取命中与常驻字节，默认关闭以控制内存。`run_deepseek_v2_lite_generation.sh` 已固定 `Hello` 生成 `11 304`、文本 `, I`，并检查默认两轮模型执行产生 54 次层读取且没有常驻副本。Factory 还实现 Chapter08 `ExecutorBatchRunner`：每层先按请求推进独立 MLA，再把同层 FFN 输入按专家分组执行；失败时恢复整批 Context。真实双请求调度固定生成 `185 85770`。Factory 的类型化模式可选择逐请求基线或专家分组；EXP-CPU-19 在 batch 2、单步 Decode 下记录到 `0.943` 的中位数比例。Chapter10 已验证四请求动态准入、两次双请求组批与终态释放，并通过通用 `HttpAdapter` 核对同步 Completion、SSE 和指标。HTTP Adapter 当前顺序执行请求；融合 Tensor kernel 和并发 socket 服务仍是独立扩展。
 
-`RealDeepSeek2CudaExecutorFactory` 复用同一个 Chapter06 执行器接口：Factory 共享 27 层设备权重，每个 Executor 独占压缩 MLA Context。Prefill 按词元推进完整模型，Decode 继续同一 Context；固定输入词元 `11` 生成 `207`，重复请求和分块 Prefill 已通过真实 GPU 测试。Factory 同时实现 Chapter08 `ExecutorBatchRunner`：各请求先读取自己的 MLA 历史，再按专家打包 FFN 输入；Gate、Up、Down 与共享专家执行真实批量量化 Linear，精确批量大小的工作区由 Factory 持久复用。重复请求 ID 会在执行前拒绝，整批失败恢复全部 Context。当前 Router、Top-K、加权拆回和最终 LM Head 仍在 Host 或逐请求路径完成，压缩 MLA payload 尚未分页。Chapter10 已验证两个活跃请求由 ServiceCore 进入一次 CUDA batch，同时覆盖流式回调、执行前取消和终态释放；DeepSeek HTTP/Tokenizer 组合仍是后续入口。
+`RealDeepSeek2CudaExecutorFactory` 复用同一个 Chapter06 执行器接口：Factory 共享 27 层设备权重，每个 Executor 独占请求 Context。默认 Context 使用连续压缩 MLA；调用 `configure_paged_mla_cache()` 后，Factory 共享 Chapter07 块池和 `CudaPagedMlaCache`，`bind_request()` 把请求 ID、页表与 Context 绑定。Prefill 把一个 chunk 打包为 `[T,D]` hidden，复用同一组 Dense/Attention 与 MoE 工作区穿过 27 层；embedding lookup 仍逐行完成，再进入 Tensor 路径。连续或分页缓存都只在完整 chunk 成功后提交位置，失败时裁剪到调用前状态。Factory 同时实现 Chapter08 `ExecutorBatchRunner`：各请求先读取自己的 MLA 历史，再按专家打包 FFN 输入；Gate、Up、Down 与共享专家执行真实批量量化 Linear，精确批量大小的工作区由 Factory 持久复用。当前 Router、Top-K、加权拆回和最终 LM Head 仍在 Host 或逐请求路径完成。真实 GPU 验收中，连续与分页 27 层 logits 最大误差为 `0`，双请求批提交和终态零占用均通过。
+
+`real_deepseek2_cuda_http_server` 是应用组合根：它加载 llama.cpp Tokenizer 与 CUDA Factory，把文本分词回调注入 `HttpAdapter`，再把分页 MLA 资源和 batch runner 注入 `ServiceCore`。Transport、Adapter 和 ServiceCore 不包含模型词表或 CUDA 类型。回环脚本使用文本 `prompt` 验证 Completion、SSE 和终态释放；当前 cpp-httplib 入口仍串行调用 Adapter，因此该入口证明协议组合成立，不作为并发 HTTP 组批证据。
 
 启用分页 K/V 后，CPU 和 CUDA Factory 都持有 `RadixPrefixCache`。请求结束时，完整物理块在释放请求页表前发布到前缀索引；新请求准入只估算可复用长度，获得运行槽时才重新查询并同步共享 `BlockTable`、Request 的 Prefill 进度和 CPU/CUDA Context 位置。`PrefixBlockStore` 让索引共用匹配和淘汰算法，同时保留两种 payload 的清理时序。容量不足时，数据面先回收最久未使用的索引独占叶端块，再重试预留；真实 CPU 和 CUDA 测试都使用相同四词元前缀比较冷启动与缓存命中路径，验证 logits 或首个生成词元一致。
 

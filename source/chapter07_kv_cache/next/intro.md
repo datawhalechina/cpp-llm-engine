@@ -16,6 +16,7 @@ Chapter06 已经固定单请求的 Prefill、Decode 和停止语义。本章接�
 | 块表（`BlockTable`） | 保存一个请求的逻辑块到物理块映射 | [`07.2 块表与物理内存`](./02_block_mapping.md) |
 | KV 块池（`KvBlockPool`） | 分配和回收固定大小物理块 | [`07.2 块表与物理内存`](./02_block_mapping.md) |
 | 分页 K/V 数据面 | 按层、物理块和槽位保存真实 key/value | [`07.3 分页 K/V 事务`](./03_paged_transaction.md) |
+| 分页 MLA 数据面 | 按层和物理槽位保存压缩 latent K/V 与 RoPE key | [`07.3 分页 K/V 事务`](./03_paged_transaction.md) |
 | 分页注意力 | 根据块表直接读取离散 K/V 的 Attention | [`07.4 分页 Attention`](./04_paged_attention.md) |
 | Radix 前缀缓存 | 按词元路径找到最长的完整 K/V 块前缀 | [`07.6 生产扩展`](./06_production_extensions.md) |
 | K/V Cache 量化 | 用低精度 payload 和 scale metadata 保存请求历史 | [`07.6 生产扩展`](./06_production_extensions.md) |
@@ -28,7 +29,7 @@ Chapter06 已经固定单请求的 Prefill、Decode 和停止语义。本章接�
 | --- | --- | --- | --- | --- |
 | 1 | A | [`07.1 K/V 形状与连续缓存`](./01_kv_baseline.md) | Chapter04 `kv_cache.cpp` | Attention 保存什么，连续基线怎样寻址 |
 | 2 | A | [`07.2 块表与物理内存`](./02_block_mapping.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter07_kv_cache/src/block_table.cpp"><code>block_table.cpp</code></a> | 逻辑词元怎样获得物理槽位 |
-| 3 | A | [`07.3 分页 K/V 事务`](./03_paged_transaction.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter07_kv_cache/src/paged_kv_cache.cpp"><code>paged_kv_cache.cpp</code></a> | 写入、提交、回滚和释放怎样配合 |
+| 3 | A | [`07.3 分页 K/V 事务`](./03_paged_transaction.md) | `paged_kv_cache.cpp`、`paged_mla_cache.cpp` | 两种 Attention 历史怎样共享写入、提交、回滚和释放语义 |
 | 4 | A | [`07.4 分页 Attention`](./04_paged_attention.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter07_kv_cache/tests/paged_kv_cache_test.cpp"><code>paged_kv_cache_test.cpp</code></a> | 离散物理块为什么仍得到连续基线结果 |
 | 5 | B | [`07.5 真实模型迁移`](./05_real_model_migration.md) | `code/engine` 真实模型入口 | 真实 Decoder 怎样绑定分页数据面并保持连续路径结果 |
 | 6 | A/G/M 扩展 | [`07.6 前缀复用与生产扩展`](./06_production_extensions.md) | `radix_prefix_cache.cpp`、生态卡 | CPU/CUDA 怎样共享前缀，K/V 量化与多模态怎样继承事务契约 |
@@ -49,3 +50,4 @@ bash code/chapter07_kv_cache/scripts/run.sh
 | L2 CPU 分页 | `bash code/chapter07_kv_cache/scripts/run.sh` | 分配失败无泄漏、事务一致、跨块输出等价、前缀共享与释放无串扰 | 必做 |
 | L3 真实模型分页 | `bash code/chapter07_kv_cache/scripts/run_real_paged_kv.sh` | TinyLlama 22 层 logits、固定 token、失败回滚、连续路径一致和终态释放 | 有模型时必做 |
 | L4 CUDA 分页执行 | `bash code/engine/scripts/run_real_cuda_runtime.sh` | 多 Token Prefill、后续 Decode、Radix 命中和冷启动 token 一致 | 有 NVIDIA GPU 时选做 |
+| L4 DeepSeek 分页 MLA | `bash code/engine/scripts/run_deepseek_v2_lite_cuda_runtime.sh` | 27 层连续/分页 logits、双请求批提交和终态块归零 | 有对应模型和 NVIDIA GPU 时选做 |

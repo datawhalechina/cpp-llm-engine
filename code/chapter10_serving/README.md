@@ -35,6 +35,8 @@
 4. 阅读 `HttpAdapter` 与 `ResponseWriter`，跟踪同步 Completion 和 SSE 如何处理断连、背压与异常。
 5. 最后阅读 `CppHttplibServer`，查看网络库如何只承担 Transport 适配。
 
+`HttpAdapter` 同时接受可选的文本分词回调。带 `prompt_tokens` 的测试直接构造稳定输入；带 `prompt` 的真实服务在应用组合层注入 Tokenizer。Adapter 只调用回调并接收词元序列，不依赖具体词表实现。
+
 请求从 waiting 进入 running 后，由 Chapter08 每步选择执行对象。请求到达终态并不等于资源已经释放；调用 `release_terminal()` 后，Request 缓存、批执行绑定和分页 KV 块才会一起回收。
 
 ## 运行与验证
@@ -96,8 +98,6 @@ bash code/engine/scripts/run_deepseek_v2_lite_cuda_serving.sh
 
 该入口使用固定词元请求，不经过 Tokenizer 或 HTTP Adapter。两个活跃请求先各自完成 Prefill，再由 Chapter08 把 Decode 交给一次 CUDA batch runner；测试同时检查持久化工作区、26 层专家批执行和取消请求释放。
 
-该入口先用 ServiceCore 接纳两组请求，检查两次双请求 Decode 组批、固定生成结果和资源归零；随后把同一 Factory 注入 `HttpAdapter`，分别验证同步 Completion 与 SSE 的固定词元、指标和释放。Adapter 测试不创建 socket；两个 HTTP 请求顺序执行，因此不作为并发 HTTP 组批证据。
-
 需要继续观察真实 HTTP 字节与 SSE chunk 时运行：
 
 ```bash
@@ -105,6 +105,15 @@ bash code/engine/scripts/run_deepseek_v2_lite_http_server.sh --check
 ```
 
 该命令复用现有 cpp-httplib Transport，完成本地 health、Completion、SSE 和 metrics 回环；去掉 `--check` 可以保留服务供手工请求。
+
+CUDA 文本服务使用独立入口，避免把 CPU 与设备执行结果混在同一个脚本中：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/engine/scripts/run_deepseek_v2_lite_cuda_http_server.sh --check
+```
+
+该回环以文本 `prompt` 验证真实 Tokenizer、CUDA Factory、分页 MLA、Completion、SSE 和终态释放。Transport 仍串行进入 Adapter，因此它不证明并发连接已经形成模型 batch。
 
 ## 扩展入口
 
