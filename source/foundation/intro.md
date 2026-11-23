@@ -4,7 +4,7 @@
 
 Foundation 帮助你解决进入推理引擎代码前最常见的问题：怎样构建和测试 C++ 项目，怎样理解对象与 Tensor 的数据关系，怎样组织资源与并发状态，以及怎样验证数值和性能结论。GPU 选修进一步介绍 CUDA 环境、资源生命周期和常用库。
 
-如果这些内容已经熟悉，直接进入 [`Chapter 00`](../chapter00_quickstart/intro.md)运行 TinyLlama；如果其中一项还不熟，从下图左侧选择对应内容。C++ 基础较弱时，先完成 [F00 C++ 就绪自测](./00_cpp_readiness.md)，再按“数据与边界 → 构建与所有权 → Runtime 状态”逐步进入题库。准备学习 GPU 时再加入 CUDA 选修。
+如果这些内容已经熟悉，直接进入 [`Chapter 00`](../chapter00_quickstart/intro.md)运行 TinyLlama；如果其中一项还不熟，从下图左侧选择对应内容。C++ 基础较弱时，先完成 [F00 C++ 就绪自测](./00_cpp_readiness.md)，再按“数据与边界 → 构建与所有权 → 运行时状态”逐步进入题库。准备学习 GPU 时再加入 CUDA 选修。
 
 ![Foundation 能力位置与学习路线](../assets/diagrams/foundation-overview.svg)
 
