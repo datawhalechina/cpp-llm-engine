@@ -39,9 +39,23 @@
 
 当前 Chapter10 的 cpp-httplib Transport 使用互斥锁串行调用 `HttpAdapter` 和 `ServiceCore`。`RequestWorkerPool` 可以在线程中重叠独立 Context，Chapter08 Tensor Batch 则把多请求激活交给一次模型调用；三者解决的问题不同。
 
+## 条件变量与 Worker 停止
+
+条件变量让 Worker 在“没有任务”时休眠，并在提交任务或请求停止时被唤醒。等待必须使用谓词重新检查共享状态，因为唤醒本身不表示队列一定非空：
+
+```cpp
+work_ready.wait(lock, [&] { return stopping || !queue.empty(); });
+```
+
+队列、停止标志和终态记录由同一互斥锁保护。Worker 从队列取出任务后释放锁，再执行任务；否则一次耗时模型调用会阻塞提交、取消和终态查询。任务完成后重新加锁，只记录一次完成、失败或取消终态。
+
+停止顺序是：停止接收新任务，设置停止标志，唤醒等待线程，处理约定范围内的已接收任务，最后由所有者调用 `join()`。析构函数可以复用幂等停止流程，避免对象销毁后后台线程继续访问成员。
+
+服务等待通常还需要截止时间。`condition_variable::wait_for` 可以限制调用线程等待终态的时长，但超时返回不等于后台计算已经停止。服务层应另外记录取消或超时状态，让 Worker、Scheduler 和 K/V 管理在安全点观察并完成资源释放。
+
 ## 验证与练习
 
-先完成 [`FQ07 Token Queue`](https://github.com/datawhalechina/cpp-llm-engine/blob/main/exercises/foundation/problems/fq07_token_queue/README.md) 和 [`FQ11 Request Queue`](https://github.com/datawhalechina/cpp-llm-engine/blob/main/exercises/foundation/problems/fq11_request_queue/README.md)，检查 FIFO、容量、取消和失败路径。随后运行：
+先完成 [`FQ07 Token Queue`](https://github.com/datawhalechina/cpp-llm-engine/blob/main/exercises/foundation/problems/fq07_token_queue/README.md) 和 [`FQ11 Request Queue`](https://github.com/datawhalechina/cpp-llm-engine/blob/main/exercises/foundation/problems/fq11_request_queue/README.md)，检查 FIFO、容量、取消和失败路径；再完成 [`FQ22 Bounded Worker`](https://github.com/datawhalechina/cpp-llm-engine/blob/main/exercises/foundation/problems/fq22_bounded_worker/README.md)，把队列接入真实线程、条件变量和终态记录。随后运行：
 
 ```bash
 bash code/chapter10_serving/scripts/run.sh

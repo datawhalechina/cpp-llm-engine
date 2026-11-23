@@ -385,6 +385,18 @@ cosine_similarity(x, y) = dot(x, y) / (norm(x) * norm(y))
 
 结果接近 `1` 表示两个向量方向相近，接近 `0` 表示整体变化方向缺少相关性，接近 `-1` 表示方向相反。它对整体缩放不敏感，因此不能替代最大误差、平均绝对误差、Top-K 重合或贪心词元检查。教程用它比较 hidden state 和 logits 的整体数值结构。
 
+<a id="f-eval-02"></a>
+### F-EVAL-02 最大绝对误差与均方根误差
+
+对长度相同且非空的参考向量 `r` 和候选向量 `x`：
+
+```text
+max_error = max_i(abs(x[i] - r[i]))
+RMSE = sqrt(sum_i((x[i] - r[i])^2) / N)
+```
+
+最大绝对误差描述最坏元素，RMSE 描述整体误差规模。两者都依赖数据类型、累加长度和计算路径，阈值由具体章节和实验固定。代码对应：Foundation FQ18、Chapter03–05 数值对照和真实模型 Golden。
+
 ## Benchmark 与 Serving
 
 <a id="f-perf-01"></a>
