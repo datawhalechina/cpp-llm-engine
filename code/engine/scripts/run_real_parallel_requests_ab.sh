@@ -9,6 +9,11 @@ execution_policy="${PARALLEL_AB_EXECUTION_POLICY:-optimized-avx2}"
 warmup="${PARALLEL_AB_WARMUP:-1}"
 iterations="${PARALLEL_AB_ITERATIONS:-3}"
 build_dir="${PARALLEL_AB_BUILD_DIR:-/tmp/cpp-llm-engine-real-parallel-ab}"
+if [[ "${execution_policy}" == "optimized-avx2" ]]; then
+    policy_suffix="avx2"
+else
+    policy_suffix="${execution_policy//[^a-zA-Z0-9_-]/_}"
+fi
 
 run_mode() {
     local mode="$1"
@@ -23,8 +28,10 @@ run_mode() {
 }
 
 mkdir -p "${result_dir}"
-run_mode sequential "${result_dir}/tinyllama_service_sequential_avx2.json"
-run_mode parallel-requests "${result_dir}/tinyllama_service_parallel_requests_avx2.json"
+sequential_result="${result_dir}/tinyllama_service_sequential_${policy_suffix}.json"
+parallel_result="${result_dir}/tinyllama_service_parallel_requests_${policy_suffix}.json"
+run_mode sequential "${sequential_result}"
+run_mode parallel-requests "${parallel_result}"
 
-echo "sequential_result=${result_dir}/tinyllama_service_sequential_avx2.json"
-echo "parallel_result=${result_dir}/tinyllama_service_parallel_requests_avx2.json"
+echo "sequential_result=${sequential_result}"
+echo "parallel_result=${parallel_result}"

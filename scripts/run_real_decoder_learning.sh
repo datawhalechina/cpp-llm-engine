@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 真实 TinyLlama CPU Decoder 学习入口。
-# 串联教学 Decoder、量化 backend 和 22 层真实 generation correctness。
+# 串联教学 Decoder、量化 backend 和 22 层真实 Decoder correctness。
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,11 +47,9 @@ cmake -S "${repo_root}/code/engine" -B "${build_dir}" \
     -DCHAPTER05_SOURCE_DIR="${repo_root}/code/chapter05_quantization" \
     -DCPP_LLM_ENGINE_REAL_MODEL="${model_path}" \
     -DCMAKE_BUILD_TYPE=Release
-cmake --build "${build_dir}" \
-    --target gguf_decoder_multilayer real_tinyllama_generation_smoke \
-    real_tinyllama_batch_smoke -j2
+cmake --build "${build_dir}" --target gguf_decoder_multilayer -j2
 ctest --test-dir "${build_dir}" \
-    -R '^(gguf_decoder_multilayer|real_tinyllama_(generation|batch)_test)$' \
+    -R '^gguf_decoder_multilayer$' \
     --output-on-failure
 
 echo "[real-decoder] learning path passed"

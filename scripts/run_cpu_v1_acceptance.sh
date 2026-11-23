@@ -49,17 +49,20 @@ LLAMA_CPP_ROOT="${llama_root}" \
     bash "${repo_root}/scripts/run_real_decoder_learning.sh"
 
 echo "[cpu-v1] task 5: generation runtime"
-bash "${repo_root}/code/chapter06_generation/scripts/run.sh"
+CPP_LLM_ENGINE_MODEL_PATH="${model_path}" \
+LLAMA_CPP_ROOT="${llama_root}" \
+    bash "${repo_root}/scripts/run_generation_runtime_learning.sh"
 
 echo "[cpu-v1] task 6: real CPU service"
 CPP_LLM_ENGINE_MODEL_PATH="${model_path}" \
-CPU_SERVICE_LEARNING_RESULT="${result_dir}/service-benchmark.json" \
+CPU_SERVICE_LEARNING_RESULT_DIR="${result_dir}/service-ab" \
     bash "${repo_root}/scripts/run_cpu_service_learning.sh"
 
 {
     echo "status=PASS"
     echo "finished_at=$(date --iso-8601=seconds)"
-    echo "service_result=${result_dir}/service-benchmark.json"
+    echo "service_sequential_result=${result_dir}/service-ab/tinyllama_service_sequential_scalar.json"
+    echo "service_parallel_result=${result_dir}/service-ab/tinyllama_service_parallel_requests_scalar.json"
 } >>"${manifest}"
 
 echo "[cpu-v1] manifest: ${manifest}"
