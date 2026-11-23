@@ -25,7 +25,22 @@ const patterns = [
   /正文页仍应/,
   /卡片写作规则/,
   /教程的维护成本/,
-  /后续新增.*再补/
+  /后续新增.*再补/,
+  /##\s+当前完成度/,
+  /##\s+.*近期交接/,
+  /下一优先级/,
+  /进入维护状态/,
+  /新的实现重心/,
+  /性能扩展队列/,
+  /仍在建设/,
+  /后续建设包括/
+]
+const learnerEntryRoots = ['source/foundation/', 'source/guides/']
+const mixedTermPatterns = [
+  /CPU reference/,
+  /CUDA backend/,
+  /scalar path/,
+  /Runtime 状态/
 ]
 
 function walk(dir) {
@@ -51,6 +66,10 @@ for (const file of files) {
     if (chineseFirstTitleRoots.some((root) => file.startsWith(`${root}/`)) &&
         /^#\s+\d+\.\d+\s+[A-Za-z]/.test(line)) {
       findings.push(`${file}:${index + 1}: chapter title must put the Chinese concept first`)
+    }
+    if ((entryFiles.includes(file) || learnerEntryRoots.some((root) => file.startsWith(root))) &&
+        mixedTermPatterns.some((pattern) => pattern.test(line))) {
+      findings.push(`${file}:${index + 1}: learner entry must introduce the Chinese concept before the English term`)
     }
   })
 }
