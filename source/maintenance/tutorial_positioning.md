@@ -26,7 +26,7 @@
 
 | 模块 | 负责的产物 |
 | --- | --- |
-| Foundation | C++、CMake、测试、CUDA、内存和数据结构前置能力 |
+| Foundation | C++、CMake、测试、数值证据、性能测量、CUDA 资源和数据结构前置能力 |
 | Chapter00 | 使用成熟实现建立真实模型推理基线 |
 | Chapter01–04 | 输入、Tensor、Operator、Attention、FFN 和 Decoder |
 | Chapter05 | 量化表示、解码、Quantized Linear 和 backend 选择 |

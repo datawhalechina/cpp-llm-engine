@@ -157,6 +157,7 @@ function createSidebar() {
             items: [
               { text: numberedText(1, '导读'), link: '/foundation/intro' },
               { text: numberedText(1.5, '正文与练习映射'), link: '/foundation/exercise_map' },
+              { text: numberedText(1.6, 'C++ 就绪自测'), link: '/foundation/00_cpp_readiness' },
               { text: numberedText(2, 'C++ 基础'), link: '/foundation/01_cxx_basics' },
               { text: numberedText(3, 'CMake 和编译基础'), link: '/foundation/02_cmake_build_basics' },
               { text: numberedText(4, 'CUDA 和环境基础'), link: '/foundation/03_cuda_environment_basics' },
@@ -167,6 +168,9 @@ function createSidebar() {
               { text: numberedText(9, 'PyTorch 到 C++ 桥接'), link: '/foundation/08_pytorch_to_cpp_bridge' },
               { text: numberedText(10, '最小 C++ / CUDA 项目'), link: '/foundation/09_minimal_cpp_cuda_project' },
               { text: numberedText(11, '进程、线程与同步异步'), link: '/foundation/10_concurrency_basics' },
+              { text: numberedText(12, '数值验证与正确性证据'), link: '/foundation/11_numerical_validation' },
+              { text: numberedText(13, 'CUDA 资源与异步执行'), link: '/foundation/12_cuda_resource_lifecycle' },
+              { text: numberedText(14, '性能测量基础'), link: '/foundation/13_performance_measurement' },
             ],
           },
         ],

@@ -18,7 +18,7 @@
 | 底层存储 | Storage | 保存实际字节并可被多个 Tensor view 共享的对象 | Chapter02 | [F-TENSOR-02](./formulas.md#f-tensor-02) |
 | 视图 | view | 共享 Storage、只改变 shape/stride/offset 的 Tensor | Chapter02 | [F-TENSOR-02](./formulas.md#f-tensor-02) |
 | 连续布局 | contiguous layout | 元素按约定维度顺序连续排列的内存布局 | Chapter02 | [F-TENSOR-02](./formulas.md#f-tensor-02) |
-| 工作区 | workspace | 算子执行期间复用的临时内存 | Chapter03、GPU 路线 | [F-TENSOR-01](./formulas.md#f-tensor-01) |
+| 工作区 | workspace | 算子执行期间复用的临时内存 | Foundation F12、Chapter03、GPU 路线 | [F-TENSOR-01](./formulas.md#f-tensor-01) |
 | 接口约定 | contract | 两个组件协作时可检查的输入输出、数据格式、状态不变量和错误行为；代码类型和测试名中保留 `Contract` | Chapter01、Chapter06 | - |
 | 推理引擎 | inference engine, engine | 加载并执行模型，管理运行时状态、缓存、调度和设备后端的系统；普通叙述使用中文，代码类型名按源码拼写 | Chapter00 | - |
 | 算子 | Operator | 对调用方提供稳定输入输出约定、把具体计算交给后端执行的接口 | [Chapter03 Operator Base](../chapter03_matmul/01_operator_base.md) | [F-LINEAR-01](./formulas.md#f-linear-01) |
@@ -27,10 +27,12 @@
 | 执行上下文 | Execution Context | 持有请求状态或设备 stream、handle、workspace 的执行对象 | Chapter06、GPU 路线 | [F-KV-01](./formulas.md#f-kv-01) |
 | 主机内存 | host memory | CPU 可直接访问的内存；GPU kernel 通常不能把普通 host pointer 当作 device pointer 使用 | Foundation CUDA、GPU 路线 | - |
 | 设备内存 | device memory | GPU kernel 可访问、由设备 allocator 管理的内存 | Foundation CUDA、GPU 路线 | [F-CUDA-01](./formulas.md#f-cuda-01) |
-| CUDA 流 | CUDA stream | 保持队列内顺序、允许不同队列并发的异步 GPU 工作序列 | GPU 路线 | [F-CUDA-01](./formulas.md#f-cuda-01) |
-| CUDA 事件 | CUDA event | 记录 stream 进度并用于依赖同步或设备侧计时的对象 | GPU 路线 | - |
+| CUDA 流 | CUDA stream | 保持队列内顺序、允许不同队列并发的异步 GPU 工作序列 | Foundation F12、GPU 路线 | [F-CUDA-01](./formulas.md#f-cuda-01) |
+| CUDA 事件 | CUDA event | 记录 stream 进度并用于依赖同步或设备侧计时的对象 | Foundation F12、GPU 路线 | - |
 | 进程 | process | 拥有独立地址空间的程序执行实例；跨进程对象需要 IPC、共享内存或网络传递 | Foundation / Chapter10 | - |
 | 线程 | thread | 进程内的执行单元；共享地址空间，因此并发修改对象需要所有权或同步规则 | Foundation / Chapter10 | - |
+| 条件变量 | condition variable | 让线程在共享状态不满足时释放互斥锁并等待通知；唤醒后仍需用谓词重新检查状态 | [Foundation 并发基础](../foundation/10_concurrency_basics.md) | - |
+| 工作线程 | Worker thread | 从队列取得任务并在后台执行的线程；队列所有权、停止规则和完成通知由外层对象管理 | Foundation / Chapter10 | - |
 | Warp | warp | CUDA 中按同一指令协同执行的一组线程；当前 NVIDIA GPU 通常每组 32 个线程 | Chapter05 | `threadIdx.x / 32` |
 | 归约 | reduction | 把多个线程的局部结果按求和、最大值等规则合并为一个结果 | Chapter05 / Chapter04 | `warp_reduce` |
 | 合并内存访问 | coalesced memory access | 相邻线程访问相邻 device 地址，使多个请求尽量合并为较少的显存事务 | Chapter05 | packed weights / input |
@@ -75,7 +77,9 @@
 | 解码器块 | Transformer decoder block, layer | Decoder 中重复堆叠的一层计算结构，通常包含 Attention、FFN、归一化和残差；“22 层/24 层”指块数量，不是隐藏维度 | Chapter04 | [F-ATTN-02](./formulas.md#f-attn-02) |
 | 残差连接 | residual connection | 将子层输出与输入相加，形成 Transformer block 的主数据通路 | Chapter04 | - |
 | 候选分数 | logits | 模型对词表中每个候选 token 输出的未归一化分数 | Chapter04-06 | [F-SAMPLE-01](./formulas.md#f-sample-01) |
-| 余弦相似度 | cosine similarity | 用两个向量夹角衡量整体方向的一致性；接近 1 表示分量变化模式相近，但仍需结合绝对误差、Top-K 和贪心词元判断 | Chapter04、09 | [F-EVAL-01](./formulas.md#f-eval-01) |
+| 余弦相似度 | cosine similarity | 用两个向量夹角衡量整体方向的一致性；接近 1 表示分量变化模式相近，但仍需结合绝对误差、Top-K 和贪心词元判断 | Foundation F11、Chapter04、09 | [F-EVAL-01](./formulas.md#f-eval-01) |
+| 最大绝对误差 | maximum absolute error, max error | 所有对应元素绝对差中的最大值，用于定位最坏偏差 | Foundation F11、Chapter03–05 | [F-EVAL-02](./formulas.md#f-eval-02) |
+| 均方根误差 | Root Mean Square Error, RMSE | 对元素误差平方取平均后开方，衡量整体误差规模并放大较大偏差 | Foundation F11、Chapter04 | [F-EVAL-02](./formulas.md#f-eval-02) |
 
 ## 生成、缓存与调度
 
@@ -123,7 +127,7 @@
 | 激活量化 | activation quantization | 对 Prefill/Decode 产生的中间 Tensor 进行静态或动态低精度表示 | [Chapter05 Runtime Quantization](../chapter05_quantization/08_quantization_in_serving_runtime.md) | [F-QUANT-03](./formulas.md#f-quant-03) |
 | K/V Cache 量化 | KV cache quantization | 用低精度 payload 和 scale metadata 保存请求级 key/value 历史 | [Chapter07 Production Extensions](../chapter07_kv_cache/next/06_production_extensions.md) | [F-QUANT-04](./formulas.md#f-quant-04) |
 | 融合内核 | fused kernel | 在一次 kernel 或紧密循环中完成原本分离的多个阶段 | Chapter05、GPU 路线 | [F-QUANT-02](./formulas.md#f-quant-02) |
-| 性能基准 | benchmark | 在固定 workload 和环境下测量延迟、吞吐与资源使用 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
+| 性能基准 | benchmark | 在固定 workload 和环境下测量延迟、吞吐与资源使用 | Foundation F13、Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
 | 性能剖析 | profiling | 将性能结果归因到阶段、算子、带宽或同步 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
 | 首词元延迟 | Time to First Token, TTFT | 请求接收到首个生成词元的时间 | Chapter09-10 | [F-PERF-01](./formulas.md#f-perf-01) |
 | 每词元输出时间 | Time per Output Token, TPOT | 首词元之后每个输出词元的平均耗时 | Chapter09-10 | [F-PERF-01](./formulas.md#f-perf-01) |
@@ -164,9 +168,11 @@
 | 测试夹具 | fixture | 为测试固定的输入、配置和期望属性，可来自合成数据或外部工具 | Foundation、Chapter01 | - |
 | 基准结果 | golden result | 由可信来源或已审核基线产生、用于数值或输出序列比较的期望结果 | Chapter01、Chapter09 | - |
 | 参考实现 | reference implementation | 优先保证语义清晰和正确性、用于校验优化实现的实现路径 | Chapter03、Chapter05 | - |
-| 回归测试 | regression test | 防止已通过行为在后续修改中退化的自动化检查 | Chapter09 | - |
+| 回归测试 | regression test | 防止已通过行为在后续修改中退化的自动化检查 | Foundation F04、Chapter09 | - |
 | 运行时错误检测器 | Sanitizer | 由编译器插桩，在程序运行时发现越界、释放后使用、未定义行为等问题；`ASan` 检查内存，`UBSan` 检查未定义行为 | [Foundation 调试与测试](../foundation/04_debugging_testing_basics.md) | - |
-| A/B 实验 | A/B experiment | 固定 workload 和环境，只改变一个目标因素的对照测量 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
+| 故障注入 | fault injection | 在指定执行阶段主动制造失败，用于验证错误传播、事务回滚、终态与资源守恒 | [Foundation 调试与测试](../foundation/04_debugging_testing_basics.md) | - |
+| A/B 实验 | A/B experiment | 固定 workload 和环境，只改变一个目标因素的对照测量 | Foundation F13、Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
+| 配对性能实验 | paired benchmark | 在相同工作负载下交替两条路径的执行顺序，保留成对样本以降低固定顺序偏差 | Foundation F13、Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
 | 墙钟时间 | wall-clock time, elapsed time | 从入口到结果可用按真实时钟经过的时间，包含计算、同步、搬运、调度和等待 | Chapter09 | - |
 
 ## 参考框架与格式

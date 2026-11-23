@@ -42,7 +42,7 @@ A 建立可观察的小尺寸闭环，B 连接真实 CPU 结构；G 和 M 是选
 
 | 模块 | 学习产物 | 运行入口 |
 | --- | --- | --- |
-| Foundation | C++、构建、测试和 CUDA 前置能力 | `bash exercises/foundation/run_all.sh` |
+| Foundation | C++、构建、测试、数值证据、性能测量和 CUDA 前置能力 | `bash exercises/foundation/run_all.sh` |
 | Chapter00 | 工具链检查与 TinyLlama 真实推理基线 | `bash code/chapter00_quickstart/run.sh` |
 | Chapter01 | tokenizer、metadata、权重与 Model | `bash code/chapter01_tensor_loader/run.sh` |
 | Chapter02 | 共享 Storage 的 Tensor view | `bash code/chapter02_tensor_ops/scripts/run.sh` |

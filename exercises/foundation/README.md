@@ -1,6 +1,6 @@
 # Foundation Exercises 基础小题库
 
-这套题库把 `foundation` 的最低门槛落实为可编译、可测试的小题。题目默认不需要模型文件或 GPU；FQ10 提供 CPU 参考实现和可选 CUDA starter。
+这套题库把 `foundation` 的最低门槛落实为可编译、可测试的小题。题目默认不需要模型文件或 GPU；FQ10 提供 CPU 参考实现和可选 CUDA starter，FQ20 用 CPU 状态机练习设备执行语义。
 
 ## 题目资产
 
@@ -23,6 +23,11 @@
 | [`FQ15`](./problems/fq15_kv_block_pool/README.md) | 主线 | KV Block Pool | block 分配、释放、复用 | `F06` / Chapter07 |
 | [`FQ16`](./problems/fq16_prefill_decode_state/README.md) | 综合 | Prefill/Decode State | 阶段迁移、token 计数、终态 | `F10` / Chapter06 |
 | [`FQ17`](./problems/fq17_minimal_project/README.md) | 综合 | Minimal Project Integration | library、app、test、workspace 所有权 | `F02`、`F09` / Chapter00–01 |
+| [`FQ18`](./problems/fq18_numerical_evidence/README.md) | 主线 | 数值证据 | 误差、相似度、稳定 Softmax | `F11` / Chapter03–05 |
+| [`FQ19`](./problems/fq19_transaction_rollback/README.md) | 主线 | 事务回滚 | 故障注入、状态和资源守恒 | `F04` / Chapter07–10 |
+| [`FQ20`](./problems/fq20_device_pipeline/README.md) | 进阶选修 | 设备流水线 | 异步顺序、资源生命周期、workspace 复用 | `F12` / CUDA 路线 |
+| [`FQ21`](./problems/fq21_paired_benchmark/README.md) | 主线 | 配对性能实验 | 预热、交替顺序、正确性门禁、中位数 | `F13` / Chapter09 |
+| [`FQ22`](./problems/fq22_bounded_worker/README.md) | 综合 | 有界 Worker 生命周期 | 线程等待、取消、异常、停止和终态唯一性 | `F10` / Chapter10 |
 
 每道题都包含问题说明、完成标准、答案验证命令、提示和主线链接。验证顺序固定为：复制并完成 starter，先运行学习者答案，再运行 `run_all.sh` 检查参考实现没有回归。
 
@@ -54,26 +59,29 @@ bash exercises/foundation/run_all.sh
 | 路径 | 题目 | 完成后能做什么 |
 | --- | --- | --- |
 | 入门必做 | `FQ01`、`FQ02`、`FQ04`、`FQ05` | 构建小型 C++ 程序，处理所有权、shape 和错误输入 |
-| CPU 主线 | `FQ03`、`FQ06`、`FQ08`、`FQ12` | 理解 view、CPU 算子、Tensor ownership 和 workspace |
-| Runtime 综合练习 | `FQ07`、`FQ09`、`FQ11`、`FQ13`、`FQ14`、`FQ15`、`FQ16` | 理解 Request、batch、scheduler、KV block 和 Prefill/Decode |
+| CPU 主线 | `FQ03`、`FQ06`、`FQ08`、`FQ12`、`FQ18` | 理解 view、CPU 算子、Tensor ownership、workspace 和数值证据 |
+| Runtime 综合练习 | `FQ07`、`FQ09`、`FQ11`、`FQ13`、`FQ14`、`FQ15`、`FQ16`、`FQ19`、`FQ22` | 理解 Request、batch、scheduler、KV block、阶段切换、失败回滚和 Worker 生命周期 |
 | 工程整合 | `FQ17` | 把 library、app、test 和资源所有权组合成可运行项目 |
-| CUDA 选修 | `FQ10` | 先写 CPU reference，再把索引逻辑映射到 CUDA kernel |
+| 性能方法 | `FQ21` | 在正确性门禁后进行预热、配对采样和中位数统计 |
+| CUDA 选修 | `FQ10`、`FQ20` | 建立 CPU/CUDA 对照，理解设备任务顺序和 workspace 复用 |
 
-推荐总顺序：`FQ01 -> FQ02 -> FQ04 -> FQ05 -> FQ03 -> FQ06 -> FQ08 -> FQ12 -> FQ17 -> FQ07 -> FQ09 -> FQ11 -> FQ13 -> FQ14 -> FQ15 -> FQ16`，有 CUDA 环境再插入 `FQ10`。
+已经熟悉 C++ 类和所有权时，推荐顺序是：`FQ01 -> FQ02 -> FQ04 -> FQ05 -> FQ03 -> FQ06 -> FQ08 -> FQ12 -> FQ18 -> FQ17 -> FQ07 -> FQ09 -> FQ11 -> FQ13 -> FQ14 -> FQ15 -> FQ16 -> FQ19 -> FQ22 -> FQ21`。
 
-初学者完成入门组即可进入 `chapter00`；希望理解 generation runtime 的学习者继续完成主线组；已有 GPU 基础的学习者再做 FQ10。
+C++ 基础较弱时，先完成 [`F00 C++ 就绪自测`](/foundation/00_cpp_readiness)，再按 `FQ02 -> FQ05 -> FQ07 -> FQ04 -> FQ01 -> FQ03 -> FQ08 -> FQ12` 学习。这个顺序先练容器、边界和 FIFO，再引入构建、移动所有权和共享视图。之后接 `FQ06 -> FQ18 -> FQ17`，最后进入 Runtime 综合练习。准备学习 GPU 时加入 `FQ10` 和 `FQ20`。
+
+完成前 3 道弱基础练习即可进入 Chapter00；希望理解 Generation Runtime 的学习者继续完成 Runtime 综合练习；已有 GPU 基础的学习者再做 FQ10。
 
 ## CPU / GPU 题库资产对照
 
 | 资产维度 | CPU 题库 | GPU 题库 |
 | --- | --- | --- |
-| 题目范围 | FQ01-FQ09、FQ11-FQ17 | FQ10，以及 F03/F07 文档练习 |
-| 核心对象 | ownership、Tensor、view、MatMul、Request、batch、scheduler、KV block、Prefill/Decode | device、thread index、kernel 边界、host/device 数据搬运、CUDA 库 |
+| 题目范围 | FQ01-FQ09、FQ11-FQ19、FQ21-FQ22 | FQ10、FQ20，以及 F03/F07/F12 文档练习 |
+| 核心对象 | ownership、Tensor、view、MatMul、Request、batch、scheduler、事务、数值与性能证据 | device、thread index、kernel 边界、host/device 数据搬运、Stream/Event 和 workspace |
 | 默认环境 | C++17、CMake、CTest，无模型、无 GPU | CPU 可完成 reference；CUDA kernel 需要 CUDA toolkit 和 GPU |
-| 验证方式 | 17 题 CTest、starter 编译、元数据检查、回归基线 | FQ10 CPU reference 默认验证；CUDA starter 需要独立 CUDA 工程对照验证 |
-| 主线出口 | Chapter 01-08 的数据、算子、Runtime、缓存与调度 | Chapter 03 CUDA backend、后续 GPU kernel 和 benchmark |
+| 验证方式 | 22 题 CTest、starter 编译、元数据检查、回归基线 | FQ10/FQ20 的 CPU 语义默认验证；真实设备由 CUDA 专项测试验证 |
+| 主线出口 | Chapter 01-10 的数据、算子、Runtime、缓存、调度、证据与服务 | Chapter03 CUDA backend、后续 GPU Kernel 和性能实验 |
 
-Foundation 的 GPU 练习先用 FQ10 建立 CPU/CUDA 对照；继续学习设备内存、stream、event、更多 kernel 和 benchmark 时，进入 [`code/cuda`](/code/cuda)。
+Foundation 的 GPU 练习先用 FQ10 建立 CPU/CUDA 对照，再用 FQ20 固定设备任务顺序和 workspace 复用；真实设备内存、Stream、Event、Kernel 和 Benchmark 进入 [`code/cuda`](/code/cuda) 验证。
 
 ## 两道状态题的区别
 
@@ -84,7 +92,7 @@ Foundation 的 GPU 练习先用 FQ10 建立 CPU/CUDA 对照；继续学习设备
 
 ## Foundation 完成标准
 
-完成入门组后，应能独立构建和测试 C++ 小程序；完成 CPU 主线和 FQ17 后，应能读懂 Chapter00–03 的项目组织、对象和算子；完成 Runtime 综合练习后，应能分别阅读 Chapter06 的生成状态、Chapter07 的 K/V 资源和 Chapter08 的调度。参考实现 CTest 通过只说明题库基线有效，自己的 starter 还需通过对应答案命令。
+完成入门组后，应能独立构建和测试 C++ 小程序；完成 CPU 主线和 FQ17 后，应能读懂 Chapter00–05 的项目组织、对象、算子和数值证据；完成 Runtime 综合练习后，应能分别阅读 Chapter06 的生成状态、Chapter07 的 K/V 资源、Chapter08 的调度和 Chapter10 的 Worker 生命周期；完成 FQ21 后，应能进入 Chapter09 阅读性能实验。参考实现 CTest 通过只说明题库基线有效，自己的 starter 还需通过对应答案命令。
 
 ## 运行全部题目
 

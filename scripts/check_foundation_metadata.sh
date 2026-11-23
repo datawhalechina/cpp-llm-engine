@@ -5,7 +5,7 @@ root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 problem_root="${root_dir}/exercises/foundation/problems"
 exercise_index="${root_dir}/exercises/foundation/README.md"
 exercise_map="${root_dir}/source/foundation/exercise_map.md"
-expected=17
+expected=22
 count=0
 
 for problem in "${problem_root}"/fq*; do
