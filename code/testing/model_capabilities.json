@@ -71,7 +71,7 @@
         "loader": { "state": "verified", "evidence": ["code/multimodal/scripts/run.sh"] },
         "cpu_model_generation": { "state": "verified", "evidence": ["code/multimodal/scripts/run.sh"] },
         "cpu_batch_serving": { "state": "partial", "evidence": ["code/multimodal/scripts/run_real_service_benchmark.sh"], "gap": "Image HTTP transport is not implemented" },
-        "cuda_model_generation": { "state": "planned", "evidence": [], "gap": "CUDA vision encoder and projector" },
+        "cuda_model_generation": { "state": "partial", "evidence": ["code/multimodal/scripts/run_cuda.sh", "code/multimodal/scripts/run_cuda_real_block.sh", "code/multimodal/scripts/run_cuda_real_encoder.sh", "code/multimodal/scripts/run_cuda_real_pipeline.sh", "code/multimodal/scripts/run_cuda_smolvlm_context.sh"], "gap": "A real-image small-window vision row reaches the 32-layer CUDA language context; the full tile, mixed text/vision sequence, decode, and generation remain" },
         "cuda_batch_serving": { "state": "planned", "evidence": [], "gap": "Depends on CUDA multimodal execution" }
       }
     }
