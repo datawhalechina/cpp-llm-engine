@@ -14,8 +14,18 @@ class Workspace {
 
   Workspace(const Workspace&) = delete;
   Workspace& operator=(const Workspace&) = delete;
-  Workspace(Workspace&&) noexcept = default;
-  Workspace& operator=(Workspace&&) noexcept = default;
+  Workspace(Workspace&& other) noexcept
+      : storage_(std::move(other.storage_)), size_(other.size_) {
+    other.size_ = 0;
+  }
+  Workspace& operator=(Workspace&& other) noexcept {
+    if (this != &other) {
+      storage_ = std::move(other.storage_);
+      size_ = other.size_;
+      other.size_ = 0;
+    }
+    return *this;
+  }
 
   std::size_t size() const { return size_; }
   bool valid() const { return storage_ != nullptr; }
@@ -37,9 +47,24 @@ int main() {
 
   Workspace moved(std::move(workspace));
   assert(!workspace.valid());
+  assert(workspace.size() == 0);
   assert(moved.size() == 2);
   assert(moved.at(0) == 1.0f);
   assert(moved.at(1) == 2.0f);
+
+  Workspace assigned(1);
+  assigned = std::move(moved);
+  assert(!moved.valid());
+  assert(moved.size() == 0);
+  assert(assigned.size() == 2);
+
+  bool moved_from_rejected = false;
+  try {
+    (void)moved.at(0);
+  } catch (const std::out_of_range&) {
+    moved_from_rejected = true;
+  }
+  assert(moved_from_rejected);
 
   bool rejected = false;
   try {

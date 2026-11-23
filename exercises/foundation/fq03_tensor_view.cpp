@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstddef>
+#include <stdexcept>
 #include <vector>
 
 struct TensorView {
@@ -8,7 +9,8 @@ struct TensorView {
   std::size_t offset = 0;
 
   float& at(std::size_t index) {
-    assert(index < length);
+    if (data == nullptr) throw std::logic_error("view has no storage");
+    if (index >= length) throw std::out_of_range("view index");
     return data[offset + index];
   }
 };
@@ -20,4 +22,11 @@ int main() {
   view.at(2) = 40;
   assert(storage[2] == 20);
   assert(storage[4] == 40);
+  bool rejected = false;
+  try {
+    (void)view.at(3);
+  } catch (const std::out_of_range&) {
+    rejected = true;
+  }
+  assert(rejected);
 }

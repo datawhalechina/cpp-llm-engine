@@ -11,6 +11,7 @@
 - view 修改能反映到根 Tensor。
 - 根 Tensor 销毁后，仍存活的 view 不访问悬空内存。
 - 越界索引和非法 slice 有明确失败行为。
+- slice 的范围检查不能因 `offset + size` 整数溢出而绕过。
 
 ## 验证
 

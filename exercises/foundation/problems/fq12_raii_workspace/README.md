@@ -7,7 +7,7 @@
 ## 完成标准
 
 - workspace 独占底层数组，禁止复制。
-- 移动构造和移动赋值后，源对象不再拥有资源。
+- 移动构造和移动赋值后，源对象不再拥有资源且 size 归零。
 - 空 workspace 和越界访问明确失败。
 - 不需要手工 `delete`，异常路径也能安全结束。
 
@@ -26,7 +26,7 @@ bash scripts/check_foundation_answer.sh /tmp/fq12-answer/main.cpp
 
 - L0：先确定 workspace 的空状态和所有权状态。
 - L1：使用 `std::unique_ptr<float[]>`，显式删除复制操作。
-- L2：增加 move assignment、异常退出和多次 step 获取/释放测试。
+- L2：显式重置移动源的 size，并测试 move assignment 和移动源访问。
 
 ## 主线映射
 

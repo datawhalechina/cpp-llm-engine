@@ -18,6 +18,11 @@ std::vector<float> matmul(const std::vector<float>& a, std::size_t m, std::size_
 }
 
 int main() {
+  assert(matmul({2}, 1, 1, {3}, 1) == std::vector<float>({6}));
+  assert(matmul({1, 2, 3}, 1, 3, {1, 0, 0, 1, 1, 1}, 2) ==
+         std::vector<float>({4, 5}));
+  assert(matmul({1, 2, 3}, 3, 1, {4}, 1) ==
+         std::vector<float>({4, 8, 12}));
   const auto result = matmul({1, 2, 3, 4}, 2, 2, {5, 6, 7, 8}, 2);
   assert(result == std::vector<float>({19, 22, 43, 50}));
   bool rejected = false;

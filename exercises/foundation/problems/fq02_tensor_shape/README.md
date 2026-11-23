@@ -9,7 +9,7 @@
 - `{2, 3, 4}` 返回 `24`。
 - `{1}` 返回 `1`。
 - 空 shape 和零维度抛出 `std::invalid_argument`。
-- 乘积溢出策略至少在文档中说明。
+- 维度乘积超过 `std::size_t` 范围时抛出 `std::overflow_error`。
 
 ## 验证
 
@@ -26,7 +26,7 @@ bash scripts/check_foundation_answer.sh /tmp/fq02-answer/main.cpp
 
 - L0：先区分 rank、shape 和 numel。
 - L1：使用累乘，不要把维度数量误当作元素数量。
-- L2：补充空输入、零维度和大维度测试。
+- L2：累乘前使用 `max / dim` 判断下一次乘法是否溢出。
 
 ## 主线映射
 
