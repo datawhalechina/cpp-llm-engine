@@ -1,7 +1,8 @@
-// CUDA GEMV 实验：测量 Q4_K/Q6_K 在 batch=1/2/4/8 下的融合 kernel 路径。
+// CUDA GEMV 实验：测量 Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL 在小 batch 下的融合 kernel。
 // 口径：固定 2048x2048 权重，计时包含 kernel 提交和末尾同步，不含分配与传输。
 // 验证：每个 batch 行与同输入的单行调用逐元素比较；本程序不注册为 CTest。
 #include "cpp_llm_engine/core/backend.h"
+#include "cpp_llm_engine/core/quantization_contract.h"
 #include "cpp_llm_engine/cuda/cuda_execution_context.h"
 #include "cpp_llm_engine/cuda/cuda_quantized_matrix.h"
 #include "cpp_llm_engine/cuda/cuda_tensor.h"
@@ -29,13 +30,10 @@ using cpp_llm_engine::cuda::CudaTensor;
 
 constexpr std::size_t kRows = 2048;
 constexpr std::size_t kCols = 2048;
-constexpr std::size_t kElementsPerBlock = 256;
-constexpr std::size_t kQ4KBlockBytes = 144;
-constexpr std::size_t kQ6KBlockBytes = 210;
-
 struct Options final {
     std::vector<std::size_t> batches{1, 2, 4, 8};
-    std::string format = "all";
+    // Keep the historical no-argument workload stable for EXP-GPU-13/14.
+    std::string format = "q4q6";
     std::string path = "fixed-four";
     std::size_t iterations = 50;
 };
@@ -66,7 +64,9 @@ bool parse_options(int argc, char** argv, Options* options) {
             options->batches = {batch};
         } else if (option == "--format" && index + 1 < argc) {
             options->format = argv[++index];
-            if (options->format != "q4" && options->format != "q6" &&
+            if (options->format != "q2" && options->format != "q3" &&
+                options->format != "q4" &&
+                options->format != "q6" && options->format != "iq4" &&
                 options->format != "all") {
                 return false;
             }
@@ -74,7 +74,9 @@ bool parse_options(int argc, char** argv, Options* options) {
             if (!parse_positive(argv[++index], &options->iterations)) return false;
         } else if (option == "--path" && index + 1 < argc) {
             options->path = argv[++index];
-            if (options->path != "fixed-four" && options->path != "adaptive") {
+            if (options->path != "fixed-four" && options->path != "adaptive" &&
+                options->path != "iq4-warp" && options->path != "q2-warp" &&
+                options->path != "q3-warp") {
                 return false;
             }
         } else {
@@ -85,9 +87,12 @@ bool parse_options(int argc, char** argv, Options* options) {
 }
 
 std::vector<std::uint8_t> make_payload(WeightFormat format) {
-    const std::size_t block_bytes =
-        format == WeightFormat::Q4K ? kQ4KBlockBytes : kQ6KBlockBytes;
-    const std::size_t block_count = kRows * kCols / kElementsPerBlock;
+    std::size_t block_elements = 0;
+    std::size_t block_bytes = 0;
+    const auto layout = cpp_llm_engine::core::quantized_block_layout(
+        format, &block_elements, &block_bytes);
+    if (!layout.is_ok()) return {};
+    const std::size_t block_count = kRows * kCols / block_elements;
     std::vector<std::uint8_t> payload(block_count * block_bytes, 0);
     for (std::size_t block = 0; block < block_count; ++block) {
         std::uint8_t* current = payload.data() + block * block_bytes;
@@ -103,7 +108,7 @@ std::vector<std::uint8_t> make_payload(WeightFormat format) {
                 current[16 + index] =
                     static_cast<std::uint8_t>((index * 29 + block * 7) & 0xff);
             }
-        } else {
+        } else if (format == WeightFormat::Q6K) {
             for (std::size_t index = 0; index < 192; ++index) {
                 current[index] =
                     static_cast<std::uint8_t>((index * 17 + block * 11) & 0xff);
@@ -113,6 +118,49 @@ std::vector<std::uint8_t> make_payload(WeightFormat format) {
             }
             current[208] = 0x00;
             current[209] = 0x34;  // fp16 0.25
+        } else if (format == WeightFormat::Q2K) {
+            for (std::size_t index = 0; index < 16; ++index) {
+                const auto scale = static_cast<std::uint8_t>(
+                    1 + (index + block) % 7);
+                const auto minimum = static_cast<std::uint8_t>(
+                    (index + 2 * block) % 4);
+                current[index] = static_cast<std::uint8_t>(
+                    scale | (minimum << 4));
+            }
+            for (std::size_t index = 0; index < 64; ++index) {
+                current[16 + index] = static_cast<std::uint8_t>(
+                    (index * 37 + block * 19 + 5) & 0xff);
+            }
+            current[80] = 0x00;
+            current[81] = 0x38;  // fp16 0.5
+            current[82] = 0x00;
+            current[83] = 0x34;  // fp16 0.25
+        } else if (format == WeightFormat::Q3K) {
+            for (std::size_t index = 0; index < 32; ++index) {
+                current[index] = static_cast<std::uint8_t>(
+                    (index * 31 + block * 17 + 9) & 0xff);
+            }
+            for (std::size_t index = 0; index < 64; ++index) {
+                current[32 + index] = static_cast<std::uint8_t>(
+                    (index * 37 + block * 19 + 5) & 0xff);
+            }
+            for (std::size_t index = 0; index < 12; ++index) {
+                current[96 + index] = static_cast<std::uint8_t>(
+                    (index * 23 + block * 11 + 7) & 0xff);
+            }
+            current[108] = 0x00;
+            current[109] = 0x34;  // fp16 0.25
+        } else {
+            current[0] = 0x00;
+            current[1] = block % 2 == 0 ? 0x2c : 0x30;  // fp16 0.0625 / 0.125
+            for (std::size_t index = 0; index < 16; ++index) {
+                const auto low = static_cast<std::uint8_t>(
+                    (index + block) % 16);
+                const auto high = static_cast<std::uint8_t>(
+                    (15 - index + block) % 16);
+                current[2 + index] = static_cast<std::uint8_t>(
+                    low | (high << 4));
+            }
         }
     }
     return payload;
@@ -133,8 +181,11 @@ bool run_format(
         return false;
     }
     context.set_quantized_gemv_path(
-        options.path == "adaptive" ? CudaQuantizedGemvPath::Adaptive
-                                   : CudaQuantizedGemvPath::FixedTile4);
+        options.path == "adaptive" ? CudaQuantizedGemvPath::Adaptive :
+        options.path == "iq4-warp" ? CudaQuantizedGemvPath::AdaptiveIq4Warp :
+        options.path == "q2-warp" ? CudaQuantizedGemvPath::AdaptiveBlockWarp :
+        options.path == "q3-warp" ? CudaQuantizedGemvPath::AdaptiveAllWarp :
+                                    CudaQuantizedGemvPath::FixedTile4);
     CudaQuantizedMatrix weights;
     if (!check_status(
             CudaQuantizedMatrix::create(kRows, kCols, format, &weights),
@@ -263,16 +314,31 @@ int main(int argc, char** argv) {
     Options options;
     if (!parse_options(argc, argv, &options)) {
         std::cerr << "usage: cpp_llm_engine_cuda_quantized_gemv_matrix "
-                     "[--batch N] [--format q4|q6|all] [--iterations N] "
-                     "[--path fixed-four|adaptive]\n";
+                     "[--batch N] [--format q2|q3|q4|q6|iq4|all] "
+                     "[--iterations N] "
+                     "[--path fixed-four|adaptive|q2-warp|q3-warp|iq4-warp]\n";
         return 2;
     }
-    if ((options.format == "q4" || options.format == "all") &&
+    if ((options.format == "q4" || options.format == "q4q6" ||
+         options.format == "all") &&
         !run_format(WeightFormat::Q4K, "Q4_K", options)) {
         return 1;
     }
-    if ((options.format == "q6" || options.format == "all") &&
+    if ((options.format == "q6" || options.format == "q4q6" ||
+         options.format == "all") &&
         !run_format(WeightFormat::Q6K, "Q6_K", options)) {
+        return 1;
+    }
+    if ((options.format == "q2" || options.format == "all") &&
+        !run_format(WeightFormat::Q2K, "Q2_K", options)) {
+        return 1;
+    }
+    if ((options.format == "q3" || options.format == "all") &&
+        !run_format(WeightFormat::Q3K, "Q3_K", options)) {
+        return 1;
+    }
+    if ((options.format == "iq4" || options.format == "all") &&
+        !run_format(WeightFormat::IQ4_NL, "IQ4_NL", options)) {
         return 1;
     }
     return 0;

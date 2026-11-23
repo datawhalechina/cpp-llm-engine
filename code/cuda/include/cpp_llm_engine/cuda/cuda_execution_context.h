@@ -63,11 +63,44 @@ public:
         const CudaTensor& source,
         const std::vector<std::size_t>& row_indices,
         CudaTensor* output);
+    core::Status gather_rows_device(
+        const CudaTensor& source,
+        const CudaTensor& row_indices,
+        std::size_t index_offset,
+        std::size_t selected_rows,
+        CudaTensor* output) const;
+    core::Status spatial_merge(
+        const CudaTensor& input,
+        std::size_t grid_width,
+        std::size_t grid_height,
+        std::size_t merge_size,
+        CudaTensor* output) const;
     core::Status weighted_scatter_add_rows(
         const CudaTensor& source,
         const std::vector<std::size_t>& destination_rows,
         const std::vector<float>& weights,
         CudaTensor* output);
+    core::Status weighted_scatter_add_rows_device(
+        const CudaTensor& source,
+        const CudaTensor& destination_rows,
+        const CudaTensor& weights,
+        std::size_t metadata_offset,
+        CudaTensor* output) const;
+    core::Status moe_route(
+        const CudaTensor& hidden,
+        const CudaTensor& router,
+        std::size_t top_k,
+        bool normalize_weights,
+        float weight_scale,
+        CudaTensor* expert_indices,
+        CudaTensor* route_weights) const;
+    core::Status moe_group_routes(
+        const CudaTensor& expert_indices,
+        const CudaTensor& route_weights,
+        std::size_t expert_count,
+        CudaTensor* grouped_rows,
+        CudaTensor* grouped_weights,
+        CudaTensor* expert_counts) const;
     core::Status zero(CudaTensor* output) const;
     core::Status vector_add(
         const CudaTensor& lhs,
@@ -83,6 +116,19 @@ public:
         const CudaTensor& weight,
         CudaTensor* output,
         float epsilon) const;
+    core::Status layer_norm_batch(
+        const CudaTensor& input,
+        const CudaTensor& weight,
+        const CudaTensor& bias,
+        CudaTensor* output,
+        float epsilon) const;
+    core::Status add_bias_batch(
+        const CudaTensor& input,
+        const CudaTensor& bias,
+        CudaTensor* output) const;
+    core::Status gelu(
+        const CudaTensor& input,
+        CudaTensor* output) const;
     core::Status swiglu(
         const CudaTensor& gate,
         const CudaTensor& up,

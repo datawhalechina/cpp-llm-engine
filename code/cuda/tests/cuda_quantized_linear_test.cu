@@ -6,6 +6,7 @@
 #include "chapter05_quantization/q3k_dequantize.h"
 #include "chapter05_quantization/q4k_dequantize.h"
 #include "chapter05_quantization/q6k_dequantize.h"
+#include "chapter05_quantization/q8_0_dequantize.h"
 #include "cpp_llm_engine/core/linear_contract.h"
 #include "cpp_llm_engine/cuda/cuda_execution_context.h"
 #include "cpp_llm_engine/cuda/cuda_quantized_matrix.h"
@@ -172,6 +173,23 @@ std::vector<std::uint8_t> make_iq4nl_payload() {
             const std::uint8_t low = static_cast<std::uint8_t>((index + block) % 16);
             const std::uint8_t high = static_cast<std::uint8_t>((15 - index + block) % 16);
             payload[offset + 2 + index] = static_cast<std::uint8_t>(low | (high << 4));
+        }
+    }
+    return payload;
+}
+
+std::vector<std::uint8_t> make_q8_0_payload() {
+    using chapter05_quantization::kQ8_0BlockBytes;
+    constexpr std::size_t block_count = 512 / 32;
+    std::vector<std::uint8_t> payload(block_count * kQ8_0BlockBytes, 0);
+    for (std::size_t block = 0; block < block_count; ++block) {
+        const std::size_t offset = block * kQ8_0BlockBytes;
+        payload[offset] = 0x00;
+        payload[offset + 1] = block % 2 == 0 ? 0x2c : 0x30;  // fp16 0.0625 / 0.125
+        for (std::size_t index = 0; index < 32; ++index) {
+            const int quant = static_cast<int>((index * 11 + block * 7) % 255) - 127;
+            payload[offset + 2 + index] = static_cast<std::uint8_t>(
+                static_cast<std::int8_t>(quant));
         }
     }
     return payload;
@@ -387,6 +405,8 @@ int main() {
     CudaQuantizedMatrix q2k_weights;
     CHECK(CudaQuantizedMatrix::create(2, 256, WeightFormat::Q2K, &q2k_weights).is_ok());
     CHECK(context.upload(&q2k_weights, q2k_payload.data(), q2k_payload.size()).is_ok());
+    context.set_quantized_gemv_path(
+        cpp_llm_engine::cuda::CudaQuantizedGemvPath::AdaptiveBlockWarp);
     CHECK(context.quantized_linear(q2k_weights, input, &output).is_ok());
     CHECK(context.download(output, output_host.data(), output_host.size() * sizeof(float)).is_ok());
     CHECK(context.quantized_linear_batch(q2k_weights, batch_input, &batch_output).is_ok());
@@ -400,6 +420,8 @@ int main() {
     for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
         CHECK(close_enough(batch_output_host[index], q2k_batch_expected[index]));
     }
+    context.set_quantized_gemv_path(
+        cpp_llm_engine::cuda::CudaQuantizedGemvPath::Adaptive);
 
     const std::vector<std::uint8_t> q3k_payload = make_q3k_payload();
     std::vector<float> q3k_decoded;
@@ -411,6 +433,8 @@ int main() {
     CudaQuantizedMatrix q3k_weights;
     CHECK(CudaQuantizedMatrix::create(2, 256, WeightFormat::Q3K, &q3k_weights).is_ok());
     CHECK(context.upload(&q3k_weights, q3k_payload.data(), q3k_payload.size()).is_ok());
+    context.set_quantized_gemv_path(
+        cpp_llm_engine::cuda::CudaQuantizedGemvPath::AdaptiveAllWarp);
     CHECK(context.quantized_linear(q3k_weights, input, &output).is_ok());
     CHECK(context.download(output, output_host.data(), output_host.size() * sizeof(float)).is_ok());
     CHECK(context.quantized_linear_batch(q3k_weights, batch_input, &batch_output).is_ok());
@@ -423,6 +447,36 @@ int main() {
     CHECK(close_enough(output_host[1], q3k_expected[1]));
     for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
         CHECK(close_enough(batch_output_host[index], q3k_batch_expected[index]));
+    }
+    context.set_quantized_gemv_path(
+        cpp_llm_engine::cuda::CudaQuantizedGemvPath::Adaptive);
+
+    const std::vector<std::uint8_t> q8_0_payload = make_q8_0_payload();
+    std::vector<float> q8_0_decoded;
+    CHECK(chapter05_quantization::dequantize_q8_0(
+        q8_0_payload.data(), q8_0_payload.size(), 512, &q8_0_decoded, &error));
+    const auto q8_0_expected = cpu_linear(q8_0_decoded, 2, 256, input_host);
+    const auto q8_0_batch_expected = cpu_linear_batch(
+        q8_0_decoded, 2, 256, batch_input_host, batch_size);
+    CudaQuantizedMatrix q8_0_weights;
+    CHECK(CudaQuantizedMatrix::create(
+        2, 256, WeightFormat::Q8_0, &q8_0_weights).is_ok());
+    CHECK(context.upload(
+        &q8_0_weights, q8_0_payload.data(), q8_0_payload.size()).is_ok());
+    CHECK(context.quantized_linear(q8_0_weights, input, &output).is_ok());
+    CHECK(context.download(
+        output, output_host.data(), output_host.size() * sizeof(float)).is_ok());
+    CHECK(context.quantized_linear_batch(
+        q8_0_weights, batch_input, &batch_output).is_ok());
+    CHECK(context.download(
+        batch_output,
+        batch_output_host.data(),
+        batch_output_host.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    CHECK(close_enough(output_host[0], q8_0_expected[0]));
+    CHECK(close_enough(output_host[1], q8_0_expected[1]));
+    for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
+        CHECK(close_enough(batch_output_host[index], q8_0_batch_expected[index]));
     }
 
     const std::vector<std::uint8_t> iq4nl_payload = make_iq4nl_payload();
@@ -437,6 +491,10 @@ int main() {
         2, 256, WeightFormat::IQ4_NL, &iq4nl_weights).is_ok());
     CHECK(context.upload(
         &iq4nl_weights, iq4nl_payload.data(), iq4nl_payload.size()).is_ok());
+    context.set_quantized_gemv_path(
+        cpp_llm_engine::cuda::CudaQuantizedGemvPath::AdaptiveIq4Warp);
+    CHECK(context.quantized_gemv_path() ==
+        cpp_llm_engine::cuda::CudaQuantizedGemvPath::AdaptiveIq4Warp);
     CHECK(context.quantized_linear(iq4nl_weights, input, &output).is_ok());
     CHECK(context.download(output, output_host.data(), output_host.size() * sizeof(float)).is_ok());
     CHECK(context.quantized_linear_batch(

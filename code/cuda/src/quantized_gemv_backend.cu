@@ -1,4 +1,4 @@
-// CUDA Backend：实现 Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL 解码与 GEMV 融合 kernel。
+// CUDA Backend：实现 Q2_K/Q3_K/Q4_K/Q6_K/Q8_0/IQ4_NL 解码与 GEMV 融合 kernel。
 // 契约：一个 CUDA block 负责同一输出行的一个批次 tile，线程直接累加 packed 权重点积。
 // 验证：cuda_quantized_linear_test.cu 与 Chapter05 CPU reference 对照。
 #include "cpp_llm_engine/cuda/quantized_gemv_backend.h"
@@ -164,6 +164,14 @@ __device__ float decode_iq4nl(
     return scale * static_cast<float>(kIQ4NLGemvQuantValues[quant]);
 }
 
+__device__ float decode_q8_0(
+    const std::uint8_t* block,
+    std::size_t local) {
+    const float scale = half_bits_to_float(load_u16(block));
+    const auto quant = static_cast<std::int8_t>(block[2 + local]);
+    return scale * static_cast<float>(quant);
+}
+
 template <core::WeightFormat Format, std::size_t BatchTile>
 __global__ void quantized_gemv_kernel(
     const std::uint8_t* weights,
@@ -174,15 +182,18 @@ __global__ void quantized_gemv_kernel(
     const std::size_t row = blockIdx.x;
     const std::size_t batch_begin = blockIdx.y * BatchTile;
     constexpr std::size_t block_elements =
-        Format == core::WeightFormat::IQ4_NL
-            ? core::kIQ4NLBlockElements
-            : core::kQuantizedBlockElements;
+        Format == core::WeightFormat::Q8_0
+            ? core::kQ8_0BlockElements
+            : (Format == core::WeightFormat::IQ4_NL
+                ? core::kIQ4NLBlockElements
+                : core::kQuantizedBlockElements);
     const std::size_t blocks_per_row = cols / block_elements;
     constexpr std::size_t block_bytes =
         Format == core::WeightFormat::Q4K ? core::kQ4KBlockBytes :
         Format == core::WeightFormat::Q6K ? core::kQ6KBlockBytes :
         Format == core::WeightFormat::Q2K ? core::kQ2KBlockBytes :
         Format == core::WeightFormat::Q3K ? core::kQ3KBlockBytes :
+        Format == core::WeightFormat::Q8_0 ? core::kQ8_0BlockBytes :
         core::kIQ4NLBlockBytes;
     const std::uint8_t* row_weights =
         weights + row * blocks_per_row * block_bytes;
@@ -201,6 +212,8 @@ __global__ void quantized_gemv_kernel(
                 weight = decode_q2k(packed, local);
             } else if constexpr (Format == core::WeightFormat::Q3K) {
                 weight = decode_q3k(packed, local);
+            } else if constexpr (Format == core::WeightFormat::Q8_0) {
+                weight = decode_q8_0(packed, local);
             } else {
                 weight = decode_iq4nl(packed, local);
             }
@@ -239,6 +252,178 @@ __global__ void quantized_gemv_kernel(
     }
 }
 
+template <std::size_t BatchTile>
+__global__ void q2k_warp_gemv_kernel(
+    const std::uint8_t* weights,
+    const float* input,
+    float* output,
+    std::size_t cols,
+    std::size_t batch_size) {
+    const std::size_t row = blockIdx.x;
+    const std::size_t batch_begin = blockIdx.y * BatchTile;
+    const std::size_t blocks_per_row = cols / core::kQuantizedBlockElements;
+    const std::uint8_t* row_weights =
+        weights + row * blocks_per_row * core::kQ2KBlockBytes;
+    const std::size_t lane = threadIdx.x;
+
+    float sums[BatchTile] = {};
+    for (std::size_t block = 0; block < blocks_per_row; ++block) {
+        const std::uint8_t* packed =
+            row_weights + block * core::kQ2KBlockBytes;
+        float global_scale = lane == 0
+            ? half_bits_to_float(load_u16(packed + 80)) : 0.0F;
+        float global_minimum = lane == 0
+            ? half_bits_to_float(load_u16(packed + 82)) : 0.0F;
+        global_scale = __shfl_sync(0xFFFFFFFFU, global_scale, 0);
+        global_minimum = __shfl_sync(0xFFFFFFFFU, global_minimum, 0);
+
+        for (std::size_t half = 0; half < 2; ++half) {
+            const std::uint8_t packed_quant = packed[16 + half * 32 + lane];
+            for (std::size_t group = 0; group < 4; ++group) {
+                std::uint8_t packed_scale = 0;
+                if (lane == 0 || lane == 16) {
+                    packed_scale = packed[half * 8 + group * 2 + lane / 16];
+                }
+                packed_scale = static_cast<std::uint8_t>(__shfl_sync(
+                    0xFFFFFFFFU, static_cast<unsigned int>(packed_scale),
+                    static_cast<int>((lane / 16) * 16)));
+                const int quant = (packed_quant >> (group * 2)) & 0x03;
+                const float weight =
+                    global_scale * static_cast<float>(packed_scale & 0x0f) *
+                        static_cast<float>(quant) -
+                    global_minimum * static_cast<float>(packed_scale >> 4);
+                const std::size_t input_col =
+                    block * core::kQuantizedBlockElements +
+                    half * 128 + group * 32 + lane;
+                for (std::size_t tile_row = 0; tile_row < BatchTile; ++tile_row) {
+                    const std::size_t batch = batch_begin + tile_row;
+                    if (batch < batch_size) {
+                        sums[tile_row] +=
+                            weight * input[batch * cols + input_col];
+                    }
+                }
+            }
+        }
+    }
+
+    for (std::size_t tile_row = 0; tile_row < BatchTile; ++tile_row) {
+        for (unsigned int offset = kWarpSize / 2; offset > 0; offset /= 2) {
+            sums[tile_row] += __shfl_down_sync(
+                0xFFFFFFFFU, sums[tile_row], offset);
+        }
+        const std::size_t batch = batch_begin + tile_row;
+        if (lane == 0 && batch < batch_size) {
+            output[batch * gridDim.x + row] = sums[tile_row];
+        }
+    }
+}
+
+template <std::size_t BatchTile>
+__global__ void q3k_warp_gemv_kernel(
+    const std::uint8_t* weights,
+    const float* input,
+    float* output,
+    std::size_t cols,
+    std::size_t batch_size) {
+    const std::size_t row = blockIdx.x;
+    const std::size_t batch_begin = blockIdx.y * BatchTile;
+    const std::size_t blocks_per_row = cols / core::kQuantizedBlockElements;
+    const std::uint8_t* row_weights =
+        weights + row * blocks_per_row * core::kQ3KBlockBytes;
+    const std::size_t lane = threadIdx.x;
+
+    float sums[BatchTile] = {};
+    for (std::size_t block = 0; block < blocks_per_row; ++block) {
+        const std::uint8_t* packed =
+            row_weights + block * core::kQ3KBlockBytes;
+        float block_scale = lane == 0
+            ? half_bits_to_float(load_u16(packed + 108)) : 0.0F;
+        block_scale = __shfl_sync(0xFFFFFFFFU, block_scale, 0);
+        const std::uint8_t high_mask = packed[lane];
+
+        for (std::size_t half = 0; half < 2; ++half) {
+            const std::uint8_t packed_quant = packed[32 + half * 32 + lane];
+            for (std::size_t group = 0; group < 4; ++group) {
+                int scale = 0;
+                if (lane == 0 || lane == 16) {
+                    const std::size_t scale_index =
+                        half * 8 + group * 2 + lane / 16;
+                    scale = static_cast<int>(
+                        q3k_scale(packed + 96, scale_index)) - 32;
+                }
+                scale = __shfl_sync(
+                    0xFFFFFFFFU, scale, static_cast<int>((lane / 16) * 16));
+                const int low = (packed_quant >> (group * 2)) & 0x03;
+                const std::uint8_t bit = static_cast<std::uint8_t>(
+                    1u << static_cast<unsigned int>(half * 4 + group));
+                const int quant = low - ((high_mask & bit) != 0 ? 0 : 4);
+                const float weight = block_scale *
+                    static_cast<float>(scale * quant);
+                const std::size_t input_col =
+                    block * core::kQuantizedBlockElements +
+                    half * 128 + group * 32 + lane;
+                for (std::size_t tile_row = 0; tile_row < BatchTile; ++tile_row) {
+                    const std::size_t batch = batch_begin + tile_row;
+                    if (batch < batch_size) {
+                        sums[tile_row] +=
+                            weight * input[batch * cols + input_col];
+                    }
+                }
+            }
+        }
+    }
+
+    for (std::size_t tile_row = 0; tile_row < BatchTile; ++tile_row) {
+        for (unsigned int offset = kWarpSize / 2; offset > 0; offset /= 2) {
+            sums[tile_row] += __shfl_down_sync(
+                0xFFFFFFFFU, sums[tile_row], offset);
+        }
+        const std::size_t batch = batch_begin + tile_row;
+        if (lane == 0 && batch < batch_size) {
+            output[batch * gridDim.x + row] = sums[tile_row];
+        }
+    }
+}
+
+template <std::size_t BatchTile>
+__global__ void iq4nl_warp_gemv_kernel(
+    const std::uint8_t* weights,
+    const float* input,
+    float* output,
+    std::size_t cols,
+    std::size_t batch_size) {
+    const std::size_t row = blockIdx.x;
+    const std::size_t batch_begin = blockIdx.y * BatchTile;
+    const std::size_t blocks_per_row = cols / core::kIQ4NLBlockElements;
+    const std::uint8_t* row_weights =
+        weights + row * blocks_per_row * core::kIQ4NLBlockBytes;
+    const std::size_t lane = threadIdx.x;
+
+    float sums[BatchTile] = {};
+    for (std::size_t block = 0; block < blocks_per_row; ++block) {
+        const float weight = decode_iq4nl(
+            row_weights + block * core::kIQ4NLBlockBytes, lane);
+        const std::size_t input_col = block * core::kIQ4NLBlockElements + lane;
+        for (std::size_t tile_row = 0; tile_row < BatchTile; ++tile_row) {
+            const std::size_t batch = batch_begin + tile_row;
+            if (batch < batch_size) {
+                sums[tile_row] += weight * input[batch * cols + input_col];
+            }
+        }
+    }
+
+    for (std::size_t tile_row = 0; tile_row < BatchTile; ++tile_row) {
+        for (unsigned int offset = kWarpSize / 2; offset > 0; offset /= 2) {
+            sums[tile_row] += __shfl_down_sync(
+                0xFFFFFFFFU, sums[tile_row], offset);
+        }
+        const std::size_t batch = batch_begin + tile_row;
+        if (lane == 0 && batch < batch_size) {
+            output[batch * gridDim.x + row] = sums[tile_row];
+        }
+    }
+}
+
 template <core::WeightFormat Format, std::size_t BatchTile>
 void launch_quantized_gemv(
     const std::uint8_t* packed,
@@ -256,6 +441,57 @@ void launch_quantized_gemv(
         packed, input, output, cols, batch_size);
 }
 
+template <std::size_t BatchTile>
+void launch_q2k_warp_gemv(
+    const std::uint8_t* packed,
+    const float* input,
+    float* output,
+    std::size_t rows,
+    std::size_t cols,
+    std::size_t batch_size,
+    cudaStream_t stream) {
+    const dim3 grid(
+        static_cast<unsigned int>(rows),
+        static_cast<unsigned int>(
+            batch_size / BatchTile + (batch_size % BatchTile != 0 ? 1 : 0)));
+    q2k_warp_gemv_kernel<BatchTile><<<grid, kWarpSize, 0, stream>>>(
+        packed, input, output, cols, batch_size);
+}
+
+template <std::size_t BatchTile>
+void launch_q3k_warp_gemv(
+    const std::uint8_t* packed,
+    const float* input,
+    float* output,
+    std::size_t rows,
+    std::size_t cols,
+    std::size_t batch_size,
+    cudaStream_t stream) {
+    const dim3 grid(
+        static_cast<unsigned int>(rows),
+        static_cast<unsigned int>(
+            batch_size / BatchTile + (batch_size % BatchTile != 0 ? 1 : 0)));
+    q3k_warp_gemv_kernel<BatchTile><<<grid, kWarpSize, 0, stream>>>(
+        packed, input, output, cols, batch_size);
+}
+
+template <std::size_t BatchTile>
+void launch_iq4nl_warp_gemv(
+    const std::uint8_t* packed,
+    const float* input,
+    float* output,
+    std::size_t rows,
+    std::size_t cols,
+    std::size_t batch_size,
+    cudaStream_t stream) {
+    const dim3 grid(
+        static_cast<unsigned int>(rows),
+        static_cast<unsigned int>(
+            batch_size / BatchTile + (batch_size % BatchTile != 0 ? 1 : 0)));
+    iq4nl_warp_gemv_kernel<BatchTile><<<grid, kWarpSize, 0, stream>>>(
+        packed, input, output, cols, batch_size);
+}
+
 template <core::WeightFormat Format>
 void launch_quantized_gemv_path(
     CudaQuantizedGemvPath path,
@@ -266,10 +502,59 @@ void launch_quantized_gemv_path(
     std::size_t cols,
     std::size_t batch_size,
     cudaStream_t stream) {
-    if (path == CudaQuantizedGemvPath::Adaptive && batch_size == 1) {
+    const bool adaptive = path != CudaQuantizedGemvPath::FixedTile4;
+    if constexpr (Format == core::WeightFormat::Q2K) {
+        if (path == CudaQuantizedGemvPath::AdaptiveBlockWarp ||
+            path == CudaQuantizedGemvPath::AdaptiveAllWarp) {
+            if (batch_size == 1) {
+                launch_q2k_warp_gemv<1>(
+                    packed, input, output, rows, cols, batch_size, stream);
+            } else if (batch_size == 2) {
+                launch_q2k_warp_gemv<2>(
+                    packed, input, output, rows, cols, batch_size, stream);
+            } else {
+                launch_q2k_warp_gemv<4>(
+                    packed, input, output, rows, cols, batch_size, stream);
+            }
+            return;
+        }
+    }
+    if constexpr (Format == core::WeightFormat::Q3K) {
+        if (path == CudaQuantizedGemvPath::AdaptiveAllWarp) {
+            if (batch_size == 1) {
+                launch_q3k_warp_gemv<1>(
+                    packed, input, output, rows, cols, batch_size, stream);
+            } else if (batch_size == 2) {
+                launch_q3k_warp_gemv<2>(
+                    packed, input, output, rows, cols, batch_size, stream);
+            } else {
+                launch_q3k_warp_gemv<4>(
+                    packed, input, output, rows, cols, batch_size, stream);
+            }
+            return;
+        }
+    }
+    if constexpr (Format == core::WeightFormat::IQ4_NL) {
+        if (path == CudaQuantizedGemvPath::AdaptiveIq4Warp ||
+            path == CudaQuantizedGemvPath::AdaptiveBlockWarp ||
+            path == CudaQuantizedGemvPath::AdaptiveAllWarp) {
+            if (batch_size == 1) {
+                launch_iq4nl_warp_gemv<1>(
+                    packed, input, output, rows, cols, batch_size, stream);
+            } else if (batch_size == 2) {
+                launch_iq4nl_warp_gemv<2>(
+                    packed, input, output, rows, cols, batch_size, stream);
+            } else {
+                launch_iq4nl_warp_gemv<4>(
+                    packed, input, output, rows, cols, batch_size, stream);
+            }
+            return;
+        }
+    }
+    if (adaptive && batch_size == 1) {
         launch_quantized_gemv<Format, 1>(
             packed, input, output, rows, cols, batch_size, stream);
-    } else if (path == CudaQuantizedGemvPath::Adaptive && batch_size == 2) {
+    } else if (adaptive && batch_size == 2) {
         launch_quantized_gemv<Format, 2>(
             packed, input, output, rows, cols, batch_size, stream);
     } else {
@@ -347,6 +632,10 @@ CudaStatus CudaQuantizedGemvBackend::compute_batch(
             batch_size, stream.native_handle());
     } else if (weights.format() == core::WeightFormat::Q3K) {
         launch_quantized_gemv_path<core::WeightFormat::Q3K>(
+            path, packed, input, output, weights.rows(), weights.cols(),
+            batch_size, stream.native_handle());
+    } else if (weights.format() == core::WeightFormat::Q8_0) {
+        launch_quantized_gemv_path<core::WeightFormat::Q8_0>(
             path, packed, input, output, weights.rows(), weights.cols(),
             batch_size, stream.native_handle());
     } else if (weights.format() == core::WeightFormat::IQ4_NL) {

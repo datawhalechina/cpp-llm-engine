@@ -16,10 +16,12 @@
 #include "cpp_llm_engine/cuda/cuda_paged_kv_cache.h"
 #include "cpp_llm_engine/cuda/gqa_attention_backend.h"
 #include "cpp_llm_engine/cuda/mla_attention_backend.h"
+#include "cpp_llm_engine/cuda/moe_router_backend.h"
 #include "cpp_llm_engine/cuda/quantized_dequantize_backend.h"
 #include "cpp_llm_engine/cuda/quantized_gemv_backend.h"
 #include "cpp_llm_engine/cuda/row_dispatch_backend.h"
 #include "cpp_llm_engine/cuda/rope_backend.h"
+#include "cpp_llm_engine/cuda/vision_elementwise_backend.h"
 
 #include <cuda_runtime_api.h>
 
@@ -234,9 +236,90 @@ core::Status CudaExecutionContext::gather_rows(
     const CudaGatherRowsRequest request{
         static_cast<const float*>(source.data()),
         static_cast<const std::size_t*>(workspace_.data()),
+        nullptr,
         static_cast<float*>(output->data()), source_shape[0],
         row_indices.size(), source_shape[1]};
     return launch_gather_rows(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::gather_rows_device(
+    const CudaTensor& source,
+    const CudaTensor& row_indices,
+    std::size_t index_offset,
+    std::size_t selected_rows,
+    CudaTensor* output) const {
+    if (!valid() || output == nullptr || selected_rows == 0) {
+        return core::Status::error("device gather rows input is invalid");
+    }
+    const core::Status source_status =
+        validate_tensor(source, "device gather rows source");
+    const core::Status index_status =
+        validate_tensor(row_indices, "device gather rows indices");
+    const core::Status output_status =
+        validate_tensor(*output, "device gather rows output");
+    if (!source_status.is_ok()) return source_status;
+    if (!index_status.is_ok()) return index_status;
+    if (!output_status.is_ok()) return output_status;
+    const auto& source_shape = source.contract().shape.dimensions;
+    const auto& index_shape = row_indices.contract().shape.dimensions;
+    const auto& output_shape = output->contract().shape.dimensions;
+    std::size_t index_elements = 0;
+    if (source_shape.size() != 2 || output_shape.size() != 2 ||
+        !row_indices.contract().shape.checked_numel(&index_elements).is_ok() ||
+        index_offset > index_elements ||
+        selected_rows > index_elements - index_offset ||
+        output_shape !=
+            std::vector<std::size_t>{selected_rows, source_shape[1]}) {
+        return core::Status::error("device gather rows shape mismatch");
+    }
+    const auto* indices = static_cast<const float*>(row_indices.data());
+    const CudaGatherRowsRequest request{
+        static_cast<const float*>(source.data()), nullptr,
+        indices + index_offset, static_cast<float*>(output->data()),
+        source_shape[0], selected_rows, source_shape[1]};
+    return launch_gather_rows(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::spatial_merge(
+    const CudaTensor& input,
+    std::size_t grid_width,
+    std::size_t grid_height,
+    std::size_t merge_size,
+    CudaTensor* output) const {
+    if (!valid() || output == nullptr || grid_width == 0 || grid_height == 0 ||
+        merge_size == 0 || grid_width % merge_size != 0 ||
+        grid_height % merge_size != 0) {
+        return core::Status::error("spatial merge input is invalid");
+    }
+    const core::Status input_status = validate_tensor(input, "spatial merge input");
+    const core::Status output_status = validate_tensor(*output, "spatial merge output");
+    if (!input_status.is_ok()) return input_status;
+    if (!output_status.is_ok()) return output_status;
+    if (grid_width > std::numeric_limits<std::size_t>::max() / grid_height) {
+        return core::Status::error("spatial merge grid overflows");
+    }
+    const auto& input_shape = input.contract().shape.dimensions;
+    const auto& output_shape = output->contract().shape.dimensions;
+    if (input_shape.size() != 2 || input_shape[0] != grid_width * grid_height) {
+        return core::Status::error("spatial merge input shape mismatch");
+    }
+    if (merge_size > std::numeric_limits<std::size_t>::max() / merge_size ||
+        merge_size * merge_size >
+            std::numeric_limits<std::size_t>::max() / input_shape[1]) {
+        return core::Status::error("spatial merge width overflows");
+    }
+    const std::size_t merged_width =
+        merge_size * merge_size * input_shape[1];
+    const std::vector<std::size_t> expected_output{
+        (grid_width / merge_size) * (grid_height / merge_size), merged_width};
+    if (output_shape != expected_output) {
+        return core::Status::error("spatial merge output shape mismatch");
+    }
+    const CudaSpatialMergeRequest request{
+        static_cast<const float*>(input.data()),
+        static_cast<float*>(output->data()), grid_width, grid_height,
+        merge_size, input_shape[1]};
+    return launch_spatial_merge(request, stream_).to_core_status();
 }
 
 core::Status CudaExecutionContext::weighted_scatter_add_rows(
@@ -290,10 +373,138 @@ core::Status CudaExecutionContext::weighted_scatter_add_rows(
     const CudaWeightedScatterAddRowsRequest request{
         static_cast<const float*>(source.data()),
         reinterpret_cast<const std::size_t*>(workspace),
+        nullptr,
         reinterpret_cast<const float*>(workspace + index_bytes),
         static_cast<float*>(output->data()), destination_rows.size(),
         output_shape[0], output_shape[1]};
     return launch_weighted_scatter_add_rows(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::weighted_scatter_add_rows_device(
+    const CudaTensor& source,
+    const CudaTensor& destination_rows,
+    const CudaTensor& weights,
+    std::size_t metadata_offset,
+    CudaTensor* output) const {
+    if (!valid() || output == nullptr) {
+        return core::Status::error(
+            "device weighted scatter-add input is invalid");
+    }
+    for (const auto& item : {
+             std::pair<const CudaTensor*, const char*>{
+                 &source, "device weighted scatter source"},
+             {&destination_rows, "device weighted scatter destinations"},
+             {&weights, "device weighted scatter weights"},
+             {output, "device weighted scatter output"}}) {
+        const core::Status status = validate_tensor(*item.first, item.second);
+        if (!status.is_ok()) return status;
+    }
+    const auto& source_shape = source.contract().shape.dimensions;
+    const auto& output_shape = output->contract().shape.dimensions;
+    std::size_t destination_elements = 0;
+    std::size_t weight_elements = 0;
+    if (source_shape.size() != 2 || output_shape.size() != 2 ||
+        source_shape[1] != output_shape[1] ||
+        !destination_rows.contract().shape.checked_numel(
+            &destination_elements).is_ok() ||
+        !weights.contract().shape.checked_numel(&weight_elements).is_ok() ||
+        destination_elements != weight_elements ||
+        metadata_offset > destination_elements ||
+        source_shape[0] > destination_elements - metadata_offset) {
+        return core::Status::error(
+            "device weighted scatter-add shape mismatch");
+    }
+    const auto* rows = static_cast<const float*>(destination_rows.data());
+    const auto* route_weights = static_cast<const float*>(weights.data());
+    const CudaWeightedScatterAddRowsRequest request{
+        static_cast<const float*>(source.data()), nullptr,
+        rows + metadata_offset, route_weights + metadata_offset,
+        static_cast<float*>(output->data()), source_shape[0], output_shape[0],
+        output_shape[1]};
+    return launch_weighted_scatter_add_rows(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::moe_route(
+    const CudaTensor& hidden,
+    const CudaTensor& router,
+    std::size_t top_k,
+    bool normalize_weights,
+    float weight_scale,
+    CudaTensor* expert_indices,
+    CudaTensor* route_weights) const {
+    if (!valid() || expert_indices == nullptr || route_weights == nullptr) {
+        return core::Status::error("MoE Router context/output is invalid");
+    }
+    for (const auto& item : {
+             std::pair<const CudaTensor*, const char*>{&hidden, "MoE hidden"},
+             {&router, "MoE Router weights"},
+             {expert_indices, "MoE expert indices"},
+             {route_weights, "MoE route weights"}}) {
+        const core::Status status = validate_tensor(*item.first, item.second);
+        if (!status.is_ok()) return status;
+    }
+    const auto& hidden_shape = hidden.contract().shape.dimensions;
+    const auto& router_shape = router.contract().shape.dimensions;
+    const auto& index_shape = expert_indices->contract().shape.dimensions;
+    if (hidden_shape.size() != 2 || router_shape.size() != 2 ||
+        hidden_shape[1] != router_shape[1] || top_k == 0 ||
+        index_shape != std::vector<std::size_t>{hidden_shape[0], top_k} ||
+        route_weights->contract().shape.dimensions != index_shape) {
+        return core::Status::error(
+            "MoE Router requires hidden[B,D], router[E,D] and outputs[B,K]");
+    }
+    const CudaMoeRouterRequest request{
+        static_cast<const float*>(hidden.data()),
+        static_cast<const float*>(router.data()),
+        static_cast<float*>(expert_indices->data()),
+        static_cast<float*>(route_weights->data()),
+        hidden_shape[0], hidden_shape[1], router_shape[0], top_k,
+        normalize_weights, weight_scale};
+    return launch_moe_router(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::moe_group_routes(
+    const CudaTensor& expert_indices,
+    const CudaTensor& route_weights,
+    std::size_t expert_count,
+    CudaTensor* grouped_rows,
+    CudaTensor* grouped_weights,
+    CudaTensor* expert_counts) const {
+    if (!valid() || grouped_rows == nullptr || grouped_weights == nullptr ||
+        expert_counts == nullptr || expert_count == 0) {
+        return core::Status::error("MoE route grouping input is invalid");
+    }
+    for (const auto& item : {
+             std::pair<const CudaTensor*, const char*>{
+                 &expert_indices, "MoE expert indices"},
+             {&route_weights, "MoE route weights"},
+             {grouped_rows, "MoE grouped rows"},
+             {grouped_weights, "MoE grouped weights"},
+             {expert_counts, "MoE expert counts"}}) {
+        const core::Status status = validate_tensor(*item.first, item.second);
+        if (!status.is_ok()) return status;
+    }
+    const auto& route_shape = expert_indices.contract().shape.dimensions;
+    std::size_t route_elements = 0;
+    if (route_shape.size() != 2 ||
+        !expert_indices.contract().shape.checked_numel(&route_elements).is_ok() ||
+        route_weights.contract().shape.dimensions != route_shape ||
+        grouped_rows->contract().shape.dimensions !=
+            std::vector<std::size_t>{expert_count, route_elements} ||
+        grouped_weights->contract().shape.dimensions !=
+            grouped_rows->contract().shape.dimensions ||
+        expert_counts->contract().shape.dimensions !=
+            std::vector<std::size_t>{expert_count}) {
+        return core::Status::error("MoE route grouping shape mismatch");
+    }
+    const CudaMoeGroupRoutesRequest request{
+        static_cast<const float*>(expert_indices.data()),
+        static_cast<const float*>(route_weights.data()),
+        static_cast<float*>(grouped_rows->data()),
+        static_cast<float*>(grouped_weights->data()),
+        static_cast<float*>(expert_counts->data()), route_shape[0],
+        expert_count, route_shape[1]};
+    return launch_moe_group_routes(request, stream_).to_core_status();
 }
 
 core::Status CudaExecutionContext::zero(CudaTensor* output) const {
@@ -388,6 +599,96 @@ core::Status CudaExecutionContext::rms_norm_batch(
         elements / input_shape.back(), input_shape.back(), epsilon};
     return cuda_decoder_elementwise_backend().rms_norm_batch(
         request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::layer_norm_batch(
+    const CudaTensor& input,
+    const CudaTensor& weight,
+    const CudaTensor& bias,
+    CudaTensor* output,
+    float epsilon) const {
+    if (!valid() || output == nullptr) {
+        return core::Status::error("batch LayerNorm context/output invalid");
+    }
+    for (const auto& item : {
+             std::pair<const CudaTensor*, const char*>{&input, "LayerNorm input"},
+             {&weight, "LayerNorm weight"}, {&bias, "LayerNorm bias"},
+             {output, "LayerNorm output"}}) {
+        const core::Status status = validate_tensor(*item.first, item.second);
+        if (!status.is_ok()) return status;
+    }
+    const auto& shape = input.contract().shape.dimensions;
+    const auto& weight_shape = weight.contract().shape.dimensions;
+    if (shape.size() < 2 || output->contract().shape.dimensions != shape ||
+        weight_shape.size() != 1 ||
+        bias.contract().shape.dimensions != weight_shape ||
+        shape.back() != weight_shape[0]) {
+        return core::Status::error(
+            "batch LayerNorm requires input/output[...,D] and weight/bias[D]");
+    }
+    std::size_t elements = 0;
+    if (!input.contract().shape.checked_numel(&elements).is_ok() ||
+        elements % shape.back() != 0) {
+        return core::Status::error("batch LayerNorm element count is invalid");
+    }
+    const CudaLayerNormBatchRequest request{
+        static_cast<const float*>(input.data()),
+        static_cast<const float*>(weight.data()),
+        static_cast<const float*>(bias.data()),
+        static_cast<float*>(output->data()), elements / shape.back(),
+        shape.back(), epsilon};
+    return launch_layer_norm_batch(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::add_bias_batch(
+    const CudaTensor& input,
+    const CudaTensor& bias,
+    CudaTensor* output) const {
+    if (!valid() || output == nullptr) {
+        return core::Status::error("batch bias context/output invalid");
+    }
+    const core::Status input_status = validate_tensor(input, "batch bias input");
+    const core::Status bias_status = validate_tensor(bias, "batch bias values");
+    const core::Status output_status = validate_tensor(*output, "batch bias output");
+    if (!input_status.is_ok()) return input_status;
+    if (!bias_status.is_ok()) return bias_status;
+    if (!output_status.is_ok()) return output_status;
+    const auto& shape = input.contract().shape.dimensions;
+    const auto& bias_shape = bias.contract().shape.dimensions;
+    std::size_t elements = 0;
+    if (shape.empty() || bias_shape.size() != 1 || bias_shape[0] == 0 ||
+        output->contract().shape.dimensions != shape ||
+        !input.contract().shape.checked_numel(&elements).is_ok() ||
+        elements % bias_shape[0] != 0) {
+        return core::Status::error(
+            "batch bias requires equal input/output shape and a trailing contiguous bias width");
+    }
+    const CudaBiasBatchRequest request{
+        static_cast<const float*>(input.data()),
+        static_cast<const float*>(bias.data()),
+        static_cast<float*>(output->data()), elements, bias_shape[0]};
+    return launch_bias_batch(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::gelu(
+    const CudaTensor& input,
+    CudaTensor* output) const {
+    if (!valid() || output == nullptr) {
+        return core::Status::error("GELU context/output invalid");
+    }
+    const core::Status input_status = validate_tensor(input, "GELU input");
+    const core::Status output_status = validate_tensor(*output, "GELU output");
+    if (!input_status.is_ok()) return input_status;
+    if (!output_status.is_ok()) return output_status;
+    std::size_t elements = 0;
+    if (!same_shape(input, *output) ||
+        !input.contract().shape.checked_numel(&elements).is_ok()) {
+        return core::Status::error("GELU input/output shape mismatch");
+    }
+    const CudaGeluRequest request{
+        static_cast<const float*>(input.data()),
+        static_cast<float*>(output->data()), elements};
+    return launch_gelu(request, stream_).to_core_status();
 }
 
 core::Status CudaExecutionContext::swiglu(

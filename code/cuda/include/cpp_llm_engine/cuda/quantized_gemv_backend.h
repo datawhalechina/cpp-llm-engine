@@ -17,6 +17,9 @@ class CudaStream;
 enum class CudaQuantizedGemvPath {
     FixedTile4,
     Adaptive,
+    AdaptiveIq4Warp,
+    AdaptiveBlockWarp,
+    AdaptiveAllWarp,
 };
 
 class CudaQuantizedGemvBackend final : public core::Backend {
