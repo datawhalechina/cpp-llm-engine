@@ -20,6 +20,8 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 using cpp_llm_engine::cuda::CudaMlaComputePath;
+using cpp_llm_engine::cuda::CudaQuantizedGemvPath;
+using cpp_llm_engine::model::CudaMoePrefillPath;
 
 struct Result {
     double elapsed_ms = 0.0;
@@ -121,7 +123,7 @@ void print_samples(const char* name, const std::vector<double>& samples) {
 
 int main(int argc, char** argv) {
     std::cout << std::setprecision(9);
-    const bool profile_mode = (argc == 4 || argc == 5) &&
+    const bool profile_mode = (argc >= 4 && argc <= 7) &&
         std::string(argv[2]) == "--profile-tensor";
     if ((!profile_mode && (argc < 2 || argc > 5)) ||
         (profile_mode && std::stoul(argv[3]) == 0)) {
@@ -130,19 +132,53 @@ int main(int argc, char** argv) {
                      "[iterations=4]\n"
                      "       real_deepseek2_cuda_tensor_prefill_benchmark "
                      "<model.gguf> --profile-tensor <length> "
-                     "[legacy|absorbed]\n";
+                     "[legacy|absorbed] "
+                     "[adaptive|block-warp|all-warp] "
+                     "[row-copies|packed|device-router|device-grouped]\n";
         return 2;
     }
     const std::string profile_path =
-        profile_mode && argc == 5 ? argv[4] : "absorbed";
+        profile_mode && argc >= 5 ? argv[4] : "absorbed";
+    const std::string profile_gemv_path =
+        profile_mode && argc >= 6 ? argv[5] : "adaptive";
+    const std::string profile_moe_path =
+        profile_mode && argc >= 7 ? argv[6] : "row-copies";
     if (profile_mode && profile_path != "legacy" &&
         profile_path != "absorbed") {
         std::cerr << "profile MLA path must be legacy or absorbed\n";
         return 2;
     }
+    if (profile_mode && profile_gemv_path != "adaptive" &&
+        profile_gemv_path != "block-warp" &&
+        profile_gemv_path != "all-warp") {
+        std::cerr << "profile GEMV path must be adaptive, block-warp, or all-warp\n";
+        return 2;
+    }
+    if (profile_mode && profile_moe_path != "row-copies" &&
+        profile_moe_path != "packed" &&
+        profile_moe_path != "device-router" &&
+        profile_moe_path != "device-grouped") {
+        std::cerr << "profile MoE path must be row-copies, packed, or "
+                     "device-router or device-grouped\n";
+        return 2;
+    }
     const CudaMlaComputePath mla_path = profile_path == "legacy"
         ? CudaMlaComputePath::LegacyThreeStage
         : CudaMlaComputePath::AbsorbedThreeStage;
+    const CudaQuantizedGemvPath gemv_path =
+        profile_gemv_path == "adaptive"
+            ? CudaQuantizedGemvPath::Adaptive
+            : profile_gemv_path == "block-warp"
+                ? CudaQuantizedGemvPath::AdaptiveBlockWarp
+                : CudaQuantizedGemvPath::AdaptiveAllWarp;
+    const CudaMoePrefillPath moe_path =
+        profile_moe_path == "row-copies"
+            ? CudaMoePrefillPath::RowCopies
+            : profile_moe_path == "packed"
+                ? CudaMoePrefillPath::PackedDispatch
+                : profile_moe_path == "device-router"
+                    ? CudaMoePrefillPath::DeviceRouterPackedDispatch
+                    : CudaMoePrefillPath::DeviceGroupedDispatch;
     const std::vector<std::size_t> lengths = profile_mode
         ? std::vector<std::size_t>{static_cast<std::size_t>(std::stoul(argv[3]))}
         : parse_lengths(argc >= 3 ? argv[2] : "2,8,32,128");
@@ -163,8 +199,11 @@ int main(int argc, char** argv) {
     const std::size_t capacity =
         *std::max_element(lengths.begin(), lengths.end());
     std::string error;
-    auto factory = cpp_llm_engine::RealDeepSeek2CudaExecutorFactory::load(
-        argv[1], capacity, &error);
+    auto factory = profile_mode
+        ? cpp_llm_engine::RealDeepSeek2CudaExecutorFactory::load(
+            argv[1], capacity, &error, mla_path, moe_path, gemv_path)
+        : cpp_llm_engine::RealDeepSeek2CudaExecutorFactory::load(
+            argv[1], capacity, &error);
     if (factory == nullptr) {
         std::cerr << "DeepSeek Tensor Prefill setup failed: " << error << '\n';
         return 1;
@@ -198,6 +237,8 @@ int main(int argc, char** argv) {
             sequential.greedy_token == tensor.greedy_token;
         std::cout << "profile_length: " << lengths.front() << '\n'
                   << "profile_mla_path: " << profile_path << '\n'
+                  << "profile_moe_path: " << profile_moe_path << '\n'
+                  << "profile_gemv_path: " << profile_gemv_path << '\n'
                   << "profile_tensor_ms: " << tensor.elapsed_ms << '\n'
                   << "profile_maximum_logits_error: " << max_error << '\n'
                   << "profile_tokens_match: "

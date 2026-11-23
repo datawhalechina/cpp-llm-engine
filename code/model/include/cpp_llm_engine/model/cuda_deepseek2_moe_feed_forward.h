@@ -1,5 +1,5 @@
-// DeepSeek2 CUDA Model：声明 Host 路由、设备执行的 MoE FFN。
-// 职责：在 CUDA 上执行命中的量化专家和共享专家。
+// DeepSeek2 CUDA Model：声明可切换 Host/设备路由的 MoE FFN。
+// 职责：计算 Top-K，并在 CUDA 上执行命中的量化专家和共享专家。
 // 契约：全部专家成功后才写入调用方输出。
 #pragma once
 
@@ -20,6 +20,8 @@ namespace cpp_llm_engine::model {
 enum class CudaMoePrefillPath {
     RowCopies,
     PackedDispatch,
+    DeviceRouterPackedDispatch,
+    DeviceGroupedDispatch,
 };
 
 struct CudaDeepSeek2MoeConfig final {
@@ -52,6 +54,7 @@ public:
     std::size_t shared_expert_hidden_size() const;
     std::size_t expert_count() const;
     const std::vector<float>& router() const;
+    const cuda::CudaTensor& router_device() const;
     const cuda::CudaQuantizedMatrix& expert_gate(std::size_t index) const;
     const cuda::CudaQuantizedMatrix& expert_up(std::size_t index) const;
     const cuda::CudaQuantizedMatrix& expert_down(std::size_t index) const;
@@ -68,6 +71,7 @@ public:
 
 private:
     std::vector<float> router_;
+    cuda::CudaTensor router_device_;
     std::vector<cuda::CudaQuantizedMatrix> expert_gate_;
     std::vector<cuda::CudaQuantizedMatrix> expert_up_;
     std::vector<cuda::CudaQuantizedMatrix> expert_down_;
@@ -140,7 +144,8 @@ public:
         const CudaDeepSeek2MoeWeights& weights,
         const cuda::CudaTensor& normalized_hidden,
         cuda::CudaTensor* output,
-        std::vector<CudaDeepSeek2MoeRoute>* routes);
+        std::vector<CudaDeepSeek2MoeRoute>* routes,
+        CudaMoePrefillPath path = CudaMoePrefillPath::PackedDispatch);
     std::size_t batch_size() const;
     std::size_t use_count() const;
     std::size_t active_expert_groups() const;

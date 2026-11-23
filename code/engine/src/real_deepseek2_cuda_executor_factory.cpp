@@ -148,7 +148,9 @@ struct RealDeepSeek2CudaExecutorFactory::Impl final {
     cuda::CudaMlaComputePath mla_path =
         cuda::CudaMlaComputePath::LegacyThreeStage;
     model::CudaMoePrefillPath moe_prefill_path =
-        model::CudaMoePrefillPath::PackedDispatch;
+        model::CudaMoePrefillPath::DeviceRouterPackedDispatch;
+    cuda::CudaQuantizedGemvPath gemv_path =
+        cuda::CudaQuantizedGemvPath::AdaptiveAllWarp;
     mutable std::mutex batch_mutex;
     mutable std::unordered_map<
         std::size_t,
@@ -167,7 +169,8 @@ RealDeepSeek2CudaExecutorFactory::load(
     std::size_t context_capacity,
     std::string* error,
     cuda::CudaMlaComputePath mla_path,
-    model::CudaMoePrefillPath moe_prefill_path) {
+    model::CudaMoePrefillPath moe_prefill_path,
+    cuda::CudaQuantizedGemvPath gemv_path) {
     auto loaded = model::RealDeepSeek2CudaModel::load(model_path, 0, error);
     if (loaded == nullptr) return nullptr;
     if (context_capacity == 0 ||
@@ -183,6 +186,7 @@ RealDeepSeek2CudaExecutorFactory::load(
     impl->context_capacity = context_capacity;
     impl->mla_path = mla_path;
     impl->moe_prefill_path = moe_prefill_path;
+    impl->gemv_path = gemv_path;
     if (error != nullptr) error->clear();
     return std::unique_ptr<RealDeepSeek2CudaExecutorFactory>(
         new RealDeepSeek2CudaExecutorFactory(std::move(impl)));
@@ -199,22 +203,32 @@ RealDeepSeek2CudaExecutorFactory::operator=(
 
 std::shared_ptr<chapter06_generation::RequestModelExecutor>
 RealDeepSeek2CudaExecutorFactory::create_executor() const {
-    return create_executor(impl_->mla_path, impl_->moe_prefill_path);
+    return create_executor(
+        impl_->mla_path, impl_->moe_prefill_path, impl_->gemv_path);
 }
 
 std::shared_ptr<chapter06_generation::RequestModelExecutor>
 RealDeepSeek2CudaExecutorFactory::create_executor(
     cuda::CudaMlaComputePath mla_path) const {
-    return create_executor(mla_path, impl_->moe_prefill_path);
+    return create_executor(
+        mla_path, impl_->moe_prefill_path, impl_->gemv_path);
 }
 
 std::shared_ptr<chapter06_generation::RequestModelExecutor>
 RealDeepSeek2CudaExecutorFactory::create_executor(
     cuda::CudaMlaComputePath mla_path,
     model::CudaMoePrefillPath moe_prefill_path) const {
+    return create_executor(mla_path, moe_prefill_path, impl_->gemv_path);
+}
+
+std::shared_ptr<chapter06_generation::RequestModelExecutor>
+RealDeepSeek2CudaExecutorFactory::create_executor(
+    cuda::CudaMlaComputePath mla_path,
+    model::CudaMoePrefillPath moe_prefill_path,
+    cuda::CudaQuantizedGemvPath gemv_path) const {
     std::string error;
     auto context = impl_->model->create_context(
-        impl_->context_capacity, &error, mla_path, moe_prefill_path);
+        impl_->context_capacity, &error, mla_path, moe_prefill_path, gemv_path);
     if (context == nullptr) return {};
     return std::make_shared<RealDeepSeek2CudaRequestExecutor>(
         std::move(context));
@@ -361,7 +375,7 @@ bool RealDeepSeek2CudaExecutorFactory::decode_batch(
     auto found = impl_->batch_workspaces.find(items.size());
     if (found == impl_->batch_workspaces.end()) {
         auto workspace = impl_->model->create_batch_workspace(
-            items.size(), error);
+            items.size(), error, impl_->gemv_path);
         if (workspace == nullptr) return false;
         found = impl_->batch_workspaces.emplace(
             items.size(), std::move(workspace)).first;

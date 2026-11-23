@@ -94,21 +94,43 @@ float maximum_error(
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 2 || argc > 5) {
+    if (argc < 2 || argc > 6) {
         std::cerr << "usage: real_deepseek2_cuda_moe_dispatch_benchmark "
-                     "<model.gguf> [lengths=32,128] [warmup=1] [iterations=4]\n";
+                     "<model.gguf> [lengths=32,128] [warmup=1] [iterations=4] "
+                     "[packed|device-router|device-grouped]\n";
         return 2;
     }
     const std::vector<std::size_t> lengths =
         parse_lengths(argc >= 3 ? argv[2] : "32,128");
     const std::size_t warmup = argc >= 4
         ? static_cast<std::size_t>(std::stoul(argv[3])) : 1;
-    const std::size_t iterations = argc == 5
+    const std::size_t iterations = argc >= 5
         ? static_cast<std::size_t>(std::stoul(argv[4])) : 4;
-    if (lengths.empty() || iterations < 2) {
+    const std::string comparison = argc == 6 ? argv[5] : "packed";
+    if (lengths.empty() || iterations < 2 ||
+        (comparison != "packed" && comparison != "device-router" &&
+         comparison != "device-grouped")) {
         std::cerr << "lengths must be positive and iterations at least 2\n";
         return 2;
     }
+    const bool compare_device_router = comparison == "device-router";
+    const bool compare_device_grouping = comparison == "device-grouped";
+    const CudaMoePrefillPath baseline_path = compare_device_grouping
+        ? CudaMoePrefillPath::DeviceRouterPackedDispatch
+        : compare_device_router
+            ? CudaMoePrefillPath::PackedDispatch
+            : CudaMoePrefillPath::RowCopies;
+    const CudaMoePrefillPath candidate_path = compare_device_grouping
+        ? CudaMoePrefillPath::DeviceGroupedDispatch
+        : compare_device_router
+            ? CudaMoePrefillPath::DeviceRouterPackedDispatch
+            : CudaMoePrefillPath::PackedDispatch;
+    const char* baseline_name = compare_device_grouping
+        ? "device-router" : compare_device_router
+            ? "packed-dispatch" : "row-copies";
+    const char* candidate_name = compare_device_grouping
+        ? "device-grouped" : compare_device_router
+            ? "device-router" : "packed-dispatch";
     int devices = 0;
     if (cudaGetDeviceCount(&devices) != cudaSuccess || devices == 0) {
         std::cerr << "CUDA device is unavailable\n";
@@ -128,61 +150,60 @@ int main(int argc, char** argv) {
     for (const std::size_t length : lengths) {
         const auto prompt = make_prompt(length);
         for (std::size_t index = 0; index < warmup; ++index) {
-            Result row_copies;
-            Result packed;
-            if (!run_path(*factory, prompt, CudaMoePrefillPath::RowCopies,
-                    &row_copies, &error) ||
-                !run_path(*factory, prompt, CudaMoePrefillPath::PackedDispatch,
-                    &packed, &error)) {
+            Result baseline;
+            Result candidate;
+            if (!run_path(*factory, prompt, baseline_path, &baseline, &error) ||
+                !run_path(*factory, prompt, candidate_path, &candidate, &error)) {
                 std::cerr << "DeepSeek MoE dispatch warmup failed: "
                           << error << '\n';
                 return 1;
             }
         }
 
-        std::vector<double> row_samples;
-        std::vector<double> packed_samples;
+        std::vector<double> baseline_samples;
+        std::vector<double> candidate_samples;
         float max_error = 0.0F;
         bool tokens_match = true;
         for (std::size_t iteration = 0; iteration < iterations; ++iteration) {
-            const bool packed_first = iteration % 2 == 1;
+            const bool candidate_first = iteration % 2 == 1;
             Result first;
             Result second;
-            const auto first_path = packed_first
-                ? CudaMoePrefillPath::PackedDispatch
-                : CudaMoePrefillPath::RowCopies;
-            const auto second_path = packed_first
-                ? CudaMoePrefillPath::RowCopies
-                : CudaMoePrefillPath::PackedDispatch;
+            const auto first_path = candidate_first
+                ? candidate_path : baseline_path;
+            const auto second_path = candidate_first
+                ? baseline_path : candidate_path;
             if (!run_path(*factory, prompt, first_path, &first, &error) ||
                 !run_path(*factory, prompt, second_path, &second, &error)) {
                 std::cerr << "DeepSeek MoE dispatch A/B failed: "
                           << error << '\n';
                 return 1;
             }
-            const Result& row_copies = packed_first ? second : first;
-            const Result& packed = packed_first ? first : second;
-            row_samples.push_back(row_copies.elapsed_ms);
-            packed_samples.push_back(packed.elapsed_ms);
+            const Result& baseline = candidate_first ? second : first;
+            const Result& candidate = candidate_first ? first : second;
+            baseline_samples.push_back(baseline.elapsed_ms);
+            candidate_samples.push_back(candidate.elapsed_ms);
             max_error = std::max(
-                max_error, maximum_error(row_copies.logits, packed.logits));
+                max_error, maximum_error(baseline.logits, candidate.logits));
             tokens_match = tokens_match &&
-                row_copies.greedy_token == packed.greedy_token;
+                baseline.greedy_token == candidate.greedy_token;
             std::cout << "paired_sample length=" << length
                       << " iteration=" << iteration + 1
                       << " path_order="
-                      << (packed_first ? "packed-first" : "row-copies-first")
-                      << " row_copies_ms=" << row_copies.elapsed_ms
-                      << " packed_dispatch_ms=" << packed.elapsed_ms << '\n';
+                      << (candidate_first ? candidate_name : baseline_name)
+                      << "-first baseline_ms=" << baseline.elapsed_ms
+                      << " candidate_ms=" << candidate.elapsed_ms << '\n';
         }
-        const double row_ms = median(row_samples);
-        const double packed_ms = median(packed_samples);
+        const double baseline_ms = median(baseline_samples);
+        const double candidate_ms = median(candidate_samples);
         const bool correct = tokens_match && max_error <= 1.0e-4F;
         all_correct = all_correct && correct;
         std::cout << "matrix_cell length=" << length
-                  << " row_copies_median_ms=" << row_ms
-                  << " packed_dispatch_median_ms=" << packed_ms
-                  << " packed_to_row_copies_ratio=" << packed_ms / row_ms
+                  << " baseline=" << baseline_name
+                  << " candidate=" << candidate_name
+                  << " baseline_median_ms=" << baseline_ms
+                  << " candidate_median_ms=" << candidate_ms
+                  << " candidate_to_baseline_ratio="
+                  << candidate_ms / baseline_ms
                   << " maximum_logits_error=" << max_error
                   << " tokens_match=" << (tokens_match ? "true" : "false")
                   << " correctness=" << (correct ? "PASS" : "FAIL") << '\n';

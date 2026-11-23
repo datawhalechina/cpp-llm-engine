@@ -1,4 +1,4 @@
-// DeepSeek2 CUDA Model：实现 Host 路由、设备执行的 MoE 正确性路径。
+// DeepSeek2 CUDA Model：实现 Host golden 与设备 Router 的 MoE 路径。
 #include "cpp_llm_engine/model/cuda_deepseek2_moe_feed_forward.h"
 
 #include "cpp_llm_engine/cuda/cuda_execution_context.h"
@@ -359,11 +359,17 @@ core::Status CudaDeepSeek2MoeWeights::upload(
     if (status.is_ok()) status = upload_shared(
         context, host.shared_expert_down, &replacement.shared_down_);
     if (!status.is_ok()) return status;
-    status = context->synchronize();
-    if (!status.is_ok()) return status;
     replacement.hidden_size_ = replacement.expert_gate_.front().cols();
     replacement.expert_hidden_size_ = replacement.expert_gate_.front().rows();
     replacement.shared_expert_hidden_size_ = replacement.shared_gate_.rows();
+    status = cuda::CudaTensor::create_contiguous(
+        {replacement.expert_gate_.size(), replacement.hidden_size_},
+        core::DType::Float32, &replacement.router_device_);
+    if (status.is_ok()) status = context->upload(
+        &replacement.router_device_, replacement.router_.data(),
+        replacement.router_.size() * sizeof(float));
+    if (status.is_ok()) status = context->synchronize();
+    if (!status.is_ok()) return status;
     if (!replacement.valid()) {
         return core::Status::error(
             "DeepSeek2 CUDA MoE uploaded weights are inconsistent");
@@ -378,6 +384,8 @@ bool CudaDeepSeek2MoeWeights::valid() const {
         expert_gate_.empty() || expert_gate_.size() != expert_up_.size() ||
         expert_gate_.size() != expert_down_.size() ||
         router_.size() != hidden_size_ * expert_gate_.size() ||
+        router_device_.contract().shape.dimensions !=
+            std::vector<std::size_t>{expert_gate_.size(), hidden_size_} ||
         shared_gate_.cols() != hidden_size_ ||
         shared_gate_.rows() != shared_expert_hidden_size_ ||
         shared_up_.cols() != hidden_size_ ||
@@ -410,6 +418,9 @@ std::size_t CudaDeepSeek2MoeWeights::expert_count() const {
 }
 const std::vector<float>& CudaDeepSeek2MoeWeights::router() const {
     return router_;
+}
+const cuda::CudaTensor& CudaDeepSeek2MoeWeights::router_device() const {
+    return router_device_;
 }
 const cuda::CudaQuantizedMatrix& CudaDeepSeek2MoeWeights::expert_gate(
     std::size_t index) const { return expert_gate_.at(index); }
@@ -556,6 +567,11 @@ struct CudaDeepSeek2MoeBatchWorkspace::Impl final {
     std::size_t routed_rows = 0;
     std::vector<BatchLinearWorkspace> expert_groups;
     BatchLinearWorkspace shared;
+    cuda::CudaTensor route_indices;
+    cuda::CudaTensor route_weights;
+    cuda::CudaTensor grouped_rows;
+    cuda::CudaTensor grouped_weights;
+    cuda::CudaTensor expert_counts;
 };
 
 CudaDeepSeek2MoeBatchWorkspace::CudaDeepSeek2MoeBatchWorkspace() = default;
@@ -588,6 +604,21 @@ core::Status CudaDeepSeek2MoeBatchWorkspace::create(
     if (status.is_ok()) status = create_batch_linear_workspace(
         batch_size, config.hidden_size, config.shared_expert_hidden_size,
         &impl->shared);
+    if (status.is_ok()) status = cuda::CudaTensor::create_contiguous(
+        {batch_size, config.top_k}, core::DType::Float32,
+        &impl->route_indices);
+    if (status.is_ok()) status = cuda::CudaTensor::create_contiguous(
+        {batch_size, config.top_k}, core::DType::Float32,
+        &impl->route_weights);
+    if (status.is_ok()) status = cuda::CudaTensor::create_contiguous(
+        {config.expert_count, batch_size * config.top_k},
+        core::DType::Float32, &impl->grouped_rows);
+    if (status.is_ok()) status = cuda::CudaTensor::create_contiguous(
+        {config.expert_count, batch_size * config.top_k},
+        core::DType::Float32, &impl->grouped_weights);
+    if (status.is_ok()) status = cuda::CudaTensor::create_contiguous(
+        {config.expert_count}, core::DType::Float32,
+        &impl->expert_counts);
     if (!status.is_ok()) return status;
     *output = CudaDeepSeek2MoeBatchWorkspace(std::move(impl));
     return core::Status::ok();
@@ -708,7 +739,8 @@ core::Status CudaDeepSeek2MoeBatchWorkspace::forward_packed(
     const CudaDeepSeek2MoeWeights& weights,
     const cuda::CudaTensor& normalized_hidden,
     cuda::CudaTensor* output,
-    std::vector<CudaDeepSeek2MoeRoute>* routes) {
+    std::vector<CudaDeepSeek2MoeRoute>* routes,
+    CudaMoePrefillPath path) {
     if (impl_ == nullptr || context == nullptr || output == nullptr ||
         routes == nullptr || !weights.valid() ||
         normalized_hidden.contract().shape.dimensions !=
@@ -720,31 +752,95 @@ core::Status CudaDeepSeek2MoeBatchWorkspace::forward_packed(
             "DeepSeek2 CUDA packed MoE input is invalid");
     }
 
-    std::vector<float> hidden(
-        impl_->batch_size * impl_->config.hidden_size);
-    core::Status status = context->download(
-        normalized_hidden, hidden.data(), hidden.size() * sizeof(float));
-    if (status.is_ok()) status = context->synchronize();
-    if (!status.is_ok()) return status;
-
     std::vector<CudaDeepSeek2MoeRoute> built_routes(impl_->batch_size);
-    for (std::size_t row = 0; row < impl_->batch_size; ++row) {
-        const auto first = hidden.begin() +
-            static_cast<std::ptrdiff_t>(row * impl_->config.hidden_size);
-        const std::vector<float> row_hidden(
-            first, first + static_cast<std::ptrdiff_t>(impl_->config.hidden_size));
-        status = build_route(
-            impl_->config, weights.router(), row_hidden, &built_routes[row]);
+    core::Status status = core::Status::ok();
+    std::vector<std::size_t> device_group_counts;
+    const bool uses_device_router =
+        path == CudaMoePrefillPath::DeviceRouterPackedDispatch ||
+        path == CudaMoePrefillPath::DeviceGroupedDispatch;
+    if (uses_device_router) {
+        status = context->moe_route(
+            normalized_hidden, weights.router_device(), impl_->config.top_k,
+            impl_->config.normalize_weights, impl_->config.weight_scale,
+            &impl_->route_indices, &impl_->route_weights);
+        std::vector<float> count_values;
+        if (status.is_ok() &&
+            path == CudaMoePrefillPath::DeviceGroupedDispatch) {
+            status = context->moe_group_routes(
+                impl_->route_indices, impl_->route_weights,
+                impl_->config.expert_count, &impl_->grouped_rows,
+                &impl_->grouped_weights, &impl_->expert_counts);
+            count_values.resize(impl_->config.expert_count);
+            if (status.is_ok()) status = context->download(
+                impl_->expert_counts, count_values.data(),
+                count_values.size() * sizeof(float));
+        }
+        std::vector<float> indices(impl_->batch_size * impl_->config.top_k);
+        std::vector<float> route_weights(indices.size());
+        if (status.is_ok()) status = context->download(
+            impl_->route_indices, indices.data(), indices.size() * sizeof(float));
+        if (status.is_ok()) status = context->download(
+            impl_->route_weights, route_weights.data(),
+            route_weights.size() * sizeof(float));
+        if (status.is_ok()) status = context->synchronize();
         if (!status.is_ok()) return status;
+        if (!count_values.empty()) {
+            device_group_counts.resize(count_values.size());
+            for (std::size_t expert = 0; expert < count_values.size(); ++expert) {
+                const float count = count_values[expert];
+                if (!std::isfinite(count) || count < 0.0F ||
+                    count > static_cast<float>(impl_->batch_size) ||
+                    std::floor(count) != count) {
+                    return core::Status::error(
+                        "DeepSeek2 CUDA device expert count is invalid");
+                }
+                device_group_counts[expert] =
+                    static_cast<std::size_t>(count);
+            }
+        }
+        for (std::size_t row = 0; row < impl_->batch_size; ++row) {
+            auto& route = built_routes[row];
+            route.expert_indices.resize(impl_->config.top_k);
+            route.weights.resize(impl_->config.top_k);
+            for (std::size_t slot = 0; slot < impl_->config.top_k; ++slot) {
+                const std::size_t offset = row * impl_->config.top_k + slot;
+                const float index = indices[offset];
+                if (!std::isfinite(index) || index < 0.0F ||
+                    index >= static_cast<float>(impl_->config.expert_count)) {
+                    return core::Status::error(
+                        "DeepSeek2 CUDA device Router index is invalid");
+                }
+                route.expert_indices[slot] = static_cast<std::size_t>(index);
+                route.weights[slot] = route_weights[offset];
+            }
+        }
+    } else {
+        std::vector<float> hidden(
+            impl_->batch_size * impl_->config.hidden_size);
+        status = context->download(
+            normalized_hidden, hidden.data(), hidden.size() * sizeof(float));
+        if (status.is_ok()) status = context->synchronize();
+        if (!status.is_ok()) return status;
+        for (std::size_t row = 0; row < impl_->batch_size; ++row) {
+            const auto first = hidden.begin() +
+                static_cast<std::ptrdiff_t>(row * impl_->config.hidden_size);
+            const std::vector<float> row_hidden(first,
+                first + static_cast<std::ptrdiff_t>(impl_->config.hidden_size));
+            status = build_route(
+                impl_->config, weights.router(), row_hidden, &built_routes[row]);
+            if (!status.is_ok()) return status;
+        }
     }
 
     struct Assignment { std::size_t row; float weight; };
     std::vector<std::vector<Assignment>> assignments(impl_->config.expert_count);
-    for (std::size_t row = 0; row < built_routes.size(); ++row) {
-        for (std::size_t slot = 0;
-             slot < built_routes[row].expert_indices.size(); ++slot) {
-            assignments[built_routes[row].expert_indices[slot]].push_back(
-                {row, built_routes[row].weights[slot]});
+    if (path != CudaMoePrefillPath::DeviceGroupedDispatch) {
+        for (std::size_t row = 0; row < built_routes.size(); ++row) {
+            for (std::size_t slot = 0;
+                 slot < built_routes[row].expert_indices.size(); ++slot) {
+                assignments[built_routes[row].expert_indices[slot]].push_back(
+                    {row, built_routes[row].weights[slot]});
+            }
         }
     }
 
@@ -754,18 +850,38 @@ core::Status CudaDeepSeek2MoeBatchWorkspace::forward_packed(
     for (std::size_t expert = 0;
          status.is_ok() && expert < assignments.size(); ++expert) {
         const auto& group = assignments[expert];
-        if (group.empty()) continue;
+        const std::size_t group_size =
+            path == CudaMoePrefillPath::DeviceGroupedDispatch
+                ? device_group_counts[expert]
+                : group.size();
+        if (group_size == 0) continue;
         ++active_expert_groups;
-        if (group.size() > 1) ++multi_row_expert_groups;
+        if (group_size > 1) ++multi_row_expert_groups;
+        auto& workspace = impl_->expert_groups[group_size - 1];
+        if (path == CudaMoePrefillPath::DeviceGroupedDispatch) {
+            const std::size_t metadata_offset =
+                expert * impl_->batch_size * impl_->config.top_k;
+            status = context->gather_rows_device(
+                normalized_hidden, impl_->grouped_rows, metadata_offset,
+                group_size, &workspace.input);
+            if (status.is_ok()) status = run_expert_batch_device(
+                context, workspace.input, weights.expert_gate(expert),
+                weights.expert_up(expert), weights.expert_down(expert),
+                &workspace);
+            if (status.is_ok()) status =
+                context->weighted_scatter_add_rows_device(
+                    workspace.output, impl_->grouped_rows,
+                    impl_->grouped_weights, metadata_offset, output);
+            continue;
+        }
         std::vector<std::size_t> rows;
         std::vector<float> route_weights;
-        rows.reserve(group.size());
-        route_weights.reserve(group.size());
+        rows.reserve(group_size);
+        route_weights.reserve(group_size);
         for (const auto assignment : group) {
             rows.push_back(assignment.row);
             route_weights.push_back(assignment.weight);
         }
-        auto& workspace = impl_->expert_groups[group.size() - 1];
         status = context->gather_rows(
             normalized_hidden, rows, &workspace.input);
         if (status.is_ok()) status = run_expert_batch_device(

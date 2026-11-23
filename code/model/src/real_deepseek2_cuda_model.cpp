@@ -141,7 +141,8 @@ struct RealDeepSeek2CudaContext::Impl final {
     std::vector<cuda::CudaTensor> prefill_rows;
     CudaDeepSeek2DensePrefillWorkspace prefill_workspace;
     CudaDeepSeek2MoeBatchWorkspace prefill_moe_workspace;
-    CudaMoePrefillPath moe_prefill_path = CudaMoePrefillPath::RowCopies;
+    CudaMoePrefillPath moe_prefill_path =
+        CudaMoePrefillPath::DeviceRouterPackedDispatch;
     std::size_t prefill_token_count = 0;
     std::size_t position = 0;
     std::size_t capacity_tokens = 0;
@@ -398,7 +399,8 @@ RealDeepSeek2CudaModel::create_context(
     std::size_t capacity_tokens,
     std::string* error,
     cuda::CudaMlaComputePath mla_path,
-    CudaMoePrefillPath moe_prefill_path) const {
+    CudaMoePrefillPath moe_prefill_path,
+    cuda::CudaQuantizedGemvPath gemv_path) const {
     if (capacity_tokens == 0 || capacity_tokens > impl_->metadata.max_position) {
         if (error != nullptr) *error = "DeepSeek2 CUDA context capacity is invalid";
         return nullptr;
@@ -408,6 +410,9 @@ RealDeepSeek2CudaModel::create_context(
     context->capacity_tokens = capacity_tokens;
     context->moe_prefill_path = moe_prefill_path;
     core::Status status = cuda::CudaExecutionContext::create(&context->execution);
+    if (status.is_ok()) {
+        context->execution.set_quantized_gemv_path(gemv_path);
+    }
     if (status.is_ok()) status = cuda::CudaTensor::create_contiguous(
         {impl_->metadata.hidden_size}, core::DType::Float32, &context->hidden);
     if (status.is_ok()) status = cuda::CudaTensor::create_contiguous(
@@ -439,7 +444,9 @@ RealDeepSeek2CudaModel::create_context(
 
 std::unique_ptr<RealDeepSeek2CudaBatchWorkspace>
 RealDeepSeek2CudaModel::create_batch_workspace(
-    std::size_t batch_size, std::string* error) const {
+    std::size_t batch_size,
+    std::string* error,
+    cuda::CudaQuantizedGemvPath gemv_path) const {
     if (batch_size == 0 || impl_->moe_configs.empty()) {
         if (error != nullptr) {
             *error = "DeepSeek2 CUDA batch size or MoE layers are invalid";
@@ -451,6 +458,9 @@ RealDeepSeek2CudaModel::create_batch_workspace(
     workspace->batch_size = batch_size;
     core::Status status = cuda::CudaExecutionContext::create(
         &workspace->execution);
+    if (status.is_ok()) {
+        workspace->execution.set_quantized_gemv_path(gemv_path);
+    }
     if (status.is_ok()) status = CudaDeepSeek2MoeBatchWorkspace::create(
         impl_->moe_configs.front(), batch_size, &workspace->moe);
     if (!status.is_ok()) {

@@ -262,10 +262,12 @@ core::Status CudaDeepSeek2MoeLayer::prefill_sequence(
     RETURN_IF_MOE_PREFILL_ERROR(context->rms_norm_batch(
         workspace->attention_residual_, weights.ffn_norm(),
         &workspace->ffn_norm_, config_.attention.rms_norm_epsilon));
-    if (moe_path == CudaMoePrefillPath::PackedDispatch) {
+    if (moe_path == CudaMoePrefillPath::PackedDispatch ||
+        moe_path == CudaMoePrefillPath::DeviceRouterPackedDispatch ||
+        moe_path == CudaMoePrefillPath::DeviceGroupedDispatch) {
         RETURN_IF_MOE_PREFILL_ERROR(moe_workspace->forward_packed(
             context, weights, workspace->ffn_norm_, &workspace->ffn_output_,
-            routes));
+            routes, moe_path));
     } else {
         std::vector<cuda::CudaTensor*> input_rows;
         std::vector<const cuda::CudaTensor*> normalized_rows;

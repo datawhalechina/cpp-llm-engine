@@ -3,6 +3,7 @@
 
 #include "cpp_llm_engine/core/status.h"
 #include "cpp_llm_engine/cuda/mla_attention_backend.h"
+#include "cpp_llm_engine/cuda/quantized_gemv_backend.h"
 #include "cpp_llm_engine/model/cuda_deepseek2_moe_feed_forward.h"
 
 #include <cstddef>
@@ -56,10 +57,14 @@ public:
         cuda::CudaMlaComputePath mla_path =
             cuda::CudaMlaComputePath::LegacyThreeStage,
         CudaMoePrefillPath moe_prefill_path =
-            CudaMoePrefillPath::RowCopies) const;
+            CudaMoePrefillPath::DeviceRouterPackedDispatch,
+        cuda::CudaQuantizedGemvPath gemv_path =
+            cuda::CudaQuantizedGemvPath::Adaptive) const;
     std::unique_ptr<RealDeepSeek2CudaBatchWorkspace> create_batch_workspace(
         std::size_t batch_size,
-        std::string* error = nullptr) const;
+        std::string* error = nullptr,
+        cuda::CudaQuantizedGemvPath gemv_path =
+            cuda::CudaQuantizedGemvPath::Adaptive) const;
     bool decode_batch(
         const std::vector<RealDeepSeek2CudaBatchItem>& items,
         RealDeepSeek2CudaBatchWorkspace* workspace,
