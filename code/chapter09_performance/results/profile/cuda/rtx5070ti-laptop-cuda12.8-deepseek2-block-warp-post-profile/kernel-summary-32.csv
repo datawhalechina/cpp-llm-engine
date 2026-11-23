@@ -1,0 +1,21 @@
+Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+44.4,148736785,1182,125834.8,77041.0,47328,1962556,182075.4,"void cpp_llm_engine::cuda::<unnamed>::q2k_warp_gemv_kernel<(unsigned long)4>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+21.9,73170692,538,136005.0,95938.0,51104,2603013,185106.9,"void cpp_llm_engine::cuda::<unnamed>::iq4nl_warp_gemv_kernel<(unsigned long)4>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+13.8,46305525,53,873689.2,739147.0,731819,2392738,241388.0,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(cpp_llm_engine::core::WeightFormat)5, (unsigned long)4>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+5.5,18428070,27,682521.1,540103.0,537768,1875962,411012.4,"cpp_llm_engine::cuda::<unnamed>::mla_absorbed_value_kernel(cpp_llm_engine::cuda::CudaMlaAttentionRequest, const float *, unsigned long)"
+3.9,13127256,27,486194.7,305572.0,296132,1725241,450289.4,"cpp_llm_engine::cuda::<unnamed>::mla_absorbed_score_kernel(cpp_llm_engine::cuda::CudaMlaAttentionRequest, const float *, const float *, unsigned long)"
+2.9,9731377,236,41234.6,41216.0,40544,42336,298.8,"void cpp_llm_engine::cuda::<unnamed>::iq4nl_warp_gemv_kernel<(unsigned long)1>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+2.7,8983807,472,19033.5,16096.0,15680,1391892,63325.6,"void cpp_llm_engine::cuda::<unnamed>::q2k_warp_gemv_kernel<(unsigned long)1>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+1.2,3941491,90,43794.3,43760.5,42881,45153,353.4,"void cpp_llm_engine::cuda::<unnamed>::iq4nl_warp_gemv_kernel<(unsigned long)2>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+1.2,3855544,180,21419.7,21377.0,20736,22689,284.3,"void cpp_llm_engine::cuda::<unnamed>::q2k_warp_gemv_kernel<(unsigned long)2>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+0.6,2026492,1,2026492.0,2026492.0,2026492,2026492,0.0,"void cpp_llm_engine::cuda::<unnamed>::quantized_gemv_kernel<(cpp_llm_engine::core::WeightFormat)3, (unsigned long)1>(const unsigned char *, const float *, float *, unsigned long, unsigned long)"
+0.5,1631730,890,1833.4,1792.0,1728,6784,246.5,"cpp_llm_engine::cuda::<unnamed>::swiglu_kernel(const float *, const float *, float *, unsigned long)"
+0.5,1590967,863,1843.5,1728.0,1632,3200,206.4,cpp_llm_engine::cuda::<unnamed>::gather_rows_kernel(cpp_llm_engine::cuda::CudaGatherRowsRequest)
+0.5,1590426,863,1842.9,1728.0,1632,3296,185.2,cpp_llm_engine::cuda::<unnamed>::weighted_scatter_add_rows_kernel(cpp_llm_engine::cuda::CudaWeightedScatterAddRowsRequest)
+0.2,533224,27,19749.0,19808.0,18656,20641,474.1,"cpp_llm_engine::cuda::<unnamed>::mla_softmax_kernel(cpp_llm_engine::cuda::CudaMlaAttentionRequest, unsigned long)"
+0.2,526535,81,6500.4,7904.0,3360,8768,2161.3,"cpp_llm_engine::cuda::<unnamed>::rms_norm_batch_kernel(const float *, const float *, float *, unsigned long, unsigned long, float)"
+0.1,184771,54,3421.7,3392.0,3136,3712,228.6,"cpp_llm_engine::cuda::<unnamed>::rope_batch_kernel(float *, const unsigned long *, unsigned long, unsigned long, unsigned long, unsigned long, float, cpp_llm_engine::core::RotaryPairing, cpp_llm_engine::core::YarnRotaryScaling)"
+0.0,164867,80,2060.8,1952.0,1664,2784,306.6,"cpp_llm_engine::cuda::<unnamed>::vector_add_kernel(const float *, const float *, float *, unsigned long)"
+0.0,94401,27,3496.3,3488.0,3456,3552,27.5,cpp_llm_engine::cuda::<unnamed>::mla_prepare_kernel(cpp_llm_engine::cuda::CudaMlaPrepareRequest)
+0.0,58305,32,1822.0,1760.0,1728,2336,192.5,"cpp_llm_engine::cuda::<unnamed>::dequantize_q2k_kernel(const unsigned char *, float *, unsigned long)"
+0.0,8737,1,8737.0,8737.0,8737,8737,0.0,"cpp_llm_engine::cuda::<unnamed>::rms_norm_kernel(const float *, const float *, float *, unsigned long, float)"

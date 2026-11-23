@@ -1,0 +1,15 @@
+Capture range started in the application.
+Capture range ended in the application.
+Generating '/tmp/nsys-report-9feb.qdstrm'
+[1/1] [0%                          ] optimized-prefill-128.nsys-repProcessing events...
+[1/1] [0%                          ] optimized-prefill-128.nsys-rep[1/1] [7%                          ] optimized-prefill-128.nsys-rep[1/1] [14%                         ] optimized-prefill-128.nsys-rep[1/1] [=============60%            ] optimized-prefill-128.nsys-rep[1/1] [===================80%      ] optimized-prefill-128.nsys-rep[1/1] [========================100%] optimized-prefill-128.nsys-rep[1/1] [========================100%] optimized-prefill-128.nsys-rep
+profile_length: 128
+profile_mla_path: absorbed
+profile_moe_path: packed
+profile_gemv_path: all-warp
+profile_tensor_ms: 930.704275
+profile_maximum_logits_error: 0
+profile_tokens_match: true
+profile_correctness: PASS
+Generated:
+    /tmp/cpp-llm-deepseek2-all-warp-post-profile/optimized-prefill-128.nsys-rep

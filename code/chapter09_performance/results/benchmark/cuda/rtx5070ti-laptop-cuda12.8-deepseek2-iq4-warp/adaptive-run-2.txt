@@ -1,0 +1,4 @@
+format=IQ4_NL path=adaptive batch=1 rows=2048 cols=2048 iterations=50 mean_ms=0.0788585 speedup_vs_repeated_single=1 max_error=0
+format=IQ4_NL path=adaptive batch=2 rows=2048 cols=2048 iterations=50 mean_ms=0.0842628 speedup_vs_repeated_single=1.87173 max_error=0
+format=IQ4_NL path=adaptive batch=4 rows=2048 cols=2048 iterations=50 mean_ms=0.100463 speedup_vs_repeated_single=3.13981 max_error=0
+format=IQ4_NL path=adaptive batch=8 rows=2048 cols=2048 iterations=50 mean_ms=0.197639 speedup_vs_repeated_single=3.19202 max_error=0

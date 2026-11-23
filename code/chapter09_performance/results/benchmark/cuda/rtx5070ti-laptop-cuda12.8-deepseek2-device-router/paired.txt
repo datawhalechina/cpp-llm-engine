@@ -1,0 +1,11 @@
+paired_sample length=32 iteration=1 path_order=packed-dispatch-first baseline_ms=261.846328 candidate_ms=299.841913
+paired_sample length=32 iteration=2 path_order=device-router-first baseline_ms=312.085448 candidate_ms=248.934537
+paired_sample length=32 iteration=3 path_order=packed-dispatch-first baseline_ms=373.482192 candidate_ms=355.989976
+paired_sample length=32 iteration=4 path_order=device-router-first baseline_ms=396.013221 candidate_ms=390.293649
+matrix_cell length=32 baseline=packed-dispatch candidate=device-router baseline_median_ms=342.78382 candidate_median_ms=327.915945 candidate_to_baseline_ratio=0.956626087 maximum_logits_error=3.9100647e-05 tokens_match=true correctness=PASS
+paired_sample length=128 iteration=1 path_order=packed-dispatch-first baseline_ms=960.531466 candidate_ms=873.59224
+paired_sample length=128 iteration=2 path_order=device-router-first baseline_ms=947.428348 candidate_ms=907.634545
+paired_sample length=128 iteration=3 path_order=packed-dispatch-first baseline_ms=953.915231 candidate_ms=881.030568
+paired_sample length=128 iteration=4 path_order=device-router-first baseline_ms=925.634107 candidate_ms=916.196379
+matrix_cell length=128 baseline=packed-dispatch candidate=device-router baseline_median_ms=950.671789 candidate_median_ms=894.332557 candidate_to_baseline_ratio=0.940737452 maximum_logits_error=3.6239624e-05 tokens_match=true correctness=PASS
+moe_dispatch_correctness=PASS

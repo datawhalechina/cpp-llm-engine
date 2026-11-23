@@ -76,7 +76,8 @@ for length in "${profile_lengths[@]}"; do
         --force-overwrite=true \
         --output="${profile_base}" \
         "${build_dir}/real_deepseek2_cuda_tensor_prefill_benchmark" \
-        "${model_path}" --profile-tensor "${length}" "${mla_path}" \
+        "${model_path}" --profile-tensor "${length}" \
+        "${mla_path}" adaptive row-copies \
         >"${result_dir}/program-output-${length}.txt"
 
     "${cuda_home}/bin/nsys" stats --force-export=true \

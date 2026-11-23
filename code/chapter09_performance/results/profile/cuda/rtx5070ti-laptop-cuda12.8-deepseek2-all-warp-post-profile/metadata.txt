@@ -1,0 +1,15 @@
+experiment_id=EXP-GPU-30
+workload_id=WL-GPU-DEEPSEEK2-ALL-WARP-POST-PROFILE-V1
+model=DeepSeek-V2-Lite-Chat-Q2_K
+backend=CUDA
+build_type=Release
+profile_lengths=32,128
+mla_path=absorbed-three-stage
+moe_prefill_path=packed-dispatch
+gemv_path=all-warp
+capture_range=one-complete-tensor-prefill
+cache=continuous-compressed-mla
+timing_scope=27-layer-prefill-and-lm-head
+excludes=model-load-context-create-and-correctness-reference
+NVIDIA Nsight Systems version 2024.6.2.225-246235244400v0
+NVIDIA GeForce RTX 5070 Ti Laptop GPU, 580.178.04, 12227 MiB

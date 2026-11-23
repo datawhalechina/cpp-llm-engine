@@ -1,0 +1,4 @@
+format=Q2_K path=q2-warp batch=1 rows=2048 cols=2048 iterations=50 mean_ms=0.0123635 speedup_vs_repeated_single=1 max_error=0
+format=Q2_K path=q2-warp batch=2 rows=2048 cols=2048 iterations=50 mean_ms=0.0144051 speedup_vs_repeated_single=1.71654 max_error=0
+format=Q2_K path=q2-warp batch=4 rows=2048 cols=2048 iterations=50 mean_ms=0.0246539 speedup_vs_repeated_single=2.00593 max_error=0
+format=Q2_K path=q2-warp batch=8 rows=2048 cols=2048 iterations=50 mean_ms=0.0450991 speedup_vs_repeated_single=2.19313 max_error=0

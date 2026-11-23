@@ -1,0 +1,13 @@
+Capture range started in the application.
+Capture range ended in the application.
+Generating '/tmp/nsys-report-836c.qdstrm'
+[1/1] [0%                          ] optimized-prefill-32.nsys-repProcessing events...
+[1/1] [0%                          ] optimized-prefill-32.nsys-rep[1/1] [9%                          ] optimized-prefill-32.nsys-rep[1/1] [==18%                       ] optimized-prefill-32.nsys-rep[1/1] [==================75%       ] optimized-prefill-32.nsys-rep[1/1] [===================81%      ] optimized-prefill-32.nsys-rep[1/1] [========================100%] optimized-prefill-32.nsys-rep[1/1] [========================100%] optimized-prefill-32.nsys-rep
+profile_length: 32
+profile_mla_path: absorbed
+profile_tensor_ms: 412.943729
+profile_maximum_logits_error: 0
+profile_tokens_match: true
+profile_correctness: PASS
+Generated:
+    /tmp/cpp-llm-deepseek2-optimized-profile/optimized-prefill-32.nsys-rep

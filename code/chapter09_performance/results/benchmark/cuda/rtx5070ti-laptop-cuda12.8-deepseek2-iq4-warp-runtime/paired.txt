@@ -1,0 +1,11 @@
+paired_sample length=32 iteration=1 path_order=adaptive-first adaptive_ms=509.908507 iq4_warp_ms=379.682751
+paired_sample length=32 iteration=2 path_order=iq4-warp-first adaptive_ms=487.818591 iq4_warp_ms=416.219082
+paired_sample length=32 iteration=3 path_order=adaptive-first adaptive_ms=529.302774 iq4_warp_ms=386.465699
+paired_sample length=32 iteration=4 path_order=iq4-warp-first adaptive_ms=521.421635 iq4_warp_ms=386.370392
+matrix_cell length=32 adaptive_median_ms=515.665071 iq4_warp_median_ms=386.418045 iq4_warp_to_adaptive_ratio=0.74935858 maximum_logits_error=0 tokens_match=true correctness=PASS
+paired_sample length=128 iteration=1 path_order=adaptive-first adaptive_ms=1791.57535 iq4_warp_ms=1464.82709
+paired_sample length=128 iteration=2 path_order=iq4-warp-first adaptive_ms=1799.38892 iq4_warp_ms=1490.00293
+paired_sample length=128 iteration=3 path_order=adaptive-first adaptive_ms=1732.64124 iq4_warp_ms=1515.13854
+paired_sample length=128 iteration=4 path_order=iq4-warp-first adaptive_ms=1679.00284 iq4_warp_ms=1499.89062
+matrix_cell length=128 adaptive_median_ms=1762.10829 iq4_warp_median_ms=1494.94678 iq4_warp_to_adaptive_ratio=0.848385301 maximum_logits_error=0 tokens_match=true correctness=PASS
+iq4_warp_correctness=PASS

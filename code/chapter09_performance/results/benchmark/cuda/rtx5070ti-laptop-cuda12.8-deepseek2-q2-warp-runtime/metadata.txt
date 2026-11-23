@@ -1,0 +1,22 @@
+experiment_id=EXP-GPU-26
+workload_id=WL-GPU-DEEPSEEK2-Q2-WARP-RUNTIME-AB-V1
+model=DeepSeek-V2-Lite-Chat-Q2_K
+lengths=32,128
+warmup=1
+iterations=4
+execution_order=baseline-experiment,experiment-baseline
+mla_path=absorbed-three-stage
+moe_prefill_path=packed-dispatch
+iq4_path=single-warp
+baseline=adaptive-256-thread-q2
+experiment=adaptive-single-warp-q2
+timing_scope=executor-prefill
+correctness=PASS
+execution_status=PASS
+a77d1dab7fae74a0377a3803b7428e60643fd231d309e8718bcee4c8ecf9499d  /home/yulinlin/data/cpp-llm-engine/llama.cpp/models/deepseek-v2-lite-chat/DeepSeek-V2-Lite-Chat-Q2_K.gguf
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2025 NVIDIA Corporation
+Built on Fri_Feb_21_20:23:50_PST_2025
+Cuda compilation tools, release 12.8, V12.8.93
+Build cuda_12.8.r12.8/compiler.35583870_0
+NVIDIA GeForce RTX 5070 Ti Laptop GPU, 580.178.04, 12227 MiB

@@ -1,0 +1,11 @@
+paired_sample length=32 iteration=1 path_order=baseline-first comparison=q3 baseline_ms=270.175655 experiment_ms=306.035146
+paired_sample length=32 iteration=2 path_order=experiment-first comparison=q3 baseline_ms=363.899643 experiment_ms=290.572539
+paired_sample length=32 iteration=3 path_order=baseline-first comparison=q3 baseline_ms=383.999289 experiment_ms=357.242885
+paired_sample length=32 iteration=4 path_order=experiment-first comparison=q3 baseline_ms=354.450056 experiment_ms=348.257936
+matrix_cell length=32 comparison=q3 baseline_median_ms=359.17485 experiment_median_ms=327.146541 experiment_to_baseline_ratio=0.910828087 maximum_logits_error=3.71932983e-05 tokens_match=true correctness=PASS
+paired_sample length=128 iteration=1 path_order=baseline-first comparison=q3 baseline_ms=996.517026 experiment_ms=961.43034
+paired_sample length=128 iteration=2 path_order=experiment-first comparison=q3 baseline_ms=984.705001 experiment_ms=933.187009
+paired_sample length=128 iteration=3 path_order=baseline-first comparison=q3 baseline_ms=1001.38917 experiment_ms=931.477798
+paired_sample length=128 iteration=4 path_order=experiment-first comparison=q3 baseline_ms=1009.08726 experiment_ms=934.380659
+matrix_cell length=128 comparison=q3 baseline_median_ms=998.953098 experiment_median_ms=933.783834 experiment_to_baseline_ratio=0.934762439 maximum_logits_error=3.14712524e-05 tokens_match=true correctness=PASS
+gemv_path_correctness=PASS

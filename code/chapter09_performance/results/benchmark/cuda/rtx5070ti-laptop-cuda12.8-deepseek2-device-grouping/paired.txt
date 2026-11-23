@@ -1,0 +1,11 @@
+paired_sample length=32 iteration=1 path_order=device-router-first baseline_ms=214.785166 candidate_ms=286.875114
+paired_sample length=32 iteration=2 path_order=device-grouped-first baseline_ms=216.696229 candidate_ms=259.025364
+paired_sample length=32 iteration=3 path_order=device-router-first baseline_ms=221.392008 candidate_ms=277.436087
+paired_sample length=32 iteration=4 path_order=device-grouped-first baseline_ms=223.975288 candidate_ms=256.122172
+matrix_cell length=32 baseline=device-router candidate=device-grouped baseline_median_ms=219.044118 candidate_median_ms=268.230726 candidate_to_baseline_ratio=1.22455114 maximum_logits_error=0 tokens_match=true correctness=PASS
+paired_sample length=128 iteration=1 path_order=device-router-first baseline_ms=808.652333 candidate_ms=810.931512
+paired_sample length=128 iteration=2 path_order=device-grouped-first baseline_ms=816.188855 candidate_ms=827.521429
+paired_sample length=128 iteration=3 path_order=device-router-first baseline_ms=826.975019 candidate_ms=815.871056
+paired_sample length=128 iteration=4 path_order=device-grouped-first baseline_ms=819.879575 candidate_ms=816.355705
+matrix_cell length=128 baseline=device-router candidate=device-grouped baseline_median_ms=818.034215 candidate_median_ms=816.11338 candidate_to_baseline_ratio=0.99765189 maximum_logits_error=0 tokens_match=true correctness=PASS
+moe_dispatch_correctness=PASS

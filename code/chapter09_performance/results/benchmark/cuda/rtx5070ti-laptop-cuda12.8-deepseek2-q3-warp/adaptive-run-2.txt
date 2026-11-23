@@ -1,0 +1,4 @@
+format=Q3_K path=adaptive batch=1 rows=2048 cols=2048 iterations=100 mean_ms=0.041015 speedup_vs_repeated_single=1 max_error=0
+format=Q3_K path=adaptive batch=2 rows=2048 cols=2048 iterations=100 mean_ms=0.0573729 speedup_vs_repeated_single=1.42977 max_error=0
+format=Q3_K path=adaptive batch=4 rows=2048 cols=2048 iterations=100 mean_ms=0.0590132 speedup_vs_repeated_single=2.78006 max_error=0
+format=Q3_K path=adaptive batch=8 rows=2048 cols=2048 iterations=100 mean_ms=0.116054 speedup_vs_repeated_single=2.82731 max_error=0
