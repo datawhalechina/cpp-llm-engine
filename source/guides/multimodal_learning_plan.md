@@ -32,7 +32,7 @@ SmolVLM 500M 的 IDEFICS3 图片路径用于说明图片进入模型前发生的
 1. 为 Patch/Position Embedding 与 Projector 建立 CPU/CUDA golden。两项合成对照均已完成。
 2. 迁移单个 SigLIP Block，固定全注意力、LayerNorm、GELU 与双残差。合成 F32 和真实 mmproj Q8_0 对照已完成。
 3. 连接 12 层 Vision Encoder，并记录显存峰值与持久工作区。4-token 数值对照和跨层工作区复用已完成，完整 1024-token tile 的性能与显存证据待补。
-4. 串联真实图片的 Patch/Position、Encoder 和 Projector，再把视觉 embedding 交给现有 CUDA LLM Context。左上 `4×4` patch 设备流水线和单行视觉 embedding 的 32 层 Context 对照已完成；完整 tile 与图文混合序列待补。
+4. 串联真实图片的 Patch/Position、Encoder 和 Projector，再把视觉 embedding 交给现有 CUDA LLM Context。左上 `4×4` patch 设备流水线和单行视觉 embedding 的 32 层 Context 对照已完成；当前交接经过 Host 中转，完整 tile、图文混合序列与设备直连待补。
 5. 接入 Chapter08 视觉 batch 与 Chapter10 图片 Transport。
 6. 在 Chapter09 分开记录图片预处理、视觉编码、语言 Prefill 和 Decode 指标。
 

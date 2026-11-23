@@ -21,9 +21,9 @@
 | `cuda_workspace.h/.cpp` | 只在容量不足时增长的可复用临时显存 |
 | `cuda_execution_context.h/.cpp` | 统一持有 stream、cuBLAS handle、workspace 和 backend 调度 |
 | `cuda_execution_context_test.cu` | Tensor 复制、批量行打包/拆包、索引收集、加权散回、算子调度和 workspace 复用测试 |
-| `cuda_quantized_matrix.h/.cpp` | packed Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL row-major device 权重 |
-| `quantized_dequantize_backend.h/.cu` | 五种 packed 格式到 Float32 workspace 的 CUDA 解码 |
-| `quantized_gemv_backend.h/.cu` | 五种 packed 格式的解码、点积与行归约融合 |
+| `cuda_quantized_matrix.h/.cpp` | packed Q2_K/Q3_K/Q4_K/Q6_K/Q8_0/IQ4_NL row-major device 权重 |
+| `quantized_dequantize_backend.h/.cu` | 六种 packed 格式到 Float32 workspace 的 CUDA 解码 |
+| `quantized_gemv_backend.h/.cu` | 六种 packed 格式的解码、点积与行归约融合 |
 | `moe_router_backend.h/.cu` | 批量 Router 点积、全专家 Softmax、稳定 Top-K 与紧凑路由输出 |
 | `row_dispatch_backend.h/.cu` | 索引行收集、加权散回与视觉空间合并数据重排 |
 | `vision_elementwise_backend.h/.cu` | 视觉 Block 使用的标准 LayerNorm、bias 广播与 GELU |
@@ -180,7 +180,7 @@ Llama Decoder 使用独立的 RMSNorm 与 SwiGLU CUDA kernel，Residual 继续�
 
 ## 真实层权重上传
 
-`code/model` 中的 `CudaLlamaLayerWeights` 接收 Chapter01 读取的单层权重，把两个 Float32 norm 和七个 Q4_K/Q6_K Linear 上传到显存。对象拥有上传后的 device storage；Chapter01 的 host Tensor 可以在同步完成后释放。上传先写入临时对象，九个权重全部成功后才替换原对象，因此格式错误不会破坏已有 GPU 权重。
+`code/model` 中的 `CudaLlamaLayerWeights` 接收 Chapter01 读取的单层权重，把两个 Float32 norm 和七个 Q4_K/Q6_K/Q8_0 Linear 上传到显存。对象拥有上传后的 device storage；Chapter01 的 host Tensor 可以在同步完成后释放。上传先写入临时对象，九个权重全部成功后才替换原对象，因此格式错误不会破坏已有 GPU 权重。
 
 `RealLlamaCudaModel` 共享各层 device 权重，`RealLlamaCudaContext` 为每个请求创建 stream、层中间张量，并持有连续 K/V 或绑定分页数据面。一次多层前向只有在所有层成功后才推进 position；失败时已追加的状态会回退到原位置。
 

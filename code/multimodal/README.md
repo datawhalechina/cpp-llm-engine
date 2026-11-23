@@ -93,7 +93,7 @@ Patch projection 把每个展平 patch 映射到 hidden width，并加入对应 
 
 CUDA 路径保留 12 层 packed Q8_0 权重。4-token 真实对照只重建一次 workspace，最大绝对误差为 `7.03e-5`。完整 1024-token tile 的显存与性能需由 Chapter09 另建实验。
 
-`CudaSmolvlmVisionPipeline` 在 Host 完成图片解码、缩放、归一化和 patch 提取，随后把 Patch/Position、12 层 Encoder 与 Projector 串在同一 CUDA Context 中。中间 hidden 不回传 Host；当前真实图片验收选取左上 `4×4` patch 子网格，输出一行 width 960 视觉 embedding。这个入口先固定数据布局和阶段边界，不代替完整 tile 的性能实验。
+`CudaSmolvlmVisionPipeline` 在 Host 完成图片解码、缩放、归一化和 patch 提取，随后把 Patch/Position、12 层 Encoder 与 Projector 串在同一 CUDA Context 中。三个视觉阶段之间的 hidden 不回传 Host；当前真实图片验收选取左上 `4×4` patch 子网格，输出一行 width 960 视觉 embedding。语言 Context 对照会把该行下载到 Host，再由 `prefill_embeddings()` 上传到语言模型自己的 CUDA Context。这个中转先固定两个执行层的接口和数值边界，不代表设备直连或完整 tile 性能。
 
 ## IDEFICS3 Projector
 
@@ -173,7 +173,7 @@ CUDA_HOME=/usr/local/cuda-12.8 \
 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh
 ```
 
-脚本通过 CTest 运行真实模型测试，核对 CPU/CUDA logits、贪心词元和 Context 位置。该测试只覆盖一行视觉 embedding，用于固定视觉与语言执行层的接口；它不代表完整图文生成。
+脚本通过 CTest 运行真实模型测试，核对 CPU/CUDA logits、贪心词元和 Context 位置。当前视觉与语言 Context 分别拥有执行资源，视觉结果经 Host 中转后进入语言 Prefill；该测试只覆盖一行视觉 embedding，用于固定接口正确性，不代表设备直连或完整图文生成。
 
 若本机已有 `llama.cpp/tools/mtmd/test-1.jpeg`，可以对 JPEG 做额外检查：
 

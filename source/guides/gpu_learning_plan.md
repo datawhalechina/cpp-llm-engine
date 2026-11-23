@@ -21,7 +21,7 @@ TinyLlama 与 Qwen3 已形成完整稠密 GPU 基线：真实模型加载、完�
 
 ## 当前完成度与后续边界
 
-六项教学任务均已有真实设备入口。TinyLlama 和 Qwen3 覆盖稠密模型纵向闭环；DeepSeek-V2-Lite 覆盖 27 层 MLA+MoE Runtime 与 Serving，并用 EXP-GPU-20～31 记录算法、计算核和数据搬运的逐步优化。
+六项教学任务均已有真实设备入口。TinyLlama 和 Qwen3 覆盖稠密模型纵向闭环；DeepSeek-V2-Lite 覆盖 27 层 MLA+MoE Runtime 与 Serving，并用 EXP-GPU-20～33 记录算法、计算核和数据搬运的逐步优化。
 
 | 范围 | 当前状态 | 下一步 |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ TinyLlama 与 Qwen3 已形成完整稠密 GPU 基线：真实模型加载、完�
 
 当前 CUDA 纵向教学任务已经完成，性能建设已按证据收敛到明确边界。EXP-GPU-32 确认设备 Router 消除了完整 hidden 回传；EXP-GPU-33 又验证设备分组候选的数值正确，但短序列回退、长序列基本持平，因此没有切换默认路径。CUDA 语言模型主线进入维护状态，新的实现重心转向视觉 CUDA；融合 grouped-MoE、更多 Attention 候选和多 GPU 继续留在性能扩展队列。
 
-视觉 CUDA 已完成 Patch/Position Embedding、单个 SigLIP Block 与 Projector 的合成 CPU/CUDA 对照。下一步接入真实 mmproj Q8_0 payload，并用持久工作区连接 12 层 Encoder；它继续复用现有 Tensor、量化 Linear、执行上下文、Runtime 和服务接口。
+视觉 CUDA 已完成真实 mmproj Q8_0 的 Patch/Position Embedding、单个 SigLIP Block、12 层 Encoder、Projector 和一行视觉 embedding 到语言 Context 的对照。视觉三阶段在同一 CUDA Context 内复用持久工作区；视觉结果进入语言 Context 时仍经过 Host 中转。下一步扩展完整 1024-token tile、图文混合 Prefill 和设备直连，再接 Runtime 与服务。
 
 ## 任务 1：固定 CUDA 环境
 
