@@ -53,4 +53,5 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 | L3 可选 DeepSeek CUDA MoE | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_moe.sh` | 第 1 层压缩 MLA、Top-6、量化专家、双残差与缓存提交匹配 CPU 参考 | 学习 MoE 设备执行时选做 |
 | L3 可选 CUDA | `bash code/engine/scripts/run_real_cuda_decoder.sh` | TinyLlama 2 层与 22 层 hidden、分层 K/V 匹配 CPU 参考实现 | 有 NVIDIA GPU 和模型时选做 |
 | L3 可选 Qwen3 CUDA | `bash code/engine/scripts/run_qwen3_cuda_decoder.sh` | Qwen3 28 层 hidden、分层 K/V、logits、融合 Attention 与 Tensor Prefill匹配 CPU 参考实现 | 验收第二种 CUDA 稠密架构时执行 |
+| L3 可选 SmolVLM CUDA Encoder | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_encoder.sh` | 真实 12 层 Q8_0 SigLIP 输出匹配 CPU reference，跨层 workspace 只建立一次 | 学习视觉 Encoder 设备执行时选做 |
 | L4 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 三阶段与融合路径均通过 logits/greedy 检查，并保留两轮 Prefill/Decode 样本；收益不稳定时不切换默认路径 | 调优融合内核时必做 |

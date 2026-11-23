@@ -1,10 +1,12 @@
-# 多模态 CPU 基础层
+# 多模态执行层
 
 本目录建立图片进入视觉编码器之前的可验证数据路径。默认构建只需要 C++17；系统存在 `libjpeg` 时增加 JPEG 解码，PPM、原始 RGB、resize、normalize 和 patch 测试不依赖真实模型或 `llama.cpp`。
 
 ## 资产总览
 
 当前资产覆盖 IDEFICS3 动态切图、单张视觉 tile 预处理、mmproj schema、Float32 Patch/Position Embedding、使用真实 Q8_0 权重的 12 层 SigLIP Vision Encoder、IDEFICS3 Projector，以及图文 embedding 序列拼接。
+
+可选 CUDA 适配已覆盖 Patch/Position Embedding、SigLIP Encoder、IDEFICS3 Projector 和语言 Context 交接。`CudaSiglipEncoder` 将 12 层真实 Q8_0 packed 权重常驻设备，复用一个 workspace 和两个 hidden buffer。`CudaSmolvlmVisionPipeline` 已用真实图片左上 `4×4` patch 子网格串起三个设备阶段，并把一行视觉 embedding 送入 32 层 SmolVLM CUDA Context；完整 1024-token tile、图文混合序列和生成仍待接入。
 
 | 资产 | 输入与输出 | 当前验证 |
 | --- | --- | --- |
@@ -21,6 +23,15 @@
 | `MmprojSchema::validate_gguf` | tensor index -> `VisionTensorLayout` | 198 个名称和 shape |
 | `multimodal_mmproj_inspect` | 真实 mmproj -> 配置与 schema 结果 | 只读 index，不加载 payload |
 | `embed_patches` | patch + F32 patch/position 权重 -> hidden states | 合成精确值；真实 mmproj 首 patch |
+| `CudaPatchEmbedding` | patch + position id -> 设备 `[tokens, hidden]` | 合成 CPU/CUDA 逐值对照；越界与 shape 失败路径 |
+| `CudaSiglipBlock` | 设备 `[tokens, hidden]` -> 单视觉 Block 输出 | 合成 F32 与真实 mmproj Q8_0 CPU/CUDA golden |
+| `multimodal_cuda_vision_block_inspect` | 真实 mmproj -> 第 0 个 CUDA Block 输出 | 4 token 最大误差 `8.82e-6`、余弦相似度 `1` |
+| `CudaSiglipEncoder` | 设备 `[tokens,768]` -> 12 层 post-norm 输出 | 权重常驻、hidden ping-pong、单 workspace |
+| `multimodal_cuda_vision_encoder_inspect` | 真实 mmproj -> 12 层 CUDA Encoder | 4 token 最大误差 `7.03e-5`、余弦相似度 `0.9999999999` |
+| `CudaIdefics3Projector` | 设备视觉网格 -> 设备语言宽度 embedding | 空间合并顺序、F32 Linear 与失败路径 |
+| `CudaSmolvlmVisionPipeline` | Host patch -> 设备视觉 embedding | 三阶段间 hidden 不回传 Host；工作区按 token shape 复用 |
+| `multimodal_cuda_vision_pipeline_inspect` | 真实图片 + mmproj -> `1x960` | 左上 `4x4` patch 最大误差 `1.43e-4`、余弦相似度 `1` |
+| `multimodal_cuda_smolvlm_context_test` | 真实视觉 embedding -> 32 层 CUDA LLM Context | logits 最大误差 `4.01e-5`、余弦相似度 `1`、贪心词元一致 |
 | `run_siglip_block` | hidden states + F32 权重 -> 单 Block 输出 | 合成 LayerNorm、全注意力、GELU、双 residual |
 | `multimodal_vision_embedding_inspect` | 真实图片 + mmproj -> 首 patch embedding | `1x768`、checksum、`payload=f32-valid` |
 | `load_siglip_block_weights` | F32/Q8_0 payload -> `SiglipBlockWeights` | 合成装配测试；FFN legacy 名称交换 |
@@ -72,11 +83,17 @@ Patch projection 把每个展平 patch 映射到 hidden width，并加入对应 
 
 `run_siglip_block` 接收可注入的 Float32 权重，因此默认测试能用小矩阵逐项验证计算顺序。加载适配器将 Q8_0 解码为该接口需要的 Float32，并把 legacy IDEFICS3 的 raw `ffn_down` 映射为输入投影、raw `ffn_up` 映射为输出投影。
 
+`CudaSiglipBlock` 沿用同一计算顺序。F32 Linear 权重转置为 cuBLAS 使用的 `[input, output]`；Q8_0 Linear 保留 GGUF 中 `[output, input]` 的 packed payload，由 CUDA fused GEMV 直接解码和累加。`CudaSiglipBlockWorkspace` 按 token 数预分配中间 Tensor 和局部 K/V；`CudaSiglipEncoder` 在 12 层之间复用该 workspace，并用两个 hidden buffer 交替承接层输出。
+
 ## 12 层 Vision Encoder
 
 `run_siglip_encoder` 不接收 12 层权重数组，而是在每轮通过 provider 加载一个 Block。Block 执行完成后只把 hidden states 交给下一轮，当前权重和中间 trace 随循环作用域释放；第 12 层结束后执行 `v.post_ln`。
 
 4-patch 验证中，每层解码后权重为 `28,351,488` bytes，进程最大 RSS 为 `46,600` KiB。该值验证少量 patch 的逐层释放策略，不代表完整 1024-token tile 的运行峰值。
+
+CUDA 路径保留 12 层 packed Q8_0 权重。4-token 真实对照只重建一次 workspace，最大绝对误差为 `7.03e-5`。完整 1024-token tile 的显存与性能需由 Chapter09 另建实验。
+
+`CudaSmolvlmVisionPipeline` 在 Host 完成图片解码、缩放、归一化和 patch 提取，随后把 Patch/Position、12 层 Encoder 与 Projector 串在同一 CUDA Context 中。中间 hidden 不回传 Host；当前真实图片验收选取左上 `4×4` patch 子网格，输出一行 width 960 视觉 embedding。这个入口先固定数据布局和阶段边界，不代替完整 tile 的性能实验。
 
 ## IDEFICS3 Projector
 
@@ -116,6 +133,47 @@ Projector 先按 `dy -> dx -> hidden` 顺序把相邻 `4x4` 个 Encoder token �
 ```bash
 bash code/multimodal/scripts/run.sh
 ```
+
+有 NVIDIA GPU 时，可单独运行首个视觉 CUDA 组件对照。该命令不需要 SmolVLM 或 mmproj：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/multimodal/scripts/run_cuda.sh
+```
+
+成功条件是 `multimodal_cuda_vision_embedding_test`、`multimodal_cuda_siglip_block_test`、`multimodal_cuda_vision_encoder_test` 和 `multimodal_cuda_vision_projector_test` 通过。该入口验证 Patch Linear、乱序 position、标准 LayerNorm、非因果多头注意力、GELU、双残差、设备空间重排和 F32 Projector。
+
+本机已有 SmolVLM mmproj 时，运行真实 Q8_0 第 0 Block 对照：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/multimodal/scripts/run_cuda_real_block.sh
+```
+
+脚本默认使用 4 个确定性视觉 token。它检查真实 schema、F32 norm/bias、Q8_0 packed Linear、非因果 Attention 和最终输出。12 层 Encoder 对照使用：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/multimodal/scripts/run_cuda_real_encoder.sh
+```
+
+真实图片的小窗口设备流水线使用：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/multimodal/scripts/run_cuda_real_pipeline.sh
+```
+
+成功输出包含 `output_shape: 1x960`、`workspace_rebuilds: 1` 和 `cpu_cuda_match: true`。该入口读取默认 PPM fixture，也可以把 mmproj 与图片路径作为前两个参数传入。
+
+继续把该视觉 embedding 送入 SmolVLM 的 32 层 CUDA 语言 Context：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/multimodal/scripts/run_cuda_smolvlm_context.sh
+```
+
+脚本通过 CTest 运行真实模型测试，核对 CPU/CUDA logits、贪心词元和 Context 位置。该测试只覆盖一行视觉 embedding，用于固定视觉与语言执行层的接口；它不代表完整图文生成。
 
 若本机已有 `llama.cpp/tools/mtmd/test-1.jpeg`，可以对 JPEG 做额外检查：
 

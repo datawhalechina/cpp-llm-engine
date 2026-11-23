@@ -101,10 +101,33 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
 | DeepSeek 长 Prefill 在指定 MLA 路径下的时间落在哪里 | `CHAPTER09_DEEPSEEK2_TENSOR_PREFILL_PROFILE_MLA_PATH=absorbed bash scripts/run_deepseek2_cuda_tensor_prefill_profile.sh` |
 | MLA 权重吸收能否降低长度 32/128 的完整 Prefill 时间 | `scripts/run_deepseek2_cuda_absorbed_mla_ab.sh` |
 | 设备端行收集与加权散回能否替代 MoE 逐行复制 | `scripts/run_deepseek2_cuda_moe_dispatch_ab.sh` |
+| Q2_K 与 IQ4_NL 的 batch 扩展和首要停顿原因是什么 | `scripts/run_deepseek2_cuda_gemv_matrix.sh` |
+| 32 线程 IQ4_NL 是否优于通用 256 线程归约 | `scripts/run_deepseek2_cuda_iq4_warp_ab.sh` |
+| IQ4_NL 单 Warp 收益能否进入完整 27 层 Prefill | `scripts/run_deepseek2_cuda_iq4_warp_runtime_ab.sh` |
+| Q2_K 单 Warp payload 复用能否减少 L1TEX 等待 | `scripts/run_deepseek2_cuda_q2_warp_ab.sh` |
+| 固定 IQ4_NL 优化后，Q2_K 收益能否进入完整 Prefill | `scripts/run_deepseek2_cuda_q2_warp_runtime_ab.sh` |
+| Q2_K/IQ4_NL 优化后，完整 Prefill 的热点迁移到哪里 | `scripts/run_deepseek2_cuda_optimized_profile.sh` |
+| Q3_K 位平面与分组 scale 复用能否改善融合 GEMV | `scripts/run_deepseek2_cuda_q3_warp_ab.sh` |
+| 固定 Q2_K/IQ4_NL 优化后，Q3_K 收益能否进入完整 Prefill | `scripts/run_deepseek2_cuda_q3_warp_runtime_ab.sh` |
+| 设备 Router 能否替代每层完整 hidden 回传 | `scripts/run_deepseek2_cuda_device_router_ab.sh` |
+| 设备 Router 接入后还剩哪些 Host/Device 往返 | `CHAPTER09_DEEPSEEK2_OPTIMIZED_PROFILE_GEMV_PATH=all-warp CHAPTER09_DEEPSEEK2_OPTIMIZED_PROFILE_MOE_PATH=device-router bash scripts/run_deepseek2_cuda_optimized_profile.sh` |
+| 设备端专家分组能否替代 Host 建表与小型 H2D | `scripts/run_deepseek2_cuda_device_grouping_ab.sh` |
 
 CUDA 入口需要相应模型、CUDA Toolkit，性能剖析入口还需要 Nsight Systems 或 Nsight Compute。Profiler 附件用于解释原因，不能替代端到端 A/B 决策。已归档 CUDA 结果与默认路径结论见[实验资产登记表](../../source/reference/experiment_assets.md#多模态cuda-与正确性资产)。
 
 DeepSeek Tensor Prefill 剖析入口通过 `CHAPTER09_DEEPSEEK2_TENSOR_PREFILL_PROFILE_MLA_PATH=legacy|absorbed` 显式选择路径，默认值为 `absorbed`。结果元数据会记录该选择，避免把优化前后的 Kernel 分布混在同一结论中。
+
+DeepSeek 量化 GEMV 使用两级证据。格式矩阵先固定权重形状与 batch，分别确认 Q2_K 的 L1TEX 等待和 IQ4_NL 的 barrier 等待；格式专用 A/B 再只改变线程组织，并以 CPU reference、执行指令和吞吐解释变化。真实模型实验逐项叠加优化：EXP-GPU-24 只切换 IQ4_NL，EXP-GPU-26 固定已验证的 IQ4_NL 后只切换 Q2_K。只有完整 27 层 Prefill 的反向顺序配对也改善且 logits 保持一致时，Factory 才切换默认路径。
+
+默认路径改变后，用 `run_deepseek2_cuda_optimized_profile.sh` 重新捕获完整 Prefill。默认 `block-warp + packed` 复现 EXP-GPU-27；设置 `GEMV_PATH=all-warp` 生成 EXP-GPU-30；再设置 `MOE_PATH=device-router` 生成 EXP-GPU-32。三项实验都固定 absorbed MLA，只按登记组合改变 GEMV 或 MoE 路径，用于判断默认值切换后的热点迁移，不与早期 EXP-GPU-20 的 absorbed MLA profile 混用。
+
+EXP-GPU-28/29 对 Q3_K 重复同一门禁：微基准与 NCU 先解释位平面复用，再在完整 Prefill 中固定 Q2_K、IQ4_NL、MLA 和 MoE 路径。Q3_K 端到端收益成立后，Factory 才从 `AdaptiveBlockWarp` 切换到 `AdaptiveAllWarp`。
+
+EXP-GPU-31 固定 absorbed MLA、all-Warp GEMV 和 packed 专家执行，只把 Router/Top-K 从 Host 移到设备。候选路径仍向 Host 回传 `[T,K]` 紧凑结果并建立专家分组，因此该实验只决定路由计算位置；后续 EXP-GPU-32/33 分别完成传输复查和设备分组 A/B。
+
+EXP-GPU-32 表明完整 hidden D2H 已被紧凑路由结果替代：长度 128 的 D2H 字节从 `27.673 MB` 降到 `0.569 MB`。`3117` 次小型 H2D 保持不变，对应 Host 建组后的行号和权重，因此 EXP-GPU-33 继续验证设备建组，而没有融合只占约 `1.0%` Kernel 时间的 Router。
+
+EXP-GPU-33 固定设备 Router，只比较 Host 建组与设备建组。设备候选在长度 32/128 的中位数比例为 `1.225/0.998`，正确性完全一致但没有稳定端到端收益。结果支持保留 `DeviceGroupedDispatch` 作为可复现实验路径，不支持切换 Factory 默认值。
 
 ## 结果目录
 

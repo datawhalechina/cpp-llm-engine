@@ -30,10 +30,10 @@
 
   <rect x="60" y="335" width="220" height="190" class="box" fill="#e8f0fa"/>
   <text x="85" y="370" class="label">图片输入</text>
-  <text x="85" y="403" class="body">Decode / Resize / Normalize</text>
-  <text x="85" y="432" class="body">Patch / Vision Encoder</text>
-  <text x="85" y="461" class="body">Projector</text>
-  <text x="85" y="493" class="small">RGB -> visual embedding</text>
+  <text x="85" y="403" class="body">Decode / Resize</text>
+  <text x="85" y="432" class="body">Normalize / Patch</text>
+  <text x="85" y="461" class="body">Vision Encoder / Projector</text>
+  <text x="85" y="493" class="small">CPU reference / CUDA backend</text>
 
   <rect x="385" y="235" width="250" height="190" class="box" fill="#f4ead8"/>
   <text x="414" y="273" class="label">统一 Embedding Sequence</text>
@@ -50,29 +50,29 @@
   <rect x="735" y="305" width="210" height="120" class="box" fill="#e7f3e8"/>
   <text x="760" y="340" class="label">Runtime</text>
   <text x="760" y="373" class="body">Request / KV / Scheduler</text>
-  <text x="760" y="398" class="small">复用 Chapter06</text>
+  <text x="760" y="398" class="small">复用 Chapter06-08</text>
 
   <rect x="735" y="465" width="210" height="120" class="box" fill="#e7f3e8"/>
   <text x="760" y="500" class="label">Serving</text>
   <text x="760" y="533" class="body">HTTP / SSE / Metrics</text>
-  <text x="760" y="558" class="small">复用 Chapter07-09</text>
+  <text x="760" y="558" class="small">复用 Chapter10</text>
 
-  <rect x="1020" y="190" width="130" height="120" class="box" fill="#fff"/>
-  <text x="1048" y="226" class="label">CPU</text>
-  <text x="1040" y="260" class="body">correctness</text>
-  <text x="1044" y="286" class="small">reference</text>
+  <rect x="1020" y="145" width="130" height="120" class="box" fill="#fff"/>
+  <text x="1048" y="181" class="label">CPU</text>
+  <text x="1040" y="215" class="body">correctness</text>
+  <text x="1044" y="241" class="small">reference</text>
 
-  <rect x="1020" y="385" width="130" height="120" class="box" fill="#fff"/>
-  <text x="1048" y="421" class="label">GPU</text>
-  <text x="1040" y="455" class="body">acceleration</text>
-  <text x="1044" y="481" class="small">backend</text>
+  <rect x="1020" y="305" width="130" height="120" class="box" fill="#fff"/>
+  <text x="1048" y="341" class="label">GPU</text>
+  <text x="1040" y="375" class="body">acceleration</text>
+  <text x="1044" y="401" class="small">backend</text>
 
   <path d="M280 205 H340 Q360 205 360 225 V285 Q360 305 385 305" class="arrow"/>
   <path d="M280 430 H340 Q360 430 360 410 V370 Q360 350 385 350" class="arrow"/>
   <path d="M635 330 H690 Q710 330 710 265 V205 Q710 205 735 205" class="arrow"/>
   <path d="M840 265 V305" class="arrow"/>
   <path d="M840 425 V465" class="arrow"/>
-  <path d="M945 205 H980 Q995 205 995 250 H1020" class="arrow"/>
-  <path d="M945 525 H980 Q995 525 995 445 H1020" class="arrow"/>
+  <path d="M945 185 H1020" class="arrow"/>
+  <path d="M945 225 H980 Q995 225 995 365 H1020" class="arrow"/>
 
 </svg>

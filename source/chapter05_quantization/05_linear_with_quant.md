@@ -38,15 +38,27 @@ GEMV 是通用矩阵向量乘法（General Matrix-Vector Multiplication）。Dec
 y[r] = sum(W[r,k] * x[k]), k = 0 ... K-1
 ```
 
-基线路径先把整个 packed 权重矩阵写成 Float32 workspace，再由 cuBLAS 重新读取；融合路径让一个 CUDA block 负责一个输出行。线程从该行的 packed block 读取量化值，在寄存器中完成解码和乘加，只把最终的 `y[r]` 写回显存。Q4_K/Q6_K 是 TinyLlama 与 Qwen3 的性能主线；Q2_K/Q3_K/IQ4_NL 先作为 DeepSeek-V2-Lite 的设备正确性基线接入同一输出契约。
+基线路径先把整个 packed 权重矩阵写成 Float32 workspace，再由 cuBLAS 重新读取；融合路径让一个 CUDA block 负责一个输出行。线程从该行的 packed block 读取量化值，在寄存器中完成解码和乘加，只把最终的 `y[r]` 写回显存。Q4_K/Q6_K 是 TinyLlama 与 Qwen3 的性能主线；Q2_K/Q3_K/IQ4_NL 通过 DeepSeek-V2-Lite 接入同一输出契约，其中 IQ4_NL 已继续完成专用线程组织和真实模型 A/B。
 
 批量 Decode 的输入是 `[B,K]`，数学上已经是矩阵矩阵乘法。这里仍称 batched GEMV，是因为代码从单向量 kernel 扩展而来，只让少量输入行共享权重读取与解码；它没有采用面向大矩阵的通用 GEMM 分块策略。批量融合路径把最多 4 个输入行组成一个 tile，一个 block 负责同一输出行在该 tile 内的多个结果。同一线程解码一个 packed 权重后，连续更新各输入行的累加器；这样既省去完整 Float32 权重副本和后续 SGEMM，也避免在相邻请求之间重复读取和解码权重。
 
 固定 4 行 tile 在 batch=4 时能完整复用一次权重解码，但 batch=1/2 仍会为 4 行准备累加器、共享归约空间和条件判断。自适应路径在运行期只选择已经编译好的 `tile=1/2/4` kernel：batch=1 用 1 行，batch=2 用 2 行，其余小批量用 4 行。它没有在 kernel 内动态改变数组大小，而是在提交 kernel 前按 batch 形状分派模板实例。
 
-Q4_K 和 Q6_K 的一个 super-block 都表示 256 个权重。当前映射使用 256 个线程，每个线程负责 super-block 中一个固定列位置，并跨该行的多个 super-block 累加局部和。相邻线程读取相邻输入位置；packed 权重则按各格式的 nibble、high-bit 和 scale 布局解码。
+Q2_K、Q4_K 和 Q6_K 的一个 super-block 都表示 256 个权重。当前映射使用 256 个线程，每个线程负责 super-block 中一个固定列位置，并跨该行的多个 super-block 累加局部和。相邻线程读取相邻输入位置；packed 权重则按各格式的 nibble、high-bit 和 scale 布局解码。
 
-点积结束后，每个 Warp 先用 shuffle 合并 32 个局部和，8 个 Warp 只把各自结果写入共享内存；首个 Warp 再完成最终归约并写回。线程数仍为 256，但不再执行 8 轮整块共享内存树形归约。当前 128 线程候选没有改善 TinyLlama profile，因此只替换归约方法，不缩小线程块。
+点积结束后，每个 Warp 先用 shuffle 合并 32 个局部和，8 个 Warp 只把各自结果写入共享内存；首个 Warp 再完成最终归约并写回。线程数仍为 256，但不再执行 8 轮整块共享内存树形归约。Q4_K 的 128 线程候选没有改善 TinyLlama profile，因此 256 元素格式只替换归约方法，不缩小线程块。
+
+IQ4_NL 的一个 block 只有 32 个权重。若继续启动 256 个线程，只有首个 Warp 能对应这 32 个元素，其余 Warp 仍要参与同步和最终归约。[格式基线实验](../reference/experiment_assets.md#exp-gpu-22)显示，IQ4_NL batch=1 的 Warp 周期约 `80%` 消耗在 barrier 等待；这不是量化公式的问题，而是线程块形状与数据块形状不匹配。专用路径改为每个输出行只启动一个 32 线程 Warp，每个 lane 解码一个元素，跨 block 累加后用 shuffle 归约，不再申请共享部分和或执行 block barrier。
+
+[单 Warp 微基准](../reference/experiment_assets.md#exp-gpu-23)中，batch=1/2/4/8 的两轮时间均降低约 `41%`～`59%`；batch=1 的执行指令从约 `6.62M` 降到 `2.27M`，显存吞吐从 `10.59 GB/s` 升至 `29.51 GB/s`。微基准只能说明 kernel 机制成立，[真实 DeepSeek 实验](../reference/experiment_assets.md#exp-gpu-24)继续固定吸收式 MLA 与 packed MoE，只替换 IQ4_NL GEMV：长度 32/128 的完整 27 层 Prefill 中位数分别降低约 `25.1%/15.2%`，logits 最大误差为 `0`。因此 DeepSeek CUDA Factory 默认选择单 Warp IQ4_NL；通用路径继续作为 A/B 基线，Q2_K 的 L1TEX 等待仍需单独优化。
+
+Q2_K 虽然表示 256 个权重，但一个 super-block 只保存 64-byte 量化 payload、16-byte scale/min 和 4-byte 全局系数。通用 256 线程映射让四组线程重复读取同一批 packed quant，并让许多线程请求相同的 scale。单 Warp 路径改为每个 lane 在一个半块中只读取一个 packed byte，再依次提取其中四个 2-bit quant；lane 0 和 16 加载两组 scale 后用 shuffle 广播。一个 Warp 仍覆盖全部 256 个权重，只是把并行的重复读取改成 lane 内的四次乘加。
+
+[Q2_K 单 Warp 微基准](../reference/experiment_assets.md#exp-gpu-25)中，batch=1/2/4/8 的两轮时间均改善；batch=1 的执行指令约从 `5.75M` 降至 `2.81M`，Warp cycles 从 `25.40` 降至 `8.96`，显存吞吐从 `19.78` 升至 `40.82 GB/s`。[真实模型实验](../reference/experiment_assets.md#exp-gpu-26)随后固定 IQ4_NL 单 Warp，只切换 Q2_K：长度 32/128 的完整 Prefill 分别改善约 `25.0%/20.5%`，最大 logits 误差不超过 `4.01e-5`。DeepSeek CUDA Factory 因而采用同时覆盖 Q2_K 与 IQ4_NL 的 block-aware 路径；两条旧路径继续用于分离格式影响。
+
+Q3_K 的 256 个权重由三部分组成：64-byte low-2-bit payload、32-byte high-bit mask 和 12-byte packed group scale。通用路径让每个线程重复解析 scale 字节；单 Warp 路径则让每个 lane 读取一个 low-bit byte 与一个 mask byte，依次处理两个 half 中的四个 group。lane 0 和 16 解码 6-bit scale 后广播，最终仍覆盖全部 256 个权重。
+
+[Q3_K 单 Warp 微基准](../reference/experiment_assets.md#exp-gpu-28)显示 batch 1、4、8 的两轮结果均改善，batch 2 对执行顺序敏感；batch 1 的执行指令约从 `10.29M` 降至 `6.52M`，Warp cycles 从 `21.94` 降至 `15.02`，显存吞吐从 `14.06` 升至 `15.81 GB/s`。[真实模型实验](../reference/experiment_assets.md#exp-gpu-29)固定 Q2_K 与 IQ4_NL 单 Warp，只切换 Q3_K：长度 32/128 的完整 Prefill 分别改善约 `8.9%/6.5%`，最大 logits 误差不超过 `3.72e-5`。因此 Factory 默认路径继续扩展到 Q3_K；旧的 block-aware 路径保留为 Q3_K 单变量基线。
 
 批量输入按最多 4 行组成一个 tile。同一线程解码一个权重后，分别与 tile 中各行对应的激活相乘，随后对每行独立做 Warp 归约。这样 batch=2 时同一 packed 权重只读取和解码一次；代价是每个线程持有多个累加器，因此 tile 继续增大前需要用 Nsight Compute 检查寄存器压力和占用率。
 
@@ -63,11 +75,11 @@ Q4_K 和 Q6_K 的一个 super-block 都表示 256 个权重。当前映射使用
 
 同一[批量权重复用实验](../reference/experiment_assets.md#exp-gpu-08)还在两个不同长度请求、一次分页 Decode 上复测该设计。两轮 `batch/sequential` 中位数比例为 `0.466/0.612`，逐请求 logits 完全一致；Nsight Systems 中 Q4_K/Q6_K kernel 仍占 GPU kernel 时间约 `96.5%`。结果支持保留 4 行 tile 和 Warp 归约，也说明后续仍需继续减少量化解码与权重读取成本。
 
-![CUDA 融合量化 GEMV 的内存访问与块归约](../assets/diagrams/chapter05-cuda-fused-gemv.svg)
+![256 元素量化块的 CUDA 融合 GEMV 内存访问与块归约](../assets/diagrams/chapter05-cuda-fused-gemv.svg)
 
 ## 计算后端策略与统一接口
 
-`Q4KLinearAvx2` 和 `Q6KLinearAvx2` 在读取 block 时直接用 AVX2/FMA 累加。CUDA 由 `CudaQuantizedMatrix` 保存 packed payload；单 token 和小批量 Decode 可直接读取 Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL block，完整反量化路径保留为独立数值对照。Q2_K、Q3_K、IQ4_NL 与 Q8_0 的 CPU 路径当前使用 portable scalar fused；请求不存在的 AVX2 实现会返回明确 `Status`，不会静默回退。
+`Q4KLinearAvx2` 和 `Q6KLinearAvx2` 在读取 block 时直接用 AVX2/FMA 累加。CUDA 由 `CudaQuantizedMatrix` 保存 packed payload；单 token 和小批量 Decode 可直接读取 Q2_K/Q3_K/Q4_K/Q6_K/Q8_0/IQ4_NL block，完整反量化路径保留为独立数值对照。Q8_0 CUDA fused GEMV 先由真实 SmolVLM mmproj 第 0 个 SigLIP Block 定位局部数值，再由 32 层语言 Context 验证模型权重上传和最终 logits。Q2_K、Q3_K、IQ4_NL 与 Q8_0 的 CPU 路径当前使用 portable scalar fused；请求不存在的 AVX2 实现会返回明确 `Status`，不会静默回退。
 
 ```cpp
 chapter05_quantization::QuantizedLinearPolicy policy{

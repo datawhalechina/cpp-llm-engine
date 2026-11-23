@@ -15,7 +15,7 @@
 | A 测量 | 从正确性闸门进入固定工作负载，记录样本并聚合指标 | 可复现的测量记录 |
 | B 归因与决策 | 从阶段耗时进入热点分析，再做单变量 A/B | 可比较的实验记录与 KEEP/REJECT 结论 |
 | G GPU 坐标 | 沿用证据身份，分别记录 Nsight 热点和真实端到端 A/B | 融合量化 GEMV profile、Attention Prefill/Decode 样本与默认路径决策 |
-| M 多模态坐标 | 固定图片、预处理和文本输入后复用服务指标 | 多模态 workload 定义；统一基线待建设 |
+| M 多模态坐标 | 固定图片、预处理和文本输入后，分开记录视觉阶段与语言阶段 | CPU 动态图片服务已有重复 benchmark；CUDA 端到端视觉基线待建设 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
@@ -41,7 +41,8 @@
 | 6 | G | [`自适应 GEMV 决策`](../../reference/experiment_assets.md#exp-gpu-14) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_cuda_adaptive_gemv_ab.sh"><code>局部原因</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_cuda_adaptive_gemv_runtime_ab.sh"><code>真实 Decode</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_cuda_adaptive_gemv_runtime_matrix.sh"><code>范围矩阵</code></a> | 局部优化怎样经过端到端决策和适用范围验证后进入默认路径 |
 | 7 | B/MoE | [`MoE 分组实验`](../../reference/experiment_assets.md#exp-cpu-13) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_qwen15_moe_grouped_batch_ab.sh"><code>run_qwen15_moe_grouped_batch_ab.sh</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_deepseek2_moe_batch_runtime_ab.sh"><code>DeepSeek Runtime A/B</code></a> | 怎样从局部专家计算逐步验证完整解码、调度和服务收益 |
 | 8 | G/MoE | [`DeepSeek CUDA 分组实验`](../../reference/experiment_assets.md#exp-gpu-17) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_deepseek2_cuda_grouped_moe_ab.sh"><code>run_deepseek2_cuda_grouped_moe_ab.sh</code></a> | 正确的跨请求批执行为什么仍可能没有端到端收益 |
-| 9 | 扩展 | [`09.9 框架对照`](./09_framework_comparison.md) | 生态卡 | 教学证据链与成熟框架工具链的对应关系 |
+| 9 | G/MoE | [`设备 Router 与热点复测`](../../reference/experiment_assets.md#exp-gpu-31) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_deepseek2_cuda_device_router_ab.sh"><code>Router A/B</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/scripts/run_deepseek2_cuda_optimized_profile.sh"><code>默认路径 profile</code></a> | 一项数据搬运优化怎样经过 A/B、默认值切换和热点复测形成闭环 |
+| 10 | 扩展 | [`09.9 框架对照`](./09_framework_comparison.md) | 生态卡 | 教学证据链与成熟框架工具链的对应关系 |
 
 ## 验证与下一步
 
@@ -60,6 +61,8 @@
 | L11 CUDA 自适应 GEMV 原因 | `bash code/chapter09_performance/scripts/run_cuda_adaptive_gemv_ab.sh` | 固定 4 行与自适应 tile 的正确性、cycles、指令和共享内存指标完整 | 调整量化 GEMV 策略时必做 |
 | L12 CUDA 自适应 GEMV 决策 | `bash code/chapter09_performance/scripts/run_cuda_adaptive_gemv_runtime_ab.sh`、`run_cuda_adaptive_gemv_runtime_matrix.sh` | 真实 Decode 输出 `KEEP`，batch/context/step 矩阵全部通过正确性和配对顺序检查 | 改变默认路径前必做 |
 | L13 DeepSeek CUDA grouped MoE A/B | `bash code/chapter09_performance/scripts/run_deepseek2_cuda_grouped_moe_ab.sh` | 两轮反向顺序配对通过 logits、余弦、词元和 grouped 调用计数门禁 | 优化 DeepSeek 专家执行时必做 |
+| L14 DeepSeek 设备 Router A/B | `bash code/chapter09_performance/scripts/run_deepseek2_cuda_device_router_ab.sh` | 长度 32/128 的反向顺序配对通过 logits 与词元门禁，并保存路由路径身份 | 迁移 Router 时必做 |
+| L15 DeepSeek 默认路径复测 | `CHAPTER09_DEEPSEEK2_OPTIMIZED_PROFILE_GEMV_PATH=all-warp CHAPTER09_DEEPSEEK2_OPTIMIZED_PROFILE_MOE_PATH=device-router bash code/chapter09_performance/scripts/run_deepseek2_cuda_optimized_profile.sh` | Nsight 结果证明完整 hidden D2H 消失，并定位剩余分组元数据传输 | 设备 Router 进入默认路径后必做 |
 
 L1 构建证据记录、统计和比较器，并运行六项测试；它证明记录格式、校验规则与决策逻辑可用，不代表当前机器上的性能数字可以直接推广到其他环境。
 

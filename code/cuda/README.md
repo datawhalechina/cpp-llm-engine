@@ -24,6 +24,9 @@
 | `cuda_quantized_matrix.h/.cpp` | packed Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL row-major device 权重 |
 | `quantized_dequantize_backend.h/.cu` | 五种 packed 格式到 Float32 workspace 的 CUDA 解码 |
 | `quantized_gemv_backend.h/.cu` | 五种 packed 格式的解码、点积与行归约融合 |
+| `moe_router_backend.h/.cu` | 批量 Router 点积、全专家 Softmax、稳定 Top-K 与紧凑路由输出 |
+| `row_dispatch_backend.h/.cu` | 索引行收集、加权散回与视觉空间合并数据重排 |
+| `vision_elementwise_backend.h/.cu` | 视觉 Block 使用的标准 LayerNorm、bias 广播与 GELU |
 | `cuda_quantized_linear_test.cu` | CPU reference、融合 GEMV、批量回退、错误路径和固定 workload 计时 |
 | `quantized_gemv_matrix.cu` | Q4_K/Q6_K 的 batch=1/2/4/8 专项矩阵与逐行正确性对照 |
 | `core/rope_contract.h` | 固定原地 RoPE 的连续布局、旋转维度、位置和频率参数 |
@@ -81,6 +84,10 @@
 
 `CudaExecutionContext` 独占一条 stream、一个 cuBLAS handle 和一个 workspace，并以 `CudaTensor` 分派 Vector Add 与 MatMul。上层调用者不再直接创建 `DeviceBuffer`、设置 cuBLAS stream 或在算子内部调用 `cudaMalloc/cudaFree`。
 
+`spatial_merge()` 将 `[grid_h × grid_w, hidden]` 按 `dy → dx → hidden` 重排为 `[(grid_h / merge) × (grid_w / merge), merge² × hidden]`。该原语只负责设备内数据布局，不包含视觉模型配置或 Projector 权重；多模态层在完成网格与 shape 校验后调用它，再复用 `linear_batch()`。
+
+视觉 Block 不能直接套用语言 Decoder 的 RMSNorm 与 SwiGLU。`layer_norm_batch()` 按 token 同时计算均值和方差，再应用 gamma、beta；`gelu()` 使用与 CPU reference 相同的 tanh 近似；`add_bias_batch()` 按展平后的 Linear 输出宽度广播 bias。视觉自注意力继续复用 GQA backend，但显式传入 `causal=false`，并令 Query head 与 K/V head 数相同，从而得到双向多头注意力。
+
 | 对象 | 拥有什么 | 不负责什么 |
 | --- | --- | --- |
 | `CudaTensor` | shape/stride/dtype/device contract、device storage | stream、kernel 和临时 workspace |
@@ -91,7 +98,9 @@
 
 `CudaQuantizedMatrix` 保存 packed Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL 权重。单 token 的 `quantized_linear()` 由一个 CUDA block 负责一个输出行，在同一 kernel 内解码、乘加和归约，不创建完整 Float32 权重矩阵。Warp 内使用 shuffle，8 个 Warp 的部分和再由首个 Warp 合并。`quantized_linear_batch()` 接收 `[B,K]` 输入和 `[N,K]` 权重，把最多 4 个输入行组成一个 tile；同一线程解码一次权重后更新多行累加器，直接生成 `[B,N]`。该路径面向教学中的小批量 Decode，更大的 tile 需要继续核对寄存器压力和占用率。DeepSeek 的 K/V-B 在模型加载阶段反量化一次，供压缩 MLA 重复读取；该权重属于模型，不随请求复制。
 
-Q2_K、Q3_K 与 Q4_K/Q6_K 一样使用 256 线程映射一个 256 元素超块；IQ4_NL 每个 block 只有 32 个元素，当前由首个 Warp 按非线性码表解码，其余 Warp 参与跨 block 累加后的统一归约。这是 DeepSeek-V2-Lite CUDA 接入的正确性基线，尚未做 Q3_K/IQ4_NL 专用线程块优化。测试分别覆盖单向量、批量输入和量化 embedding 行读取，并与 Chapter05 CPU reference 逐项对照。
+Q2_K、Q3_K 与 Q4_K/Q6_K 的通用路径使用 256 线程映射一个 256 元素超块。IQ4_NL 每个 block 只有 32 个元素，单 Warp 路径让每个 lane 解码一个非线性码表元素。Q2_K 每个 lane 从 packed byte 提取四个 2-bit 值；Q3_K 每个 lane 复用 low-2-bit 与 high-bit mask，并由 lane 0/16 广播 6-bit group scale。三者跨 block 累加后直接用 shuffle 归约。`Adaptive`、`AdaptiveIq4Warp` 和 `AdaptiveBlockWarp` 分别保留通用、仅 IQ4_NL、Q2_K 加 IQ4_NL 的回归基线；`AdaptiveAllWarp` 再加入 Q3_K。测试覆盖单向量、批量输入和量化 embedding 行读取，并与 Chapter05 CPU reference 逐项对照。
+
+EXP-GPU-22 在通用路径上定位到 IQ4_NL batch=1 约 `80%` 的 barrier stall；Q2_K 的主要等待则来自 L1TEX scoreboard，两者不能共用同一个优化判断。EXP-GPU-23～26 依次证明 IQ4_NL 与 Q2_K 单 Warp 能改善微基准和完整模型。EXP-GPU-27 对默认路径重新剖析后，尚未专门优化的 Q3_K 已占长度 32/128 Kernel 时间的约 `13.8%/18.1%`。EXP-GPU-28 将 Q3_K batch 1 的执行指令约从 `10.29M` 降至 `6.52M`，Warp cycles 从 `21.94` 降至 `15.02`；EXP-GPU-29 在完整 Prefill 中复测，长度 32/128 分别改善约 `8.9%/6.5%`，最大 logits 误差不超过 `3.72e-5`。DeepSeek Factory 因此默认使用 `AdaptiveAllWarp`，其余枚举值继续作为逐格式回归基线。
 
 NCU 基线显示 Q4_K kernel 的 L1TEX 等待明显，而 DRAM 吞吐和 occupancy 不是首要限制。EXP-GPU-09 的 Warp 元数据广播、EXP-GPU-10 的 shared payload 和 EXP-GPU-11 的显式 FMA 分别回退约 `10.1%`、`1.6%` 和 `4.3%` cycles，代码不保留这些候选。EXP-GPU-12 使用 `__ushort_as_half` 与 `__half2float` 替换手写 FP16 位解码，cycles 约减少 `28.8%`，真实双请求 logits 保持一致；当前代码保留原生 half 转换，后续优化重新聚焦 L1/TEX payload 访问。
 
@@ -203,9 +212,11 @@ DeepSeek-V2-Lite 的 CUDA 稠密首层已连接 Q2_K/Q3_K/IQ4_NL、YaRN partial 
 
 首版 MLA reference kernel 每个 head 使用一个线程，并在每个 Value 维重复计算 score。EXP-GPU-17 对一次双请求 Decode 的捕获中，54 次 MLA kernel 总计约 `32.16 s`，占 GPU kernel 时间 `99.9%`。三阶段基线让每个 `(head, token)` 只计算一次 score，再由 `(head, value)` 复用概率。权重吸收路径继续把 `q_nope @ W_K` 提前到历史遍历之前，并先聚合概率加权 latent、再执行 `W_V @ c_attended`。连续与分页实现共用 `CudaMlaComputePath` 类型化选择，组件测试覆盖单词元、批量因果查询和非连续物理块。
 
-三阶段实现下，长度 128 的 Tensor Prefill 中 MLA score/value 占 Kernel 时间约 `88.5%`。EXP-GPU-20 完成权重吸收后，长度 32 和 128 的端到端时间比例分别为 `0.515` 和 `0.169`，logits 最大误差不超过 `5.73e-5`。吸收式路径的复测中，MLA score/value 占比降至约 `5.1%/8.0%`。EXP-GPU-21 再用索引收集和加权散回把长度 128 的 Device-to-Device 复制从 `30,290` 次降到 `338` 次，端到端改善约 `5.3%`；量化 GEMV 仍占约 `92%` 的 Kernel 时间。DeepSeek CUDA Factory 默认选择 absorbed 与 packed-dispatch，旧路径继续用于公式和性能回归。
+三阶段实现下，长度 128 的 Tensor Prefill 中 MLA score/value 占 Kernel 时间约 `88.5%`。EXP-GPU-20 完成权重吸收后，长度 32 和 128 的端到端时间比例分别为 `0.515` 和 `0.169`，logits 最大误差不超过 `5.73e-5`。吸收式路径的复测中，MLA score/value 占比降至约 `5.1%/8.0%`。EXP-GPU-21 再用索引收集和加权散回把长度 128 的 Device-to-Device 复制从 `30,290` 次降到 `338` 次，端到端改善约 `5.3%`；量化 GEMV 仍占约 `92%` 的 Kernel 时间。EXP-GPU-22～29 随后完成 IQ4_NL、Q2_K 与 Q3_K 单 Warp 优化。DeepSeek CUDA Factory 默认选择 absorbed MLA、device-router packed-dispatch 与 all-Warp GEMV，旧路径继续用于公式和性能回归。
 
-MoE 路径由 Host 完成 Router 与稳定 Top-K，CUDA 执行命中的 Top-6 路由专家和共享专家。单独 FFN 与 CPU 的最大绝对误差为 `5.82e-10`；连接压缩 MLA、双残差和请求缓存后，真实第 1 层双词元最大误差为 `9.83e-7`。跨请求 Decode 继续按行对象分组；Tensor Prefill 保持连续 `[T,D]`，用 `gather_rows_kernel` 收集专家输入，并由 `weighted_scatter_add_rows_kernel` 在设备端合并输出。设备端 Top-K 和单 kernel grouped-MoE 仍属于后续候选。
+MoE 正确性基线由 Host 完成 Router 与稳定 Top-K，默认 Tensor Prefill 则由 `moe_router_kernel` 在设备端计算 Router、全专家 Softmax、稳定 Top-6 和归一化权重。每个词元只向 Host 回传 6 个专家编号与权重，再由 Host 建立专家组；`gather_rows_kernel` 收集输入，`weighted_scatter_add_rows_kernel` 合并输出。EXP-GPU-31 在长度 32/128 下分别改善约 `4.3%/5.9%`，最大 logits 误差不超过 `3.91e-5`。EXP-GPU-32 确认长度 128 的 D2H 字节从 `27.673 MB` 降到 `0.569 MB`，剩余 `3117` 次小型 H2D 来自 Host 分组元数据。
+
+`moe_group_routes_kernel` 提供设备端分组候选：每个专家按词元和 Top-K 槽位顺序扫描路由，生成固定容量的行号、权重和计数表，设备版 gather/scatter 直接消费这些表。EXP-GPU-33 的输出与默认路径完全一致，但长度 32 慢约 `22.5%`，长度 128 基本持平。当前实现需要每个专家扫描全部路由并回读计数，因此保留为可选教学路径；默认仍使用 Host 分组。融合 grouped-MoE 需要重新设计分组与专家执行，而不是直接切换这个候选。
 
 `RealDeepSeek2CudaModel` 已将第 0 层稠密权重、后续 26 层 MoE 权重、Embedding、最终归一化和 LM Head 常驻设备。请求 Context 独占 27 层压缩缓存，并在全层成功后统一推进位置。单词元 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`。`RealDeepSeek2CudaExecutorFactory` 已接入 Chapter06 Runtime、Chapter08 `ExecutorBatchRunner` 和 Chapter10 ServiceCore；固定词元生成、重复请求隔离、分块 Tensor Prefill、跨请求专家 batch、服务动态组批、流式回调、取消与资源释放均通过。独立 HTTP 入口再注入真实 Tokenizer，并以文本 `prompt` 验证 Completion、SSE、分页 MLA 和终态释放。
 

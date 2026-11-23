@@ -84,7 +84,12 @@ CMake 选项决定编译哪些 backend，运行参数只选择已经编译的能
 | --- | --- | --- |
 | CUDA backend | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备资源、量化 Linear、K/V、GQA、MLA、Decoder 和 MoE 数据面 |
 | 真实模型集成 | [`code/engine/README.md`](code/engine/README.md) | TinyLlama、Qwen3、Qwen1.5-MoE 与 DeepSeek-V2-Lite 的分阶段入口 |
-| 多模态 | `bash code/multimodal/scripts/run.sh` | SmolVLM CPU 输入、Vision、Projector 和 Decoder golden |
+| 多模态 CPU | `bash code/multimodal/scripts/run.sh` | SmolVLM 输入、12 层 Vision Encoder、Projector、Decoder 与服务 golden |
+| 多模态 CUDA 组件 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda.sh` | 合成 Patch/Position、单 SigLIP Block 与 Projector CPU/CUDA golden |
+| 多模态真实 CUDA Block | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_block.sh` | 真实 mmproj Q8_0 第 0 Block 与 CPU reference 一致 |
+| 多模态真实 CUDA Encoder | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_encoder.sh` | 真实 mmproj 12 层 Q8_0 Encoder 与 CPU reference 一致 |
+| 多模态真实图片 CUDA 流水线 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_pipeline.sh` | 图片小窗口在设备端完成 Patch/Position、12 层 Encoder 与 Projector |
+| 多模态 CUDA 语言交接 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh` | 一行真实视觉 embedding 进入 32 层 SmolVLM CUDA Context，并与 CPU logits 对照 |
 
 修改 CUDA 后端、真实 CUDA 模型/Context 或服务接入后，依次运行纵向验收：
 
@@ -94,7 +99,7 @@ bash code/engine/scripts/run_real_cuda_runtime.sh
 bash code/engine/scripts/run_real_cuda_serving.sh
 ```
 
-上面的三条命令以 TinyLlama 展示默认 CUDA 纵向验收。Qwen3、Qwen1.5-MoE、DeepSeek-V2-Lite 和 SmolVLM 应使用各自已登记的脚本，避免只替换模型路径而跳过架构适配。分阶段状态和最小入口见[模型能力与扩展顺序](source/reference/model_support.md)，完整命令与成功条件见 [`code/engine/README.md`](code/engine/README.md)；环境准备见 [CUDA 指南](source/guides/setup_cuda.md)。
+上面的三条引擎命令以 TinyLlama 展示默认 CUDA 纵向验收。Qwen3、Qwen1.5-MoE、DeepSeek-V2-Lite 和 SmolVLM 应使用各自已登记的脚本，避免只替换模型路径而跳过架构适配。SmolVLM 的 CUDA 入口已完成合成视觉组件、真实 Q8_0 单 Block、12 层小 token Encoder、真实图片小窗口流水线和单行视觉 embedding 的语言 Context 交接；完整 tile、图文混合序列与生成仍在后续建设。分阶段状态和最小入口见[模型能力与扩展顺序](source/reference/model_support.md)，完整命令与成功条件见 [`code/engine/README.md`](code/engine/README.md) 和 [`code/multimodal/README.md`](code/multimodal/README.md)；环境准备见 [CUDA 指南](source/guides/setup_cuda.md)。
 
 ## 判断验证结果
 

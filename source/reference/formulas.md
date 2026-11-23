@@ -176,6 +176,28 @@ output = o / l
 
 代码对应：Chapter04 CPU 分块在线 Attention 参考路径。验证重点：不同分块大小、极端分数、因果可见范围和三段式参考输出一致。
 
+<a id="f-attn-05"></a>
+### F-ATTN-05 多头潜在注意力与权重吸收
+
+MLA 为每个历史词元保存低秩 latent `c_t` 和位置分支 `k_t^R`。当前头的非位置 Key 与 Value 可由上投影恢复：
+
+```text
+k_t^C = W_K c_t
+v_t   = W_V c_t
+score_t = q^C · k_t^C + q^R · k_t^R
+```
+
+矩阵乘法结合律允许把非位置 Key 投影吸收到 Query，把 Value 投影移到历史聚合之后：
+
+```text
+q_absorbed = q^C W_K
+score_t = q_absorbed · c_t + q^R · k_t^R
+c_attended = sum_t softmax(score)_t c_t
+output = W_V c_attended
+```
+
+两种顺序保持相同的压缩缓存、位置分支和 Softmax 语义；权重吸收减少对每个历史位置重复执行的投影。代码对应：Chapter04 MLA CPU reference、`CudaMlaCache` 和 absorbed CUDA 路径。验证重点：显式展开与低秩路径一致、连续与分页缓存一致、吸收前后 logits 与词元一致。
+
 <a id="f-rope-01"></a>
 ### F-ROPE-01 Rotary Position Embedding
 
@@ -204,6 +226,28 @@ Y = hidden × W_down^T
 ```
 
 代码对应：Chapter01 真实 TinyLlama FFN。Chapter04 教学 FFN 使用 ReLU，不能把两者写成同一个实现。
+
+<a id="f-ffn-02"></a>
+### F-FFN-02 MoE Router、Top-K 与专家合并
+
+对词元隐藏状态 `x` 和 Router 权重 `W_r`，先计算全部专家 logits 与概率：
+
+```text
+z = W_r x
+p_i = exp(z_i - max(z)) / sum_j exp(z_j - max(z))
+S = stable_top_k(z, K)
+```
+
+选中专家输出按路由概率合并。模型配置要求重新归一化时，再除以选中概率之和：
+
+```text
+w_i = p_i                              if normalize_selected = false
+w_i = p_i / sum_(j in S) p_j           if normalize_selected = true
+y_routed = route_scale * sum_(i in S) w_i Expert_i(x)
+y = y_routed + y_shared
+```
+
+`stable_top_k` 在分数相同时选择编号较小的专家。设备 Router 可以改变计算位置与回传规模，但必须保持这些选择和权重规则。代码对应：Chapter04 MoE reference、Model 的 Host Router 与 CUDA device Router。验证重点：专家编号、路由权重、合并输出、完整 logits 和贪心词元。
 
 ## KV Cache 与内存
 
@@ -436,6 +480,24 @@ sequence_shape = [T_prefix + T_visual + T_suffix, D]
 ```
 
 代码对应：`code/multimodal` 的 prompt composition、Projector 和 `EmbeddingRequestExecutor`。验证重点：placeholder 区间、hidden width、拼接顺序、同步/SSE token 一致和终态释放。
+
+<a id="f-mm-04"></a>
+### F-MM-04 空间合并与 Projector
+
+Projector 先把每个 `merge_size × merge_size` 的相邻视觉 token 按空间顺序拼接，再把合并宽度映射到语言模型 embedding width。
+
+```text
+T_projector = T_vision / merge_size²
+D_merged = merge_size² × D_vision
+Y[T_projector, D_llm] = X_merged[T_projector, D_merged] × W[D_merged, D_llm] + b
+
+SmolVLM baseline:
+T_projector = 1024 / 4² = 64
+D_merged = 4² × 768 = 12288
+Y shape = [64, 960]
+```
+
+代码对应：`merge_spatial_patches()`、`CudaExecutionContext::spatial_merge()` 和 IDEFICS3 Projector。验证重点：`dy → dx → hidden` 的拼接顺序、整除关系和输出宽度。
 
 ## 使用规则
 

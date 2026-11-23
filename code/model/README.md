@@ -29,10 +29,10 @@
 | `RealDeepSeek2CpuModel` | 共享 GGUF 索引、embedding、最终归一化和 LM Head，按层执行 1 个稠密层与 26 个 MoE 层 |
 | `RealDeepSeek2CpuContext` | 保存单个请求的位置和 27 层压缩 MLA 历史，支持 Prefill、Decode 和 reset |
 | `CudaDeepSeek2DenseLayerWeights` | 完整上传稠密首层的 Q2_K/Q3_K/IQ4_NL Linear 与 Float32 Norm 后替换输出对象，提供 MLA CUDA 只读权重视图 |
-| `CudaDeepSeek2MoeWeights` | 在加载阶段切分并上传 64 个 packed experts 与共享专家，保留 Host Router 控制面 |
+| `CudaDeepSeek2MoeWeights` | 在加载阶段切分并上传 64 个 packed experts、共享专家与 Float32 Router，同时保留 Host Router golden |
 | `CudaDeepSeek2MoeFeedForward` | 执行 Top-6 命中专家和共享专家的 CUDA Gate/Up/Down，并在完整成功后写入输出 |
 | `CudaDeepSeek2MoeBatchWorkspace` | 为跨请求行对象或连续 Prefill Tensor 建立专家分发表，复用批量 Gate/Up/Down 与共享专家临时张量 |
-| `CudaDeepSeek2MoeLayer` | 连接压缩 MLA、Host Top-6、CUDA 专家执行、双残差和请求级缓存回退 |
+| `CudaDeepSeek2MoeLayer` | 连接压缩 MLA、可切换 Host/设备 Top-6、CUDA 专家执行、双残差和请求级缓存回退 |
 | `RealDeepSeek2CudaModel` | 常驻第 0 层稠密权重、26 层 MoE 权重、Embedding、最终归一化和 LM Head |
 | `RealDeepSeek2CudaBatchWorkspace` | 在 27 层 Model 上复用各 MoE 层的跨请求批量工作区，并记录执行次数 |
 | `RealDeepSeek2CudaContext` | 独占执行流、中间 Tensor 与 27 层压缩 MLA 历史，整组提交或回退 |
@@ -48,11 +48,11 @@ DeepSeek2 的稠密层和 MoE 层共享同一个按词元执行主体。Q 的 64
 
 CUDA 稠密首层保持相同状态边界。`CudaDeepSeek2DenseLayerWeights` 在模型加载阶段上传 packed Linear，并只为 K/V-B 建立一份共享 Float32 展开矩阵；`CudaDeepSeek2DenseLayer` 为请求保存中间 Tensor 和压缩历史。真实双词元 CPU/CUDA 层输出最大误差为 `5.01e-6`。
 
-CUDA MoE 把 Router 和稳定 Top-K 留在 Host 控制面，将命中的 Top-6 路由专家与共享专家放到设备执行。模型加载阶段把三维 packed expert 切成独立设备矩阵，单请求工作区完成 Gate、Up、SwiGLU 和 Down；所有专家成功后才提交结果。真实第 1 层的专家索引与 CPU 一致，路由权重误差为 `0`，FFN 输出最大绝对误差为 `5.82e-10`。完整 MLA+MoE 层的双词元最大误差为 `9.83e-7`、平均误差为 `1.36e-7`，压缩缓存只在整层成功后推进。
+CUDA MoE 保留 Host Router 作为数值基线，默认 Prefill 使用设备 Router。模型加载阶段把 Float32 Router、三维 packed expert 和共享专家上传到设备；设备 Router 为 `[T,D]` 输入生成 `[T,K]` 专家编号与权重，Host 只读取紧凑结果并建立专家组。单请求工作区完成 Gate、Up、SwiGLU 和 Down，所有专家成功后才提交结果。真实第 1 层的专家索引与 CPU 一致，路由权重误差为 `0`，FFN 输出最大绝对误差为 `5.82e-10`。完整 MLA+MoE 层的双词元最大误差为 `9.83e-7`、平均误差为 `1.36e-7`，压缩缓存只在整层成功后推进。
 
 跨请求路径在每层先分别完成 MLA，再由 `CudaDeepSeek2MoeBatchWorkspace` 按专家收集请求行。Gate、Up 和 Down 调用批量量化 Linear，共享专家一次处理完整批次，Host 最后按路由权重拆回请求输出。真实 batch=2 测试证明一个持久化工作区可连续服务 26 个 MoE 层，批量结果与相同输入的顺序路径一致。工作区还累计活跃专家组、多行专家组和路由行数；EXP-GPU-17 中两个相同请求的专家组全部形成双行批次。消除 MLA score 重算后，6 轮完整 Decode 配对中 grouped 路径比顺序路径改善约 `17.3%`。
 
-完整 CUDA Model 在共享对象中常驻 27 层只读权重。Context 默认创建连续压缩 MLA Cache，绑定 `RealDeepSeek2CudaMlaDataPlane` 后则让全部层共享同一请求页表，并用层号选择各自的压缩载荷。单词元依次经过第 0 层稠密 FFN、后续 26 层 MoE、最终 RMSNorm 和 LM Head；所有层成功后才提交页表位置，任一层、下载或同步失败都裁剪到调用前位置。批执行先为每个请求预留槽位，整批成功后逐一提交，失败时统一回滚。分块 Prefill 把 `[T,D]` hidden 送过全部 27 层；`CudaMoePrefillPath` 可在逐行复制基线与设备端索引收集、加权散回之间切换。Factory 默认使用权重吸收 MLA 和 packed dispatch，测试与 benchmark 保留两条旧路径。真实 Q2_K 模型的 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`；分页数值、双请求提交和终态释放均已通过专用 Runtime 验收。
+完整 CUDA Model 在共享对象中常驻 27 层只读权重。Context 默认创建连续压缩 MLA Cache，绑定 `RealDeepSeek2CudaMlaDataPlane` 后则让全部层共享同一请求页表，并用层号选择各自的压缩载荷。单词元依次经过第 0 层稠密 FFN、后续 26 层 MoE、最终 RMSNorm 和 LM Head；所有层成功后才提交页表位置，任一层、下载或同步失败都裁剪到调用前位置。批执行先为每个请求预留槽位，整批成功后逐一提交，失败时统一回滚。分块 Prefill 把 `[T,D]` hidden 送过全部 27 层；`CudaMoePrefillPath` 可在逐行复制、Host Router packed dispatch 与设备 Router packed dispatch 之间切换，`CudaQuantizedGemvPath` 同时传入请求 Context 与持久化 batch workspace。Factory 默认使用权重吸收 MLA、设备 Router packed dispatch 和按 Q2_K/Q3_K/IQ4_NL block 形状选择的单 Warp GEMV，测试与 benchmark 保留各条旧路径。真实 Q2_K 模型的 CPU/CUDA logits 余弦相似度为 `1`，贪心词元同为 `207`；分页数值、双请求提交和终态释放均已通过专用 Runtime 验收。
 
 `RealDeepSeek2CpuModel` 提供有界 LRU 层权重缓存，统计容量、常驻层、常驻字节、命中和未命中。默认容量为 0，执行后立即释放当层权重。完整 Decode 固定按 0–26 层顺序访问，容量小于 27 时层的复用距离大于缓存容量，下一轮通常仍全部未命中；容量 27 可以消除后续 GGUF 层读取，但会额外常驻接近整套 Decoder 权重。该缓存管理模型权重，不保存请求 K/V。
 
@@ -84,7 +84,7 @@ CUDA 模型持有量化 embedding、分层 Decoder 权重、final norm 和 LM He
 
 `forward_hidden_sequence()` 接收连续 `[T,D]` embedding，逐层使用 `CudaDecoderBatchLayer::prefill_sequence()` 批量执行 RMSNorm、Linear、RoPE 和因果 GQA，并一次向每层连续 K/V 追加 T 个位置。TinyLlama 22 层、2-token Tensor Prefill 与顺序执行的最大误差为 `3.05e-05`。
 
-`prefill_tokens()` 继续补上批量 embedding、最后一行 RMSNorm 和 LM Head，并在 Context 内按 token 数复用 Prefill workspace。22 层最终 logits 与顺序执行最大误差为 `1.19e-05`；reset 后重复相同 shape，workspace 创建次数保持 1。连续 CUDA Executor 已使用该入口，绑定分页数据面的请求仍保留逐 token 路径。
+`prefill_tokens()` 继续补上批量 embedding、最后一行 RMSNorm 和 LM Head，并在 Context 内按 token 数复用 Prefill workspace。`prefill_embeddings()` 接收已经由文本或视觉输入层准备好的 `[T,D]` Float32 序列，两者共用同一个事务式 Prefill 主体：输入、容量、上传、分层执行或输出失败时不推进 position。22 层最终 logits 与顺序执行最大误差为 `1.19e-05`；reset 后重复相同 shape，workspace 创建次数保持 1。SmolVLM 的 Q8_0 权重也通过同一上传边界和 32 层 Context 对照。连续 CUDA Executor 已使用 token 入口，绑定分页数据面的请求仍保留逐 token 路径。
 
 Qwen1.5-MoE 路径把 Chapter01 的 Router、三组 packed experts 和共享专家权重交给 `run_real_moe_feed_forward()`。执行器先对 60 个 Router 分数做 Softmax，再只为 Top-4 专家创建 View；Q3_K/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0 均进入 Chapter05 统一 Linear。`run_qwen2_moe_prefill_layer()` 连接 RMSNorm、带 bias 的 Q/K/V、NeoX RoPE、因果 Attention、MoE 和双残差，并按词元返回旋转后的 K/V 负载。
 
@@ -94,7 +94,7 @@ EXP-CPU-13～18 从第一层 MoE 子层逐步扩展到完整 Decoder、batch 1/2
 
 多请求 Decode 采用按层交错：每个请求先从自己的历史 K/V 计算 Attention，再把该层所有请求的归一化 FFN 输入交给同一张专家 assignment 表，最后按请求拆回输出。全部请求完成后才提交本层 K/V；后续层或 LM Head 失败时，Model 恢复整批请求的 24 层状态。层级测试将该路径与逐请求执行逐元素对照。
 
-DeepSeek-V2-Lite 的 CPU 与 CUDA 路径使用相同分组原则：Attention 保存各请求独立的压缩 latent K/V 和位置 Key，每层先逐请求完成 MLA，再把 64 选 6 的 FFN 输入交给共同的专家分发表。CPU 路径复用量化专家 View 和 batch Linear；CUDA 路径把同一专家的请求行交给设备端批量量化 Linear，并让共享专家处理完整批次。两者都保留 Host 路由与加权拆回，因此不等同于成熟框架的融合 grouped-MoE kernel。
+DeepSeek-V2-Lite 的 CPU 与 CUDA 路径使用相同分组原则：Attention 保存各请求独立的压缩 latent K/V 和位置 Key，每层先逐请求完成 MLA，再把 64 选 6 的 FFN 输入交给共同的专家分发表。CPU 路径复用量化专家 View 和 batch Linear；CUDA 默认路径在设备端计算路由，再把紧凑结果交给 Host 建表，同一专家的请求行随后进入设备批量量化 Linear。`DeviceGroupedDispatch` 可在设备端生成分组表并直接驱动 gather/scatter，但 EXP-GPU-33 未证明端到端收益，因此只作为对照路径。融合 grouped-MoE kernel 属于后续性能扩展。
 
 CUDA Model Context 可以绑定连续 MLA Cache，也可以绑定 Engine 注入的分页 MLA 数据面。Model 只根据当前层、逻辑位置和页表 View 读写压缩载荷，不分配物理块；Chapter07 块池和 Engine Factory 负责请求绑定、预留、提交、裁剪与释放。27 层全部成功后才推进 Context 位置，批执行中的任一路径失败会把所有请求裁剪到调用前位置。
 

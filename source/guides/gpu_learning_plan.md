@@ -2,7 +2,7 @@
 
 GPU 路线在 CPU 已验证的算法和公共接口上替换设备内存、计算核与执行上下文。建议先完成 [CPU 六任务](./cpu_learning_plan.md)中的前四项；完整学习调度和服务前，再补齐 CPU 任务五、六。
 
-TinyLlama 与 Qwen3 都已形成完整 GPU 基线：真实模型加载、完整 Decoder、Generation、分页 K/V、批量执行和服务均有验证入口。TinyLlama 用于学习 Llama 稠密架构，Qwen3 用于验证 Q/K Norm、NeoX RoPE 和非对称 Q/KV 投影不会改变上层 Runtime 与服务契约。
+TinyLlama 与 Qwen3 已形成完整稠密 GPU 基线：真实模型加载、完整 Decoder、Generation、分页 K/V、批量执行和服务均有验证入口。DeepSeek-V2-Lite 继续覆盖分页 MLA、权重吸收、MoE 专家执行、格式专用量化 GEMV 和设备 Router。三种模型复用同一 Runtime、调度与服务契约。
 
 环境安装与故障排查见 [CUDA 安装与配置](./setup_cuda.md)，代码对象与测试清单见 [`code/cuda/README.md`](/code/cuda)。
 
@@ -18,6 +18,25 @@ TinyLlama 与 Qwen3 都已形成完整 GPU 基线：真实模型加载、完整 
 | 4 | 运行真实 GPU Decoder | `code/model`、`code/engine` | TinyLlama 单层、2 层和 22 层结果通过 CPU/CUDA 对照 |
 | 5 | 接入生成、批次与分页 K/V | Chapter06–08、`code/engine` | 真实生成、多请求批次和分页缓存正确推进 |
 | 6 | 接入服务并建立性能证据 | Chapter09–10 | 同步/SSE 服务通过，GPU 优化有可重复的 A/B 证据 |
+
+## 当前完成度与后续边界
+
+六项教学任务均已有真实设备入口。TinyLlama 和 Qwen3 覆盖稠密模型纵向闭环；DeepSeek-V2-Lite 覆盖 27 层 MLA+MoE Runtime 与 Serving，并用 EXP-GPU-20～31 记录算法、计算核和数据搬运的逐步优化。
+
+| 范围 | 当前状态 | 下一步 |
+| --- | --- | --- |
+| 资源与核心算子 | 已完成真实设备测试 | 继续保持跨 CUDA 版本回归 |
+| 稠密模型 | TinyLlama、Qwen3 已完成 Runtime/Serving | 扩展模型需先通过 schema 与 CPU golden |
+| DeepSeek MLA | 连续/分页、Tensor Prefill、权重吸收已完成 | 增加优化后热点复测 |
+| DeepSeek MoE | 专家执行、packed dispatch、设备 Router 已完成；设备分组候选已验证但未带来稳定收益 | 默认保留 Host 建组；融合 grouped-MoE 进入性能扩展队列 |
+| Attention 优化 | 三阶段 golden 与 FA2-inspired 候选可 A/B | 保留教学候选，收益通过端到端证据后再切默认 |
+| 工程范围 | 单消费级 NVIDIA GPU | 多 GPU、分布式与生产级多租户作为框架对照 |
+
+## CUDA 与多模态的近期交接
+
+当前 CUDA 纵向教学任务已经完成，性能建设已按证据收敛到明确边界。EXP-GPU-32 确认设备 Router 消除了完整 hidden 回传；EXP-GPU-33 又验证设备分组候选的数值正确，但短序列回退、长序列基本持平，因此没有切换默认路径。CUDA 语言模型主线进入维护状态，新的实现重心转向视觉 CUDA；融合 grouped-MoE、更多 Attention 候选和多 GPU 继续留在性能扩展队列。
+
+视觉 CUDA 已完成 Patch/Position Embedding、单个 SigLIP Block 与 Projector 的合成 CPU/CUDA 对照。下一步接入真实 mmproj Q8_0 payload，并用持久工作区连接 12 层 Encoder；它继续复用现有 Tensor、量化 Linear、执行上下文、Runtime 和服务接口。
 
 ## 任务 1：固定 CUDA 环境
 
@@ -49,8 +68,9 @@ CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
 | 对象 | 原理入口 | GPU 实现重点 |
 | --- | --- | --- |
 | MatMul | Chapter03 | 行主序映射、cuBLAS Handle 与 Stream |
-| 量化 Linear | Chapter05 | 分块解码、融合 GEMV 与批量 SGEMM |
-| RoPE、GQA | Chapter04 | 位置、Head 映射、因果遮罩与归约 |
+| 量化 Linear | Chapter05 | 分块解码、格式专用融合 GEMV 与批量权重复用 |
+| RoPE、GQA、MLA | Chapter04 | 位置、Head 映射、因果遮罩、低秩缓存与权重吸收 |
+| MoE Router | Chapter04 | 全专家 Softmax、稳定 Top-K、专家分发与设备路由 |
 
 完成标志是 `code/cuda/scripts/run.sh` 中对应设备测试通过，并能解释 CPU 参考实现与 CUDA 计算核的输入输出为何相同。
 

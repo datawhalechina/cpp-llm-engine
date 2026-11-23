@@ -58,6 +58,12 @@
 | 注意力 | Attention | 根据 Q/K 相关性对 V 加权聚合 | Chapter04 | [F-ATTN-02](./formulas.md#f-attn-02) |
 | 多头注意力 | Multi-head Attention, MHA | 将隐藏维度拆成多个 head 分别计算 Attention，再合并回原维度 | [Chapter04 Multi-head Attention](../chapter04_attention/01_multihead_attention.md) | [F-ATTN-02](./formulas.md#f-attn-02) |
 | 分组查询注意力 | Grouped-Query Attention, GQA | 多个 query head 共享较少的 KV head | Chapter04 | [F-ATTN-03](./formulas.md#f-attn-03) |
+| 多头潜在注意力 | Multi-head Latent Attention, MLA | 将历史 K/V 压缩为低秩 latent 与位置 Key，并在注意力计算时展开或吸收投影 | Chapter04 | [F-ATTN-05](./formulas.md#f-attn-05) |
+| 权重吸收 | weight absorption | 利用矩阵乘法结合律，把 MLA 的 Key 投影移到 Query 一侧，并把 Value 投影移到历史聚合之后，减少对每个历史位置的重复投影 | Chapter04 | [F-ATTN-05](./formulas.md#f-attn-05) |
+| 混合专家 | Mixture of Experts, MoE | 由 Router 为每个词元选择少量专家执行 FFN，再按路由权重合并输出 | Chapter04 | [F-FFN-02](./formulas.md#f-ffn-02) |
+| 路由器 | Router | 根据词元隐藏状态计算各专家分数的 MoE 组件 | Chapter04 | [F-FFN-02](./formulas.md#f-ffn-02) |
+| 路由 Top-K | routing Top-K | 按专家分数选出 K 个执行专家；稳定版本在分数相同时优先较小编号 | Chapter04 | [F-FFN-02](./formulas.md#f-ffn-02) |
+| 设备端路由 | device-side routing | 在 GPU 上计算 Router、Softmax 和 Top-K；专家分组是否也留在设备端是下一层独立设计选择 | Chapter04、GPU 路线 | [F-FFN-02](./formulas.md#f-ffn-02) |
 | 专家分组执行 | grouped expert execution | 在同一层把命中同一专家的词元或请求行组成一组，共享专家权重读取与量化块解码；一个 Top-K 词元会进入 K 组 | Chapter04、08 | - |
 | 因果掩码 | causal mask | 阻止当前位置读取未来 token 的 Attention mask | Chapter04 | [F-ATTN-02](./formulas.md#f-attn-02) |
 | 层归一化 | LayerNorm | 使用均值和方差归一化 hidden state | Chapter04 | [F-NORM-01](./formulas.md#f-norm-01) |
@@ -137,11 +143,14 @@
 | 中文术语 | 英文或缩写 | 定义 | 首次学习 | 相关公式 |
 | --- | --- | --- | --- | --- |
 | 多模态推理 | multimodal inference | 同一请求联合处理文本、图片或其他模态 | [多模态学习计划](../guides/multimodal_learning_plan.md) | [F-MM-01](./formulas.md#f-mm-01) |
+| 动态切图 | dynamic tiling | 按原图长宽比和图片 token 预算生成局部切片与全局概览图 | [多模态学习计划](../guides/multimodal_learning_plan.md) | [F-MM-01](./formulas.md#f-mm-01) |
 | 图像块 | image patch | Vision Transformer 输入的固定大小局部像素块 | 多模态输入链路 | [F-MM-02](./formulas.md#f-mm-02) |
 | 全局概览图 | overview image | 动态切图时保留整图关系的固定大小输入 | 多模态输入链路 | [F-MM-02](./formulas.md#f-mm-02) |
 | 局部切片 | local tile | 从 refined image 裁出的固定大小高分辨率输入 | 多模态输入链路 | [F-MM-02](./formulas.md#f-mm-02) |
 | 视觉编码器 | Vision Encoder | 将图像 patch 转换为视觉 hidden state 的 Transformer | 多模态输入链路 | [F-ATTN-02](./formulas.md#f-attn-02) |
-| 视觉投影器 | Projector | 将视觉 hidden state 合并并映射到 LLM embedding width | 多模态输入链路 | [F-MM-02](./formulas.md#f-mm-02) |
+| SigLIP | Sigmoid Loss for Language Image Pre-training | SmolVLM 使用的视觉编码器家族；教程关注其编码 Block，不展开预训练目标 | [多模态学习计划](../guides/multimodal_learning_plan.md) | [F-ATTN-02](./formulas.md#f-attn-02) |
+| 双向全注意力 | bidirectional full attention | 每个视觉 token 可以读取同一视觉序列中的全部位置，不使用语言 Decoder 的因果遮罩 | [多模态学习计划](../guides/multimodal_learning_plan.md) | [F-ATTN-02](./formulas.md#f-attn-02) |
+| 视觉投影器 | Projector | 将视觉 hidden state 合并并映射到 LLM embedding width | 多模态输入链路 | [F-MM-04](./formulas.md#f-mm-04) |
 | 视觉嵌入 | visual embedding | Projector 输出并插入语言模型序列的连续向量 | 多模态输入链路 | - |
 | 图像 token 预算 | image-token budget | 控制图片像素预算、tile 数和上下文占用的运行参数 | 多模态输入链路 | [F-MM-01](./formulas.md#f-mm-01) |
 | 多模态投影文件 | multimodal projector, mmproj | 保存 Vision Encoder 和 Projector metadata/权重的模型文件 | 多模态输入链路 | - |

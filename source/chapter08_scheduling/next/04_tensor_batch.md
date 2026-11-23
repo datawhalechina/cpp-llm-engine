@@ -36,7 +36,7 @@
 
 DeepSeek CUDA batch 保留了“Attention 隔离、FFN 合并”的边界。每个请求先在自己的执行流和压缩 MLA 历史上完成 Attention；所有请求到达 FFN 后，批量工作区读取 Router 结果，把命中同一专家的输入行打包，再调用 `quantized_linear_batch()` 完成 Gate、Up 和 Down。共享专家直接处理整个批次，结果按请求加权拆回。批量大小相同时，Factory 会复用同一个工作区，避免 26 个 MoE 层和后续 Decode step 重复分配临时张量。
 
-这条路径已经执行真实跨请求量化计算。分页 MLA 只合并地址管理和设备载荷，不合并请求语义：各请求仍使用自己的页表、位置和可见历史。Router、稳定 Top-K 和加权拆回在 Host 完成，最终归一化与 LM Head 按请求执行；当前实现也不等于设备执行重叠或单个融合 grouped-MoE kernel。
+这条路径已经执行真实跨请求量化计算。分页 MLA 只合并地址管理和设备载荷，不合并请求语义：各请求仍使用自己的页表、位置和可见历史。跨请求 `ExecutorBatchRunner` 在 Host 完成 Router、稳定 Top-K 和加权拆回，最终归一化与 LM Head 按请求执行。Chapter04 的设备 Router 当前服务单请求 Tensor Prefill；把同一分组元数据路径扩展到跨请求 batch，是后续数据面任务。设备执行重叠与单个融合 grouped-MoE kernel 仍需独立 A/B。
 
 ## 为什么批量临时张量需要复用
 

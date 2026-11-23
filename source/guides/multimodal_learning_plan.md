@@ -4,7 +4,11 @@
 
 SmolVLM 500M 的 IDEFICS3 图片路径用于说明图片进入模型前发生的变化。可运行代码和验证命令位于 `code/multimodal`。
 
-建议先完成 [CPU 六任务](./cpu_learning_plan.md)中的输入、算子和解码器部分。当前多模态实现使用 CPU；未来接入 GPU 时，图片管线仍在统一嵌入序列处与语言模型交接，执行后端关系见[系统与执行架构](../reference/architecture.md#cpu-主线与-gpu-扩展)。
+建议先完成 [CPU 六任务](./cpu_learning_plan.md)中的输入、算子和解码器部分。多模态完整链路当前使用 CPU；CUDA 已完成 Patch/Position Embedding、单个 SigLIP Block、Projector 和单行视觉 embedding 到语言 Context 的对照。执行后端关系见[系统与执行架构](../reference/architecture.md#cpu-主线与-gpu-扩展)。
+
+这条路线已有可运行实现。当前已完成图片预处理、真实 mmproj schema、12 层 SigLIP、Projector、图文 embedding、32 层语言 Decoder、同步/SSE 服务与阶段性能记录；后续建设包括图片 HTTP 传输、视觉模型 CUDA backend、跨请求视觉 batch 和图片/视觉特征缓存。
+
+多模态采用“独立路线 + 章节交接点”的组织方式：学习计划连续讲解完整图片链路，Chapter01/03/04/05/06/09/10 分别解释模型读取、算子、运行时、性能和服务交接。
 
 ![多模态六任务学习路线](../assets/diagrams/multimodal-six-task-learning-route.svg)
 
@@ -19,7 +23,24 @@ SmolVLM 500M 的 IDEFICS3 图片路径用于说明图片进入模型前发生的
 | 5 | 拼接统一嵌入 | Projector、文本/视觉 Embedding、Decoder | 图片占位被视觉向量替换并进入语言模型 |
 | 6 | 接入服务与性能证据 | Runtime、ServiceCore、阶段指标 | 同步/SSE 输出、终态释放和重复测量通过 |
 
-六项任务共用 `bash code/multimodal/scripts/run.sh` 作为默认入口；需要真实模型、图片或性能实验时，再按各节给出的环境变量和专用脚本运行。
+## GPU 多模态建设顺序
+
+语言模型 CUDA 主线已具备稳定的 Tensor、量化 Linear、Runtime 和服务接口，因此多模态 GPU 可以从视觉数据面开始，不需要复制一套请求系统。
+
+启动门槛是完成 DeepSeek 设备端专家分组元数据的 A/B，并把 CUDA 主线的默认值与剩余热点固定下来。该门槛用于避免同时改动通用设备执行层和视觉模型层；它不要求先完成融合 grouped-MoE、全部 Attention 候选或多 GPU。CPU 多模态学习路线已经可运行，视觉 CUDA 是下一阶段的设备扩展。
+
+1. 为 Patch/Position Embedding 与 Projector 建立 CPU/CUDA golden。两项合成对照均已完成。
+2. 迁移单个 SigLIP Block，固定全注意力、LayerNorm、GELU 与双残差。合成 F32 和真实 mmproj Q8_0 对照已完成。
+3. 连接 12 层 Vision Encoder，并记录显存峰值与持久工作区。4-token 数值对照和跨层工作区复用已完成，完整 1024-token tile 的性能与显存证据待补。
+4. 串联真实图片的 Patch/Position、Encoder 和 Projector，再把视觉 embedding 交给现有 CUDA LLM Context。左上 `4×4` patch 设备流水线和单行视觉 embedding 的 32 层 Context 对照已完成；完整 tile 与图文混合序列待补。
+5. 接入 Chapter08 视觉 batch 与 Chapter10 图片 Transport。
+6. 在 Chapter09 分开记录图片预处理、视觉编码、语言 Prefill 和 Decode 指标。
+
+CPU 六项任务共用 `bash code/multimodal/scripts/run.sh` 作为默认入口；CUDA 合成组件使用 `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda.sh`，真实 mmproj 单 Block、12 层 Encoder、图片小窗口流水线和语言 Context 交接分别使用 `run_cuda_real_block.sh`、`run_cuda_real_encoder.sh`、`run_cuda_real_pipeline.sh` 与 `run_cuda_smolvlm_context.sh`。需要完整图片或性能实验时，再按各节给出的环境变量和专用脚本运行。
+
+![多模态输入与 CPU/GPU 执行主线的关系](../assets/diagrams/multimodal-cpu-gpu-relationship.svg)
+
+首批 CUDA 组件沿用 CPU 公式，但调整权重存储和执行位置。Patch/Position 在上传时把 `[hidden,patch]` 转成 cuBLAS 使用的 `[patch,hidden]`，并把固定 Patch bias 折叠进 position table；运行时在设备上完成 Linear、位置行收集和向量相加。单个 SigLIP Block 使用标准 LayerNorm、GELU 和双残差，Attention 通过 `causal=false` 复用 GQA backend。真实 Q8_0 Linear 保留 GGUF packed payload，由 fused GEMV 在设备端直接解码；4-token Block 0 对照的最大绝对误差为 `8.82e-6`，余弦相似度为 `1`。12 层 Encoder 使用两个 hidden buffer 交替承接层输出，并跨层复用中间 Tensor 与局部 K/V workspace；4-token 真实对照最大绝对误差为 `7.03e-5`。Projector 将视觉网格按 `dy → dx → hidden` 重排后直接执行 Linear。真实图片左上 `4×4` patch 的三阶段设备流水线输出 `1×960`，最大误差为 `1.43e-4`；该行进入 32 层 CUDA Context 后，logits 最大误差为 `4.01e-5`、贪心词元与 CPU 一致。下一步是完整 1024-token tile、图文混合序列和生成闭环。
 
 ![IDEFICS3 动态切图与视觉输入链路](../assets/diagrams/idefics3-image-tiling.svg)
 
