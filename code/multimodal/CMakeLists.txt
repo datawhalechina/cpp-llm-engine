@@ -9,11 +9,18 @@ include(${CMAKE_CURRENT_LIST_DIR}/../testing/cmake/CppLlmTesting.cmake)
 
 option(MULTIMODAL_ENABLE_LLAMA_CPP_TOKENIZER "Enable the optional real tokenizer path" OFF)
 option(MULTIMODAL_ENABLE_CBLAS "Enable the optional CBLAS vision compute backend" OFF)
+option(MULTIMODAL_ENABLE_CUDA "Enable optional CUDA vision adapters" OFF)
 option(MULTIMODAL_ENABLE_SERVICE_INTEGRATION
     "Enable the optional Chapter10 service smoke in the real projector inspector" OFF)
 set(MULTIMODAL_CBLAS_LIBRARY "" CACHE FILEPATH "Optional CBLAS library override")
 set(LLAMA_CPP_ROOT "" CACHE PATH "llama.cpp source checkout")
 set(LLAMA_CPP_BUILD_DIR "" CACHE PATH "llama.cpp build directory containing bin/")
+set(MULTIMODAL_CUDA_SMOLVLM_MMPROJ "" CACHE FILEPATH
+    "Optional SmolVLM mmproj for the CUDA vision-to-context test")
+set(MULTIMODAL_CUDA_SMOLVLM_MODEL "" CACHE FILEPATH
+    "Optional SmolVLM text GGUF for the CUDA vision-to-context test")
+set(MULTIMODAL_CUDA_SMOLVLM_IMAGE "" CACHE FILEPATH
+    "Optional image for the CUDA vision-to-context test")
 
 add_library(cpp_llm_multimodal
     src/input_embedding.cpp
@@ -62,6 +69,83 @@ target_include_directories(cpp_llm_multimodal PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../core/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../model/include
 )
+
+if(MULTIMODAL_ENABLE_CUDA)
+    if(NOT TARGET cpp_llm_engine_cuda)
+        add_subdirectory(
+            ${CMAKE_CURRENT_SOURCE_DIR}/../cuda
+            ${CMAKE_CURRENT_BINARY_DIR}/cuda
+        )
+    endif()
+    add_library(cpp_llm_multimodal_cuda
+        src/cuda_siglip_block.cpp
+        src/cuda_vision_encoder.cpp
+        src/cuda_vision_embedding.cpp
+        src/cuda_vision_pipeline.cpp
+        src/cuda_vision_projector.cpp
+    )
+    target_include_directories(cpp_llm_multimodal_cuda PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_link_libraries(cpp_llm_multimodal_cuda PUBLIC
+        cpp_llm_multimodal
+        cpp_llm_engine_cuda
+    )
+    add_executable(multimodal_cuda_vision_embedding_test
+        tests/cuda_vision_embedding_test.cpp
+    )
+    target_link_libraries(multimodal_cuda_vision_embedding_test PRIVATE
+        cpp_llm_multimodal_cuda
+    )
+    cpp_llm_prepare_test(multimodal_cuda_vision_embedding_test)
+    add_executable(multimodal_cuda_vision_projector_test
+        tests/cuda_vision_projector_test.cpp
+    )
+    target_link_libraries(multimodal_cuda_vision_projector_test PRIVATE
+        cpp_llm_multimodal_cuda
+    )
+    cpp_llm_prepare_test(multimodal_cuda_vision_projector_test)
+    add_executable(multimodal_cuda_siglip_block_test
+        tests/cuda_siglip_block_test.cpp
+    )
+    target_link_libraries(multimodal_cuda_siglip_block_test PRIVATE
+        cpp_llm_multimodal_cuda
+    )
+    cpp_llm_prepare_test(multimodal_cuda_siglip_block_test)
+    add_executable(multimodal_cuda_vision_encoder_test
+        tests/cuda_vision_encoder_test.cpp
+    )
+    target_link_libraries(multimodal_cuda_vision_encoder_test PRIVATE
+        cpp_llm_multimodal_cuda
+    )
+    cpp_llm_prepare_test(multimodal_cuda_vision_encoder_test)
+    add_executable(multimodal_cuda_vision_block_inspect
+        examples/cuda_vision_block_inspect.cpp
+    )
+    target_link_libraries(multimodal_cuda_vision_block_inspect PRIVATE
+        cpp_llm_multimodal_cuda
+    )
+    add_executable(multimodal_cuda_vision_encoder_inspect
+        examples/cuda_vision_encoder_inspect.cpp
+    )
+    target_link_libraries(multimodal_cuda_vision_encoder_inspect PRIVATE
+        cpp_llm_multimodal_cuda
+    )
+    add_executable(multimodal_cuda_vision_pipeline_inspect
+        examples/cuda_vision_pipeline_inspect.cpp
+    )
+    target_link_libraries(multimodal_cuda_vision_pipeline_inspect PRIVATE
+        cpp_llm_multimodal_cuda
+    )
+    add_executable(multimodal_cuda_smolvlm_context_inspect
+        examples/cuda_smolvlm_context_inspect.cpp
+        ../model/src/cuda_llama_layer_weights.cpp
+        ../model/src/real_llama_cuda_model.cpp
+    )
+    target_link_libraries(multimodal_cuda_smolvlm_context_inspect PRIVATE
+        cpp_llm_multimodal_cuda
+    )
+endif()
 
 if(MULTIMODAL_ENABLE_CBLAS)
     if(MULTIMODAL_CBLAS_LIBRARY)
@@ -204,6 +288,50 @@ add_test(NAME multimodal_vision_projector_test COMMAND multimodal_vision_project
 add_test(NAME multimodal_input_embedding_test COMMAND multimodal_input_embedding_test)
 add_test(NAME multimodal_smolvlm_prompt_test COMMAND multimodal_smolvlm_prompt_test)
 add_test(NAME multimodal_request_metrics_test COMMAND multimodal_request_metrics_test)
+if(MULTIMODAL_ENABLE_CUDA)
+    add_test(
+        NAME multimodal_cuda_vision_embedding_test
+        COMMAND multimodal_cuda_vision_embedding_test)
+    add_test(
+        NAME multimodal_cuda_vision_projector_test
+        COMMAND multimodal_cuda_vision_projector_test)
+    add_test(
+        NAME multimodal_cuda_siglip_block_test
+        COMMAND multimodal_cuda_siglip_block_test)
+    add_test(
+        NAME multimodal_cuda_vision_encoder_test
+        COMMAND multimodal_cuda_vision_encoder_test)
+    set(_smolvlm_test_assets
+        "${MULTIMODAL_CUDA_SMOLVLM_MMPROJ}"
+        "${MULTIMODAL_CUDA_SMOLVLM_MODEL}"
+        "${MULTIMODAL_CUDA_SMOLVLM_IMAGE}")
+    set(_smolvlm_test_requested FALSE)
+    foreach(_asset IN LISTS _smolvlm_test_assets)
+        if(NOT "${_asset}" STREQUAL "")
+            set(_smolvlm_test_requested TRUE)
+        endif()
+    endforeach()
+    if(_smolvlm_test_requested)
+        foreach(_asset IN LISTS _smolvlm_test_assets)
+            if("${_asset}" STREQUAL "" OR NOT EXISTS "${_asset}")
+                message(FATAL_ERROR
+                    "SmolVLM CUDA context test requires three existing assets")
+            endif()
+        endforeach()
+        add_test(
+            NAME multimodal_cuda_smolvlm_context_test
+            COMMAND multimodal_cuda_smolvlm_context_inspect
+                "${MULTIMODAL_CUDA_SMOLVLM_MMPROJ}"
+                "${MULTIMODAL_CUDA_SMOLVLM_MODEL}"
+                "${MULTIMODAL_CUDA_SMOLVLM_IMAGE}")
+        cpp_llm_set_test_labels(
+            multimodal_cuda_smolvlm_context_test
+            real_model slow cuda multimodal vision generation integration)
+        cpp_llm_set_test_contract(
+            multimodal_cuda_smolvlm_context_test
+            OWNER 06 LEVEL real_model STATUS active)
+    endif()
+endif()
 cpp_llm_set_test_labels(multimodal_preprocessor_test unit multimodal preprocessing)
 cpp_llm_set_test_labels(multimodal_mmproj_schema_test contract multimodal loader)
 cpp_llm_set_test_labels(multimodal_vision_encoder_test component multimodal vision)
@@ -212,3 +340,17 @@ cpp_llm_set_test_labels(multimodal_vision_projector_test component multimodal pr
 cpp_llm_set_test_labels(multimodal_input_embedding_test integration multimodal embedding)
 cpp_llm_set_test_labels(multimodal_smolvlm_prompt_test unit multimodal prompt)
 cpp_llm_set_test_labels(multimodal_request_metrics_test unit multimodal metrics)
+if(MULTIMODAL_ENABLE_CUDA)
+    cpp_llm_set_test_labels(
+        multimodal_cuda_vision_embedding_test
+        component cuda multimodal vision embedding)
+    cpp_llm_set_test_labels(
+        multimodal_cuda_vision_projector_test
+        component cuda multimodal vision projector)
+    cpp_llm_set_test_labels(
+        multimodal_cuda_siglip_block_test
+        component cuda multimodal vision siglip attention)
+    cpp_llm_set_test_labels(
+        multimodal_cuda_vision_encoder_test
+        integration cuda multimodal vision siglip encoder)
+endif()
