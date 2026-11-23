@@ -12,7 +12,7 @@ CUDA 指南只处理安装、版本选择和故障定位。环境可用后，按
 | 编译 CUDA Kernel、cuBLAS 和设备资源测试 | NVIDIA GPU、驱动、CUDA Toolkit | `code/cuda/scripts/run.sh` |
 | 运行真实 TinyLlama CUDA Runtime 与服务 | 上述环境和 TinyLlama GGUF | `code/engine/scripts/run_real_cuda_runtime.sh` |
 
-CUDA 是扩展路径的运行条件，不影响 CPU reference、接口设计和正确性基线。先通过 CPU 测试，再排查设备编译或数值差异，可以把代码问题与环境问题分开。
+CUDA 是 GPU 扩展路径的运行条件，CPU 参考实现、接口设计和正确性基线可以独立完成。先通过 CPU 测试，再排查设备编译或数值差异，可以把代码问题与环境问题分开。
 
 ## 驱动、Toolkit 与 Runtime
 

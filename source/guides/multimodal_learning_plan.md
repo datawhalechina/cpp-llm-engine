@@ -1,12 +1,10 @@
 # 多模态六任务学习计划
 
-多模态路线在 CPU 语言模型主线上增加图片输入。图片经过解码、动态切图、视觉编码器（Vision Encoder）和投影层（Projector）后形成视觉嵌入，再与文本嵌入组成统一序列；后续继续使用已有语言模型解码器、生成运行时和服务层。
+多模态路线在 CPU 语言模型主线上增加图片输入。图片经过解码、动态切图、视觉编码器（Vision Encoder）和投影层（Projector）后形成视觉嵌入，再与文本嵌入组成统一序列；后续继续使用已有语言模型解码器、生成运行时和服务层。本文负责学习顺序和原理，具体数值结果集中收录在[实验资产索引](../reference/experiment_assets.md#多模态cuda-与正确性资产)。
 
 SmolVLM 500M 的 IDEFICS3 图片路径用于说明图片进入模型前发生的变化。可运行代码和验证命令位于 `code/multimodal`。
 
-建议先完成 [CPU 六任务](./cpu_learning_plan.md)中的输入、算子和解码器部分。多模态完整链路当前使用 CPU；CUDA 已完成 Patch/Position Embedding、单个 SigLIP Block、Projector 和单行视觉 embedding 到语言 Context 的对照。执行后端关系见[系统与执行架构](../reference/architecture.md#cpu-主线与-gpu-扩展)。
-
-这条路线已有可运行实现。当前已完成图片预处理、真实 mmproj schema、12 层 SigLIP、Projector、图文 embedding、32 层语言 Decoder、同步/SSE 服务与阶段性能记录；后续建设包括图片 HTTP 传输、视觉模型 CUDA backend、跨请求视觉 batch 和图片/视觉特征缓存。
+建议先完成 [CPU 六任务](./cpu_learning_plan.md)中的输入、算子和解码器部分。首轮使用 CPU 走通图片预处理、12 层 SigLIP、投影层、图文嵌入、32 层语言解码器和服务；进阶路线再用 CUDA 对照视觉计算。执行后端关系见[系统与执行架构](../reference/architecture.md#cpu-主线与-gpu-扩展)。
 
 多模态采用“独立路线 + 章节交接点”的组织方式：学习计划连续讲解完整图片链路，Chapter01/03/04/05/06/09/10 分别解释模型读取、算子、运行时、性能和服务交接。
 
@@ -19,28 +17,28 @@ SmolVLM 500M 的 IDEFICS3 图片路径用于说明图片进入模型前发生的
 | 1 | 固定模型与图片基线 | SmolVLM、mmproj、固定 JPEG | 模型、图片和外部输出身份可复现 |
 | 2 | 完成图片预处理 | 解码、缩放、切图、Patch | 图片变成形状和顺序确定的视觉输入 |
 | 3 | 读取视觉模型 | mmproj、配置、视觉权重 | 字段模式、张量布局和量化数据通过检查 |
-| 4 | 执行视觉编码器 | SigLIP Attention、MLP、12 层权重 | 视觉隐藏状态与独立参考结果一致 |
-| 5 | 拼接统一嵌入 | Projector、文本/视觉 Embedding、Decoder | 图片占位被视觉向量替换并进入语言模型 |
-| 6 | 接入服务与性能证据 | Runtime、ServiceCore、阶段指标 | 同步/SSE 输出、终态释放和重复测量通过 |
+| 4 | 执行视觉编码器 | SigLIP 注意力、MLP、12 层权重 | 视觉隐藏状态与独立参考结果一致 |
+| 5 | 拼接统一嵌入 | 投影层、文本/视觉嵌入、解码器 | 图片占位被视觉向量替换并进入语言模型 |
+| 6 | 接入服务与性能证据 | 生成运行时、服务核心、阶段指标 | 同步/流式输出、终态释放和重复测量通过 |
 
-## GPU 多模态建设顺序
+## GPU 多模态进阶路线
 
-语言模型 CUDA 主线已具备稳定的 Tensor、量化 Linear、Runtime 和服务接口，因此多模态 GPU 可以从视觉数据面开始，不需要复制一套请求系统。
+语言模型 CUDA 路线已经提供设备张量、量化线性层、运行时和服务接口，因此视觉路径复用请求系统，只替换视觉数据面的执行位置。按下面顺序学习，每一步都先与 CPU 结果比较：
 
-启动门槛是完成 DeepSeek 设备端专家分组元数据的 A/B，并把 CUDA 主线的默认值与剩余热点固定下来。该门槛用于避免同时改动通用设备执行层和视觉模型层；它不要求先完成融合 grouped-MoE、全部 Attention 候选或多 GPU。CPU 多模态学习路线已经可运行，视觉 CUDA 是下一阶段的设备扩展。
+| 顺序 | GPU 学习对象 | 验证重点 |
+| --- | --- | --- |
+| 1 | Patch/Position Embedding 与 Projector | 权重布局、位置行收集和输出形状 |
+| 2 | 单个 SigLIP 编码块 | 全注意力、LayerNorm、GELU 与双残差 |
+| 3 | 12 层视觉编码器 | 跨层数值误差、显存峰值与持久工作区 |
+| 4 | 图片流水线到语言执行上下文 | 视觉嵌入顺序、CPU/CUDA 对照和上下文隔离 |
+| 5 | 视觉批处理与图片传输 | 请求组批、输入限制和终态释放 |
+| 6 | 分阶段性能证据 | 图片预处理、视觉编码、语言预填充和解码耗时 |
 
-1. 为 Patch/Position Embedding 与 Projector 建立 CPU/CUDA golden。两项合成对照均已完成。
-2. 迁移单个 SigLIP Block，固定全注意力、LayerNorm、GELU 与双残差。合成 F32 和真实 mmproj Q8_0 对照已完成。
-3. 连接 12 层 Vision Encoder，并记录显存峰值与持久工作区。4-token 数值对照和跨层工作区复用已完成，完整 1024-token tile 的性能与显存证据待补。
-4. 串联真实图片的 Patch/Position、Encoder 和 Projector，再把视觉 embedding 交给现有 CUDA LLM Context。左上 `4×4` patch 设备流水线和单行视觉 embedding 的 32 层 Context 对照已完成；当前交接经过 Host 中转，完整 tile、图文混合序列与设备直连待补。
-5. 接入 Chapter08 视觉 batch 与 Chapter10 图片 Transport。
-6. 在 Chapter09 分开记录图片预处理、视觉编码、语言 Prefill 和 Decode 指标。
-
-CPU 六项任务共用 `bash code/multimodal/scripts/run.sh` 作为默认入口；CUDA 合成组件使用 `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda.sh`，真实 mmproj 单 Block、12 层 Encoder、图片小窗口流水线和语言 Context 交接分别使用 `run_cuda_real_block.sh`、`run_cuda_real_encoder.sh`、`run_cuda_real_pipeline.sh` 与 `run_cuda_smolvlm_context.sh`。需要完整图片或性能实验时，再按各节给出的环境变量和专用脚本运行。
+CPU 六项任务共用 `bash code/multimodal/scripts/run.sh`。CUDA 合成组件使用 `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda.sh`；真实 mmproj 单编码块、12 层编码器、图片小窗口流水线和语言执行上下文交接分别使用 `run_cuda_real_block.sh`、`run_cuda_real_encoder.sh`、`run_cuda_real_pipeline.sh` 与 `run_cuda_smolvlm_context.sh`。模型能力表记录各入口的验证范围。
 
 ![多模态输入与 CPU/GPU 执行主线的关系](../assets/diagrams/multimodal-cpu-gpu-relationship.svg)
 
-首批 CUDA 组件沿用 CPU 公式，但调整权重存储和执行位置。Patch/Position 在上传时把 `[hidden,patch]` 转成 cuBLAS 使用的 `[patch,hidden]`，并把固定 Patch bias 折叠进 position table；运行时在设备上完成 Linear、位置行收集和向量相加。单个 SigLIP Block 使用标准 LayerNorm、GELU 和双残差，Attention 通过 `causal=false` 复用 GQA backend。真实 Q8_0 Linear 保留 GGUF packed payload，由 fused GEMV 在设备端直接解码；4-token Block 0 对照的最大绝对误差为 `8.82e-6`，余弦相似度为 `1`。12 层 Encoder 使用两个 hidden buffer 交替承接层输出，并跨层复用中间 Tensor 与局部 K/V workspace；4-token 真实对照最大绝对误差为 `7.03e-5`。Projector 将视觉网格按 `dy → dx → hidden` 重排后直接执行 Linear。真实图片左上 `4×4` patch 的三阶段设备流水线输出 `1×960`，最大误差为 `1.43e-4`；该行进入 32 层 CUDA Context 后，logits 最大误差为 `4.01e-5`、贪心词元与 CPU 一致。下一步是完整 1024-token tile、图文混合序列和生成闭环。
+CUDA 组件沿用 CPU 公式，但调整权重存储和执行位置。图块与位置嵌入在上传时把 `[hidden,patch]` 转成 cuBLAS 使用的 `[patch,hidden]`，并把固定偏置折叠进位置表；运行时在设备上完成线性层、位置行收集和向量相加。单个 SigLIP 编码块使用标准层归一化、GELU 和双残差，注意力通过 `causal=false` 复用 GQA 后端。真实 Q8_0 线性层保留 GGUF 压缩载荷，由融合 GEMV 在设备端直接解码。12 层编码器使用两个隐藏状态缓冲区交替承接层输出，并跨层复用中间张量与局部 K/V 工作区；投影层再按 `dy → dx → hidden` 重排视觉网格。单编码块、12 层编码器、真实图片小窗口和语言执行上下文的误差记录分别见 `VAL-MM-CUDA-03` 至 `VAL-MM-CUDA-06`。
 
 ![IDEFICS3 动态切图与视觉输入链路](../assets/diagrams/idefics3-image-tiling.svg)
 
@@ -48,18 +46,18 @@ CPU 六项任务共用 `bash code/multimodal/scripts/run.sh` 作为默认入口�
 
 SmolVLM 500M Instruct 的规模允许在单机 CPU 上逐阶段执行，IDEFICS3 又把多模态输入的关键结构显式分开：动态 tiles 与 overview、SigLIP Vision Encoder、空间合并 Projector，以及与语言模型同宽的 visual embedding。语言侧仍是 Llama 风格 Decoder，因此图片进入统一 embedding sequence 后可以复用 Chapter06 Runtime 和 Chapter10 ServiceCore。
 
-当前选择 Q8_0 是为了让视觉权重保持量化表示，同时使用规则明确的 `FP16 scale + 32×int8` block 建立第一条解码和 Linear golden。`llama.cpp` 的 mtmd 路径能够加载同一语言模型、mmproj、图片和 prompt，提供独立外部答案与切图数量。
+Q8_0 让视觉权重保持量化表示，同时使用规则明确的 `FP16 scale + 32×int8` 数据块建立第一条解码和线性层基准结果。`llama.cpp` 的 mtmd 路径能够加载同一语言模型、mmproj、图片和提示词，提供独立外部答案与切图数量。
 
 固定 640×488 Apollo 11 JPEG 用于真实解码、动态切图和完整回答；仓库内 2×2 PPM 与合成小 Tensor 用于无模型默认测试和精确数值定位。它们都是带固定输入或 hash 的 fixture，不是训练数据集，也不用于衡量视觉问答准确率。未来若评估模型质量，应另建包含样本清单、标注、指标和版本的数据集流程。
 
-| 选择条件 | 当前资产提供的价值 |
+| 选择条件 | 固定资产提供的教学价值 |
 | --- | --- |
 | 单机可执行 | 500M 模型允许 CPU correctness 路径逐阶段运行 |
 | 输入链路完整 | IDEFICS3 同时覆盖 resize、padding、overview、tile、patch 和 visual token |
-| Runtime 可复用 | Projector 输出 width 960，可与文本 embedding 组成统一 Decoder 输入 |
+| 运行时可复用 | 投影层输出宽度 960，可与文本嵌入组成统一解码器输入 |
 | 量化可解释 | Q8_0 block 适合先固定视觉权重解码和跨实现 golden |
-| 外部可对照 | `llama.cpp` mtmd 提供相同模型与图片的独立 CPU baseline |
-| 错误可定位 | 真实 JPEG 负责系统闭环；无损 PPM和合成 Tensor 负责局部精确回归 |
+| 外部可对照 | `llama.cpp` mtmd 提供相同模型与图片的独立 CPU 基线 |
+| 错误可定位 | 真实 JPEG 负责系统闭环；无损 PPM 和合成张量负责局部精确回归 |
 
 ## mmproj 怎样变成可执行的视觉模型
 
@@ -103,7 +101,7 @@ mmproj 是独立于语言模型 GGUF 的视觉权重文件。Chapter01 的 `Gguf
 
 每张 512×512 RGB tile 先归一化为 Float32 CHW。16×16 patch 会得到 `32×32=1024` 个原始 patch，每个 patch 展平为 `3×16×16=768` 个输入值；SigLIP Vision Encoder 处理这些 patch，IDEFICS3 Projector 再进行空间合并并映射到语言模型 embedding width，数量关系见 [`F-MM-02`](../reference/formulas.md#f-mm-02)。
 
-| 阶段 | 形状或数量 | 当前建设状态 |
+| 阶段 | 形状或数量 | 可验证结果 |
 | --- | --- | --- |
 | RGB tile | `[512, 512, 3]` HWC RGB8 | 已实现 |
 | normalize | `[3, 512, 512]` CHW Float32 | 已实现 |
@@ -221,7 +219,7 @@ Prompt 解析先产生文本片段和图片片段。文本 token 经过 `token_e
 ![文本占位符展开为 Visual Embedding](../assets/diagrams/multimodal-embedding-composition.svg)
 ![SmolVLM Prompt、图片 chunk 与 Decoder 序列](../assets/diagrams/smolvlm-prompt-chunks.svg)
 
-## 当前验证入口
+## 运行验证
 
 默认命令验证几何、tile 顺序、normalize 和 patch shape，不依赖模型、网络或 GPU。真实基线命令使用本地 SmolVLM 和 `llama.cpp`，记录模型、mmproj、图片 hash 和完整日志。
 

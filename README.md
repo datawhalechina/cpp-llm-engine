@@ -77,16 +77,15 @@ Chapter04–05 建立 Attention 与量化 Linear 的数值语义，Chapter07–0
 
 ### 模型适配
 
-| 模型 | 架构差异带来的学习内容 | 当前状态 |
+| 模型 | 架构差异带来的学习内容 | 可运行路径 |
 | --- | --- | --- |
 | TinyLlama 1.1B | Llama 稠密 Decoder、22 个解码器块、GGUF 与 GQA | CPU/CUDA 生成与服务主线 |
 | Qwen3-0.6B | Q/K Norm、NeoX RoPE、非对称 Q/K/V 头和共享 LM Head | CPU/CUDA 推理服务闭环 |
 | Qwen1.5-MoE-A2.7B | 60 选 4 Router、packed experts、共享专家和混合量化 | CPU 24 层生成、按专家分组批执行、调度与服务闭环 |
-| DeepSeek-R1-Distill-Qwen-1.5B | Qwen2.5 配置、Tokenizer 与聊天模板差异 | 待适配 |
 | DeepSeek-V2-Lite | MLA、混合稠密/MoE 层、64 选 6 Router 与共享专家 | CPU/CUDA 27 层生成、分页 MLA、分块 Prefill 与文本服务闭环 |
 | SmolVLM-500M | Vision Encoder、Projector 与视觉词元序列 | CPU 多模态模型与服务生命周期闭环 |
 
-各模型分阶段的完成状态、真实入口和剩余边界见[模型能力与扩展顺序](source/reference/model_support.md)。
+各模型分阶段的可运行入口和适用范围见[模型能力与扩展顺序](source/reference/model_support.md)。
 
 ## 当前可学内容
 

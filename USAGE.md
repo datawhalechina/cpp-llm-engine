@@ -34,7 +34,7 @@ A 教学基线 → B 真实主线
 | --- | --- | --- | --- |
 | CPU 主线 | 从模型输入到单机推理服务 | [CPU 六任务学习计划](source/guides/cpu_learning_plan.md) | 默认回归通过，能解释权重到服务的完整链路 |
 | GPU 扩展 | 将算子、工作区和 K/V 存储迁移到 CUDA | [GPU 六任务学习计划](source/guides/gpu_learning_plan.md) | CPU/CUDA 数值对照和真实设备测试通过 |
-| 多模态扩展 | 增加图片预处理、Vision Encoder 和 Projector | [多模态六任务学习计划](source/guides/multimodal_learning_plan.md) | 图片形成 embedding 序列并进入现有 LLM Runtime |
+| 多模态扩展 | 增加图片预处理、视觉编码器和投影层 | [多模态六任务学习计划](source/guides/multimodal_learning_plan.md) | 图片形成嵌入序列并进入现有语言模型运行时 |
 
 A 建立可观察的小尺寸闭环，B 连接真实 CPU 结构；G 和 M 是选做扩展，不是排在 B 之后的必修章节。只学习执行核心时可先完成 Chapter00–06，继续学习缓存、调度和服务时再进入 Chapter07–10。
 
@@ -44,27 +44,27 @@ A 建立可观察的小尺寸闭环，B 连接真实 CPU 结构；G 和 M 是选
 | --- | --- | --- |
 | Foundation | C++、构建、测试、数值证据、性能测量和 CUDA 前置能力 | `bash exercises/foundation/run_all.sh` |
 | Chapter00 | 工具链检查与 TinyLlama 真实推理基线 | `bash code/chapter00_quickstart/run.sh` |
-| Chapter01 | tokenizer、metadata、权重与 Model | `bash code/chapter01_tensor_loader/run.sh` |
-| Chapter02 | 共享 Storage 的 Tensor view | `bash code/chapter02_tensor_ops/scripts/run.sh` |
-| Chapter03 | 可验证的 CPU MatMul backend | `bash code/chapter03_matmul/scripts/run.sh` |
-| Chapter04 | Attention、FFN 与单层 Decoder | `bash code/chapter04_attention/scripts/run.sh` |
-| Chapter05 | Q4_K/Q6_K 量化 Linear | `bash code/chapter05_quantization/scripts/run.sh` |
-| Chapter06 | Prefill、Decode、采样与流式输出 | `bash code/chapter06_generation/scripts/run.sh` |
-| Chapter07 | BlockTable、分页 K/V 与缓存事务 | `bash code/chapter07_kv_cache/scripts/run.sh` |
-| Chapter08 | Scheduler、Continuous Batching 与 Tensor batch | `bash code/chapter08_scheduling/scripts/run.sh` |
-| Chapter09 | benchmark、profiling 与性能证据 | `bash code/chapter09_performance/scripts/run.sh` |
-| Chapter10 | ServiceCore、HTTP/SSE 与 metrics | `bash code/chapter10_serving/scripts/run.sh` |
+| Chapter01 | 分词器、模型元数据、权重与模型对象 | `bash code/chapter01_tensor_loader/run.sh` |
+| Chapter02 | 共享存储的张量视图 | `bash code/chapter02_tensor_ops/scripts/run.sh` |
+| Chapter03 | 可验证的 CPU 矩阵乘法后端 | `bash code/chapter03_matmul/scripts/run.sh` |
+| Chapter04 | 注意力、前馈网络与单层解码器 | `bash code/chapter04_attention/scripts/run.sh` |
+| Chapter05 | Q4_K/Q6_K 量化线性层 | `bash code/chapter05_quantization/scripts/run.sh` |
+| Chapter06 | 预填充、逐词元解码、采样与流式输出 | `bash code/chapter06_generation/scripts/run.sh` |
+| Chapter07 | 块表、分页 K/V 与缓存事务 | `bash code/chapter07_kv_cache/scripts/run.sh` |
+| Chapter08 | 调度器、连续批处理与张量批次 | `bash code/chapter08_scheduling/scripts/run.sh` |
+| Chapter09 | 性能基准、性能剖析与证据 | `bash code/chapter09_performance/scripts/run.sh` |
+| Chapter10 | 服务核心、HTTP/SSE 与指标 | `bash code/chapter10_serving/scripts/run.sh` |
 
 每章先读 `intro.md` 和正文，再从 `code/<chapter>/README.md` 进入实现、测试和运行脚本。
 
 ## 修改运行参数
 
-示例程序和 benchmark 使用命令行参数改变请求、实验负载或已编译实现，不需要修改源码。先通过对应脚本完成构建，再在代码 README 中找到可执行程序和参数说明。
+示例程序和性能基准使用命令行参数改变请求、实验负载或已编译实现。先通过对应脚本完成构建，再在代码 README 中找到可执行程序和参数说明。
 
 | 参数类型 | 示例 | 改变内容 |
 | --- | --- | --- |
 | 请求参数 | `--prompt`、`--max-new-tokens` | 单次生成输入与停止条件 |
-| 负载参数 | `--batch`、`--iterations` | benchmark 的规模和采样次数 |
+| 负载参数 | `--batch`、`--iterations` | 性能基准的规模和采样次数 |
 | 实现参数 | `--attention-path three-stage` | 从已编译且通过正确性验证的实现中选择一条 |
 
 ```bash
@@ -76,20 +76,20 @@ code/engine/build/cpp_llm_engine_demo \
   --attention-path fused-online
 ```
 
-CMake 选项决定编译哪些 backend，运行参数只选择已经编译的能力。实验编号和结果目录只用于保存证据，不会切换 kernel；未知参数会打印用法并退出。
+CMake 选项决定编译哪些后端，运行参数从已编译能力中选择执行路径。实验编号和结果目录只保存证据，计算核由实现参数选择；未知参数会打印用法并退出。
 
 ## 可选扩展
 
 | 扩展 | 入口 | 当前范围 |
 | --- | --- | --- |
-| CUDA backend | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备资源、量化 Linear、K/V、GQA、MLA、Decoder 和 MoE 数据面 |
+| CUDA 后端 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备资源、量化线性层、K/V、GQA、MLA、解码器和 MoE 数据面 |
 | 真实模型集成 | [`code/engine/README.md`](code/engine/README.md) | TinyLlama、Qwen3、Qwen1.5-MoE 与 DeepSeek-V2-Lite 的分阶段入口 |
-| 多模态 CPU | `bash code/multimodal/scripts/run.sh` | SmolVLM 输入、12 层 Vision Encoder、Projector、Decoder 与服务 golden |
-| 多模态 CUDA 组件 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda.sh` | 合成 Patch/Position、单 SigLIP Block 与 Projector CPU/CUDA golden |
-| 多模态真实 CUDA Block | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_block.sh` | 真实 mmproj Q8_0 第 0 Block 与 CPU reference 一致 |
-| 多模态真实 CUDA Encoder | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_encoder.sh` | 真实 mmproj 12 层 Q8_0 Encoder 与 CPU reference 一致 |
-| 多模态真实图片 CUDA 流水线 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_pipeline.sh` | 图片小窗口在设备端完成 Patch/Position、12 层 Encoder 与 Projector |
-| 多模态 CUDA 语言交接 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh` | 一行真实视觉 embedding 进入 32 层 SmolVLM CUDA Context，并与 CPU logits 对照 |
+| 多模态 CPU | `bash code/multimodal/scripts/run.sh` | SmolVLM 输入、12 层视觉编码器、投影层、解码器与服务基准结果 |
+| 多模态 CUDA 组件 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda.sh` | 合成 Patch/Position、单个 SigLIP 编码块与投影层的 CPU/CUDA 对照 |
+| 多模态真实 CUDA 编码块 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_block.sh` | 真实 mmproj Q8_0 第 0 编码块与 CPU 参考实现一致 |
+| 多模态真实 CUDA 编码器 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_encoder.sh` | 真实 mmproj 12 层 Q8_0 编码器与 CPU 参考实现一致 |
+| 多模态真实图片 CUDA 流水线 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_pipeline.sh` | 图片小窗口在设备端完成 Patch/Position、12 层编码器与投影层 |
+| 多模态 CUDA 语言交接 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh` | 一行真实视觉嵌入进入 32 层 SmolVLM CUDA 执行上下文，并与 CPU 候选分数对照 |
 
 修改 CUDA 后端、真实 CUDA 模型/Context 或服务接入后，依次运行纵向验收：
 
@@ -99,7 +99,7 @@ bash code/engine/scripts/run_real_cuda_runtime.sh
 bash code/engine/scripts/run_real_cuda_serving.sh
 ```
 
-上面的三条引擎命令以 TinyLlama 展示默认 CUDA 纵向验收。Qwen3、Qwen1.5-MoE、DeepSeek-V2-Lite 和 SmolVLM 应使用各自已登记的脚本，避免只替换模型路径而跳过架构适配。SmolVLM 的 CUDA 入口已完成合成视觉组件、真实 Q8_0 单 Block、12 层小 token Encoder、真实图片小窗口流水线和单行视觉 embedding 的语言 Context 交接；完整 tile、图文混合序列与生成仍在后续建设。分阶段状态和最小入口见[模型能力与扩展顺序](source/reference/model_support.md)，完整命令与成功条件见 [`code/engine/README.md`](code/engine/README.md) 和 [`code/multimodal/README.md`](code/multimodal/README.md)；环境准备见 [CUDA 指南](source/guides/setup_cuda.md)。
+上面的三条引擎命令以 TinyLlama 展示默认 CUDA 纵向验收。Qwen3、Qwen1.5-MoE、DeepSeek-V2-Lite 和 SmolVLM 使用各自登记的脚本，因为它们包含不同的架构配置与权重路径。分阶段能力和最小入口见[模型能力与扩展顺序](source/reference/model_support.md)，完整命令与成功条件见 [`code/engine/README.md`](code/engine/README.md) 和 [`code/multimodal/README.md`](code/multimodal/README.md)；环境准备见 [CUDA 指南](source/guides/setup_cuda.md)。
 
 ## 判断验证结果
 
@@ -122,14 +122,14 @@ npm run docs:check-links
 | 文档检查 | `npm run docs:check-links` | 链接有效且 VitePress 站点可以完整构建 |
 | 真实环境 | 引擎集成、CUDA 或多模态对应脚本 | 指定模型、设备或输入路径真实运行通过 |
 
-benchmark 只能比较固定环境和 workload 下的性能，不能替代正确性测试。实验条件与结果入口见[实验资产表](source/reference/experiment_assets.md)。
+性能基准比较固定环境和工作负载下的表现，正确性由独立测试和数值门禁保证。实验条件与结果入口见[实验资产表](source/reference/experiment_assets.md)。
 
 ## 阅读代码的方法
 
 1. 从章节 `intro.md` 确认上游输入、本章处理和下游输出。
 2. 在正文中理解数据形状、公式、状态变化和设计理由。
 3. 用 `code/<chapter>/README.md` 找到实现文件、测试和运行入口。
-4. 先运行测试，再修改实现；优化时保留 CPU reference 或 golden。
+4. 先运行测试，再修改实现；优化时保留 CPU 参考实现或基准结果。
 5. 最后阅读框架对照，理解教学实现如何扩展到成熟系统。
 
 阅读具体实现时，同时追踪三条线：
@@ -137,7 +137,7 @@ benchmark 只能比较固定环境和 workload 下的性能，不能替代正确
 | 观察线 | 主要章节 | 需要回答的问题 |
 | --- | --- | --- |
 | 数据 | Chapter01–02、04、06–07 | 数据是什么形状、由谁持有、怎样随请求增长 |
-| 算子 | Chapter03–05、CUDA | 一次计算做什么，由哪个 CPU/GPU backend 执行 |
+| 算子 | Chapter03–05、CUDA | 一次计算做什么，由哪个 CPU/GPU 后端执行 |
 | 系统 | Chapter00、06–10 | 请求怎样推进、测量、回收并通过服务输出 |
 
 术语不明确时查[术语表](source/reference/glossary.md)，推导不明确时查[公式表](source/reference/formulas.md)，寻找跨章实现时查[教程资产索引](source/reference/tutorial_assets.md)。运行失败时先执行对应章节的 `run.sh`；Chapter00 环境和模型问题见[排错页](source/chapter00_quickstart/05_troubleshooting.md)。
