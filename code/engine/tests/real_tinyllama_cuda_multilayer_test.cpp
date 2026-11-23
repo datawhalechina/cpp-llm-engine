@@ -203,6 +203,45 @@ int main(int argc, char** argv) {
               sequential_token_logits.begin());
     CHECK(tensor_token_prefill->position() == 2);
     CHECK(tensor_token_prefill->prefill_workspace_creation_count() == 1);
+
+    auto embedding_prefill_context = cuda_model->create_context(2, &error);
+    CHECK(embedding_prefill_context != nullptr);
+    cpp_llm_engine::core::DecoderEmbeddingSequence embedding_sequence{
+        2, embeddings.hidden_size, sequence_input};
+    std::vector<float> embedding_prefill_logits;
+    CHECK(embedding_prefill_context->prefill_embeddings(
+        embedding_sequence, &embedding_prefill_logits).is_ok());
+    float embedding_prefill_error = 0.0F;
+    CHECK(close(
+        embedding_prefill_logits, tensor_token_logits,
+        &embedding_prefill_error));
+    CHECK(embedding_prefill_context->position() == 2);
+    CHECK(embedding_prefill_context->prefill_workspace_creation_count() == 1);
+    CHECK(embedding_prefill_context->prefill_embeddings(
+        embedding_sequence, &embedding_prefill_logits).is_ok());
+    CHECK(embedding_prefill_context->position() == 2);
+    CHECK(embedding_prefill_context->prefill_workspace_creation_count() == 1);
+    cpp_llm_engine::core::DecoderEmbeddingSequence invalid_embeddings{
+        2, embeddings.hidden_size + 1, sequence_input};
+    CHECK(!embedding_prefill_context->prefill_embeddings(
+        invalid_embeddings, &embedding_prefill_logits).is_ok());
+    CHECK(embedding_prefill_context->position() == 2);
+    cpp_llm_engine::core::DecoderEmbeddingSequence short_storage{
+        2, embeddings.hidden_size, embeddings.values};
+    CHECK(!embedding_prefill_context->prefill_embeddings(
+        short_storage, &embedding_prefill_logits).is_ok());
+    CHECK(embedding_prefill_context->position() == 2);
+    CHECK(!embedding_prefill_context->prefill_embeddings(
+        embedding_sequence, nullptr).is_ok());
+    CHECK(embedding_prefill_context->position() == 2);
+    cpp_llm_engine::core::DecoderEmbeddingSequence over_capacity{
+        3, embeddings.hidden_size, sequence_input};
+    over_capacity.values.insert(
+        over_capacity.values.end(), embeddings.values.begin(),
+        embeddings.values.end());
+    CHECK(!embedding_prefill_context->prefill_embeddings(
+        over_capacity, &embedding_prefill_logits).is_ok());
+    CHECK(embedding_prefill_context->position() == 2);
     tensor_token_prefill->reset();
     CHECK(tensor_token_prefill->prefill_tokens(
         {kTokenId, kTokenId}, &tensor_token_logits).is_ok());
@@ -218,6 +257,8 @@ int main(int argc, char** argv) {
               << "fused_logits_max_error: " << fused_logits_error << '\n'
               << "tensor_prefill_max_error: " << tensor_prefill_error << '\n'
               << "token_prefill_max_error: " << token_prefill_error << '\n'
+              << "embedding_prefill_max_error: "
+              << embedding_prefill_error << '\n'
               << "prefill_workspace_creations: "
               << tensor_token_prefill->prefill_workspace_creation_count() << '\n'
               << "greedy_token: "

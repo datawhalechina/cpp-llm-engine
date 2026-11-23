@@ -280,6 +280,8 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
             examples/real_deepseek2_cuda_tensor_prefill_benchmark.cpp)
         add_executable(real_deepseek2_cuda_moe_dispatch_benchmark
             examples/real_deepseek2_cuda_moe_dispatch_benchmark.cpp)
+        add_executable(real_deepseek2_cuda_iq4_warp_benchmark
+            examples/real_deepseek2_cuda_iq4_warp_benchmark.cpp)
         add_executable(real_deepseek2_cuda_absorbed_mla_benchmark
             examples/real_deepseek2_cuda_absorbed_mla_benchmark.cpp)
         target_link_libraries(real_deepseek2_cuda_dense_layer_test
@@ -303,6 +305,8 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
         target_link_libraries(real_deepseek2_cuda_tensor_prefill_benchmark
             PRIVATE cpp_llm_engine_cuda_runtime)
         target_link_libraries(real_deepseek2_cuda_moe_dispatch_benchmark
+            PRIVATE cpp_llm_engine_cuda_runtime)
+        target_link_libraries(real_deepseek2_cuda_iq4_warp_benchmark
             PRIVATE cpp_llm_engine_cuda_runtime)
         target_link_libraries(real_deepseek2_cuda_absorbed_mla_benchmark
             PRIVATE cpp_llm_engine_cuda_runtime)
@@ -543,6 +547,9 @@ cpp_llm_set_test_labels(embedding_request_service_test integration engine servin
 if(CPP_LLM_ENGINE_ENABLE_CUDA)
     add_test(NAME cuda_llama_layer_weights_test COMMAND cuda_llama_layer_weights_test)
     cpp_llm_set_test_labels(cuda_llama_layer_weights_test cuda integration)
+    cpp_llm_set_test_contract(
+        cuda_llama_layer_weights_test
+        OWNER 05 LEVEL integration STATUS active)
     add_test(NAME cuda_deepseek2_dense_layer_weights_test
         COMMAND cuda_deepseek2_dense_layer_weights_test)
     cpp_llm_set_test_labels(

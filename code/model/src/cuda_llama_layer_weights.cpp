@@ -1,6 +1,6 @@
 // Llama CUDA Model：实现真实 layer 权重的格式校验与显存上传。
 // 职责：把 GGUF `[input,output]` shape 转换为 CUDA rows=output、cols=input。
-// 契约：仅接受 F32 norm 与 Q4_K/Q6_K Linear，不做永久 Float32 反量化。
+// 契约：接受 F32 norm 与已登记的 packed Linear，不做永久 Float32 反量化。
 // 验证：cuda_llama_layer_weights_test 在真实 GPU 上执行。
 #include "cpp_llm_engine/model/cuda_llama_layer_weights.h"
 
@@ -40,8 +40,10 @@ core::Status upload_linear(
     core::WeightFormat format = core::WeightFormat::Unknown;
     if (host.dtype() == chapter01::DType::Q4_K) format = core::WeightFormat::Q4K;
     if (host.dtype() == chapter01::DType::Q6_K) format = core::WeightFormat::Q6K;
+    if (host.dtype() == chapter01::DType::Q8_0) format = core::WeightFormat::Q8_0;
     if (format == core::WeightFormat::Unknown) {
-        return core::Status::error("CUDA Llama Linear requires Q4_K or Q6_K");
+        return core::Status::error(
+            "CUDA Llama Linear requires Q4_K, Q6_K, or Q8_0");
     }
     const auto cols = static_cast<std::size_t>(host.shape()[0]);
     const auto rows = static_cast<std::size_t>(host.shape()[1]);

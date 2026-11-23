@@ -78,8 +78,10 @@ core::Status upload_quantized_matrix(
     core::WeightFormat format = core::WeightFormat::Unknown;
     if (host.dtype() == chapter01::DType::Q4_K) format = core::WeightFormat::Q4K;
     if (host.dtype() == chapter01::DType::Q6_K) format = core::WeightFormat::Q6K;
+    if (host.dtype() == chapter01::DType::Q8_0) format = core::WeightFormat::Q8_0;
     if (format == core::WeightFormat::Unknown) {
-        return core::Status::error("CUDA model matrix requires Q4_K or Q6_K");
+        return core::Status::error(
+            "CUDA model matrix requires Q4_K, Q6_K, or Q8_0");
     }
     const auto cols = static_cast<std::size_t>(host.shape()[0]);
     const auto rows = static_cast<std::size_t>(host.shape()[1]);
@@ -146,6 +148,71 @@ struct RealLlamaCudaContext::Impl final {
         prefill_rows = std::move(rows_replacement);
         prefill_token_count = token_count;
         ++prefill_workspace_creations;
+        return core::Status::ok();
+    }
+
+    core::Status run_prefill(
+        std::size_t token_count,
+        std::vector<float>* output) {
+        std::vector<cuda::CudaTensor*> row_outputs;
+        row_outputs.reserve(token_count);
+        for (std::size_t index = 0; index < token_count; ++index) {
+            row_outputs.push_back(&prefill_rows[index]);
+        }
+        std::vector<std::size_t> physical_blocks;
+        core::Status status = core::Status::ok();
+        if (external_kv != nullptr) {
+            std::string error;
+            if (!external_kv->reserve(position + token_count, &error)) {
+                status = core::Status::error(error);
+            } else {
+                physical_blocks = external_kv->physical_blocks();
+            }
+        }
+        for (std::size_t index = 0;
+             status.is_ok() && index < layers.size(); ++index) {
+            if (external_kv != nullptr) {
+                status = prefill_layer.prefill_sequence_paged(
+                    &execution, model->layers[index].decoder_weights(),
+                    external_kv->payload(), index, physical_blocks,
+                    &prefill_hidden, position);
+            } else {
+                status = prefill_layer.prefill_sequence(
+                    &execution, model->layers[index].decoder_weights(),
+                    &caches[index], &prefill_hidden, position);
+            }
+        }
+        if (status.is_ok()) {
+            status = execution.unpack_rows(prefill_hidden, row_outputs);
+        }
+        if (status.is_ok()) {
+            status = execution.rms_norm(
+                prefill_rows.back(), model->output_norm, &final_hidden,
+                model->metadata.rms_norm_epsilon);
+        }
+        if (status.is_ok()) {
+            status = execution.quantized_linear(
+                model->output_weight, final_hidden, &logits);
+        }
+        std::vector<float> result(model->metadata.vocab_size);
+        if (status.is_ok()) {
+            status = execution.download(
+                logits, result.data(), result.size() * sizeof(float));
+        }
+        if (status.is_ok()) status = execution.synchronize();
+        if (!status.is_ok()) {
+            rollback_caches();
+            return status;
+        }
+        if (external_kv != nullptr) {
+            std::string error;
+            if (!external_kv->commit(position + token_count, &error)) {
+                rollback_caches();
+                return core::Status::error(error);
+            }
+        }
+        position += token_count;
+        *output = std::move(result);
         return core::Status::ok();
     }
 
@@ -825,74 +892,44 @@ core::Status RealLlamaCudaContext::prefill_tokens(
     }
     core::Status status = impl_->prepare_prefill_workspace(tokens.size());
     std::vector<const cuda::CudaTensor*> row_inputs;
-    std::vector<cuda::CudaTensor*> row_outputs;
     row_inputs.reserve(tokens.size());
-    row_outputs.reserve(tokens.size());
     for (std::size_t index = 0; status.is_ok() && index < tokens.size(); ++index) {
         status = impl_->execution.embedding_lookup(
             impl_->model->embedding, static_cast<std::size_t>(tokens[index]),
             &impl_->prefill_rows[index]);
         row_inputs.push_back(&impl_->prefill_rows[index]);
-        row_outputs.push_back(&impl_->prefill_rows[index]);
     }
     if (status.is_ok()) {
         status = impl_->execution.pack_rows(row_inputs, &impl_->prefill_hidden);
     }
-    std::vector<std::size_t> physical_blocks;
-    if (status.is_ok() && impl_->external_kv != nullptr) {
-        std::string error;
-        if (!impl_->external_kv->reserve(impl_->position + tokens.size(), &error)) {
-            status = core::Status::error(error);
-        } else {
-            physical_blocks = impl_->external_kv->physical_blocks();
-        }
+    if (!status.is_ok()) return status;
+    return impl_->run_prefill(tokens.size(), logits);
+}
+
+core::Status RealLlamaCudaContext::prefill_embeddings(
+    const core::DecoderEmbeddingSequence& embeddings,
+    std::vector<float>* logits) {
+    const core::Status validation = embeddings.validate(
+        impl_->model->metadata.hidden_size);
+    if (!validation.is_ok()) return validation;
+    if (logits == nullptr) {
+        return core::Status::error(
+            "CUDA embedding prefill requires final logits output");
     }
-    for (std::size_t index = 0; status.is_ok() && index < impl_->layers.size(); ++index) {
-        if (impl_->external_kv != nullptr) {
-            status = impl_->prefill_layer.prefill_sequence_paged(
-                &impl_->execution,
-                impl_->model->layers[index].decoder_weights(),
-                impl_->external_kv->payload(), index, physical_blocks,
-                &impl_->prefill_hidden, impl_->position);
-        } else {
-            status = impl_->prefill_layer.prefill_sequence(
-                &impl_->execution,
-                impl_->model->layers[index].decoder_weights(),
-                &impl_->caches[index], &impl_->prefill_hidden, impl_->position);
-        }
+    if (embeddings.token_count > impl_->capacity_tokens) {
+        return core::Status::error(
+            "CUDA embedding prefill exceeds context capacity");
     }
+    reset();
+    core::Status status = impl_->prepare_prefill_workspace(
+        embeddings.token_count);
     if (status.is_ok()) {
-        status = impl_->execution.unpack_rows(impl_->prefill_hidden, row_outputs);
+        status = impl_->execution.upload(
+            &impl_->prefill_hidden, embeddings.values.data(),
+            embeddings.values.size() * sizeof(float));
     }
-    if (status.is_ok()) {
-        status = impl_->execution.rms_norm(
-            impl_->prefill_rows.back(), impl_->model->output_norm,
-            &impl_->final_hidden, impl_->model->metadata.rms_norm_epsilon);
-    }
-    if (status.is_ok()) {
-        status = impl_->execution.quantized_linear(
-            impl_->model->output_weight, impl_->final_hidden, &impl_->logits);
-    }
-    std::vector<float> result(impl_->model->metadata.vocab_size);
-    if (status.is_ok()) {
-        status = impl_->execution.download(
-            impl_->logits, result.data(), result.size() * sizeof(float));
-    }
-    if (status.is_ok()) status = impl_->execution.synchronize();
-    if (!status.is_ok()) {
-        impl_->rollback_caches();
-        return status;
-    }
-    if (impl_->external_kv != nullptr) {
-        std::string error;
-        if (!impl_->external_kv->commit(impl_->position + tokens.size(), &error)) {
-            impl_->rollback_caches();
-            return core::Status::error(error);
-        }
-    }
-    impl_->position += tokens.size();
-    *logits = std::move(result);
-    return core::Status::ok();
+    if (!status.is_ok()) return status;
+    return impl_->run_prefill(embeddings.token_count, logits);
 }
 
 core::Status RealLlamaCudaContext::copy_layer_kv(

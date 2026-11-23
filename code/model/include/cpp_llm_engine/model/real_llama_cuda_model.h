@@ -3,6 +3,7 @@
 // 契约：单次 forward_hidden 要么提交所有层的 KV，要么回退到调用前状态。
 #pragma once
 
+#include "cpp_llm_engine/core/decoder_contract.h"
 #include "cpp_llm_engine/core/status.h"
 
 #include <cstddef>
@@ -125,6 +126,9 @@ public:
         std::vector<float>* logits);
     core::Status prefill_tokens(
         const std::vector<std::int32_t>& tokens,
+        std::vector<float>* logits);
+    core::Status prefill_embeddings(
+        const core::DecoderEmbeddingSequence& embeddings,
         std::vector<float>* logits);
     core::Status copy_layer_kv(
         std::size_t layer,

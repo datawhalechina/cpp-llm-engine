@@ -1,5 +1,5 @@
 // Engine CUDA：验证 Chapter01 layer 权重到 CUDA Model 权重的上传边界。
-// 职责：检查 F32 norm、Q4_K/Q6_K 格式、矩阵方向、payload bytes 和失败路径。
+// 职责：检查 F32 norm、Q4_K/Q6_K/Q8_0 格式、矩阵方向、payload bytes 和失败路径。
 // 通过条件：基础权重与可选 Q/K Norm 上传后视图有效，host 销毁不影响设备所有权。
 #include "cpp_llm_engine/model/cuda_llama_layer_weights.h"
 
@@ -23,8 +23,11 @@ chapter01::Tensor packed(
     chapter01::DType dtype,
     std::size_t input_width,
     std::size_t output_width) {
-    const std::size_t block_bytes = dtype == chapter01::DType::Q4_K ? 144 : 210;
-    const std::size_t blocks_per_row = input_width / 256;
+    const bool q8_0 = dtype == chapter01::DType::Q8_0;
+    const std::size_t block_bytes = q8_0 ? 34 :
+        (dtype == chapter01::DType::Q4_K ? 144 : 210);
+    const std::size_t block_values = q8_0 ? 32 : 256;
+    const std::size_t blocks_per_row = input_width / block_values;
     std::vector<std::byte> bytes(
         output_width * blocks_per_row * block_bytes, std::byte{0});
     return chapter01::Tensor::from_raw_bytes(
@@ -48,6 +51,18 @@ chapter01::RealLlamaLayerWeights make_layer() {
     layer.ffn_gate = packed("gate", chapter01::DType::Q4_K, 256, 512);
     layer.ffn_up = packed("up", chapter01::DType::Q6_K, 256, 512);
     layer.ffn_down = packed("down", chapter01::DType::Q6_K, 512, 256);
+    return layer;
+}
+
+chapter01::RealLlamaLayerWeights make_q8_layer() {
+    chapter01::RealLlamaLayerWeights layer = make_layer();
+    layer.attn_q = packed("q", chapter01::DType::Q8_0, 256, 256);
+    layer.attn_k = packed("k", chapter01::DType::Q8_0, 256, 64);
+    layer.attn_v = packed("v", chapter01::DType::Q8_0, 256, 64);
+    layer.attn_output = packed("o", chapter01::DType::Q8_0, 256, 256);
+    layer.ffn_gate = packed("gate", chapter01::DType::Q8_0, 256, 512);
+    layer.ffn_up = packed("up", chapter01::DType::Q8_0, 256, 512);
+    layer.ffn_down = packed("down", chapter01::DType::Q8_0, 512, 256);
     return layer;
 }
 
@@ -127,6 +142,15 @@ int main() {
           std::vector<std::size_t>{64});
     CHECK(qwen_weights.key_norm->contract().shape.dimensions ==
           std::vector<std::size_t>{64});
+
+    cpp_llm_engine::model::CudaLlamaLayerWeights q8_device;
+    CHECK(cpp_llm_engine::model::CudaLlamaLayerWeights::upload(
+        &context, make_q8_layer(), &q8_device).is_ok());
+    const auto q8_weights = q8_device.decoder_weights();
+    CHECK(matrix_matches(q8_weights.query, 256, 256,
+        cpp_llm_engine::core::WeightFormat::Q8_0, 256 * 8 * 34));
+    CHECK(matrix_matches(q8_weights.down, 256, 512,
+        cpp_llm_engine::core::WeightFormat::Q8_0, 256 * 16 * 34));
 
     host = {};
     CHECK(device.valid());
