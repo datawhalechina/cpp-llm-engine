@@ -48,9 +48,9 @@ Benchmark 入口需要完成环境登记、预热、重复运行和结果落盘�
 
 统一 evidence v2 会保存并比较硬件名称和主机逻辑并发数，防止两台不同机器仅因都写了 `device=cpu` 而进入同一结论。线程数、亲和性、频率、驱动和功耗状态仍需由实验入口固定并写入实验说明；当前比较器不会替代操作系统或设备级控制。
 
-## 迁移旧实验结果
+## 复用已有实验结果
 
-旧结果能否进入统一证据，取决于是否保留每轮测量，而不是文件中是否已经有均值或 P50。重构前的 Chapter07 教学 benchmark 和真实 batch 结果包含 `samples`，可以通过导入器转换；早期服务结果只保存聚合统计，只能作为历史参考，不能参与新的 A/B 回归。
+已有结果只有保留每轮样本时才能转换为统一证据；只有均值或 P50 的文件保留作历史参考。Chapter07 的教学性能基准和真实批次结果包含 `samples`，可以通过导入器转换：
 
 ```bash
 node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
@@ -58,7 +58,7 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
   --output-dir /tmp/chapter09-evidence
 ```
 
-新的服务 benchmark 同时保存逐轮 Prefill、Decode、端到端时间、TTFT、吞吐和正确性。需要升级旧服务基线时，应使用原 workload 重新测量，不能用 mean 或 P50 生成伪样本。
+新的服务性能基准按轮保存预填充、解码、端到端时间、首词元延迟、吞吐和正确性。升级旧基线时使用原工作负载重新测量，聚合值不能反向生成原始样本。
 
 ## 验证实验入口
 

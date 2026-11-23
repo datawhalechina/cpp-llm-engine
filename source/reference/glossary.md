@@ -21,14 +21,19 @@
 | 工作区 | workspace | 算子执行期间复用的临时内存 | Foundation F12、Chapter03、GPU 路线 | [F-TENSOR-01](./formulas.md#f-tensor-01) |
 | 接口约定 | contract | 两个组件协作时可检查的输入输出、数据格式、状态不变量和错误行为；代码类型和测试名中保留 `Contract` | Chapter01、Chapter06 | - |
 | 推理引擎 | inference engine, engine | 加载并执行模型，管理运行时状态、缓存、调度和设备后端的系统；普通叙述使用中文，代码类型名按源码拼写 | Chapter00 | - |
+| 运行时（泛称） | runtime | 程序启动后负责动态执行、状态推进和资源协作的代码或环境；具体含义由限定词确定，例如生成运行时、CUDA 运行时 | Foundation、Chapter06 | - |
 | 算子 | Operator | 对调用方提供稳定输入输出约定、把具体计算交给后端执行的接口 | [Chapter03 Operator Base](../chapter03_matmul/01_operator_base.md) | [F-LINEAR-01](./formulas.md#f-linear-01) |
 | 后端 | Backend | 在 CPU、CUDA 或外部库上实现同一算子接口约定的执行组件 | Chapter03 | [F-LINEAR-01](./formulas.md#f-linear-01) |
 | 内核 | Kernel | 完成具体数值循环或 GPU 并行计算的底层实现 | Chapter03、Foundation CUDA | [F-LINEAR-01](./formulas.md#f-linear-01) |
+| 单指令多数据 | Single Instruction, Multiple Data, SIMD | 用一条指令对多个数据元素执行相同操作的并行方式；具体可由 AVX2 等 CPU 指令集实现 | [Foundation 数据结构与算法](../foundation/06_data_structure_algorithm_basics.md) | - |
+| 高级向量扩展 2 | Advanced Vector Extensions 2, AVX2 | x86 CPU 的 256-bit SIMD 指令集扩展；教程将它用于部分 Q4_K/Q6_K 量化 Linear 加速 | Foundation F06、Chapter05 | [F-LINEAR-01](./formulas.md#f-linear-01) |
+| 融合乘加 | Fused Multiply-Add, FMA | 在一次指令中完成乘法与加法并只进行一次舍入；教程的 AVX2 量化路径会检查对应 CPU 能力 | Foundation F06、Chapter05 | [F-LINEAR-01](./formulas.md#f-linear-01) |
 | 执行上下文 | Execution Context | 持有请求状态或设备 stream、handle、workspace 的执行对象 | Chapter06、GPU 路线 | [F-KV-01](./formulas.md#f-kv-01) |
 | 主机内存 | host memory | CPU 可直接访问的内存；GPU kernel 通常不能把普通 host pointer 当作 device pointer 使用 | Foundation CUDA、GPU 路线 | - |
 | 设备内存 | device memory | GPU kernel 可访问、由设备 allocator 管理的内存 | Foundation CUDA、GPU 路线 | [F-CUDA-01](./formulas.md#f-cuda-01) |
 | CUDA 流 | CUDA stream | 保持队列内顺序、允许不同队列并发的异步 GPU 工作序列 | Foundation F12、GPU 路线 | [F-CUDA-01](./formulas.md#f-cuda-01) |
 | CUDA 事件 | CUDA event | 记录 stream 进度并用于依赖同步或设备侧计时的对象 | Foundation F12、GPU 路线 | - |
+| CUDA 运行时 | CUDA Runtime | 为设备发现、内存管理、计算核启动和错误处理提供 API 与动态库的 CUDA 软件层；它不是 Chapter06 的生成运行时类 | [Foundation CUDA 环境](../foundation/03_cuda_environment_basics.md) | - |
 | 进程 | process | 拥有独立地址空间的程序执行实例；跨进程对象需要 IPC、共享内存或网络传递 | Foundation / Chapter10 | - |
 | 线程 | thread | 进程内的执行单元；共享地址空间，因此并发修改对象需要所有权或同步规则 | Foundation / Chapter10 | - |
 | 条件变量 | condition variable | 让线程在共享状态不满足时释放互斥锁并等待通知；唤醒后仍需用谓词重新检查状态 | [Foundation 并发基础](../foundation/10_concurrency_basics.md) | - |
@@ -107,7 +112,7 @@
 | 分页注意力 | PagedAttention | 通过逻辑 block 到物理 block 的映射读取非连续 KV Cache 的注意力方法 | Chapter07 | [F-KV-01](./formulas.md#f-kv-01) |
 | 采样器 | Sampler | 根据 logits 选择下一 token 的组件 | Chapter06 | [F-SAMPLE-01](./formulas.md#f-sample-01) |
 | 贪心采样 | Greedy Sampling | 每步选择最大 logit 对应 token | Chapter06 | [F-SAMPLE-01](./formulas.md#f-sample-01) |
-| 运行时 | Runtime | 组织模型执行、缓存、采样和请求状态推进的组件 | Chapter06 | - |
+| 生成运行时 | Generation Runtime, `Runtime` | 在程序运行期间把单次模型调用组织成单请求生成过程：检查状态，调用执行器与采样器，提交词元、回调和终态；缓存布局、多请求选择和网络协议分别由后续组件负责 | [Chapter06 预填充与逐词元解码](../chapter06_generation/next/02_prefill_decode.md) | - |
 | 请求调度槽位 | request scheduling slot | 一个调度步中可接纳一个活跃请求的执行名额，不表示 K/V 物理地址 | Chapter08 | [F-SCHED-01](./formulas.md#f-sched-01) |
 | 调度器 | Scheduler | 根据请求槽位、token 和内存预算选择本 step 请求 | Chapter08 | - |
 | 流式输出 | streaming | token 生成后立即向调用方持续返回事件 | Chapter06、Chapter10 | [F-PERF-01](./formulas.md#f-perf-01) |

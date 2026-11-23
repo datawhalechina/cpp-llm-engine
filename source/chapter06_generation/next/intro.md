@@ -9,7 +9,7 @@ Chapter04 已经固定 Decoder 的计算顺序，Chapter05 让真实量化权重
 | A 教学闭环 | 用小词表、确定性 logits 和 Greedy 跟踪请求状态 | 固定 token、阶段、停止条件和回调顺序 |
 | B 真实执行闭环 | 接入 TinyLlama、Qwen3、Qwen1.5-MoE 和 DeepSeek-V2-Lite 的 Tokenizer、完整 Decoder 和请求专属模型执行上下文 | 稠密、标准 MoE 与 MLA-MoE 架构的固定生成词元、文本结果和请求状态 |
 | G GPU 扩展坐标 | 保持 Request 和停止语义不变，将模型执行器替换为设备后端 | TinyLlama、Qwen3 已完成真实文本闭环；DeepSeek 已接入固定词元 Runtime |
-| M 多模态扩展坐标 | 视觉 embedding 进入模型后复用 Prefill、Decode、采样和终态语义 | CPU SmolVLM 已接入同一 Runtime；CUDA 已验证单行视觉 embedding 进入 32 层 Context，完整图文生成仍在建设 |
+| M 多模态扩展坐标 | 视觉嵌入进入模型后复用预填充、逐词元解码、采样和终态语义 | CPU SmolVLM 复用同一生成运行时；CUDA 路径提供单行视觉嵌入进入 32 层执行上下文的对照 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
@@ -18,13 +18,14 @@ Chapter04 已经固定 Decoder 的计算顺序，Chapter05 让真实量化权重
 | 模型执行上下文（Context） | 保存或绑定一个请求的位置、分层 K/V 和后端状态 | [`06.1 请求状态与模型调用`](./01_request_contract.md) |
 | 模型执行器（`RequestModelExecutor`） | 使用一个请求的 Context，回答 logits 是什么 | [`06.1 请求状态与模型调用`](./01_request_contract.md) |
 | 执行器工厂（Factory） | 复用共享模型，并为请求创建执行器和 Context | [`06.1 请求状态与模型调用`](./01_request_contract.md) |
+| 生成运行时（`Runtime`） | 按顺序调用执行器和采样器，提交请求状态与输出 | [`06.2 预填充与逐词元解码`](./02_prefill_decode.md) |
 | 采样器（`Sampler`） | 从 logits 选择下一个词元 | [`06.5 采样与停止`](./05_sampling_stop.md) |
 
 ![Chapter 06 主图：单请求怎样完成 Prefill、Decode 和输出](../../assets/diagrams/chapter06-generation-core.svg)
 
 ## 开始学习
 
-先沿单请求的状态推进理解 Generation Core：请求保存可观察状态，模型执行器持有模型执行上下文，Runtime 组织 Prefill、Decode、采样、停止和回调。随后接入 TinyLlama、Qwen3、Qwen1.5-MoE 与 DeepSeek-V2-Lite，观察层数、注意力和 FFN 结构变化时控制流保持不变。
+先沿单请求的状态推进理解生成核心：请求保存可观察状态，模型执行器持有模型执行上下文，生成运行时组织预填充、逐词元解码、采样、停止和回调。随后接入 TinyLlama、Qwen3、Qwen1.5-MoE 与 DeepSeek-V2-Lite，观察层数、注意力和前馈网络结构变化时控制流保持不变。
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |

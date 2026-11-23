@@ -136,7 +136,7 @@ def attention_reference(query, key, value, causal, offset):
 | 稳定 softmax | 最大值、指数、分母三段循环 | 大分数不直接进入 `exp` |
 | 3D/4D 视图适配 | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/tensor_attention_adapter.cpp"><code>tensor_attention_adapter.cpp</code></a> | 批次指针偏移与连续性检查 |
 
-适配器不隐式复制非连续视图。Chapter02 的转置或切片如果破坏连续布局，调用者必须先执行 `contiguous()`，复制成本因此保持可见。`try_compute_tensor_attention_into()` 接收调用方提供的可写输出视图；它先完成全部批次计算，成功后统一提交，因此形状校验或计算后端失败不会覆盖已有输出。返回 Chapter02 张量的旧入口继续作为兼容外壳。
+适配器要求调用方显式处理非连续视图。Chapter02 的转置或切片如果破坏连续布局，调用者先执行 `contiguous()`，复制成本因此保持可见。`try_compute_tensor_attention_into()` 接收调用方提供的可写输出视图；它先完成全部批次计算，成功后统一提交，因此形状校验或计算后端失败不会覆盖已有输出。返回 Chapter02 张量的原有入口继续作为兼容外壳。
 
 ## 分块在线 Softmax 怎样合并状态
 

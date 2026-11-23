@@ -21,6 +21,7 @@ Chapter03 的调用路径已经可以顺着源码追踪：输入视图生成请�
 | [llama.cpp CPU Backend](../reference/ecosystem/local_and_delivery.md#llama-cpp) | 图算子如何分派到 CPU 矩阵乘法或点积内核 | `MatMulOp → CpuReferenceMatmulBackend → kernel` |
 | [llama.cpp CUDA Backend](../reference/ecosystem/local_and_delivery.md#llama-cpp) | 同一个图算子如何选择 CUDA Kernel 或计算库 | G 路线的设备指针、Stream 和结果对照 |
 | [TensorRT-LLM Runtime 与 Kernel](../reference/ecosystem/production_frameworks.md#tensorrt-llm) | Buffer、执行上下文、GEMM 与 Workspace 怎样连接 | 请求、Backend 和设备资源的分工 |
+| PyTorch 复算 | 用独立张量实现计算同一固定输入 | 区分公式错误、CPU 索引错误和 CUDA 参数错误 |
 
 ## 继续阅读源码
 

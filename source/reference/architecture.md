@@ -45,7 +45,7 @@ ServiceCore
 | Operator | MatMul、Attention、Norm 等数值语义和输入输出约束 | Chapter03–05 |
 | Backend | 同一 Operator 的 CPU、CUDA、库或融合实现 | Chapter03、05、`code/cuda` |
 | Executor | 把 Runtime 的 Prefill/Decode 调用适配到 Model 与 Context | Chapter06、`code/engine` |
-| Runtime | 提交 Prefill/Decode、采样结果和请求终态 | Chapter06 |
+| 生成运行时（`Runtime`） | 提交预填充/逐词元解码、采样结果和单请求终态 | Chapter06 |
 | Scheduler | 根据请求状态和资源预算选择本步候选 | Chapter08 |
 | ServiceCore | 管理准入、取消、超时和统一释放 | Chapter10 |
 

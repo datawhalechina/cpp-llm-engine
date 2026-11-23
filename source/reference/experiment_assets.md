@@ -4,7 +4,7 @@
 
 实验 ID 保持稳定并回答“这份证据登记在哪里”；workload ID 回答“哪些结果允许比较”。重新采集同一条件时保留两者；模型、输入、执行方式或测量区间变化时分配新的 workload ID，并根据研究问题决定是否建立新实验。`EXP` 表示性能实验，`VAL` 表示数值或结构验证资产。
 
-重构前的教学基线使用 `EXP-CPU-01 / WL-CPU-TEACHING-BATCH-V1`，真实 scalar batch 使用 `EXP-CPU-10 / WL-CPU-REAL-BATCH-V1`，现统一归档在 Chapter09。当前 TinyLlama 服务基线使用统一 schema 保存 scalar/AVX2 与顺序/并行请求的逐轮样本。
+早期教学基线使用 `EXP-CPU-01 / WL-CPU-TEACHING-BATCH-V1`，真实标量批次使用 `EXP-CPU-10 / WL-CPU-REAL-BATCH-V1`，现统一归档在 Chapter09。TinyLlama 服务基线使用统一结构保存标量/AVX2 与顺序/并行请求的逐轮样本。
 
 ## CPU Runtime、Decoder 与服务实验
 

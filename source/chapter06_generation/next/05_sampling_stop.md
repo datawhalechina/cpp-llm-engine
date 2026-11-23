@@ -21,7 +21,7 @@ Greedy 不需要随机数，同一组 logits 始终产生同一个词元，适�
 | `Sampler` | 从 logits 选择词元 ID | 不修改请求状态 |
 | `Runtime` | 提交词元并判断停止 | 不改变模型内部 logits 算法 |
 
-Temperature、top-k 和 top-p 尚未进入当前公共实现。增加这些策略时应扩展 Sampler 配置与独立统计测试，不修改 Prefill/Decode 的执行顺序。
+本章公共实现使用贪心采样固定生成结果。Temperature、top-k 和 top-p 可以作为采样器扩展：它们增加配置与统计测试，同时沿用相同的预填充和逐词元解码顺序。
 
 ## 两个停止条件
 

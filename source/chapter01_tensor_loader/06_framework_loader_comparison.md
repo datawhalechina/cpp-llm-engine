@@ -4,12 +4,12 @@ Chapter01 把外部模型文件转换为稳定的配置、分词器、张量映�
 
 ## 对象映射
 
-| 教程对象 | `llama.cpp` | vLLM | 阅读重点 |
-| --- | --- | --- | --- |
-| `GgufReader`、`GgufTensorLoader` | GGUF 读取器、模型加载器 | 检查点加载器 | 文件索引何时转换为权重对象 |
-| `ModelMetadataAdapter`、`ModelConfig` | 架构元数据、模型参数 | 模型配置、加载配置 | 外部字段怎样归一化并校验 |
-| `ModelBuilder`、分层权重加载器 | model tensor creation/loading | 参数名映射和 weight loading | 稠密整体布局与 MoE/MLA 分层对象怎样绑定到模型结构 |
-| `TokenizerMetadataAdapter` | GGUF 分词器元数据 | 分词器配置 | 词表与特殊词元怎样和模型配置对齐 |
+| 教程对象 | Python 模型接口 | `llama.cpp` | vLLM | 阅读重点 |
+| --- | --- | --- | --- | --- |
+| `GgufReader`、`GgufTensorLoader` | Transformers 检查点入口 | GGUF 读取器、模型加载器 | 检查点加载器 | 文件索引何时转换为权重对象 |
+| `ModelMetadataAdapter`、`ModelConfig` | `PretrainedConfig` 一类配置对象 | 架构元数据、模型参数 | 模型配置、加载配置 | 外部字段怎样归一化并校验 |
+| `ModelBuilder`、分层权重加载器 | 参数创建与 `state_dict` 加载 | 模型张量创建与加载 | 参数名映射和权重加载 | 稠密整体布局与 MoE/MLA 分层对象怎样绑定到模型结构 |
+| `TokenizerMetadataAdapter` | tokenizer 配置与特殊词元 | GGUF 分词器元数据 | 分词器配置 | 词表与特殊词元怎样和模型配置对齐 |
 
 ## 教学实现与生产实现
 

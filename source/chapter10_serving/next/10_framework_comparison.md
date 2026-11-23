@@ -13,6 +13,8 @@
 | K/V 所有权 | context KV | KV cache manager | radix/prefix cache |
 | metrics | timings/server metrics | serving metrics | scheduler/server metrics |
 
+Python 服务常用 FastAPI 或 Starlette 定义路由、解析请求并输出流式事件；它们对应本章的 Transport/Adapter，而不是 `ServiceCore`、Scheduler 或模型 Executor。vLLM、SGLang 等项目会把这类协议层连接到独立推理引擎，职责边界与本教程的 `HttpAdapter → ServiceCore → Chapter08 Scheduler` 相同。
+
 ## 教学实现与生产实现
 
 | 问题 | 成熟系统增加的对象 | 工程影响 |

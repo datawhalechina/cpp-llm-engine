@@ -12,7 +12,7 @@
 | KV cache | 有些系统会继续量化 KV cache，以降低长上下文显存压力 | cache dtype、block 大小和精度影响 |
 | benchmark | 显存下降不等于吞吐一定提升 | latency、throughput、精度和显存要一起看 |
 
-权重量化主要改变模型参数的存储和 Linear 计算路径。Loader 提供 packed payload，Decoder 提交激活和输出空间，`QuantizedLinearPolicy` 在已注册的 scalar 与 AVX2 CPU backend 之间选择实现。CUDA 由独立的 `CudaExecutionContext` 分派单 token 融合 GEMV 或 batch 反量化加 cuBLAS，不进入这项 CPU policy。KV Cache 量化发生在请求运行过程中，连接 Attention backend、缓存布局和 decode 精度；当前主线实现的是权重量化。
+权重量化主要改变模型参数的存储和线性层计算路径。加载器提供压缩载荷，解码器提交激活和输出空间，`QuantizedLinearPolicy` 在已注册的标量与 AVX2 CPU 后端之间选择实现。CUDA 由独立的 `CudaExecutionContext` 分派单词元融合 GEMV 或批量反量化加 cuBLAS，与 CPU 策略各自管理执行实现。K/V Cache 量化发生在请求运行过程中，连接注意力后端、缓存布局和解码精度；本章可运行代码聚焦权重量化。
 
 ![仅权重量化的数据路径](../assets/diagrams/chapter05-quantization-weight-only.svg)
 
@@ -22,7 +22,7 @@
 
 权重和激活都量化后，Linear 可以进入 W8A8、INT4/INT8 或 FP8 矩阵 kernel。若 kernel 先把激活还原成浮点再计算，主要收益仍停留在存储或搬运；只有算子真正消费低精度输入，才可能同时减少计算成本。SmoothQuant 一类方法还会在离线阶段重分配权重与激活中的异常值，说明激活量化不仅是给 Tensor 增加一个 dtype。
 
-当前 Chapter05 只实现权重量化：输入激活和累加结果保持 Float32。后续接入激活量化时，需要新增激活 scale 契约、校准或动态统计、低精度 GEMM backend，以及 Linear/Decoder/最终 logits 的独立误差门禁。
+Chapter05 的可运行路径采用仅权重量化，输入激活和累加结果保持 Float32。激活量化作为进阶设计，需要增加激活缩放因子约定、校准或动态统计、低精度 GEMM 后端，以及线性层、解码器和最终候选分数的独立误差门禁。
 
 | 观察点 | 仅权重量化主线 | 激活量化扩展 |
 | --- | --- | --- |
