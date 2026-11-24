@@ -53,10 +53,17 @@ __global__ void spatial_merge_kernel(CudaSpatialMergeRequest request) {
     const std::size_t merged_width = request.merge_size * request.merge_size *
         request.hidden_size;
     const std::size_t elements =
-        output_grid_width * output_grid_height * merged_width;
+        request.batch_size * output_grid_width * output_grid_height *
+        merged_width;
     if (index >= elements) return;
 
-    const std::size_t output_token = index / merged_width;
+    const std::size_t packed_output_token = index / merged_width;
+    const std::size_t output_tokens_per_image =
+        output_grid_width * output_grid_height;
+    const std::size_t image =
+        packed_output_token / output_tokens_per_image;
+    const std::size_t output_token =
+        packed_output_token % output_tokens_per_image;
     const std::size_t merged_column = index % merged_width;
     const std::size_t hidden = merged_column % request.hidden_size;
     const std::size_t spatial = merged_column / request.hidden_size;
@@ -66,7 +73,10 @@ __global__ void spatial_merge_kernel(CudaSpatialMergeRequest request) {
     const std::size_t output_x = output_token % output_grid_width;
     const std::size_t input_y = output_y * request.merge_size + dy;
     const std::size_t input_x = output_x * request.merge_size + dx;
-    const std::size_t input_token = input_y * request.grid_width + input_x;
+    const std::size_t input_tokens_per_image =
+        request.grid_width * request.grid_height;
+    const std::size_t input_token = image * input_tokens_per_image +
+        input_y * request.grid_width + input_x;
     request.output[index] =
         request.input[input_token * request.hidden_size + hidden];
 }
@@ -138,6 +148,7 @@ CudaStatus launch_spatial_merge(
     if (request.input == nullptr || request.output == nullptr ||
         request.grid_width == 0 || request.grid_height == 0 ||
         request.merge_size == 0 || request.hidden_size == 0 ||
+        request.batch_size == 0 ||
         request.grid_width % request.merge_size != 0 ||
         request.grid_height % request.merge_size != 0 || !stream.valid()) {
         return CudaStatus::from(cudaErrorInvalidValue, "spatial merge request");
@@ -146,8 +157,9 @@ CudaStatus launch_spatial_merge(
         request.grid_width / request.merge_size;
     const std::size_t output_grid_height =
         request.grid_height / request.merge_size;
-    const std::size_t elements = output_grid_width * output_grid_height *
-        request.merge_size * request.merge_size * request.hidden_size;
+    const std::size_t elements = request.batch_size * output_grid_width *
+        output_grid_height * request.merge_size * request.merge_size *
+        request.hidden_size;
     CudaStatus status = validate_grid(elements, "spatial merge grid");
     if (!status.is_ok()) return status;
     const std::size_t blocks = elements / kBlockSize +

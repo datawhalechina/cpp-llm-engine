@@ -22,6 +22,7 @@
 #include "cpp_llm_engine/cuda/row_dispatch_backend.h"
 #include "cpp_llm_engine/cuda/rope_backend.h"
 #include "cpp_llm_engine/cuda/vision_elementwise_backend.h"
+#include "cpp_llm_engine/cuda/vision_attention_backend.h"
 
 #include <cuda_runtime_api.h>
 
@@ -286,8 +287,19 @@ core::Status CudaExecutionContext::spatial_merge(
     std::size_t grid_height,
     std::size_t merge_size,
     CudaTensor* output) const {
+    return spatial_merge_batch(
+        input, 1, grid_width, grid_height, merge_size, output);
+}
+
+core::Status CudaExecutionContext::spatial_merge_batch(
+    const CudaTensor& input,
+    std::size_t batch_size,
+    std::size_t grid_width,
+    std::size_t grid_height,
+    std::size_t merge_size,
+    CudaTensor* output) const {
     if (!valid() || output == nullptr || grid_width == 0 || grid_height == 0 ||
-        merge_size == 0 || grid_width % merge_size != 0 ||
+        batch_size == 0 || merge_size == 0 || grid_width % merge_size != 0 ||
         grid_height % merge_size != 0) {
         return core::Status::error("spatial merge input is invalid");
     }
@@ -300,7 +312,9 @@ core::Status CudaExecutionContext::spatial_merge(
     }
     const auto& input_shape = input.contract().shape.dimensions;
     const auto& output_shape = output->contract().shape.dimensions;
-    if (input_shape.size() != 2 || input_shape[0] != grid_width * grid_height) {
+    if (batch_size > std::numeric_limits<std::size_t>::max() /
+            (grid_width * grid_height) || input_shape.size() != 2 ||
+        input_shape[0] != batch_size * grid_width * grid_height) {
         return core::Status::error("spatial merge input shape mismatch");
     }
     if (merge_size > std::numeric_limits<std::size_t>::max() / merge_size ||
@@ -311,14 +325,15 @@ core::Status CudaExecutionContext::spatial_merge(
     const std::size_t merged_width =
         merge_size * merge_size * input_shape[1];
     const std::vector<std::size_t> expected_output{
-        (grid_width / merge_size) * (grid_height / merge_size), merged_width};
+        batch_size * (grid_width / merge_size) *
+            (grid_height / merge_size), merged_width};
     if (output_shape != expected_output) {
         return core::Status::error("spatial merge output shape mismatch");
     }
     const CudaSpatialMergeRequest request{
         static_cast<const float*>(input.data()),
         static_cast<float*>(output->data()), grid_width, grid_height,
-        merge_size, input_shape[1]};
+        merge_size, input_shape[1], batch_size};
     return launch_spatial_merge(request, stream_).to_core_status();
 }
 
@@ -689,6 +704,59 @@ core::Status CudaExecutionContext::gelu(
         static_cast<const float*>(input.data()),
         static_cast<float*>(output->data()), elements};
     return launch_gelu(request, stream_).to_core_status();
+}
+
+core::Status CudaExecutionContext::vision_attention_batch(
+    const CudaTensor& query,
+    const CudaTensor& key,
+    const CudaTensor& value,
+    std::size_t batch_size,
+    std::size_t tokens_per_image,
+    CudaTensor* output) {
+    if (!valid() || output == nullptr || batch_size == 0 ||
+        tokens_per_image == 0) {
+        return core::Status::error("vision attention batch input is invalid");
+    }
+    for (const auto& item : {
+             std::pair<const CudaTensor*, const char*>{&query, "vision query"},
+             {&key, "vision key"}, {&value, "vision value"},
+             {output, "vision output"}}) {
+        const core::Status status = validate_tensor(*item.first, item.second);
+        if (!status.is_ok()) return status;
+    }
+    if (batch_size > std::numeric_limits<std::size_t>::max() /
+            tokens_per_image) {
+        return core::Status::error("vision attention token count overflows");
+    }
+    const std::size_t packed_tokens = batch_size * tokens_per_image;
+    const auto& shape = query.contract().shape.dimensions;
+    if (shape.size() != 3 || shape[0] != packed_tokens ||
+        shape[1] == 0 || shape[2] == 0 ||
+        key.contract().shape.dimensions != shape ||
+        value.contract().shape.dimensions != shape ||
+        output->contract().shape.dimensions != shape) {
+        return core::Status::error(
+            "vision attention requires packed [B*T,H,D] tensors");
+    }
+    if (packed_tokens > std::numeric_limits<std::size_t>::max() / shape[1] ||
+        packed_tokens * shape[1] >
+            std::numeric_limits<std::size_t>::max() / tokens_per_image ||
+        packed_tokens * shape[1] * tokens_per_image >
+            std::numeric_limits<std::size_t>::max() / sizeof(float)) {
+        return core::Status::error("vision attention score count overflows");
+    }
+    const CudaVisionAttentionRequest request{
+        static_cast<const float*>(query.data()),
+        static_cast<const float*>(key.data()),
+        static_cast<const float*>(value.data()),
+        static_cast<float*>(output->data()), batch_size, tokens_per_image,
+        shape[1], shape[2], 0.0F};
+    const core::Status workspace_status =
+        reserve_workspace(request.score_count() * sizeof(float));
+    if (!workspace_status.is_ok()) return workspace_status;
+    return launch_vision_attention(
+        request, static_cast<float*>(workspace_.data()),
+        request.score_count(), stream_).to_core_status();
 }
 
 core::Status CudaExecutionContext::swiglu(

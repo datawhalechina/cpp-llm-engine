@@ -54,6 +54,7 @@ add_library(cpp_llm_engine_cuda
     src/row_dispatch_backend.cu
     src/rope_backend.cu
     src/vision_elementwise_backend.cu
+    src/vision_attention_backend.cu
 )
 target_include_directories(cpp_llm_engine_cuda
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include

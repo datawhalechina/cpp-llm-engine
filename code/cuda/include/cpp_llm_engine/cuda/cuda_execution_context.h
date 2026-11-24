@@ -75,6 +75,13 @@ public:
         std::size_t grid_height,
         std::size_t merge_size,
         CudaTensor* output) const;
+    core::Status spatial_merge_batch(
+        const CudaTensor& input,
+        std::size_t batch_size,
+        std::size_t grid_width,
+        std::size_t grid_height,
+        std::size_t merge_size,
+        CudaTensor* output) const;
     core::Status weighted_scatter_add_rows(
         const CudaTensor& source,
         const std::vector<std::size_t>& destination_rows,
@@ -129,6 +136,13 @@ public:
     core::Status gelu(
         const CudaTensor& input,
         CudaTensor* output) const;
+    core::Status vision_attention_batch(
+        const CudaTensor& query,
+        const CudaTensor& key,
+        const CudaTensor& value,
+        std::size_t batch_size,
+        std::size_t tokens_per_image,
+        CudaTensor* output);
     core::Status swiglu(
         const CudaTensor& gate,
         const CudaTensor& up,

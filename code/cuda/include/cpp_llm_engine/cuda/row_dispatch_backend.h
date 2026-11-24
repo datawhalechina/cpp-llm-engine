@@ -39,6 +39,7 @@ struct CudaSpatialMergeRequest final {
     std::size_t grid_height = 0;
     std::size_t merge_size = 0;
     std::size_t hidden_size = 0;
+    std::size_t batch_size = 1;
 };
 
 CudaStatus launch_gather_rows(
