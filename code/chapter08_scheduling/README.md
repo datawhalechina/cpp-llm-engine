@@ -27,7 +27,9 @@ ContinuousBatchScheduler
 
 Planner 不修改请求和缓存；同优先级、同等待时间的 Prefill 请求优先选择 `cached_prefix_tokens` 更长者。waiting 阶段的数值是 CPU/CUDA Factory 给出的无副作用估算，只决定哪个请求先获得运行槽；ServiceCore 提升请求时重新查询并采用真实前缀，再把实际长度交给 Planner。Scheduler 在执行前预留资源，模型失败时裁剪到原计数，成功后才提交 K/V 与请求结果。Runner 必须自行回滚模型 Context，因为 Scheduler 只拥有请求与外部缓存事务。`OverlapScheduler` 只保存计划和状态快照，不拥有 Request、Executor 或物理块。
 
-`ExecutorBatchRunner` 固定批次提交规则，不要求所有模型使用同一种 K/V 数据面。当前三条真实路径如下：
+调度链分为五层：Chapter10 管理 admission 与 waiting/running，Chapter08 负责单步选择和事务编排，Chapter07 管理 K/V 资源，模型 Executor 组织真实批次，CPU/CUDA Backend 执行算子。Chapter08 不承担网络接入和设备 Kernel 调度。
+
+`ExecutorBatchRunner` 固定批次提交规则，不要求所有模型使用同一种 K/V 数据面。当前四条真实路径如下：
 
 | 模型路径 | 请求历史 | 跨请求合并的计算 | Chapter07 分页事务 |
 | --- | --- | --- | --- |
@@ -47,6 +49,8 @@ Planner 不修改请求和缓存；同优先级、同等待时间的 Prefill 请
 | 缓存事务与批输入 | 预留 KV 槽位、执行、提交或回滚 | `chapter08_cache_transaction_test` |
 | Ragged Tensor Batch | Chapter06 教学 Transformer 的批量 Prefill 前置能力 | `chapter08_tensor_batch_test`（integration） |
 | `ExecutorBatchInput`、`ExecutorBatchRunner` | 把 Decode 候选交给真实模型批量执行 | `chapter08_cache_transaction_test`、真实模型测试 |
+
+`StepBatchStats::scheduled_*` 表示已经发起的执行尝试，`advanced_*` 表示实际推进的请求和模型词元，`generated_tokens` 只统计新生成词元。失败或无进展会留下 attempted 与 advanced 的差值。
 
 1. 从 `scheduler.cpp` 对比 Round-robin 和 Tensor Batch，理解“选择请求”与“合并执行”的区别。
 2. 阅读 `StepBatchPlanner::build()`，观察请求数预算、词元预算、缓存命中和 Chunked Prefill 如何共同决定批次。
@@ -103,4 +107,11 @@ bash code/chapter09_performance/scripts/run_qwen15_moe_scheduling_ab.sh
 
 ## 扩展入口
 
-当前实现包含同步 CPU 调度、优先级老化、真实 Radix 命中排序、真实 Decode batch 和 overlap 计划校验。TinyLlama CPU/CUDA、Qwen1.5-MoE CPU、DeepSeek-V2-Lite CPU/CUDA Factory 都实现 `ExecutorBatchRunner`。SmolVLM CUDA 通过 Engine 的 `CudaEmbeddingBatchRunner` 复用同一协议：两个图文请求分别 Prefill，后三轮 Decode 进入三次 `batch=2` 调用，请求 K/V 和输出始终隔离。DeepSeek CUDA 路径先让每个请求从自己的压缩 MLA 历史计算 Attention，再按专家打包同层 FFN 输入；Factory 已把请求 Context 接到 Chapter07 页表事务，批次成功时统一提交，失败时统一裁剪。Gate、Up、Down 和共享专家使用真实批量量化 Linear，Router、Top-K、加权拆回和最终 LM Head 仍在 Host 或逐请求路径完成。真实多请求 Prefill Tensor batch、DeepSeek CPU Factory 分页绑定、融合路由与拆回 kernel、Deadline、抢占、设备事件重叠和开放环到达率留给后续扩展。
+| 已接入路径 | 批量执行边界 |
+| --- | --- |
+| TinyLlama CPU/CUDA | 多行 Linear、分页 K/V 和真实解码批次 |
+| Qwen1.5-MoE CPU | 请求 Context 隔离，同层输入按专家分组 |
+| DeepSeek-V2-Lite CPU/CUDA | 独立 MLA 历史，FFN 输入按专家分组；CUDA 使用分页 MLA 事务 |
+| SmolVLM CUDA | 图文请求分别预填充，语言解码进入 `CudaEmbeddingBatchRunner` |
+
+后续扩展包括真实多请求 Prefill Tensor batch、DeepSeek CPU Factory 分页绑定、设备端融合路由与拆回、Deadline、协作式抢占、设备事件重叠和开放环到达率。每项扩展继续沿用 `ExecutorBatchRunner` 的整批提交或整批回滚规则。

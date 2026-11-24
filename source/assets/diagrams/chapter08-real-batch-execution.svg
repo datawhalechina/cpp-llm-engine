@@ -16,22 +16,22 @@
   <text x="48" y="80" class="text">批次不是循环调用单请求接口，而是让多行激活共同经过模型算子</text>
 
   <rect x="48" y="114" width="260" height="92" rx="15" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
-  <text x="178" y="148" text-anchor="middle" class="label">Step batch</text><text x="178" y="176" text-anchor="middle" class="text">请求、Prefill/Decode、token 数</text>
+  <text x="178" y="148" text-anchor="middle" class="label">步骤批次</text><text x="178" y="176" text-anchor="middle" class="text">请求、预填充/解码、词元数</text>
   <rect x="470" y="114" width="260" height="92" rx="15" fill="#fff7ed" stroke="#fb923c" stroke-width="2"/>
-  <text x="600" y="148" text-anchor="middle" class="label">Executor batch</text><text x="600" y="176" text-anchor="middle" class="text">token、position、分页 K/V 槽</text>
+  <text x="600" y="148" text-anchor="middle" class="label">执行器批次</text><text x="600" y="176" text-anchor="middle" class="text">词元、位置、分页 K/V 槽</text>
   <rect x="892" y="114" width="260" height="92" rx="15" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
-  <text x="1022" y="148" text-anchor="middle" class="label">Tensor batch</text><text x="1022" y="176" text-anchor="middle" class="text">多行激活进入共享算子</text>
+  <text x="1022" y="148" text-anchor="middle" class="label">张量批次</text><text x="1022" y="176" text-anchor="middle" class="text">多行激活进入共享算子</text>
   <path d="M308 160H465" class="line"/><path d="M730 160H887" class="line"/>
   <text x="389" y="146" text-anchor="middle" class="text">补齐模型输入</text><text x="811" y="146" text-anchor="middle" class="text">打包多行</text>
 
   <rect x="48" y="258" width="1104" height="300" rx="19" fill="#fff" stroke="#cbd5e1"/>
   <text x="72" y="292" class="label">一个 Decoder Layer 内的共享计算与独立历史</text>
   <rect x="76" y="340" width="220" height="104" rx="15" fill="#fef3c7" stroke="#f59e0b"/>
-  <text x="186" y="374" text-anchor="middle" class="label">Batch Q / K / V</text><text x="186" y="403" text-anchor="middle" class="text">多行共同遍历量化权重</text><text x="186" y="427" text-anchor="middle" class="text">共享只读 Model</text>
+  <text x="186" y="374" text-anchor="middle" class="label">批量 Q / K / V</text><text x="186" y="403" text-anchor="middle" class="text">多行共同遍历量化权重</text><text x="186" y="427" text-anchor="middle" class="text">共享只读模型</text>
   <rect x="378" y="318" width="300" height="96" rx="15" fill="#dbeafe" stroke="#60a5fa"/>
-  <text x="528" y="352" text-anchor="middle" class="label">Request A Attention</text><text x="528" y="380" text-anchor="middle" class="text">position A · BlockTable A</text><text x="528" y="402" text-anchor="middle" class="text">读取/写入分页 K/V A</text>
+  <text x="528" y="352" text-anchor="middle" class="label">请求 A 的注意力</text><text x="528" y="380" text-anchor="middle" class="text">位置 A · 块表 A</text><text x="528" y="402" text-anchor="middle" class="text">读取/写入分页 K/V A</text>
   <rect x="378" y="438" width="300" height="96" rx="15" fill="#e0f2fe" stroke="#38bdf8"/>
-  <text x="528" y="472" text-anchor="middle" class="label">Request B Attention</text><text x="528" y="500" text-anchor="middle" class="text">position B · BlockTable B</text><text x="528" y="522" text-anchor="middle" class="text">读取/写入分页 K/V B</text>
+  <text x="528" y="472" text-anchor="middle" class="label">请求 B 的注意力</text><text x="528" y="500" text-anchor="middle" class="text">位置 B · 块表 B</text><text x="528" y="522" text-anchor="middle" class="text">读取/写入分页 K/V B</text>
   <path d="M296 392H334V366H373" class="line"/><path d="M334 392V486H373" class="line"/>
   <rect x="760" y="340" width="240" height="104" rx="15" fill="#fef3c7" stroke="#f59e0b"/>
   <text x="880" y="370" text-anchor="middle" class="label">模型结构分支</text><text x="880" y="397" text-anchor="middle" class="text">稠密：多行 FFN</text><text x="880" y="421" text-anchor="middle" class="text">MoE：按专家分组后拆回请求</text>
@@ -41,7 +41,7 @@
   <path d="M1000 392H1027" class="line"/>
 
   <rect x="126" y="610" width="340" height="72" rx="15" fill="#fef3c7" stroke="#f59e0b"/>
-  <text x="296" y="640" text-anchor="middle" class="label">Batch LM Head</text><text x="296" y="665" text-anchor="middle" class="text">多行 hidden → 多行 logits</text>
+  <text x="296" y="640" text-anchor="middle" class="label">批量输出头</text><text x="296" y="665" text-anchor="middle" class="text">多行隐藏状态 → 多行 logits</text>
   <rect x="650" y="598" width="424" height="96" rx="15" fill="#ecfdf5" stroke="#10b981"/>
   <text x="674" y="630" class="label">整批提交或回滚</text><text x="674" y="658" class="text">成功：分别推进请求位置并提交分页 K/V</text><text x="674" y="681" class="text">失败：所有请求裁剪到本步执行前计数</text>
   <path d="M880 444V578H296V605" class="line"/><path d="M466 646H645" class="line"/>

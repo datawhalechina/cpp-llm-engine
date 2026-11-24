@@ -1,6 +1,6 @@
 # 06.7 逐词元通知并传播模型错误
 
-同步生成通常在请求结束后返回完整词元序列，流式调用则需要在每个词元提交后立即通知上层。Generation Core 提供单请求词元回调（`TokenCallback`），只传递词元 ID 和请求内 step；HTTP、SSE、断连和写回背压留给 Chapter10。
+同步生成通常在请求结束后返回完整词元序列，流式调用则需要在每个词元提交后立即通知上层。单请求生成核心提供词元回调（`TokenCallback`），只传递词元 ID 和请求内输出序号；HTTP、SSE、断连和写回背压留给 Chapter10。
 
 ## 提交后再通知
 
@@ -30,7 +30,7 @@
 | Decode 返回失败 | 保留之前已提交词元，随后 `Failed` | 不为失败步骤触发 |
 | Decode 返回空 logits | 保留之前已提交词元，随后 `Failed` | 不为失败步骤触发 |
 
-当前 `TokenCallback` 是同步观察接口，不返回写入结果。网络断连、慢客户端和 Writer 失败需要由 Chapter10 把请求标记为取消或失败，不能在 Generation Core 中引入 socket 状态。
+当前 `TokenCallback` 是同步观察接口，不返回写入结果。网络断连、慢客户端和写回失败由 Chapter10 转换为取消或失败状态，单请求生成核心继续只处理词元与请求状态。
 
 ## 验证回调时序
 
@@ -43,4 +43,4 @@ ctest --test-dir /tmp/cpp-llm-chapter06-stream \
   -R '^chapter06_generation_test$' --output-on-failure
 ```
 
-Generation 测试固定 EOS 词元 `7`，检查回调收到 `(7, 0)`，并观察到输出长度 `1`、历史长度 `3` 和 `Finished`。多请求回调归属和 step 顺序由 Chapter08 的 Scheduler 测试验证。
+生成测试固定 EOS 词元 `7`，检查回调收到 `(7, 0)`，并观察到输出长度 `1`、历史长度 `3` 和 `Finished`。多请求回调归属和输出顺序由 Chapter08 的调度器测试验证。

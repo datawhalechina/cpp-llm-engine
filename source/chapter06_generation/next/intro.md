@@ -2,13 +2,13 @@
 
 ## 本章导读
 
-Chapter04 已经固定 Decoder 的计算顺序，Chapter05 让真实量化权重能够进入 Linear。本章把一次模型前向扩展为单请求生成循环：先用 Prefill 处理 prompt，再逐词元 Decode，经过采样、停止判断和回调得到可观察输出。Chapter07 在这组语义下管理模型 K/V，Chapter08 再选择多个请求怎样共享执行机会。
+Chapter04 已经固定解码器的计算顺序，Chapter05 让真实量化权重能够进入线性层。本章把一次模型前向扩展为单请求生成循环：先用预填充处理提示词元，再逐词元解码，经过采样、停止判断和回调得到可观察输出。Chapter07 在这组语义下管理模型 K/V，Chapter08 再选择多个请求怎样共享执行机会。
 
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
 | A 请求状态验证 | 用小词表、确定性 logits 和 Greedy 跟踪请求状态 | 固定 token、阶段、停止条件和回调顺序 |
 | B 真实模型生成 | 接入 TinyLlama、Qwen3、Qwen1.5-MoE 和 DeepSeek-V2-Lite 的 Tokenizer、完整 Decoder 和请求专属模型执行上下文 | 稠密、标准 MoE 与 MLA-MoE 架构的固定生成词元、文本结果和请求状态 |
-| G GPU 扩展坐标 | 保持 Request 和停止语义不变，将模型执行器替换为设备后端 | TinyLlama、Qwen3 已通过真实文本验证；DeepSeek 已接入固定词元 Runtime |
+| G GPU 扩展坐标 | 保持请求和停止语义不变，将模型执行器替换为设备后端 | TinyLlama、Qwen3 已通过真实文本验证；DeepSeek 已接入固定词元生成运行时 |
 | M 多模态扩展坐标 | 视觉嵌入进入模型后复用预填充、逐词元解码、采样和终态语义 | CPU SmolVLM 复用同一生成运行时；CUDA 路径已用完整图文序列完成四词元生成对照 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
@@ -22,6 +22,14 @@ Chapter04 已经固定 Decoder 的计算顺序，Chapter05 让真实量化权重
 | 采样器（`Sampler`） | 从 logits 选择下一个词元 | [`06.5 采样与停止`](./05_sampling_stop.md) |
 
 ![Chapter 06 主图：单请求怎样完成 Prefill、Decode 和输出](../../assets/diagrams/chapter06-generation-core.svg)
+
+## 跨章协作
+
+Chapter06–10 共同完成一次请求的生命周期：Chapter06 推进单请求生成状态，Chapter07 管理缓存事务，Chapter08 选择并组织多请求执行，Chapter10 管理服务终态，Chapter09 横向记录正确性与性能证据。
+
+Chapter06 的控制流不是只执行一次的线性流水线，而是一个单请求状态机：预填充结束后反复执行“解码、采样、提交、停止判断”，直到进入终态。Chapter07 可以改变 K/V 的物理布局，Chapter08 可以改变请求的执行顺序和组合方式，但都沿用这组单请求状态与结果语义。
+
+![Chapter06 到 Chapter10 请求生命周期知识图谱](../../assets/diagrams/runtime-system-knowledge-map.svg)
 
 ## 开始学习
 
@@ -43,12 +51,12 @@ Chapter04 已经固定 Decoder 的计算顺序，Chapter05 让真实量化权重
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |
 | L1 默认 CPU | `bash code/chapter06_generation/scripts/run_generation_core.sh` | 单请求生成、Greedy、终态和回调测试通过，示例输出 `request phase: finished` | 必做 |
-| L2 真实模型 | `bash code/chapter06_generation/scripts/run_real_generation.sh` | token golden 和连续请求 Context 隔离通过 | 有模型时必做 |
-| L2 可选 Qwen3 | `bash code/chapter06_generation/scripts/run_qwen3_generation.sh` | 自动识别 `qwen3`，固定 token golden 和连续请求 Context 隔离通过 | 扩展模型时执行 |
+| L2 真实模型 | `bash code/chapter06_generation/scripts/run_real_generation.sh` | 固定词元结果和连续请求上下文隔离通过 | 有模型时必做 |
+| L2 可选 Qwen3 | `bash code/chapter06_generation/scripts/run_qwen3_generation.sh` | 自动识别 `qwen3`，固定词元结果和连续请求上下文隔离通过 | 扩展模型时执行 |
 | L2 可选 Qwen1.5-MoE | `bash code/engine/scripts/run_qwen15_moe_generation.sh` | 24 层分层 K/V、Runtime 状态、真实 Tokenizer 和文本解码通过 | 学习 MoE 时执行 |
 | L2 可选 DeepSeek-V2-Lite | `bash code/engine/scripts/run_deepseek_v2_lite_generation.sh` | 27 层压缩 MLA 历史、Runtime 状态、固定词元和文本解码通过 | 学习 MLA-MoE 时执行 |
 | L3 可选 DeepSeek CUDA Model | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_model.sh` | 27 层、最终归一化与 LM Head 的 logits 和贪心词元匹配 CPU | 学习完整 CUDA 模型时选做 |
 | L3 可选 DeepSeek CUDA Runtime | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_runtime.sh` | 固定生成词元、分块 Prefill、27 层状态和重复请求隔离通过 | 学习 MLA-MoE GPU 生成时选做 |
-| L3 可选 CUDA | `bash code/engine/scripts/run_real_cuda_generation.sh` | `Hello TinyLlama` 生成 CPU/CUDA 相同的四个 golden token，重复请求结果一致 | 有 NVIDIA GPU、模型和 llama.cpp 时选做 |
-| L3 可选 Qwen3 CUDA | `bash code/engine/scripts/run_qwen3_cuda_generation.sh` | 自动读取 28 层架构，真实 Tokenizer、四个 golden token 与重复请求隔离通过 | 完成 Qwen3 CUDA Runtime 后执行 |
+| L3 可选 CUDA | `bash code/engine/scripts/run_real_cuda_generation.sh` | `Hello TinyLlama` 在 CPU/CUDA 上生成相同的四个固定词元，重复请求结果一致 | 有 NVIDIA GPU、模型和 llama.cpp 时选做 |
+| L3 可选 Qwen3 CUDA | `bash code/engine/scripts/run_qwen3_cuda_generation.sh` | 自动读取 28 层架构，真实分词器、四个固定词元与重复请求隔离通过 | 完成 Qwen3 CUDA 生成运行时后执行 |
 | L3 可选 SmolVLM CUDA 生成 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh ... mixed-prompt` | 完整 tile、真实文本与四词元生成的 CPU/CUDA 结果一致 | 学习多模态 GPU 交接时选做 |

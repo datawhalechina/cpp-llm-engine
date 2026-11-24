@@ -55,7 +55,7 @@ Chunked Prefill 只是把第一行拆成多次模型调用；如何决定每次�
 
 ## 验证阶段变化
 
-执行 Generation Core 测试：
+执行单请求生成核心测试：
 
 ```bash
 cmake -S code/chapter06_generation -B /tmp/cpp-llm-chapter06-core \

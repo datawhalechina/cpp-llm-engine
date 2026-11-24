@@ -43,7 +43,7 @@ Chapter07 命中共享 K/V 前缀时，`adopt_prefilled_prefix()` 会把同一�
 
 命令行不是新的运行时层。它只是进程入口：`argv -> 类型化配置 -> Factory/Runtime -> Backend`。脚本中的实验编号和结果目录只负责记录证据，不能改变 kernel 实现。
 
-请求归 Generation Core 管理可观察状态；执行器持有真实模型 Context。`history()` 保存词元 ID，用于观察请求推进；真实模型的分层 K/V 由执行器持有，物理 Block 分配在 Chapter07 引入。
+请求由单请求生成核心管理可观察状态；执行器持有真实模型上下文。`history()` 保存词元 ID，用于观察请求推进；真实模型的分层 K/V 由执行器持有，物理块分配在 Chapter07 引入。
 
 ## Factory 为什么叫“工厂”
 

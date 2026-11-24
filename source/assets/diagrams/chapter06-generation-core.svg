@@ -30,10 +30,10 @@
     <text x="228" y="198" font-size="12" fill="#7b5b3f">Decoder 与量化权重</text>
     <rect x="476" y="151" width="248" height="64" rx="14" fill="#087f5b" filter="url(#shadow)"/>
     <text x="600" y="178" font-size="16" font-weight="700" fill="#ffffff">Chapter 06</text>
-    <text x="600" y="199" font-size="13" fill="#d9fff1">单请求 Generation Core</text>
+    <text x="600" y="199" font-size="13" fill="#d9fff1">单请求生成核心</text>
     <rect x="848" y="160" width="248" height="46" rx="12" fill="#e8f1f6" stroke="#a9c3d2"/>
     <text x="972" y="180" font-size="14" font-weight="700" fill="#315d72">Chapter 07–08–10</text>
-    <text x="972" y="198" font-size="12" fill="#526b78">KV · Scheduling · Serving</text>
+    <text x="972" y="198" font-size="12" fill="#526b78">K/V 缓存 · 调度 · 服务</text>
   </g>
   <path d="M352 183 H476" fill="none" stroke="#52606d" stroke-width="2.3" marker-end="url(#arrow)"/>
   <path d="M724 183 H848" fill="none" stroke="#52606d" stroke-width="2.3" marker-end="url(#arrow)"/>
@@ -58,7 +58,7 @@
     <rect x="720" y="292" width="180" height="98" rx="15" fill="#fff1df" stroke="#d8893b" stroke-width="2"/>
     <text x="810" y="323" font-size="15" font-weight="700" fill="#92511b">提交与通知</text>
     <text x="810" y="348" font-size="13" fill="#715238">append · callback</text>
-    <text x="810" y="371" font-size="11" fill="#8b6b50">token, step</text>
+    <text x="810" y="371" font-size="11" fill="#8b6b50">词元、输出序号</text>
 
     <rect x="948" y="292" width="196" height="98" rx="15" fill="#ffffff" stroke="#9ab6c4" stroke-width="2"/>
     <text x="1046" y="323" font-size="15" font-weight="700" fill="#315d72">停止判断</text>
@@ -84,5 +84,5 @@
   <text x="648" y="553" font-size="12" fill="#7b8b93">四种模型的固定词元、文本与请求 Context 隔离</text>
 
   <rect x="56" y="590" width="1088" height="32" rx="10" fill="#173f35"/>
-  <text x="600" y="612" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">本章产物：不依赖 Scheduler 和物理 KV Block 的单请求生成契约</text>
+  <text x="600" y="612" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">本章产物：可独立运行的单请求生成循环，为缓存、调度和服务提供请求状态</text>
 </svg>

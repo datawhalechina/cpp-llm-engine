@@ -40,21 +40,21 @@ Decode 每次只有一个 Query，位置就是已提交词元数。Prefill 会�
 | `key_tokens = P + T` | 已提交历史与当前 chunk 写入的 K/V 总数 |
 | `visible_keys(i) = P + i + 1` | 因果掩码为 Query `i` 保留的可见范围 |
 
-实现先批量计算当前 chunk 的 Q/K/V，再把每个 K/V 行按 BlockTable 写入物理槽位。Attention 随后读取“历史 + 当前 chunk”，因果掩码阻止前面的 Query 看到 chunk 中更靠后的 K/V。分页路径不需要把离散物理块拼回连续 Tensor。
+CUDA Tensor Prefill 先批量计算当前 chunk 的 Q/K/V，再把每个 K/V 行按 BlockTable 写入物理槽位。Attention 随后读取“历史 + 当前 chunk”，因果掩码阻止前面的 Query 看到 chunk 中更靠后的 K/V。分页路径不需要把离散物理块拼回连续 Tensor。
 
-控制面仍保持事务边界：预留只提供写入位置，设备 payload 写入和所有层计算成功后才把已提交词元数推进到 `P + T`；任何一层失败都裁剪回 `P`。
+控制面仍保持事务边界：预留只提供写入位置，设备载荷写入和所有层计算成功后才把已提交词元数推进到 `P + T`；任何一层失败都裁剪回 `P`。
 
 ## 怎样证明寻址没有改变结果
 
-测试使用同一组 query、key 和 value 计算两次：连续参考按 `[token, kv_head, head_dimension]` 读取；分页实现让多个 Query 和 K/V 跨越非连续物理块。两组输出逐元素接近，才能说明分页只改变地址，没有改变 Attention 语义。测试还要让 chunk 跨过块边界，并检查 Query `i` 看不到未来位置。
+测试分两级核对。Chapter07 的 CPU 参考实现使用单个 Query，让 K/V 跨越非连续物理块并与连续参考逐元素比较；CUDA 专项测试再把输入扩大到多个 Query，让 chunk 跨过块边界，并检查 Query `i` 看不到未来位置。这样可以分别定位页表寻址错误和批量因果范围错误。
 
-`CpuPagedKvCache::attention()` 是便于阅读和核对的 CPU 参考实现。它逐词元查询页表并使用临时分数数组，不代表生产级融合内核；设备实现可以改变并行方式和数据布局，但必须保持相同输入要求与数值基线。
+`CpuPagedKvCache::attention()` 是便于阅读和核对的单 Query CPU 参考实现。它逐词元查询页表并使用临时分数数组，不代表生产级融合内核；设备实现可以扩展到多 Query、改变并行方式和数据布局，但必须保持相同的页表语义与数值基线。
 
 MLA 的页表寻址相同，读取内容不同。标准 GQA 路径从槽位取得各 KV head 的 key/value；MLA 路径取得压缩 latent K/V 和 RoPE key，再按 Chapter04 的 MLA 公式恢复当前 Attention 所需分量。`CpuPagedMlaCache::gather_layer()` 提供便于核对的连续视图，用来证明跨块顺序正确；`CudaMlaAttentionBackend::compute_paged()` 则在 score 和 value kernel 中直接把逻辑位置映射到物理槽位，不先 gather 连续缓存。
 
 ## 验证连续与分页等价
 
-通过条件包括多 Query 因果遮罩、跨块读取、GQA 头映射、连续与分页结果一致，以及物理块释放复用后无请求串扰。CUDA 专项测试使用非连续物理块顺序比较连续与分页 MLA；真实 DeepSeek Runtime 已完成 27 层 logits、双请求批提交和终态块计数验收，连续与分页 logits 最大误差为 `0`。
+CPU 组件通过条件包括单 Query 跨块读取、GQA 头映射、连续与分页结果一致，以及物理块释放复用后无请求串扰。CUDA 专项测试补充多 Query 因果遮罩，并使用非连续物理块顺序比较连续与分页 MLA；真实 DeepSeek Runtime 已完成 27 层 logits、双请求批提交和终态块计数验收，连续与分页 logits 最大误差为 `0`。
 
 ```bash
 cmake -S code/chapter07_kv_cache -B /tmp/cpp-llm-chapter07-attention \

@@ -34,7 +34,7 @@
 [layer, kv_head, sequence_position, head_dimension]
 ```
 
-每次 Decode 只增加一个 `sequence_position`。Chapter07 会把相同逻辑位置映射到 BlockTable 和分页 payload；页面、物理槽位与回收策略不属于 Generation Core。
+每次逐词元解码只增加一个 `sequence_position`。Chapter07 会把相同逻辑位置映射到块表和分页载荷；页面、物理槽位与回收策略由 Chapter07 管理。
 
 因此本章只固定两项请求级所有权：Request 管理词元与终态，模型 Context 管理每层数值状态。Chapter07 再让 BlockTable 管理逻辑位置到物理块的引用，Chapter10 负责在请求终止时分别释放执行器和缓存资源。
 

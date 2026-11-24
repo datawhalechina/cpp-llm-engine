@@ -47,5 +47,5 @@
 
   <rect x="122" y="548" width="956" height="62" rx="15" fill="#e2e8f0" stroke="#94a3b8"/>
   <text x="600" y="574" text-anchor="middle" class="label">Chapter07 只改变模型 K/V 的物理布局</text>
-  <text x="600" y="597" text-anchor="middle" class="text">连续 sequence_position 映射到 BlockTable 与分页 payload，Token History 的职责不变</text>
+  <text x="600" y="597" text-anchor="middle" class="text">连续序列位置映射到块表与分页载荷，词元历史的职责不变</text>
 </svg>

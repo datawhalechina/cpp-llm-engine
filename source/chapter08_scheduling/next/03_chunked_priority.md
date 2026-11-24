@@ -36,15 +36,15 @@ effective_priority = base_priority
 
 `cached_prefix_tokens` 在两个阶段有不同含义。准入时，ServiceCore 保存 Chapter07 给出的无副作用估算，只用它排列 waiting 请求，不增加块引用，也不推进 Request。请求获得运行槽时，Factory 重新查询并采用仍然有效的前缀，同时推进 `BlockTable`、`Request::prefill_offset()` 和模型 Context；随后交给 Planner 的才是实际采用长度。估算过期只会改变候选顺序，不能直接改变执行状态。
 
-## 当前公平性保证到哪里
+## 优先级老化怎样保证请求推进
 
-`PriorityAgingPolicy` 由调用方跨 step 保存，Planner 只读策略状态。缓存不足或 Executor 没有推进时，请求继续老化；实际推进后等待步数清零。Overlap 计划同时记录策略版本，版本变化后旧计划不能执行。
+`PriorityAgingPolicy` 由调用方跨调度步保存，计划器只读策略状态。缓存不足或模型执行器没有推进时，请求继续老化；实际推进后等待步数清零。重叠计划同时记录策略版本，版本变化后旧计划不能执行。
 
 | 已验证 | 后续能力 |
 | --- | --- |
 | Decode 优先并为可分块 Prefill 保留最小机会 | 自动 Deadline 与到期队列 |
-| 多个长输入按进度轮换 | step 边界协作式抢占 |
-| 小优先级差可由有界老化追平 | 缓存压力和持续 admission 下的长期公平性 |
+| 多个长输入按进度轮换 | 调度步边界的协作式抢占 |
+| 小优先级差可由有界老化追平 | 缓存压力和持续准入下的长期公平性 |
 | 同优先级结果可复现 | 配额与多租户策略 |
 | 同级 Prefill 按估算命中长度选择，运行前重新采用 | 缓存压力与命中收益联合评分 |
 

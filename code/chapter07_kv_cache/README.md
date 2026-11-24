@@ -28,7 +28,7 @@ Chapter08 / Chapter10
 | TinyLlama | `[layer, token, kv_head, head_dim]` 标准 K/V | CPU/CUDA 分页、Radix 和真实模型证据完整 |
 | Qwen3 | 与 TinyLlama 相同的标准 GQA K/V | 可复用 Llama 数据面接口，当前没有独立分页 golden |
 | Qwen1.5-MoE | 标准分层 K/V，FFN 改为专家结构 | 当前 MoE Factory 使用请求 Context，尚未绑定分页 payload |
-| DeepSeek-V2-Lite | 低秩 latent K/V 加共享位置 Key | CPU/CUDA 分页 payload、直接页表读取和真实 Context 绑定已实现；27 层真实 GPU 等价性、双请求提交和终态释放已验证 |
+| DeepSeek-V2-Lite | 低秩 latent K/V 加共享位置 Key | CPU 分页组件已实现，CPU Factory 仍使用连续 Context；CUDA 已完成直接页表读取、真实 Context 绑定、27 层等价性、双请求提交和终态释放 |
 
 ## 阅读顺序与资产
 
@@ -52,7 +52,7 @@ Chapter08 / Chapter10
 bash code/chapter07_kv_cache/scripts/run.sh
 ```
 
-CTest 应通过块池、标准分页 K/V、分页 MLA 和 Radix 前缀缓存四项测试。它们分别固定控制面接口，验证两种 payload、Attention 与失败原子性，并证明共享块不会因单个请求结束而提前释放。
+CTest 应通过块池、标准分页 K/V、分页 MLA 和 Radix 前缀缓存四项测试。它们分别固定控制面接口，验证两种 payload、Attention 与失败原子性，并证明共享块不会因单个请求结束而提前释放。块池还运行固定种子的事务状态机，持续检查容量守恒、所有权唯一性和失败不改状态；Radix 用例组合发布、挂接、私有后缀、裁剪、释放和淘汰。测试对象保持单线程，避免把上层执行器的同步策略混入缓存契约。
 
 已准备 TinyLlama 模型和 llama.cpp CPU 构建时，再运行真实模型验收：
 
@@ -67,3 +67,5 @@ bash code/chapter07_kv_cache/scripts/run_real_paged_kv.sh
 CUDA 路径已在 `code/cuda` 分别实现标准 GQA 和压缩 MLA 的共享分页 payload。两种 Attention backend 都按 BlockTable 直接读取物理槽位，不先拼接连续缓存。Llama Factory 连接 Radix 匹配与淘汰；DeepSeek Factory 连接请求绑定、预留、整批提交、失败裁剪和终态清块。真实 DeepSeek GPU 验收入口位于 `code/engine/scripts/run_deepseek_v2_lite_cuda_runtime.sh`，以连续/分页 logits、双请求批提交和终态零占用为通过条件。
 
 当前连续与分页 payload 都保存浮点 K/V。K/V Cache 量化仍需增加每层或每块 scale metadata、低精度 payload、事务一致性检查、Attention 读取 backend 和长上下文误差测试；BlockTable 与引用计数接口应保持不变。
+
+核心缓存对象本身不提供跨线程锁。当前 ServiceCore 与执行器负责串行化同一请求的状态迁移；若以后允许多个工作线程直接操作同一个块池，需要在资源所有者一侧增加同步，而不是把调度锁混入页表和数值数据面。

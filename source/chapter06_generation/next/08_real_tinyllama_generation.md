@@ -2,7 +2,7 @@
 
 合成 logits 可以稳定验证状态和停止条件，但不能证明 Tokenizer、完整 Decoder、量化权重和模型 K/V 已经连通。真实模型验证保持同一个 `Request -> Runtime -> Sampler` 控制流，只把教学执行器替换为真实模型 Context。TinyLlama 是默认基线，Qwen3 验证第二种稠密架构，Qwen1.5-MoE 验证标准专家模型，DeepSeek-V2-Lite 验证压缩 MLA 与混合稠密/MoE 层。
 
-## 文本怎样进入 Generation Core
+## 文本怎样进入单请求生成核心
 
 真实入口由 `RealLlamaEngine` 组装，执行顺序如下：
 

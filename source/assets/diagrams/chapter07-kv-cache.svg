@@ -30,7 +30,7 @@
     <text x="228" y="198" font-size="12" fill="#526b78">单请求生成语义</text>
     <rect x="476" y="151" width="248" height="64" rx="14" fill="#087f5b" filter="url(#shadow)"/>
     <text x="600" y="178" font-size="16" font-weight="700" fill="#ffffff">Chapter 07</text>
-    <text x="600" y="199" font-size="13" fill="#d9fff1">KV Cache · Memory</text>
+    <text x="600" y="199" font-size="13" fill="#d9fff1">K/V 缓存 · 物理内存</text>
     <rect x="848" y="160" width="248" height="46" rx="12" fill="#fff1df" stroke="#efc38e"/>
     <text x="972" y="180" font-size="14" font-weight="700" fill="#92511b">Chapter 08</text>
     <text x="972" y="198" font-size="12" fill="#7b5b3f">多请求调度与批处理</text>
@@ -90,5 +90,5 @@
   <path d="M782 549 H858 V534 H936" fill="none" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
 
   <rect x="56" y="590" width="1088" height="32" rx="10" fill="#173f35"/>
-  <text x="600" y="612" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">本章产物：独立于调度策略的 K/V 寻址、数据与生命周期契约</text>
+  <text x="600" y="612" font-size="13" font-weight="700" text-anchor="middle" fill="#ffffff">本章产物：供调度器使用的 K/V 寻址、数据读写与生命周期接口</text>
 </svg>

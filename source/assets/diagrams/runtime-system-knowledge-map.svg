@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="650" viewBox="0 0 1240 650" role="img" aria-labelledby="title desc">
+  <title id="title">Chapter06 到 Chapter10 请求生命周期知识图谱</title>
+  <desc id="desc">请求依次经过 Chapter10 服务准入、Chapter08 调度、Chapter06 生成运行时和模型执行；Chapter07 为调度、运行时和模型提供缓存事务，Chapter09 记录横向证据。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8f3e7"/><stop offset="1" stop-color="#e5f0ec"/></linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#315650"/></marker>
+    <style>
+      .title{font:700 28px 'Noto Sans CJK SC',sans-serif;fill:#173832}.sub{font:500 15px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.chapter{font:700 13px 'Noto Sans CJK SC',sans-serif;fill:#8b5b20}.head{font:700 16px 'Noto Sans CJK SC',sans-serif;fill:#173832}.small{font:500 12px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.inverse{fill:#fff}.inverseSub{fill:#d7e5e1}.inverseChapter{fill:#f4c77d}.box{stroke:#315650;stroke-width:1.8;rx:14}.line{stroke:#4f7069;stroke-width:2;fill:none;marker-end:url(#arrow)}.evidence{stroke:#8b6b3d;stroke-width:1.7;stroke-dasharray:6 5;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1240" height="650" fill="url(#bg)"/>
+  <text x="50" y="50" class="title">请求生命周期：一条调用主链，两层共享支撑</text>
+  <text x="50" y="78" class="sub">每章只保留一个主节点；章内对象回到各章主图展开。</text>
+
+  <text x="50" y="120" class="head">请求调用主链</text>
+  <rect x="50" y="145" width="235" height="112" class="box" fill="#fff1cf"/>
+  <text x="70" y="171" class="chapter">CHAPTER10 · 服务</text><text x="167" y="201" text-anchor="middle" class="head">ServiceCore + Transport</text><text x="167" y="225" text-anchor="middle" class="small">准入 · 等待 · HTTP/SSE</text><text x="167" y="245" text-anchor="middle" class="small">取消、超时与终态释放</text>
+
+  <rect x="345" y="145" width="235" height="112" class="box" fill="#e7f2e9"/>
+  <text x="365" y="171" class="chapter">CHAPTER08 · 调度</text><text x="462" y="201" text-anchor="middle" class="head">Scheduler + Step Batch</text><text x="462" y="225" text-anchor="middle" class="small">候选 · 优先级 · 预算</text><text x="462" y="245" text-anchor="middle" class="small">连续批处理与执行计划</text>
+
+  <rect x="640" y="145" width="235" height="112" class="box" fill="#e4eef9"/>
+  <text x="660" y="171" class="chapter">CHAPTER06 · 生成</text><text x="757" y="201" text-anchor="middle" class="head">Runtime + Executor</text><text x="757" y="225" text-anchor="middle" class="small">Prefill · Decode · Sample</text><text x="757" y="245" text-anchor="middle" class="small">请求状态与停止条件</text>
+
+  <rect x="935" y="145" width="255" height="112" class="box" fill="#f7fbf9"/>
+  <text x="955" y="171" class="chapter">CHAPTER04–05 · 既有模型</text><text x="1062" y="201" text-anchor="middle" class="head">Model + Context</text><text x="1062" y="225" text-anchor="middle" class="small">Decoder · Quantized Linear</text><text x="1062" y="245" text-anchor="middle" class="small">产生 logits 与分层 K/V</text>
+
+  <path d="M285 201H345" class="line"/><text x="315" y="191" text-anchor="middle" class="small">准入</text>
+  <path d="M580 201H640" class="line"/><text x="610" y="191" text-anchor="middle" class="small">计划</text>
+  <path d="M875 201H935" class="line"/><text x="905" y="191" text-anchor="middle" class="small">执行</text>
+
+  <text x="50" y="310" class="head">共享资源层</text>
+  <rect x="345" y="335" width="845" height="105" class="box" fill="#f4ead9"/>
+  <text x="370" y="362" class="chapter">CHAPTER07 · 缓存与事务</text>
+  <text x="767" y="388" text-anchor="middle" class="head">BlockTable + Paged K/V + Radix Cache</text>
+  <text x="767" y="413" text-anchor="middle" class="small">逻辑位置映射物理块；为执行步预留资源，为模型保存历史，并在成功或失败后提交、回滚和释放</text>
+
+  <path d="M462 257V335" class="line"/><text x="474" y="299" class="small">预留</text>
+  <path d="M757 257V335" class="line"/><text x="769" y="299" class="small">绑定</text>
+  <path d="M1062 257V335" class="line"/><text x="1074" y="299" class="small">读写</text>
+
+  <text x="50" y="492" class="head">横向证据层</text>
+  <rect x="120" y="515" width="1070" height="92" class="box" fill="#173832"/>
+  <text x="145" y="542" class="chapter inverseChapter">CHAPTER09 · 验证与性能</text>
+  <text x="315" y="574" text-anchor="middle" class="head inverse">正确性</text><text x="315" y="594" text-anchor="middle" class="small inverseSub">状态守恒 · 请求隔离 · Golden</text>
+  <text x="655" y="574" text-anchor="middle" class="head inverse">运行指标</text><text x="655" y="594" text-anchor="middle" class="small inverseSub">TTFT · TPOT · 吞吐 · 延迟</text>
+  <text x="995" y="574" text-anchor="middle" class="head inverse">性能归因</text><text x="995" y="594" text-anchor="middle" class="small inverseSub">配对实验 · Timeline · Kernel Profile</text>
+
+  <path d="M167 257V485H250V515" class="evidence"/>
+  <path d="M767 440V515" class="evidence"/>
+  <text x="50" y="630" class="sub">主链决定调用顺序，Chapter07 保证资源状态，Chapter09 判断结果是否正确以及优化是否有效。</text>
+</svg>

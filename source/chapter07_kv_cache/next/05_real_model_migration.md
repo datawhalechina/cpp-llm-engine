@@ -6,7 +6,7 @@
 
 Context 先绑定抽象 K/V 数据面，引擎适配层再连接请求 ID 和分页缓存。每层 Q/K/V 投影完成后写入预留槽位，全部层写完才提交；Attention 根据页表和有效词元数读取历史。请求进入终态后统一释放物理块。
 
-| 迁移步骤 | 必须保持的证据 |
+| 迁移步骤 | 应检查的结果 |
 | --- | --- |
 | Context 绑定分页数据面 | 两个请求的状态仍隔离 |
 | 每层写入预留槽位 | 所有层写完才能提交 |
@@ -15,18 +15,18 @@ Context 先绑定抽象 K/V 数据面，引擎适配层再连接请求 ID 和分
 | Generation Runtime 接入事务 | 固定 greedy token 不变 |
 | 请求终态释放物理块 | 重复请求无泄漏、无串扰 |
 
-CUDA Context 对连续和分页数据面使用同一组模型权重与批量 Decoder 算子。连续 Prefill 把 K/V 追加到请求独占缓存；分页 Prefill 根据请求 BlockTable 把同一个 chunk 写入共享物理 payload，并让多 Query Attention 直接读取页表。两条路径都只在完整 chunk 成功后推进 Context 位置。
+CUDA 上下文对连续和分页数据面使用同一组模型权重与批量解码器算子。连续预填充把 K/V 追加到请求独占缓存；分页预填充根据请求块表把同一个分块写入共享物理载荷，并让多查询注意力直接读取页表。两条路径都只在完整分块成功后推进上下文位置。
 
 ## 模型架构怎样改变分页适配
 
-块分配、引用计数和提交回滚可以保持平台无关，真正保存的 payload 仍由 Attention 架构决定。当前真实分页测试以 TinyLlama 的标准 GQA K/V 为基线；其他模型需要先确认自己的缓存表示能否直接放入相同布局。
+块分配、引用计数和提交回滚可以保持平台无关，真正保存的载荷仍由注意力架构决定。当前真实分页测试以 TinyLlama 的标准 GQA K/V 为基线；其他模型需要先确认自己的缓存表示能否直接放入相同布局。
 
 | 模型 | 请求级 Attention 历史 | 迁移到 Chapter07 时的处理 |
 | --- | --- | --- |
-| TinyLlama | 每层标准 key/value，多个 Query head 共享 KV head | 已接入标准分页 payload |
-| Qwen3 | 标准 GQA K/V，head 数和 RoPE 参数不同 | 复用 payload 形状，另建模型级分页 golden |
-| Qwen1.5-MoE | Attention 仍使用标准 K/V，MoE 只改变 FFN | 可复用标准 payload，当前 Factory 尚未绑定数据面 |
-| DeepSeek-V2-Lite | 每层保存低秩 latent K/V 与共享位置 Key | CPU/CUDA payload、直接页表读取和真实 CUDA Context 绑定已实现；27 层真实 GPU 验收已通过 |
+| TinyLlama | 每层标准 key/value，多个查询头共享 K/V 头 | 已接入标准分页载荷 |
+| Qwen3 | 标准 GQA K/V，头数和 RoPE 参数不同 | 复用载荷形状，另建模型级分页固定结果 |
+| Qwen1.5-MoE | 注意力仍使用标准 K/V，MoE 只改变前馈网络 | 可复用标准载荷，当前执行器工厂尚未绑定数据面 |
+| DeepSeek-V2-Lite | 每层保存低秩 latent K/V 与共享位置 Key | CPU 分页组件已固定载荷和事务，CPU Factory 仍使用连续 Context；CUDA 已完成直接页表读取、真实 Context 绑定和 27 层验收 |
 
 DeepSeek 的压缩缓存原理见 [`04.1 多头注意力与 MLA`](../../chapter04_attention/01_multihead_attention.md)。这里不把 latent 强行展开为标准 K/V 再长期保存，因为那会丢失 MLA 降低缓存容量的设计目标。
 
@@ -40,7 +40,7 @@ CUDA_HOME=/usr/local/cuda-12.8 \
 
 第二个入口通过时应输出分页 logits 误差、`paged_mla_batch: true` 和 `paged_mla_terminal_release: true`。这些字段分别证明数值等价、跨请求事务和最终物理块回收。
 
-[`EXP-GPU-18`](../../reference/experiment_assets.md#exp-gpu-18) 使用同一 DeepSeek-V2-Lite 模型比较连续与分页 MLA。2-token Prefill 和一步 Decode 的分页/连续中位数比例为 `0.973/0.987`，logits 最大误差为 `0`。逐轮样本仍有波动，因此该结果只说明当前短上下文下两条路径成本同量级；保留分页路径的主要理由是按需分块、跨请求复用和终态回收，而不是已经证明的延迟加速。
+[`EXP-GPU-18`](../../reference/experiment_assets.md#exp-gpu-18) 使用同一 DeepSeek-V2-Lite 模型比较连续与分页 MLA。短上下文结果显示两条路径成本处于同一量级，连续与分页 logits 一致。分页路径在这里主要解决按需分块、跨请求复用和终态回收；具体样本与设备环境统一查阅实验资产。
 
 ## 为什么要逐级比较
 
@@ -61,4 +61,4 @@ CUDA_HOME=/usr/local/cuda-12.8 \
 bash code/chapter07_kv_cache/scripts/run_real_paged_kv.sh
 ```
 
-真实 CUDA 分页 Prefill 的逐 Token/Tensor A/B 登记为 [`EXP-GPU-05`](../../reference/experiment_assets.md#exp-gpu-05)。固定 32 Token 结果支持使用 Tensor 路径，但性能结论只适用于登记的设备和工作负载。
+真实 CUDA 分页预填充的逐词元/张量 A/B 登记为 [`EXP-GPU-05`](../../reference/experiment_assets.md#exp-gpu-05)。固定 32 词元结果支持使用张量路径，但性能结论只适用于登记的设备和负载。
