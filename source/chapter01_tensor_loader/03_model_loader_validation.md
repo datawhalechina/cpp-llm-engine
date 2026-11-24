@@ -4,7 +4,7 @@
 
 ## 从文件恢复 Tensor
 
-<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> 中的 `load()` 每次先清空旧状态，再依次校验魔数、版本和张量数量。每条记录恢复名称、数据类型、设备、形状和权重数据，先放入局部 Tensor Map；只有全部记录成功后才提交结果，失败时不会暴露半加载模型。
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/model_loader.cpp"><code>model_loader.cpp</code></a> 中的 `load()` 每次先清空旧状态，再依次校验魔数、版本和张量数量。每条记录恢复名称、数据类型、设备、形状和权重数据，先放入局部张量映射；全部记录成功后再提交结果，失败时保持输出为空。
 
 ## 在最早位置拒绝错误
 
@@ -21,12 +21,12 @@
 
 打印张量名称、形状、数据类型和存储大小适合快速观察；自动化检查负责固定长期行为。测试至少覆盖：
 
-- 合法文件恢复完整 tensor map
-- 按名称命中已知 tensor，未知名称返回空
+- 合法文件恢复完整张量映射
+- 按名称命中已知张量，未知名称返回空
 - 形状与权重数据可还原为预期数值
 - 错误 magic、version、dtype、device、shape 和截断输入被拒绝
 - 重复名称和与 shape 不匹配的 payload 被拒绝
-- 失败后 Tensor Map 保持为空
+- 失败后张量映射保持为空
 
 真实 GGUF 使用同样的验证思想，但由 [`01.5 模型元数据与 GGUF`](./05_model_metadata_and_gguf.md) 继续检查模型元数据、张量索引、数据对齐、量化权重数据和 Llama 结构约束。
 
@@ -36,7 +36,7 @@
 bash code/chapter01_tensor_loader/run.sh
 ```
 
-通过标准是 CTest 全部成功，并且失败用例在加载阶段返回可定位的错误。不要用后续算子的数值结果替代加载器的名称、形状和权重数据检查。
+通过标准包括 CTest 全部成功，以及失败用例在加载阶段返回可定位的错误。加载器测试负责名称、形状和权重数据，后续算子测试负责计算结果。
 
 教学格式验证通过后，[`模型元数据与 GGUF`](./05_model_metadata_and_gguf.md) 使用相同检查顺序处理真实模型文件。
 

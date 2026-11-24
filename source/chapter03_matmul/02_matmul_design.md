@@ -2,7 +2,7 @@
 
 两个矩阵能够相乘，需要满足 `lhs.cols == rhs.rows`。代码还要知道数据地址、行优先步长和输出位置，才能把数学公式变成一次安全的内存访问。
 
-本章 Linear、MatMul 和权重转置统一采用 [`F-LINEAR-01`](../reference/formulas.md#f-linear-01) 的 shape 约定。
+本章线性层、矩阵乘法和权重转置统一采用 [`F-LINEAR-01`](../reference/formulas.md#f-linear-01) 的形状约定。
 
 ## 先固定输入和输出形状
 
@@ -28,11 +28,11 @@ GEMV 是 General Matrix-Vector Multiplication，即通用矩阵向量乘法；GE
 
 | 推理场景 | 典型输入 | 计算称呼 | 主要复用机会 |
 | --- | --- | --- | --- |
-| 单 token Decode | `x[K]` | GEMV：`y = W x` | 一次读取权重并完成一个向量 |
-| 多 token Prefill | `X[T,K]` | GEMM：`Y = X Wᵀ` | 多个 token 复用权重 tile |
-| 小批量 Decode | `X[B,K]` | 数学上是 GEMM；专用实现常称 batched GEMV | 多个请求共享权重读取与解码 |
+| 单词元解码 | `x[K]` | GEMV：`y = W x` | 一次读取权重并完成一个向量 |
+| 多词元预填充 | `X[T,K]` | GEMM：`Y = X Wᵀ` | 多个词元复用同一权重分块 |
+| 小批量解码 | `X[B,K]` | 数学上是 GEMM；专用实现常称批量 GEMV | 多个请求共享权重读取与解码 |
 
-本章公共 `MatMulOp` 统一接收二维矩阵，不根据名称切换语义。当前教学代码把实现选择留给调用方：显式注入 CPU Backend，或者进入独立的 cuBLAS 接口。Chapter05 的量化融合路径称为 batched GEMV，因为它扩展单向量 kernel，让少量输入行共享一次 packed 权重解码；Chapter08 决定哪些请求进入同一执行批次，Chapter09 再用固定工作负载判断何时选择不同实现。
+本章公共 `MatMulOp` 接收二维矩阵，调用方显式传入 CPU 计算后端，CUDA 路径使用独立的 cuBLAS 接口。Chapter05 的量化融合路径称为批量 GEMV：它扩展单向量计算内核，让少量输入行共享一次打包权重解码。Chapter08 决定哪些请求进入同一执行批次，Chapter09 再用固定负载比较不同实现。
 
 每个输出元素由左输入的一行和右输入的一列计算。`try_compute(lhs, rhs, &output)` 先检查矩阵对象和形状，再把地址与 `M、N、K` 写入 `MatmulRequest`；`compute()` 使用同一流程，在失败时抛出异常。
 
@@ -45,7 +45,7 @@ GEMV 是 General Matrix-Vector Multiplication，即通用矩阵向量乘法；GE
 | 1 | 检查存储范围、二维形状、Float32 和 CPU 设备 | 确认地址和元素解释有效 |
 | 2 | 检查连续行优先步长 | 让内核可以使用 `row * cols + col` 寻址 |
 | 3 | 基址加 offset，创建 `MatmulRequest` | 指向视图中的第一个参与计算元素 |
-| 4 | 在临时连续结果中运行 CPU Backend | 失败时保留调用者原来的输出 |
+| 4 | 在临时连续结果中运行 CPU 计算后端 | 失败时保留调用者原来的输出 |
 | 5 | 计算成功后复制到 `MutableTensorViewRef` | 一次提交完整结果 |
 
 切片或转置产生的非连续视图会返回 `matmul requires contiguous row-major input`。调用 `contiguous()` 得到连续副本后，可以重新提交计算。
@@ -55,17 +55,17 @@ GEMV 是 General Matrix-Vector Multiplication，即通用矩阵向量乘法；GE
 | 位置 | 当前实现 | 阅读重点 |
 | --- | --- | --- |
 | 算子入口 | `MatMulOp` | 接收输入并创建请求 |
-| CPU Backend | `CpuReferenceMatmulBackend` | 检查请求并选择 CPU 内核 |
+| CPU 计算后端 | `CpuReferenceMatmulBackend` | 检查请求并选择 CPU 内核 |
 | CPU 内核 | `cpu_kernel.cpp` | 用三重循环计算每个输出元素 |
 | GPU 选读 | `CublasMatmulBackend` | 用设备内存和 `cublasSgemm` 完成同一形状的计算 |
 
 CPU 和 CUDA 的输入地址位于不同设备。行优先数据交给 cuBLAS 时还要处理列优先解释，具体步骤放在 [`03.4`](./04_cublas_implement.md)。
 
-## 临时结果和 Workspace 由谁持有
+## 临时结果和工作区由谁持有
 
-输出临时结果用于保证失败原子性：Backend 成功后才覆盖调用者的 Tensor。Workspace 保存 Backend 执行期间的中间数据，例如量化权重解码结果或 GPU 归约空间；二者都不改变输入 Tensor 的所有权。
+输出先写入临时结果，计算后端成功后才覆盖调用者的张量。工作区保存计算期间的中间数据，例如量化权重解码结果或 GPU 归约空间；二者都不改变输入张量的所有权。
 
-Workspace 的容量先由 shape 计算并校验，只在不足时增长。异步 GPU 执行还要等使用它的 stream 或 event 完成后才能复用。CPU reference 不模拟 CUDA stream，但必须保留相同的输入输出和失败行为，供设备实现做数值对照。GPU 资源所有者见 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/include/cpp_llm_engine/cuda/cuda_workspace.h"><code>CudaWorkspace</code></a> 和 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/include/cpp_llm_engine/cuda/cuda_execution_context.h"><code>CudaExecutionContext</code></a>。
+工作区容量先由形状计算并校验，仅在空间不足时增长。异步 GPU 执行需要等待使用它的 CUDA 流或事件完成后再复用。CPU 参考实现提供相同的输入、输出和错误行为，设备实现用它做数值对照。GPU 资源所有者见 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/include/cpp_llm_engine/cuda/cuda_workspace.h"><code>CudaWorkspace</code></a> 和 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/include/cpp_llm_engine/cuda/cuda_execution_context.h"><code>CudaExecutionContext</code></a>。
 
 ## 动手验证
 

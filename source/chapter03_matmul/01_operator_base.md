@@ -16,7 +16,7 @@ public:
 
 `MatMulOp` 实现 `compute()`。调用者传入两个 `Matrix`，得到一个新的输出 `Matrix`；CPU 循环由 `CpuReferenceMatmulBackend` 执行。选读 GPU 路线时，[`03.4`](./04_cublas_implement.md) 会把相同的矩阵形状交给设备指针和 cuBLAS。
 
-多一层调用接口会增加一个类和一次分派，但换来两个直接收益：调用方只依赖计算语义，CPU 与 CUDA 可以分别测试。Chapter04 采用独立的教学 Linear，并复用本章的形状约束、乘加语义和数值基线。学习者仍然能够沿着 `MatMulOp → Backend → Kernel` 找到本章的实际计算代码。
+多一层调用接口会增加一个类和一次分派，但也带来两个直接收益：调用方提交相同的矩阵请求，CPU 与 CUDA 实现可以分别测试。Chapter04 采用独立的教学线性层，并复用本章的形状检查、乘加公式和数值基线。实际计算代码可以沿 `MatMulOp → 计算后端 → 计算内核` 找到。
 
 ## Matrix 怎样连接 Chapter02 的视图
 

@@ -1,6 +1,6 @@
 # 03.3 参考实现（CPU）
 
-CPU 参考实现按矩阵乘法公式直接写成三重循环。代码不追求最快，而是让索引、累加方向和输出位置都能逐行检查。
+CPU 参考实现按矩阵乘法公式直接写成三重循环，以清晰的索引、累加方向和输出位置提供数值基线。
 
 ## 三重循环怎样对应矩阵乘法
 
@@ -28,7 +28,7 @@ for (std::size_t i = 0; i < M; ++i) {
 
 ## 请求怎样进入 CPU 内核
 
-`MatMulOp::try_compute()` 将矩阵适配为 `MatmulRequest`；`try_compute_tensor_views_into()` 接收 Chapter02 的两个只读输入视图和一个可写输出视图；`CpuReferenceMatmulBackend` 负责分派；<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/src/cpu_kernel.cpp"><code>cpu_kernel.cpp</code></a> 校验指针和尺寸后执行循环。返回 `Matrix` 的 `try_compute_tensor_views()` 继续作为教学兼容入口。
+`MatMulOp::try_compute()` 将矩阵适配为 `MatmulRequest`；`try_compute_tensor_views_into()` 接收 Chapter02 的两个只读输入视图和一个可写输出视图；`CpuReferenceMatmulBackend` 负责分派；<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/src/cpu_kernel.cpp"><code>cpu_kernel.cpp</code></a> 校验指针和尺寸后执行循环。`try_compute_tensor_views()` 则返回一个新的教学 `Matrix`。
 
 SIMD、分块和 GPU 可以换一种更快的计算方法，但输出仍要与这段循环比较。
 

@@ -4,14 +4,14 @@
 
 ## 两条输入链怎样汇合
 
-文本不会直接进入张量，GGUF 权重也不会解释用户输入文本（prompt）。一次执行需要同时取得两类产物：
+一次执行同时需要文本侧产生的词元序列，以及模型文件侧产生的配置和权重：
 
 | 输入链 | 经过的对象 | 交给后续章节的产物 |
 | --- | --- | --- |
 | 文本输入 | 分词器、输入约束 | 词元编号、输入长度、停止词元 |
 | 模型文件 | 模型元数据、张量索引、`ModelLoader` | `ModelConfig`、权重张量、解码器布局 |
 
-两条链共享词表约束：Tokenizer 产生的每个 ID 必须小于 `vocab_size`，embedding 和 LM Head 的词表维度也必须与它一致。下图从两种原始输入开始，追踪到 Chapter04 的 Decoder 与 Chapter06 的 Request/Runtime。
+两条链共享词表约束：分词器产生的每个 ID 必须小于 `vocab_size`，词嵌入和 LM Head 的词表维度也必须与它一致。下图从两种原始输入开始，追踪到 Chapter04 的解码器与 Chapter06 的请求运行时。
 
 ![文本与模型两条输入链在模型执行前汇合](../assets/diagrams/chapter01-input-contract.svg)
 
@@ -28,21 +28,21 @@ public:
 };
 ```
 
-默认 `Tokenizer` 用固定字母映射建立最小编码/解码测试：字母转换为整数，未知字符转换为 `0`。它适合验证接口、越界行为和往返转换，但这些整数不构成 TinyLlama 的真实分词结果。
+默认 `Tokenizer` 用固定字母映射建立最小编码/解码测试：字母转换为整数，未知字符转换为 `0`。它用于验证接口、越界行为和往返转换。TinyLlama 则使用模型词表和真实分词规则。
 
 `RealTokenizer` 位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/real_tokenizer.cpp"><code>real_tokenizer.cpp</code></a>。它读取真实 GGUF vocabulary，并调用 llama.cpp tokenizer API 执行模型规定的规则：
 
-分词器只负责文本与词元编号之间的转换；聊天模板先把 system、user、assistant 等角色整理为模型约定的文本，再交给分词器。当前 TinyLlama golden 使用固定原始 prompt，没有在自研 Runtime 中自动套用聊天模板。接入 Qwen 等模型时，模板版本、特殊词元和停止词元必须与模型配置一起建立新基线，不能只替换 GGUF 文件。
+分词器负责文本与词元编号之间的转换；聊天模板先把 system、user、assistant 等角色整理为模型约定的文本，再交给分词器。TinyLlama 固定结果使用原始提示文本。接入 Qwen 等模型时，需要同时固定模板版本、特殊词元、停止词元和模型配置。
 
 | 真实 Tokenizer 数据或规则 | 为什么影响结果 |
 | --- | --- |
 | 词表与词元编号 | 决定每个整数对应的字节序列 |
-| BPE merge 或 SentencePiece model | 决定文本怎样切分与合并 |
-| normalization 与 Unicode 处理 | 决定相同可见文本进入算法前的字节形式 |
+| BPE 合并规则或 SentencePiece 模型 | 决定文本怎样切分与合并 |
+| 规范化与 Unicode 处理 | 决定相同可见文本进入算法前的字节形式 |
 | BOS、EOS、PAD、UNK | 决定序列起止和异常输入行为 |
 | 对话模板 | 决定对话角色和生成提示怎样进入词元序列 |
 
-`ModelConfig` 位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/model_config.h"><code>model_config.h</code></a>，保存 `vocab_size`、`hidden_size`、`max_position`、`layer_count` 和 `max_new_tokens`。进入 Decoder 前至少满足：
+`ModelConfig` 位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/model_config.h"><code>model_config.h</code></a>，保存 `vocab_size`、`hidden_size`、`max_position`、`layer_count` 和 `max_new_tokens`。进入解码器前至少满足：
 
 ```text
 ModelConfig.vocab_size == Tokenizer.vocab_size

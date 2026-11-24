@@ -2,9 +2,25 @@
 
 ## 本章导读
 
-Chapter02 已经能用张量视图找到一段数据。本章把两个连续二维视图送入矩阵乘法，先用 CPU 三重循环算出可手工复查的结果，再观察同一计算语义怎样进入 CPU Backend 或可选的 cuBLAS。Chapter04 将复用这里的形状约束和验证方法，独立组装线性层、注意力和前馈网络。
+Chapter02 已经能用张量视图找到一段数据。本章把两个连续二维视图送入矩阵乘法，先用 CPU 三重循环算出可手工复查的结果，再把相同的 M、N、K 和输出要求交给 CPU 计算后端或可选的 cuBLAS。Chapter04 将复用这里的形状检查和验证方法，独立组装线性层、注意力和前馈网络。
 
 在 Transformer 中，一组词元特征可以写成 `X[T,D]`：`T` 是词元数，`D` 是每个词元的特征宽度。线性投影用 `X[T,D] × W[D,O]` 得到 `Y[T,O]`，Q/K/V 投影、Attention 输出投影和 FFN 都会重复这项计算。Chapter03 先用一个二维例子把形状、地址和计算方法讲清楚。
+
+| 实现层次 | 主要对象 | 本章怎样验证 |
+| --- | --- | --- |
+| 数据对象 | 教学 `Matrix`、Chapter02 `TensorViewRef` | 行优先布局、连续性、偏移和生命周期 |
+| 计算请求 | Core `MatmulRequest` | `[M,K] × [K,N] -> [M,N]`、缓冲区大小和设备类型 |
+| 算子 | `MatMulOp`、张量适配器 | 输入校验、接收计算后端和成功后提交 |
+| 计算后端 | `CpuReferenceMatmulBackend`、CUDA cuBLAS 接口 | 把同一计算请求交给 CPU 或 GPU |
+| 计算内核 | CPU 三重循环、`cublasSgemm` | 固定数值、跨后端容差和失败状态 |
+
+| 本章新术语 | 先这样理解 | 首次解释 |
+| --- | --- | --- |
+| 算子（operator） | 接收输入、检查条件并发起一次计算的上层入口 | [`03.1 从算子入口发起计算`](./01_operator_base.md) |
+| 计算后端（backend） | 决定在哪类设备、通过哪种实现执行请求 | [`03.2 矩阵乘法请求`](./02_matmul_design.md) |
+| 计算内核（kernel） | 真正遍历数据并产生输出的底层函数 | [`03.3 CPU 参考实现`](./03_cpu_reference.md) |
+| GEMV / GEMM | 矩阵乘向量 / 矩阵乘矩阵的执行形状 | [`03.2 GEMV 和 GEMM`](./02_matmul_design.md#gemv-和-gemm-描述什么形状) |
+| 工作区（workspace） | 执行期间复用的临时内存 | [`03.2 临时结果与工作区`](./02_matmul_design.md#临时结果和-workspace-由谁持有) |
 
 ![Chapter 03 主图：矩阵乘法与计算后端](../assets/diagrams/chapter03-main.svg)
 
@@ -26,7 +42,7 @@ bash code/chapter03_matmul/scripts/run.sh
 
 ## 验证与下一步
 
-CPU 主线完成后进入 [`Chapter 04`](../chapter04_attention/intro.md)，观察相同乘加语义怎样进入独立的教学 Linear、注意力和前馈网络。量化权重的 GEMV 放在 Chapter05，请求组批与实现选择分别放在 Chapter08 和 Chapter09。下面两条命令分别检查默认 CPU 路径和可选 CUDA 路径。
+CPU 主线完成后进入 [`Chapter 04`](../chapter04_attention/intro.md)，观察相同乘加公式怎样进入独立的教学线性层、注意力和前馈网络。量化权重的 GEMV 放在 Chapter05，请求组批与实现选择分别放在 Chapter08 和 Chapter09。下面两条命令分别检查默认 CPU 路径和可选 CUDA 路径。
 
 | 路径 | 执行入口 | 通过条件 |
 | --- | --- | --- |

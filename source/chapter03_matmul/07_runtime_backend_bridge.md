@@ -1,6 +1,6 @@
 # 03.7 在成熟框架中寻找矩阵乘法路径
 
-Chapter03 的调用路径已经可以顺着源码追踪：输入视图生成请求，Backend 选择实现，CPU 循环或 cuBLAS 完成计算。阅读成熟框架时也沿着这条路径查找，不必先理解整个项目。
+Chapter03 的调用路径可以顺着源码追踪：输入视图生成请求，计算后端选择实现，CPU 循环或 cuBLAS 完成计算。阅读生产框架时也可以沿着这条路径查找关键对象。
 
 ![算子、计算后端与内核分层](../assets/diagrams/chapter03-operator-backend-kernel.svg)
 
@@ -18,9 +18,9 @@ Chapter03 的调用路径已经可以顺着源码追踪：输入视图生成请�
 
 | 生产项目入口 | 先寻找什么 | 与本章对照什么 |
 | --- | --- | --- |
-| [llama.cpp CPU Backend](../reference/ecosystem/local_and_delivery.md#llama-cpp) | 图算子如何分派到 CPU 矩阵乘法或点积内核 | `MatMulOp → CpuReferenceMatmulBackend → kernel` |
-| [llama.cpp CUDA Backend](../reference/ecosystem/local_and_delivery.md#llama-cpp) | 同一个图算子如何选择 CUDA Kernel 或计算库 | G 路线的设备指针、Stream 和结果对照 |
-| [TensorRT-LLM Runtime 与 Kernel](../reference/ecosystem/production_frameworks.md#tensorrt-llm) | Buffer、执行上下文、GEMM 与 Workspace 怎样连接 | 请求、Backend 和设备资源的分工 |
+| [llama.cpp CPU 计算后端](../reference/ecosystem/local_and_delivery.md#llama-cpp) | 图算子如何分派到 CPU 矩阵乘法或点积内核 | `MatMulOp → CpuReferenceMatmulBackend → 计算内核` |
+| [llama.cpp CUDA 计算后端](../reference/ecosystem/local_and_delivery.md#llama-cpp) | 同一个图算子如何选择 CUDA 计算内核或计算库 | G 路线的设备指针、CUDA 流和结果对照 |
+| [TensorRT-LLM 运行时与计算内核](../reference/ecosystem/production_frameworks.md#tensorrt-llm) | 缓冲区、执行上下文、GEMM 与工作区怎样连接 | 请求、计算后端和设备资源的分工 |
 | PyTorch 复算 | 用独立张量实现计算同一固定输入 | 区分公式错误、CPU 索引错误和 CUDA 参数错误 |
 
 ## 继续阅读源码
@@ -29,7 +29,7 @@ Chapter03 的调用路径已经可以顺着源码追踪：输入视图生成请�
 
 1. 输入布局和矩阵形状由哪个对象决定；
 2. CPU 与 GPU 在哪个位置分派；
-3. 临时 Workspace、Stream 和设备 Buffer 由谁持有；
+3. 临时工作区、CUDA 流和设备缓冲区由谁持有；
 4. 优化实现使用哪一份 CPU 或独立结果做回归。
 
-能够回答这四个问题，就已经把 Chapter03 的小型调用路径映射到了成熟框架，不需要先通读整个仓库。
+回答这四个问题后，就能把 Chapter03 的小型调用路径映射到生产框架，再按需深入相关模块。

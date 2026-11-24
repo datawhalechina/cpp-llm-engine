@@ -8,10 +8,17 @@ Chapter 01 已经建立模型形状、数据类型和底层存储概念；本章
 | --- | --- | --- |
 | A 小尺寸验证 | 用二维小数组观察共享存储、变形、切片、转置和显式连续化 | 可直接打印的形状、步长、偏移与共享关系 |
 | B 跨章张量接口 | 将同一地址公式扩展到 1–4 维，并通过 `TensorViewRef` 交给后续计算后端 | 3D/4D Q/K/V 布局、Chapter03–05 跨章测试 |
-| G GPU 扩展坐标 | 保留 shape、stride 和连续性语义，由 `CudaTensor` 管理设备存储 | 当前没有 Host Tensor 自动迁移；上传和设备生命周期由 CUDA 模块验证 |
-| M 多模态扩展坐标 | 用相同形状语言描述图像、patch 和 embedding 序列 | 当前多模态对象不直接依赖 Chapter02 Tensor 类型，只复用数据布局约定 |
+| G GPU 扩展坐标 | 保留形状、步长和连续性规则，由 `CudaTensor` 管理设备存储 | CUDA 模块中的上传与设备生命周期测试 |
+| M 多模态扩展坐标 | 用相同形状语言描述图像块和嵌入序列 | 多模态对象复用本章的数据布局约定 |
 
-本章先用中文概念建立直觉，再在正文中对应到代码变量：
+| 实现层次 | 主要对象 | 解决的问题 |
+| --- | --- | --- |
+| 拥有存储 | `Tensor` 与 `shared_ptr<vector<float>>` | 让共享视图持有同一块主机内存 |
+| 布局描述 | `shape`、`strides`、`offset` | 把逻辑索引映射到底层元素位置 |
+| 视图变换 | `reshape`、`slice`、`transpose` | 在满足条件时只改变布局，不复制数值 |
+| 显式物化 | `contiguous()` | 把非连续逻辑顺序复制为新的连续存储 |
+| 跨章引用 | `TensorViewRef`、`MutableTensorViewRef` | 以非拥有方式把地址和布局交给后续算子 |
+| 验证 | 二维与 N 维测试、Chapter03–05 集成测试 | 检查索引、生命周期、失败后原对象和算子输入布局 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
@@ -27,7 +34,7 @@ Chapter 01 已经建立模型形状、数据类型和底层存储概念；本章
 
 ## 开始学习
 
-阅读时先用二维地址理解共享存储，再把同一套形状、步长和偏移公式推广到更多轴。最后通过公共只读/可写视图，把本章张量交给后续算子；跨章测试分别位于 Chapter03 的矩阵乘、Chapter04 的解码器组件和 Chapter05 的量化 Linear，不属于本章默认 CTest。
+阅读时先用二维地址理解共享存储，再把同一套形状、步长和偏移公式推广到更多轴。最后通过公共只读/可写视图，把本章张量交给后续算子。跨章测试分别位于 Chapter03 的矩阵乘、Chapter04 的解码器组件和 Chapter05 的量化线性层，可在学到对应章节时运行。
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
@@ -38,10 +45,10 @@ Chapter 01 已经建立模型形状、数据类型和底层存储概念；本章
 
 ## 验证与下一步
 
-[`Chapter 03`](../chapter03_matmul/intro.md) 明确要求二维输入，把连续 CPU Float32 视图适配为 `MatmulRequest`；高维张量不会被自动展平或解释为批量矩阵乘法。
+[`Chapter 03`](../chapter03_matmul/intro.md) 接受二维输入，把连续 CPU Float32 视图适配为 `MatmulRequest`。高维输入由调用方先变形，批量矩阵乘法则使用专门的批量接口。
 
 | 验收层级 | 执行入口 | 通过条件 | 本章要求 |
 | --- | --- | --- | --- |
 | L1 默认 CPU | `bash code/chapter02_tensor_ops/scripts/run.sh` | 示例输出布局与共享关系；两个 CTest 验证 1–4 维索引、变形、转置、切片、`contiguous()` 和失败路径 | 必做 |
-| L2 相邻章节 | `bash code/chapter03_matmul/scripts/run.sh`、`bash code/chapter04_attention/scripts/run.sh`、`bash code/chapter05_quantization/scripts/run.sh` | Chapter02 公共视图进入 MatMul、Decoder 组件与量化 Linear，错误布局在计算前被拒绝 | 学到对应章节后执行 |
-| L3 可选 CUDA | 不单独设置 Chapter02 CUDA 验收 | 本章只建立主机视图；设备存储由 `code/cuda` 的 `CudaTensor` 验证 | 不适用 |
+| L2 相邻章节 | `bash code/chapter03_matmul/scripts/run.sh`、`bash code/chapter04_attention/scripts/run.sh`、`bash code/chapter05_quantization/scripts/run.sh` | Chapter02 公共视图进入矩阵乘、解码器组件与量化线性层，错误布局在计算前被拒绝 | 学到对应章节后执行 |
+| L3 可选 CUDA | `CUDA_HOME=/usr/local/cuda bash code/cuda/scripts/run.sh` | `CudaTensor` 的设备存储、上传与视图输入通过测试 | 学习 GPU 时选做 |
