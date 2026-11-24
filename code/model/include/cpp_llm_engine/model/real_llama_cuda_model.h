@@ -105,7 +105,7 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-class RealLlamaCudaContext final {
+class RealLlamaCudaContext final : public core::DecoderExecutionContext {
 public:
     ~RealLlamaCudaContext();
     RealLlamaCudaContext(RealLlamaCudaContext&&) noexcept;
@@ -126,17 +126,20 @@ public:
         std::vector<float>* logits);
     core::Status prefill_tokens(
         const std::vector<std::int32_t>& tokens,
-        std::vector<float>* logits);
+        std::vector<float>* logits) override;
     core::Status prefill_embeddings(
         const core::DecoderEmbeddingSequence& embeddings,
-        std::vector<float>* logits);
+        std::vector<float>* logits) override;
+    core::Status decode_token(
+        core::DecoderTokenId token,
+        core::DecoderLogits* logits) override;
     core::Status copy_layer_kv(
         std::size_t layer,
         std::vector<float>* key,
         std::vector<float>* value);
     void set_attention_path(cuda::CudaAttentionPath path);
     void set_quantized_gemv_path(cuda::CudaQuantizedGemvPath path);
-    void reset();
+    void reset() override;
     bool attach_kv_data_plane(
         std::shared_ptr<RealLlamaCudaKvDataPlane> data_plane,
         std::string* error = nullptr);
@@ -146,6 +149,8 @@ public:
     bool uses_external_kv() const;
     bool uses_external_kv_for(std::size_t request_id) const;
     std::size_t position() const;
+    std::size_t token_count() const override;
+    core::DecoderModelContract model_contract() const override;
     std::size_t capacity_tokens() const;
     std::size_t prefill_workspace_creation_count() const;
 

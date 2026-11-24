@@ -932,6 +932,12 @@ core::Status RealLlamaCudaContext::prefill_embeddings(
     return impl_->run_prefill(embeddings.token_count, logits);
 }
 
+core::Status RealLlamaCudaContext::decode_token(
+    core::DecoderTokenId token,
+    core::DecoderLogits* logits) {
+    return forward_token(token, logits);
+}
+
 core::Status RealLlamaCudaContext::copy_layer_kv(
     std::size_t layer,
     std::vector<float>* key,
@@ -1005,6 +1011,30 @@ bool RealLlamaCudaContext::uses_external_kv_for(std::size_t request_id) const {
 }
 
 std::size_t RealLlamaCudaContext::position() const { return impl_->position; }
+
+std::size_t RealLlamaCudaContext::token_count() const { return position(); }
+
+core::DecoderModelContract RealLlamaCudaContext::model_contract() const {
+    return {
+        impl_->model->metadata.vocab_size,
+        impl_->model->layers.size(),
+        impl_->model->metadata.max_position,
+        {
+            impl_->model->layer_config.hidden_size,
+            impl_->model->layer_config.ffn_size,
+            impl_->model->layer_config.query_heads,
+            impl_->model->layer_config.kv_heads,
+            impl_->model->layer_config.head_dimension,
+            impl_->model->layer_config.rotary_dimension,
+            core::DecoderNormalizationKind::RmsNorm,
+            core::DecoderActivationKind::SwiGlu,
+            core::DecoderPositionEncodingKind::Rotary,
+            true,
+            true,
+        },
+    };
+}
+
 std::size_t RealLlamaCudaContext::capacity_tokens() const {
     return impl_->capacity_tokens;
 }
