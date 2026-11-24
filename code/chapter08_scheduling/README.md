@@ -103,4 +103,4 @@ bash code/chapter09_performance/scripts/run_qwen15_moe_scheduling_ab.sh
 
 ## 扩展入口
 
-当前实现包含同步 CPU 调度、优先级老化、真实 Radix 命中排序、真实 Decode batch 和 overlap 计划校验。TinyLlama CPU/CUDA、Qwen1.5-MoE CPU、DeepSeek-V2-Lite CPU/CUDA Factory 都实现 `ExecutorBatchRunner`。DeepSeek CUDA 路径先让每个请求从自己的压缩 MLA 历史计算 Attention，再按专家打包同层 FFN 输入；Factory 已把请求 Context 接到 Chapter07 页表事务，批次成功时统一提交，失败时统一裁剪。Gate、Up、Down 和共享专家使用真实批量量化 Linear，Router、Top-K、加权拆回和最终 LM Head 仍在 Host 或逐请求路径完成。真实多请求 Prefill Tensor batch、DeepSeek CPU Factory 分页绑定、融合路由与拆回 kernel、Deadline、抢占、设备事件重叠和开放环到达率留给后续扩展。
+当前实现包含同步 CPU 调度、优先级老化、真实 Radix 命中排序、真实 Decode batch 和 overlap 计划校验。TinyLlama CPU/CUDA、Qwen1.5-MoE CPU、DeepSeek-V2-Lite CPU/CUDA Factory 都实现 `ExecutorBatchRunner`。SmolVLM CUDA 通过 Engine 的 `CudaEmbeddingBatchRunner` 复用同一协议：两个图文请求分别 Prefill，后三轮 Decode 进入三次 `batch=2` 调用，请求 K/V 和输出始终隔离。DeepSeek CUDA 路径先让每个请求从自己的压缩 MLA 历史计算 Attention，再按专家打包同层 FFN 输入；Factory 已把请求 Context 接到 Chapter07 页表事务，批次成功时统一提交，失败时统一裁剪。Gate、Up、Down 和共享专家使用真实批量量化 Linear，Router、Top-K、加权拆回和最终 LM Head 仍在 Host 或逐请求路径完成。真实多请求 Prefill Tensor batch、DeepSeek CPU Factory 分页绑定、融合路由与拆回 kernel、Deadline、抢占、设备事件重叠和开放环到达率留给后续扩展。

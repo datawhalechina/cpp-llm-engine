@@ -27,6 +27,7 @@
 | `moe_router_backend.h/.cu` | 批量 Router 点积、全专家 Softmax、稳定 Top-K 与紧凑路由输出 |
 | `row_dispatch_backend.h/.cu` | 索引行收集、加权散回与视觉空间合并数据重排 |
 | `vision_elementwise_backend.h/.cu` | 视觉 Block 使用的标准 LayerNorm、bias 广播与 GELU |
+| `vision_attention_backend.h/.cu` | 固定长度图片序列的 packed 双向注意力与 batch 隔离 |
 | `cuda_quantized_linear_test.cu` | CPU reference、融合 GEMV、批量回退、错误路径和固定 workload 计时 |
 | `quantized_gemv_matrix.cu` | Q4_K/Q6_K 的 batch=1/2/4/8 专项矩阵与逐行正确性对照 |
 | `core/rope_contract.h` | 固定原地 RoPE 的连续布局、旋转维度、位置和频率参数 |
@@ -84,9 +85,9 @@
 
 `CudaExecutionContext` 独占一条 stream、一个 cuBLAS handle 和一个 workspace，并以 `CudaTensor` 分派 Vector Add 与 MatMul。上层调用者不再直接创建 `DeviceBuffer`、设置 cuBLAS stream 或在算子内部调用 `cudaMalloc/cudaFree`。
 
-`spatial_merge()` 将 `[grid_h × grid_w, hidden]` 按 `dy → dx → hidden` 重排为 `[(grid_h / merge) × (grid_w / merge), merge² × hidden]`。该原语只负责设备内数据布局，不包含视觉模型配置或 Projector 权重；多模态层在完成网格与 shape 校验后调用它，再复用 `linear_batch()`。
+`spatial_merge()` 将 `[grid_h × grid_w, hidden]` 按 `dy → dx → hidden` 重排为 `[(grid_h / merge) × (grid_w / merge), merge² × hidden]`。`spatial_merge_batch()` 对 `[B × grid_h × grid_w, hidden]` 保留相同的逐图片边界。两个原语只负责设备内数据布局，不包含视觉模型配置或 Projector 权重；多模态层完成网格与 shape 校验后再复用 `linear_batch()`。
 
-视觉 Block 不能直接套用语言 Decoder 的 RMSNorm 与 SwiGLU。`layer_norm_batch()` 按 token 同时计算均值和方差，再应用 gamma、beta；`gelu()` 使用与 CPU reference 相同的 tanh 近似；`add_bias_batch()` 按展平后的 Linear 输出宽度广播 bias。视觉自注意力继续复用 GQA backend，但显式传入 `causal=false`，并令 Query head 与 K/V head 数相同，从而得到双向多头注意力。
+视觉 Block 不能直接套用语言 Decoder 的 RMSNorm 与 SwiGLU。`layer_norm_batch()` 按 token 同时计算均值和方差，再应用 gamma、beta；`gelu()` 使用与 CPU reference 相同的 tanh 近似；`add_bias_batch()` 按展平后的 Linear 输出宽度广播 bias。单图片与多图片视觉自注意力使用 `vision_attention_batch()`：输入按 `[B×T,H,D]` 打包，Linear 合并处理全部 token，Softmax 的 key 范围始终限制在同一张图片的 `T` 个 Patch 内。
 
 | 对象 | 拥有什么 | 不负责什么 |
 | --- | --- | --- |

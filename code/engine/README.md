@@ -28,6 +28,7 @@ Factory 的名称表示它负责按统一规则创建和装配 Executor，而不
 | `src/` | prompt、Tokenizer backend、真实模型 Runtime/Batch 适配与服务装配 |
 | `tests/` | Engine、真实模型、批处理、生成与 ServiceCore 的分层集成测试 |
 | `EmbeddingRequestExecutor` | 预计算 text/visual embedding -> Chapter06 每请求执行器 |
+| `CudaEmbeddingBatchRunner` | 多个 embedding 请求 Context -> CUDA 批量 Decode |
 | `examples/` | First Success、真实生成/服务/HTTP smoke 和真实服务 benchmark |
 | `scripts/run.sh` | 默认隔离构建、demo 和 CTest 入口 |
 | `scripts/run_real_serving_benchmark.sh` | 可选 TinyLlama 双请求 Release benchmark |
@@ -105,7 +106,7 @@ EXP-GPU-16 使用该入口覆盖 batch 1/2、上下文 `16/128` 和 Decode `1/8`
 
 执行器工厂按精确 batch size 缓存 `RealLlamaCudaBatchWorkspace`，复用 stream、cuBLAS handle、embedding rows、批量 hidden/logits 和 Decoder 中间 Tensor。同一工厂的批量调用由互斥锁串行保护；请求级位置和页表仍归各模型执行上下文所有，不进入 workspace。真实 Runtime 与 Service 测试覆盖双请求分页 batch、预留/提交分离、失败不推进和终态释放。融合 PagedAttention、跨 batch size 容量复用、并发 batch 和真实 socket server 尚未接入。
 
-`EmbeddingRequestExecutor` 接收 Core `DecoderEmbeddingSequence` 和每请求 `DecoderExecutionContext`，把预计算 embedding 适配为 Chapter06 `RequestModelExecutor`。Request 中的 prompt position 只承担序列长度和调度计数，真实 hidden values 由 Context 消费；prefill 成功后适配器立即释放 embedding storage，decode 继续使用同一 Context 和既有 KV 生命周期。默认测试用合成 Context 验证 Runtime 生成、长度校验、错误传播与释放，不要求多模态模型文件。
+`EmbeddingRequestExecutor` 接收 Core `DecoderEmbeddingSequence` 和每请求 `DecoderExecutionContext`，把预计算 embedding 适配为 Chapter06 `RequestModelExecutor`。Request 中的 prompt position 只承担序列长度和调度计数，真实 hidden values 由 Context 消费；prefill 成功后适配器立即释放 embedding storage，decode 继续使用同一 Context 和既有 KV 生命周期。`decoder_context()` 返回不转移所有权的底层 Context 指针，供类型匹配的 `ExecutorBatchRunner` 校验位置并执行批量 Decode；Context 的生命周期仍由 Executor 管理。`CudaEmbeddingBatchRunner` 实现该交接，按 batch 大小缓存工作区并调用真实 Llama CUDA batch。默认测试用合成 Context 验证 Runtime 生成、长度校验、错误传播、类型交接点与释放，不要求多模态模型文件。
 
 `embedding_request_service_test` 将同一个适配器注入 Chapter10 `HttpAdapter`。同步 completion 与真实 `ResponseWriter` SSE 都生成 `[2,4]`；压力段连续执行 32 个成功请求、8 个 prefill 失败请求，再覆盖客户端断开和 deadline 超时。每次终态后都检查 Context 析构、inflight 归零以及 accepted 与 completed/failed/cancelled/timed_out/released 计数。该测试固定服务复用契约，不解析图片 HTTP body，也不代替真实 SmolVLM 服务 benchmark。
 

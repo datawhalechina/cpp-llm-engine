@@ -20,7 +20,7 @@ CUDA Backend ─────┘                              │
 
 当前资产覆盖 IDEFICS3 动态切图、单张视觉 tile 预处理、mmproj schema、Float32 Patch/Position Embedding、使用真实 Q8_0 权重的 12 层 SigLIP Vision Encoder、IDEFICS3 Projector，以及图文 embedding 序列拼接。
 
-可选 CUDA 适配已覆盖 Patch/Position Embedding、SigLIP Encoder、IDEFICS3 Projector 和语言 Context 交接。`CudaSiglipEncoder` 将 12 层真实 Q8_0 packed 权重常驻设备，复用一个 workspace 和两个 hidden buffer。`CudaSmolvlmVisionPipeline` 同时提供左上 `4×4` 快速检查和完整 `32×32` tile 对照；完整 tile 将 1024 个 Patch 变为 64 行视觉 embedding。真实分词器产生的 24 个文本词元与这 64 行视觉向量组成 `88x960` 序列，并已通过 Chapter06 Runtime 完成四词元 CPU/CUDA 贪心生成对照。同步 Completion 与 SSE 已使用独立 CUDA Context 验证；图片 HTTP 传输和真实请求组批仍待接入。
+可选 CUDA 适配已覆盖 Patch/Position Embedding、SigLIP Encoder、IDEFICS3 Projector 和语言 Context 交接。`CudaSiglipEncoder` 将 12 层真实 Q8_0 packed 权重常驻设备，复用一个 workspace 和两个 hidden buffer。`CudaSmolvlmVisionPipeline` 支持单 tile 与固定网格多图片 packed batch；Linear/MLP 合并执行，双向 Attention 和空间合并保持图片边界。完整 `32×32` tile 将 1024 个 Patch 变为 64 行视觉 embedding。真实分词器产生的 24 个文本词元与这 64 行视觉向量组成 `88x960` 序列，并已通过 Chapter06 Runtime 完成四词元 CPU/CUDA 贪心生成对照。同步 Completion、SSE、双图片视觉组批和双请求语言 Decode 组批已验证；图片 HTTP 传输与图文 Prefill 组批仍待接入。
 
 | 资产 | 输入与输出 | 当前验证 |
 | --- | --- | --- |
@@ -43,8 +43,8 @@ CUDA Backend ─────┘                              │
 | `CudaSiglipEncoder` | 设备 `[tokens,768]` -> 12 层 post-norm 输出 | 权重常驻、hidden ping-pong、单 workspace |
 | `multimodal_cuda_vision_encoder_inspect` | 真实 mmproj -> 12 层 CUDA Encoder | 4 token 最大误差 `7.03e-5`、余弦相似度 `0.9999999999` |
 | `CudaIdefics3Projector` | 设备视觉网格 -> 设备语言宽度 embedding | 空间合并顺序、F32 Linear 与失败路径 |
-| `CudaSmolvlmVisionPipeline` | Host patch -> 设备视觉 embedding | 三阶段间 hidden 不回传 Host；工作区按 token shape 复用 |
-| `multimodal_cuda_vision_pipeline_inspect` | 真实图片 + mmproj -> `1x960` 或 `64x960` | 快速 `4x4` 窗口与完整 `32x32` tile 均通过 CPU/CUDA 对照 |
+| `CudaSmolvlmVisionPipeline` | 单张或固定网格图片 batch -> 设备视觉 embedding | 三阶段间 hidden 不回传 Host；Attention 与空间合并按图片隔离 |
+| `multimodal_cuda_vision_pipeline_inspect` | 真实图片 + mmproj -> `1x960` 或 `64x960` | 完整 tile 的单图片与 `batch=2` packed 输出通过 CPU/CUDA 对照 |
 | `multimodal_cuda_smolvlm_context_test` | 真实视觉 embedding -> 32 层 CUDA LLM Context | 快速单行与完整 64 行 Prefill 均通过 CPU/CUDA logits、位置和贪心词元对照 |
 | `run_siglip_block` | hidden states + F32 权重 -> 单 Block 输出 | 合成 LayerNorm、全注意力、GELU、双 residual |
 | `multimodal_vision_embedding_inspect` | 真实图片 + mmproj -> 首 patch embedding | `1x768`、checksum、`payload=f32-valid` |
@@ -108,6 +108,8 @@ Patch projection 把每个展平 patch 映射到 hidden width，并加入对应 
 CUDA 路径保留 12 层 packed Q8_0 权重。4-token 真实对照只重建一次 workspace，最大绝对误差为 `7.03e-5`。完整 1024-token tile 同样只构建一次 workspace，经过 12 层 Encoder 和 Projector 后得到 `64x960`，与 CPU CBLAS 参考实现的最大误差为 `2.365e-4`、余弦相似度为 `1`；显存和性能仍需由 Chapter09 单独测量。
 
 `CudaSmolvlmVisionPipeline` 在 Host 完成图片解码、缩放、归一化和 patch 提取，随后把 Patch/Position、12 层 Encoder 与 Projector 串在同一 CUDA Context 中。三个视觉阶段之间的 hidden 不回传 Host；快速模式选取左上 `4×4` patch 子网格，完整模式执行全部 `32×32` patch。语言 Context 对照仍会把视觉结果下载到 Host，再由 `prefill_embeddings()` 上传到语言模型自己的 CUDA Context。这个中转固定两个执行层的接口和数值边界，设备直连与完整图文生成是下一阶段。
+
+多图片组批先要求图片使用相同网格。Pipeline 把 `B` 张图片打包为 `[B×T,hidden]`：Patch Linear、LayerNorm、Q/K/V、MLP 和 Projector Linear 一次处理全部行；视觉 Attention 只读取同一图片的 `T` 个 Patch，空间合并也先定位图片再定位网格。真实完整 tile 的 `batch=2` 输出最大误差为 `4.88e-4`，两张图片均匹配 CPU reference。该接口完成视觉计算组批，还没有把不同网格做 padding，也没有把视觉 batch 与语言 Prefill 合成一个服务事务。
 
 ## IDEFICS3 Projector
 
@@ -238,7 +240,7 @@ bash code/multimodal/scripts/run_cuda_smolvlm_context.sh \
   "What historic event is shown? Answer in one short sentence."
 ```
 
-该模式为同步与 SSE 请求分别创建 CUDA Context。成功输出包含 `service_sync_match: true`、`service_stream_match: true`、`service_metrics_match: true`、`service_factory_calls: 2` 和 `cpu_cuda_match: true`。这项检查验证请求隔离与资源释放；两个请求仍按顺序执行，不代表模型批处理已经接通。
+该模式先为同步与 SSE 请求分别创建 CUDA Context，再把两个独立图文请求交给 Chapter08 连续调度。Engine 的 `CudaEmbeddingBatchRunner` 从每个 Executor 读取不转移所有权的 CUDA Context，并按 batch 大小持久复用工作区。成功输出包含 `service_sync_match: true`、`service_stream_match: true`、`service_metrics_match: true`、`service_model_batch_calls: 3`、`service_tensor_batch_requests: 6`、`service_batch_workspaces: 1` 和 `cpu_cuda_match: true`。两个请求分别完成 88-position Prefill，之后三轮 Decode 均以 `batch=2` 执行。视觉 Pipeline 已有独立的固定网格 `batch=2` 数值入口，但 Service 尚未收集待处理图片；图文 Prefill 仍按请求执行。
 
 若本机已有 `llama.cpp/tools/mtmd/test-1.jpeg`，可以对 JPEG 做额外检查：
 
