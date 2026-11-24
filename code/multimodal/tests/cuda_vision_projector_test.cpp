@@ -77,6 +77,42 @@ int main() {
               1.0e-5F);
     }
 
+    multimodal::FloatMatrix second_input = input;
+    for (float& value : second_input.values) value = value * -0.25F + 0.5F;
+    multimodal::Idefics3ProjectorTrace second_expected;
+    CHECK(multimodal::run_idefics3_projector(
+        second_input, grid_width, grid_height, merge_size, weights,
+        &second_expected, &error));
+    std::vector<float> packed_input = input.values;
+    packed_input.insert(
+        packed_input.end(), second_input.values.begin(), second_input.values.end());
+    std::vector<float> packed_expected = expected.output.values;
+    packed_expected.insert(
+        packed_expected.end(), second_expected.output.values.begin(),
+        second_expected.output.values.end());
+    CudaTensor device_batch_input;
+    CudaTensor device_batch_output;
+    CHECK(CudaTensor::create_contiguous(
+        {2 * input.rows, input.cols}, DType::Float32,
+        &device_batch_input).is_ok());
+    CHECK(CudaTensor::create_contiguous(
+        {2 * expected.output.rows, expected.output.cols}, DType::Float32,
+        &device_batch_output).is_ok());
+    CHECK(context.upload(
+        &device_batch_input, packed_input.data(),
+        packed_input.size() * sizeof(float)).is_ok());
+    CHECK(projector.forward_batch(
+        &context, device_batch_input, 2, grid_width, grid_height, merge_size,
+        &device_batch_output).is_ok());
+    actual.resize(packed_expected.size());
+    CHECK(context.download(
+        device_batch_output, actual.data(),
+        actual.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    for (std::size_t index = 0; index < actual.size(); ++index) {
+        CHECK(std::fabs(actual[index] - packed_expected[index]) <= 1.0e-5F);
+    }
+
     CHECK(!projector.forward(
         &context, device_input, grid_width, grid_height, 3, &output).is_ok());
     CudaTensor wrong_output;

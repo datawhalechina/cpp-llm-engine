@@ -146,12 +146,21 @@ Status CudaSiglipEncoder::forward(
     CudaExecutionContext* context,
     const CudaTensor& input,
     CudaTensor* output) {
+    return forward_batch(context, input, 1, output);
+}
+
+Status CudaSiglipEncoder::forward_batch(
+    CudaExecutionContext* context,
+    const CudaTensor& input,
+    std::size_t batch_size,
+    CudaTensor* output) {
     if (context == nullptr || output == nullptr || !context->valid() ||
-        !valid()) {
+        !valid() || batch_size == 0) {
         return Status::error("CUDA SigLIP Encoder forward input is invalid");
     }
     const auto& shape = input.contract().shape.dimensions;
-    if (shape.size() != 2 || shape[0] == 0 || shape[1] != hidden_size_ ||
+    if (shape.size() != 2 || shape[0] == 0 ||
+        shape[0] % batch_size != 0 || shape[1] != hidden_size_ ||
         output->contract().shape.dimensions != shape) {
         return Status::error("CUDA SigLIP Encoder input/output shape is invalid");
     }
@@ -161,8 +170,8 @@ Status CudaSiglipEncoder::forward(
     const CudaTensor* current = &input;
     for (std::size_t layer = 0; layer < blocks_.size(); ++layer) {
         CudaTensor* destination = layer % 2 == 0 ? &hidden_a_ : &hidden_b_;
-        status = blocks_[layer].forward_with_workspace(
-            context, *current, &workspace_, destination);
+        status = blocks_[layer].forward_batch_with_workspace(
+            context, *current, batch_size, &workspace_, destination);
         if (!status.is_ok()) return status;
         current = destination;
     }

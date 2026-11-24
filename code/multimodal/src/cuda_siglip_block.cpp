@@ -19,7 +19,6 @@ namespace {
 using cpp_llm_engine::core::DType;
 using cpp_llm_engine::core::Status;
 using cpp_llm_engine::cuda::CudaExecutionContext;
-using cpp_llm_engine::cuda::CudaKvCache;
 using cpp_llm_engine::cuda::CudaLinearWeight;
 using cpp_llm_engine::cuda::CudaQuantizedMatrix;
 using cpp_llm_engine::cuda::CudaTensor;
@@ -131,8 +130,6 @@ Status CudaSiglipBlockWorkspace::create(
         {token_count, feed_forward_size}, &replacement.feed_forward_activated);
     if (status.is_ok()) status = create_tensor(
         {token_count, hidden_size}, &replacement.feed_forward_output);
-    if (status.is_ok()) status = CudaKvCache::create(
-        token_count, attention_heads, head_dimension, &replacement.cache);
     if (!status.is_ok()) return status;
     replacement.token_count_ = token_count;
     replacement.hidden_size_ = hidden_size;
@@ -149,7 +146,7 @@ bool CudaSiglipBlockWorkspace::valid_for(
     std::size_t feed_forward_size) const {
     return token_count_ == token_count && hidden_size_ == hidden_size &&
         attention_heads_ == attention_heads &&
-        feed_forward_size_ == feed_forward_size && cache.valid();
+        feed_forward_size_ == feed_forward_size;
 }
 
 std::size_t CudaSiglipBlockWorkspace::token_count() const {
@@ -403,18 +400,28 @@ Status CudaSiglipBlock::forward_with_workspace(
     const CudaTensor& input,
     CudaSiglipBlockWorkspace* workspace,
     CudaTensor* output) const {
+    return forward_batch_with_workspace(
+        context, input, 1, workspace, output);
+}
+
+Status CudaSiglipBlock::forward_batch_with_workspace(
+    CudaExecutionContext* context,
+    const CudaTensor& input,
+    std::size_t batch_size,
+    CudaSiglipBlockWorkspace* workspace,
+    CudaTensor* output) const {
     if (context == nullptr || workspace == nullptr || output == nullptr ||
-        !context->valid() || !valid()) {
+        !context->valid() || !valid() || batch_size == 0) {
         return Status::error("CUDA SigLIP Block workspace input is invalid");
     }
     const auto& shape = input.contract().shape.dimensions;
-    if (shape.size() != 2 || shape[1] != hidden_size_ ||
+    if (shape.size() != 2 || shape[0] % batch_size != 0 ||
+        shape[1] != hidden_size_ ||
         output->contract().shape.dimensions != shape ||
         !workspace->valid_for(
             shape[0], hidden_size_, attention_heads_, feed_forward_size_)) {
         return Status::error("CUDA SigLIP Block workspace shape is invalid");
     }
-    workspace->cache.clear();
     Status status = context->layer_norm_batch(
         input, norm_1_weight_, norm_1_bias_, &workspace->normalized_attention,
         layer_norm_epsilon_);
@@ -424,11 +431,9 @@ Status CudaSiglipBlock::forward_with_workspace(
         context, workspace->normalized_attention, key_, &workspace->key);
     if (status.is_ok()) status = run_linear(
         context, workspace->normalized_attention, value_, &workspace->value);
-    if (status.is_ok()) status = context->append_kv(
-        &workspace->cache, workspace->key, workspace->value);
-    if (status.is_ok()) status = context->gqa_attention(
-        workspace->query, workspace->cache,
-        &workspace->attention_context, 0, false);
+    if (status.is_ok()) status = context->vision_attention_batch(
+        workspace->query, workspace->key, workspace->value, batch_size,
+        shape[0] / batch_size, &workspace->attention_context);
     if (status.is_ok()) status = run_linear(
         context, workspace->attention_context, attention_output_,
         &workspace->attention_projection);

@@ -38,6 +38,13 @@ public:
         std::size_t grid_width,
         std::size_t grid_height,
         cpp_llm_engine::cuda::CudaTensor* output);
+    cpp_llm_engine::core::Status forward_batch(
+        cpp_llm_engine::cuda::CudaExecutionContext* context,
+        const std::vector<PatchTensor>& patches,
+        const std::vector<std::vector<std::size_t>>& positions,
+        std::size_t grid_width,
+        std::size_t grid_height,
+        cpp_llm_engine::cuda::CudaTensor* output);
 
     bool valid() const;
     std::size_t workspace_rebuild_count() const;

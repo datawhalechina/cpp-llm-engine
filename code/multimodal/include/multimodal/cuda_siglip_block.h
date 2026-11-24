@@ -5,7 +5,6 @@
 #pragma once
 
 #include "cpp_llm_engine/core/status.h"
-#include "cpp_llm_engine/cuda/cuda_kv_cache.h"
 #include "cpp_llm_engine/cuda/cuda_quantized_matrix.h"
 #include "cpp_llm_engine/cuda/cuda_tensor.h"
 #include "multimodal/mmproj_schema.h"
@@ -51,7 +50,6 @@ private:
     cpp_llm_engine::cuda::CudaTensor feed_forward_hidden;
     cpp_llm_engine::cuda::CudaTensor feed_forward_activated;
     cpp_llm_engine::cuda::CudaTensor feed_forward_output;
-    cpp_llm_engine::cuda::CudaKvCache cache;
     std::size_t token_count_ = 0;
     std::size_t hidden_size_ = 0;
     std::size_t attention_heads_ = 0;
@@ -83,6 +81,12 @@ public:
     cpp_llm_engine::core::Status forward_with_workspace(
         cpp_llm_engine::cuda::CudaExecutionContext* context,
         const cpp_llm_engine::cuda::CudaTensor& input,
+        CudaSiglipBlockWorkspace* workspace,
+        cpp_llm_engine::cuda::CudaTensor* output) const;
+    cpp_llm_engine::core::Status forward_batch_with_workspace(
+        cpp_llm_engine::cuda::CudaExecutionContext* context,
+        const cpp_llm_engine::cuda::CudaTensor& input,
+        std::size_t batch_size,
         CudaSiglipBlockWorkspace* workspace,
         cpp_llm_engine::cuda::CudaTensor* output) const;
 

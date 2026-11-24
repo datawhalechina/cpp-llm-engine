@@ -78,14 +78,55 @@ Status CudaSmolvlmVisionPipeline::forward(
     std::size_t grid_width,
     std::size_t grid_height,
     CudaTensor* output) {
+    return forward_batch(
+        context, {patches}, {positions}, grid_width, grid_height, output);
+}
+
+Status CudaSmolvlmVisionPipeline::forward_batch(
+    CudaExecutionContext* context,
+    const std::vector<PatchTensor>& patch_batch,
+    const std::vector<std::vector<std::size_t>>& position_batch,
+    std::size_t grid_width,
+    std::size_t grid_height,
+    CudaTensor* output) {
     if (context == nullptr || output == nullptr || !context->valid() ||
-        !valid() || !patches.valid() || grid_width == 0 || grid_height == 0 ||
+        !valid() || patch_batch.empty() ||
+        patch_batch.size() != position_batch.size() ||
+        grid_width == 0 || grid_height == 0 ||
         grid_width > std::numeric_limits<std::size_t>::max() / grid_height ||
-        grid_width * grid_height != positions.size() ||
-        positions.size() != static_cast<std::size_t>(patches.patch_count)) {
+        patch_batch.size() > std::numeric_limits<std::size_t>::max() /
+            (grid_width * grid_height) ||
+        patch_batch.size() * grid_width * grid_height >
+            static_cast<std::size_t>(std::numeric_limits<int>::max())) {
         return Status::error("CUDA vision pipeline forward input is invalid");
     }
-    const std::size_t output_tokens =
+    const std::size_t tokens_per_image = grid_width * grid_height;
+    PatchTensor packed;
+    packed.patch_count = static_cast<int>(
+        patch_batch.size() * tokens_per_image);
+    for (std::size_t index = 0; index < patch_batch.size(); ++index) {
+        if (!patch_batch[index].valid() ||
+            static_cast<std::size_t>(patch_batch[index].patch_count) !=
+                tokens_per_image ||
+            position_batch[index].size() != tokens_per_image ||
+            (index != 0 && patch_batch[index].patch_values !=
+                patch_batch.front().patch_values)) {
+            return Status::error(
+                "CUDA vision pipeline batch shapes are inconsistent");
+        }
+        packed.values.insert(
+            packed.values.end(), patch_batch[index].values.begin(),
+            patch_batch[index].values.end());
+    }
+    packed.patch_values = patch_batch.front().patch_values;
+    std::vector<std::size_t> packed_positions;
+    packed_positions.reserve(patch_batch.size() * tokens_per_image);
+    for (const auto& image_positions : position_batch) {
+        packed_positions.insert(
+            packed_positions.end(), image_positions.begin(),
+            image_positions.end());
+    }
+    const std::size_t output_tokens = patch_batch.size() *
         (grid_width / merge_size_) * (grid_height / merge_size_);
     if (grid_width % merge_size_ != 0 || grid_height % merge_size_ != 0 ||
         output->contract().shape.dimensions !=
@@ -93,13 +134,14 @@ Status CudaSmolvlmVisionPipeline::forward(
         return Status::error("CUDA vision pipeline output shape is invalid");
     }
 
-    Status status = prepare_workspace(positions.size());
+    Status status = prepare_workspace(packed_positions.size());
     if (status.is_ok()) status = embedding_.forward(
-        context, patches, positions, &embedded_);
-    if (status.is_ok()) status = encoder_.forward(
-        context, embedded_, &encoded_);
-    if (status.is_ok()) status = projector_.forward(
-        context, encoded_, grid_width, grid_height, merge_size_, output);
+        context, packed, packed_positions, &embedded_);
+    if (status.is_ok()) status = encoder_.forward_batch(
+        context, embedded_, patch_batch.size(), &encoded_);
+    if (status.is_ok()) status = projector_.forward_batch(
+        context, encoded_, patch_batch.size(), grid_width, grid_height,
+        merge_size_, output);
     return status;
 }
 

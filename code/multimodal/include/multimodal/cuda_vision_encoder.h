@@ -33,6 +33,11 @@ public:
         cpp_llm_engine::cuda::CudaExecutionContext* context,
         const cpp_llm_engine::cuda::CudaTensor& input,
         cpp_llm_engine::cuda::CudaTensor* output);
+    cpp_llm_engine::core::Status forward_batch(
+        cpp_llm_engine::cuda::CudaExecutionContext* context,
+        const cpp_llm_engine::cuda::CudaTensor& input,
+        std::size_t batch_size,
+        cpp_llm_engine::cuda::CudaTensor* output);
 
     bool valid() const;
     std::size_t block_count() const;

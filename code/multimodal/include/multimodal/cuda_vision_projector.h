@@ -30,6 +30,14 @@ public:
         std::size_t grid_height,
         std::size_t merge_size,
         cpp_llm_engine::cuda::CudaTensor* output) const;
+    cpp_llm_engine::core::Status forward_batch(
+        cpp_llm_engine::cuda::CudaExecutionContext* context,
+        const cpp_llm_engine::cuda::CudaTensor& input,
+        std::size_t batch_size,
+        std::size_t grid_width,
+        std::size_t grid_height,
+        std::size_t merge_size,
+        cpp_llm_engine::cuda::CudaTensor* output) const;
 
     bool valid() const;
     std::size_t input_size() const;

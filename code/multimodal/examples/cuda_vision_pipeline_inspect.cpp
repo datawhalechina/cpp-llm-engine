@@ -164,6 +164,23 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    CudaTensor batch_output;
+    std::vector<float> batch_actual(2 * expected.output.values.size());
+    if (status.is_ok()) status = CudaTensor::create_contiguous(
+        {2 * expected.output.rows, expected.output.cols}, DType::Float32,
+        &batch_output);
+    if (status.is_ok()) status = pipeline.forward_batch(
+        &context, {selected, selected}, {positions, positions},
+        selected_grid, selected_grid, &batch_output);
+    if (status.is_ok()) status = context.download(
+        batch_output, batch_actual.data(),
+        batch_actual.size() * sizeof(float));
+    if (status.is_ok()) status = context.synchronize();
+    if (!status.is_ok()) {
+        std::cerr << "CUDA vision batch failed: " << status.message() << '\n';
+        return 1;
+    }
+
     float maximum_error = 0.0F;
     double dot = 0.0;
     double expected_square = 0.0;
@@ -178,9 +195,22 @@ int main(int argc, char** argv) {
         actual_square += static_cast<double>(actual[value]) * actual[value];
     }
     const double cosine = dot / std::sqrt(expected_square * actual_square);
+    float batch_maximum_error = 0.0F;
+    for (std::size_t image_index = 0; image_index < 2; ++image_index) {
+        for (std::size_t value = 0; value < expected.output.values.size();
+             ++value) {
+            batch_maximum_error = std::max(
+                batch_maximum_error,
+                std::fabs(batch_actual[
+                    image_index * expected.output.values.size() + value] -
+                    expected.output.values[value]));
+        }
+    }
+    const bool batch_matched = std::isfinite(batch_maximum_error) &&
+        batch_maximum_error <= 5.0e-2F;
     const bool matched = std::isfinite(maximum_error) &&
         std::isfinite(cosine) && maximum_error <= 5.0e-2F &&
-        cosine >= 0.9999;
+        cosine >= 0.9999 && batch_matched;
     std::cout << std::setprecision(10)
               << "source_image: " << image.width << 'x' << image.height << '\n'
               << "vision_mode: "
@@ -203,6 +233,10 @@ int main(int argc, char** argv) {
               << expected.output.cols << '\n'
               << "workspace_rebuilds: "
               << pipeline.workspace_rebuild_count() << '\n'
+              << "vision_batch_size: 2\n"
+              << "vision_batch_maximum_error: " << batch_maximum_error << '\n'
+              << "vision_batch_match: "
+              << (batch_matched ? "true" : "false") << '\n'
               << "maximum_error: " << maximum_error << '\n'
               << "cosine_similarity: " << cosine << '\n'
               << "cpu_cuda_match: " << (matched ? "true" : "false") << '\n';

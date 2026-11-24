@@ -60,14 +60,29 @@ Status CudaIdefics3Projector::forward(
     std::size_t grid_height,
     std::size_t merge_size,
     CudaTensor* output) const {
+    return forward_batch(
+        context, input, 1, grid_width, grid_height, merge_size, output);
+}
+
+Status CudaIdefics3Projector::forward_batch(
+    CudaExecutionContext* context,
+    const CudaTensor& input,
+    std::size_t batch_size,
+    std::size_t grid_width,
+    std::size_t grid_height,
+    std::size_t merge_size,
+    CudaTensor* output) const {
     if (context == nullptr || output == nullptr || !context->valid() ||
-        !valid() || grid_width == 0 || grid_height == 0 || merge_size == 0 ||
+        !valid() || batch_size == 0 || grid_width == 0 || grid_height == 0 ||
+        merge_size == 0 ||
         grid_width % merge_size != 0 || grid_height % merge_size != 0) {
         return Status::error("CUDA IDEFICS3 projector forward input is invalid");
     }
     const auto& input_shape = input.contract().shape.dimensions;
     if (grid_width > std::numeric_limits<std::size_t>::max() / grid_height ||
-        input_shape.size() != 2 || input_shape[0] != grid_width * grid_height ||
+        batch_size > std::numeric_limits<std::size_t>::max() /
+            (grid_width * grid_height) || input_shape.size() != 2 ||
+        input_shape[0] != batch_size * grid_width * grid_height ||
         merge_size > std::numeric_limits<std::size_t>::max() / merge_size ||
         merge_size * merge_size >
             std::numeric_limits<std::size_t>::max() / input_shape[1] ||
@@ -75,7 +90,8 @@ Status CudaIdefics3Projector::forward(
         return Status::error("CUDA IDEFICS3 projector shape is invalid");
     }
     const std::size_t output_tokens =
-        (grid_width / merge_size) * (grid_height / merge_size);
+        batch_size * (grid_width / merge_size) *
+        (grid_height / merge_size);
     if (output->empty() ||
         output->contract().dtype != DType::Float32 ||
         output->contract().device != cpp_llm_engine::core::DeviceKind::CUDA ||
@@ -88,8 +104,8 @@ Status CudaIdefics3Projector::forward(
     Status status = CudaTensor::create_contiguous(
         {output_tokens, input_size_}, DType::Float32, &merged);
     if (status.is_ok()) {
-        status = context->spatial_merge(
-            input, grid_width, grid_height, merge_size, &merged);
+        status = context->spatial_merge_batch(
+            input, batch_size, grid_width, grid_height, merge_size, &merged);
     }
     if (status.is_ok()) {
         status = context->linear_batch(
