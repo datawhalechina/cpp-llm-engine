@@ -17,7 +17,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq05_debug_safe_buffer/starter /tmp/fq05-answer
-bash scripts/check_foundation_answer.sh /tmp/fq05-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq05-answer/main.cpp
 ```
 
 运行普通题库和 UBSan 题库：

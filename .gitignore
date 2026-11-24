@@ -55,6 +55,9 @@ docs/.vitepress/cache/
 SESSION_HANDOFF.md
 complicated_old/
 
+# Personal audit scripts and notes
+/scripts/local/
+
 # Large local model or dataset downloads
 *.gguf
 *.ggml

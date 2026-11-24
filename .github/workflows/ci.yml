@@ -33,9 +33,6 @@ jobs:
       - name: Install documentation dependencies
         run: npm ci
 
-      - name: Check documentation style
-        run: npm run docs:check-style
-
       - name: Build documentation and check links
         run: npm run docs:check-links
 

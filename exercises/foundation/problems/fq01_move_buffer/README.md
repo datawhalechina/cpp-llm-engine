@@ -17,7 +17,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq01_move_buffer/starter /tmp/fq01-answer
-bash scripts/check_foundation_answer.sh /tmp/fq01-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq01-answer/main.cpp
 ```
 
 参考实现：`../../fq01_move_buffer.cpp`。完成后运行：

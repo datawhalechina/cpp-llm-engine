@@ -18,7 +18,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq18_numerical_evidence/starter /tmp/fq18-answer
-bash scripts/check_foundation_answer.sh /tmp/fq18-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq18-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点检查 `fq18_numerical_evidence` 的误差指标、稳定 Softmax 和失败输入。

@@ -19,7 +19,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq22_bounded_worker/starter /tmp/fq22-answer
-bash scripts/check_foundation_answer.sh /tmp/fq22-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq22-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点检查 `fq22_bounded_worker` 的容量、取消、异常、停止和终态唯一性。

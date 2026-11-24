@@ -66,10 +66,7 @@ for (const file of [
   'USAGE.md',
   'CONTRIBUTING.md',
   'SESSION_HANDOFF.md',
-  'docs/README.md',
-  'docs/README.en.md',
   'docs/index.md',
-  'docs/guide.md',
 ]) {
   if (existsSync(file)) repositoryMarkdownFiles.push(file)
 }

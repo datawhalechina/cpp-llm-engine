@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 problem_root="${root_dir}/exercises/foundation/problems"
 exercise_index="${root_dir}/exercises/foundation/README.md"
 exercise_map="${root_dir}/source/foundation/exercise_map.md"

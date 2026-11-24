@@ -17,7 +17,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq12_raii_workspace/starter /tmp/fq12-answer
-bash scripts/check_foundation_answer.sh /tmp/fq12-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq12-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq12_raii_workspace`；再用 UBSan/ASan 检查移动和边界路径。

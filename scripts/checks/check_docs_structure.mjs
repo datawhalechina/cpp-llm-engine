@@ -11,6 +11,8 @@ const chapterSource = /^source\/chapter\d{2}_[^/]+\/.+\.md$/
 const maintainerOnlyLink = /(?:source\/maintenance\/|(?:^|[.]{0,2}\/+)maintenance\/)/
 const maintainerOnlyStatus = /(?:当前就绪度|后续补强顺序|审核结论与补强顺序|English coverage status)/i
 const sidebarConfig = readFileSync('docs/.vitepress/config.mts', 'utf8')
+const codeIndexPath = 'docs/code/README.md'
+const codeIndex = readFileSync(codeIndexPath, 'utf8')
 
 function isMaintainerFile(file) {
   return file.startsWith('source/maintenance/')
@@ -111,9 +113,32 @@ for (const chapterDirectory of chapterDirectories) {
     }
   }
 
-  const onlineCodeIndex = join('docs/code', `${chapterDirectory}.md`)
-  if (!existsSync(onlineCodeIndex)) {
-    findings.push(`${onlineCodeIndex}: online chapter code index is missing`)
+  if (!codeIndex.includes(codeReadme)) {
+    findings.push(`${codeIndexPath}: missing canonical code README link for ${codeReadme}`)
+  }
+}
+
+for (const moduleName of ['model', 'engine', 'cuda', 'multimodal']) {
+  const codeReadme = join('code', moduleName, 'README.md')
+  if (!existsSync(codeReadme)) {
+    findings.push(`${codeReadme}: shared module code README is missing`)
+  } else if (!codeIndex.includes(codeReadme)) {
+    findings.push(`${codeIndexPath}: missing canonical code README link for ${codeReadme}`)
+  }
+}
+
+const extensionsRoot = 'source/extensions'
+if (existsSync(extensionsRoot)) {
+  for (const extension of readdirSync(extensionsRoot, { withFileTypes: true })) {
+    if (!extension.isDirectory()) continue
+
+    const extensionPath = join(extensionsRoot, extension.name)
+    for (const page of readdirSync(extensionPath).filter((file) => file.endsWith('.md'))) {
+      const route = `/extensions/${extension.name}/${page.replace(/\.md$/, '')}`
+      if (!sidebarConfig.includes(`link: '${route}'`)) {
+        findings.push(`${extensionPath}/${page}: extension page is missing from the Chinese sidebar`)
+      }
+    }
   }
 }
 

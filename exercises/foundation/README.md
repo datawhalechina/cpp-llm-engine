@@ -31,7 +31,7 @@
 
 每道题都包含问题说明、完成标准、答案验证命令、提示和主线链接。验证顺序固定为：复制并完成 starter，先运行学习者答案，再运行 `run_all.sh` 检查参考实现没有回归。
 
-题库根目录中的 `.cpp` 是可运行参考实现；每道题的 `starter/` 目录提供不含答案的最小起点。单文件答案统一使用 `bash scripts/check_foundation_answer.sh /tmp/<answer>/main.cpp` 编译并运行；FQ04 和 FQ17 按各自 README 使用 CMake/CTest 验收。
+题库根目录中的 `.cpp` 是可运行参考实现；每道题的 `starter/` 目录提供不含答案的最小起点。单文件答案统一使用 `bash scripts/workflows/check_foundation_answer.sh /tmp/<answer>/main.cpp` 编译并运行；FQ04 和 FQ17 按各自 README 使用 CMake/CTest 验收。
 
 ## 如何完成一道题
 
@@ -81,7 +81,7 @@ C++ 基础较弱时，先完成 [`F00 C++ 就绪自测`](/foundation/00_cpp_read
 | 验证方式 | 22 题 CTest、starter 编译、元数据检查、回归基线 | FQ10/FQ20 的 CPU 语义默认验证；真实设备由 CUDA 专项测试验证 |
 | 主线出口 | Chapter 01-10 的数据、算子、Runtime、缓存、调度、证据与服务 | Chapter03 CUDA backend、后续 GPU Kernel 和性能实验 |
 
-Foundation 的 GPU 练习先用 FQ10 建立 CPU/CUDA 对照，再用 FQ20 固定设备任务顺序和 workspace 复用；真实设备内存、Stream、Event、Kernel 和 Benchmark 进入 [`code/cuda`](/code/cuda) 验证。
+Foundation 的 GPU 练习先用 FQ10 建立 CPU/CUDA 对照，再用 FQ20 固定设备任务顺序和 workspace 复用；真实设备内存、Stream、Event、Kernel 和 Benchmark 进入 [`code/cuda`](https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/README.md) 验证。
 
 ## 两道状态题的区别
 

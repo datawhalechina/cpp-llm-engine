@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 llama_root="${LLAMA_CPP_ROOT:-${repo_root}/llama.cpp}"
 build_dir="${SMOLVLM_BUILD_DIR:-/tmp/cpp-llm-engine-smolvlm-build}"
 model_dir="${SMOLVLM_MODEL_DIR:-${llama_root}/models/smolvlm-500m}"

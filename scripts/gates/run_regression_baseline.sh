@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
@@ -29,6 +29,11 @@ run_and_check \
     line_endings \
     "cd '${repo_root}' && npm run code:check-line-endings" \
     "Shell script line ending check passed"
+
+run_and_check \
+    script_catalog \
+    "cd '${repo_root}' && npm run test:check-script-catalog" \
+    "Script catalog check passed"
 
 run_and_check \
     code_headers \
@@ -61,18 +66,23 @@ run_and_check \
     "Model capability check passed"
 
 run_and_check \
+    multimodal_target_boundaries \
+    "cd '${repo_root}' && npm run test:check-multimodal-boundaries" \
+    "Multimodal target boundary check passed"
+
+run_and_check \
     foundation \
     "cd '${repo_root}' && bash exercises/foundation/run_all.sh"
 
 run_and_check \
     foundation_starters \
-    "cd '${repo_root}' && bash scripts/check_foundation_starters.sh" \
+    "cd '${repo_root}' && bash scripts/checks/check_foundation_starters.sh" \
     "Foundation starter contract passed" \
     "FQ04 starts with zero tests; FQ17 builds but its behavior test fails until completed"
 
 run_and_check \
     foundation_metadata \
-    "cd '${repo_root}' && bash scripts/check_foundation_metadata.sh" \
+    "cd '${repo_root}' && bash scripts/checks/check_foundation_metadata.sh" \
     "Foundation metadata check passed"
 
 run_and_check \

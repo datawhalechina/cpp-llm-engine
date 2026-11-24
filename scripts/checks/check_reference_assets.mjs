@@ -1,18 +1,18 @@
 #!/usr/bin/env node
-// 检查术语和公式参考资产的稳定编号、引用与重复项。
+// 检查术语、公式、章节入口和实验资产的稳定编号与引用。
 import fs from 'node:fs'
 import path from 'node:path'
 
 const formulaFile = 'source/reference/formulas.md'
 const glossaryFile = 'source/reference/glossary.md'
-const tutorialAssetsFile = 'source/reference/tutorial_assets.md'
 const experimentAssetsFile = 'source/reference/experiment_assets.md'
+const usageFile = 'USAGE.md'
 const sourceRoot = 'source'
 
 const formulaText = fs.readFileSync(formulaFile, 'utf8')
 const glossaryText = fs.readFileSync(glossaryFile, 'utf8')
-const tutorialAssetsText = fs.readFileSync(tutorialAssetsFile, 'utf8')
 const experimentAssetsText = fs.readFileSync(experimentAssetsFile, 'utf8')
+const usageText = fs.readFileSync(usageFile, 'utf8')
 const findings = []
 
 function markdownFiles(root) {
@@ -112,24 +112,10 @@ const chapterSlugs = [
   'chapter10_serving',
 ]
 
-const restructuredChapterIntros = {
-  chapter06_generation: '../chapter06_generation/next/intro.md',
-  chapter07_kv_cache: '../chapter07_kv_cache/next/intro.md',
-  chapter08_scheduling: '../chapter08_scheduling/next/intro.md',
-  chapter09_performance: '../chapter09_performance/next/intro.md',
-  chapter10_serving: '../chapter10_serving/next/intro.md',
-}
-
 for (const slug of chapterSlugs) {
-  const introAsset = restructuredChapterIntros[slug] ?? `../${slug}/intro.md`
-  const requiredAssets = [
-    introAsset,
-    `/code/${slug}`,
-  ]
-  for (const asset of requiredAssets) {
-    if (!tutorialAssetsText.includes(asset)) {
-      findings.push(`${tutorialAssetsFile}: missing ${slug} asset ${asset}`)
-    }
+  const runEntry = `code/${slug}`
+  if (!usageText.includes(runEntry)) {
+    findings.push(`${usageFile}: missing ${slug} run entry ${runEntry}`)
   }
 
   const codeReadme = `code/${slug}/README.md`
@@ -179,6 +165,6 @@ if (findings.length > 0) {
 
 console.log(
   `Reference asset check passed: ${formulaIds.length} formulas, ${terms.length} terms, ` +
-    `${chapterSlugs.length} chapters, ${experimentIds.length} experiments`,
+    `${chapterSlugs.length} chapter entries, ${experimentIds.length} experiments`,
 )
 

@@ -19,7 +19,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq20_device_pipeline/starter /tmp/fq20-answer
-bash scripts/check_foundation_answer.sh /tmp/fq20-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq20-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点检查 `fq20_device_pipeline` 的执行顺序和 workspace 复用。该练习验证设备语义；真实 CUDA API 由 `code/cuda` 专项入口验证。
@@ -32,4 +32,4 @@ bash scripts/check_foundation_answer.sh /tmp/fq20-answer/main.cpp
 
 ## 主线映射
 
-对应 [`Foundation CUDA 资源`](/foundation/12_cuda_resource_lifecycle)、[`CUDA 代码架构`](/code/cuda) 和 [`Chapter09 性能证据`](/chapter09_performance/next/intro)。
+对应 [`Foundation CUDA 资源`](/foundation/12_cuda_resource_lifecycle)、[`CUDA 代码架构`](https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/README.md) 和 [`Chapter09 性能证据`](/chapter09_performance/next/intro)。

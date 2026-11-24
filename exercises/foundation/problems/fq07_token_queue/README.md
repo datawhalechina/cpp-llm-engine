@@ -17,7 +17,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq07_token_queue/starter /tmp/fq07-answer
-bash scripts/check_foundation_answer.sh /tmp/fq07-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq07-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq07_token_queue`。

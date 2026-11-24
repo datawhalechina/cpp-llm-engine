@@ -4,11 +4,11 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/migrate_chapter_to_source.sh <chapter-dir>
+  scripts/maintenance/migrate_chapter_to_source.sh <chapter-dir>
 
 Examples:
-  scripts/migrate_chapter_to_source.sh chapter03_matmul
-  scripts/migrate_chapter_to_source.sh chapter06_generation
+  scripts/maintenance/migrate_chapter_to_source.sh chapter03_matmul
+  scripts/maintenance/migrate_chapter_to_source.sh chapter06_generation
 
 What it does:
   - Moves docs/<chapter-dir> to source/<chapter-dir> if needed
@@ -23,7 +23,7 @@ if [[ $# -ne 1 ]]; then
 fi
 
 chapter_dir="$1"
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 docs_path="$repo_root/docs/$chapter_dir"
 source_path="$repo_root/source/$chapter_dir"
 docs_parent_rel="../source/$chapter_dir"

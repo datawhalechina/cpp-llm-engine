@@ -19,7 +19,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq21_paired_benchmark/starter /tmp/fq21-answer
-bash scripts/check_foundation_answer.sh /tmp/fq21-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq21-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点检查 `fq21_paired_benchmark` 的预热、交替顺序、正确性门禁和样本统计。

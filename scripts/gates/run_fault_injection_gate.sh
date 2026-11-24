@@ -2,8 +2,8 @@
 # 故障注入专项门：用严格警告和 Sanitizer 验证注入器、事务回滚与终态释放。
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-quality_gate="${repo_root}/scripts/run_cpp_quality_gate.sh"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+quality_gate="${repo_root}/scripts/gates/run_cpp_quality_gate.sh"
 
 echo "[fault-injection] testing infrastructure"
 bash "${quality_gate}" \

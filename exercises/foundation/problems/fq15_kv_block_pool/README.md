@@ -19,7 +19,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq15_kv_block_pool/starter /tmp/fq15-answer
-bash scripts/check_foundation_answer.sh /tmp/fq15-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq15-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点检查 `fq15_kv_block_pool` 的容量不足、释放和复用路径。

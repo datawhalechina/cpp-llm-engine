@@ -3,7 +3,7 @@
 # 产物：在临时结果目录保存 commit、模型、环境和各子任务生成的结果路径。
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 model_path="${CPP_LLM_ENGINE_MODEL_PATH:-${repo_root}/llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf}"
 llama_root="${LLAMA_CPP_ROOT:-${repo_root}/llama.cpp}"
 llama_simple="${LLAMA_SIMPLE_BIN:-${llama_root}/build/bin/llama-simple}"
@@ -41,22 +41,22 @@ LLAMA_CPP_ROOT="${llama_root}" \
     bash "${repo_root}/code/chapter01_tensor_loader/run_real_tokenizer.sh"
 
 echo "[cpu-v1] task 3: tensor and operator"
-bash "${repo_root}/scripts/run_tensor_operator_learning.sh"
+bash "${repo_root}/scripts/workflows/run_tensor_operator_learning.sh"
 
 echo "[cpu-v1] task 4: real 22-layer decoder"
 CPP_LLM_ENGINE_MODEL_PATH="${model_path}" \
 LLAMA_CPP_ROOT="${llama_root}" \
-    bash "${repo_root}/scripts/run_real_decoder_learning.sh"
+    bash "${repo_root}/scripts/workflows/run_real_decoder_learning.sh"
 
 echo "[cpu-v1] task 5: generation runtime"
 CPP_LLM_ENGINE_MODEL_PATH="${model_path}" \
 LLAMA_CPP_ROOT="${llama_root}" \
-    bash "${repo_root}/scripts/run_generation_runtime_learning.sh"
+    bash "${repo_root}/scripts/workflows/run_generation_runtime_learning.sh"
 
 echo "[cpu-v1] task 6: real CPU service"
 CPP_LLM_ENGINE_MODEL_PATH="${model_path}" \
 CPU_SERVICE_LEARNING_RESULT_DIR="${result_dir}/service-ab" \
-    bash "${repo_root}/scripts/run_cpu_service_learning.sh"
+    bash "${repo_root}/scripts/workflows/run_cpu_service_learning.sh"
 
 {
     echo "status=PASS"

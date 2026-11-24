@@ -18,7 +18,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq19_transaction_rollback/starter /tmp/fq19-answer
-bash scripts/check_foundation_answer.sh /tmp/fq19-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq19-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点检查 `fq19_transaction_rollback` 的故障路径、成功提交和重复释放。

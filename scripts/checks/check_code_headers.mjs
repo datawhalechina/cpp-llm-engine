@@ -5,7 +5,7 @@ const sourceExtensions = new Set([".h", ".hpp", ".cpp", ".cc", ".cu", ".cuh"]);
 const roots = process.argv.slice(2);
 
 if (roots.length === 0) {
-  console.error("Usage: node scripts/check_code_headers.mjs <directory> [...]");
+  console.error("Usage: node scripts/checks/check_code_headers.mjs <directory> [...]");
   process.exit(2);
 }
 

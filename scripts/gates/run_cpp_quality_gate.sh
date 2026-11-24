@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # CPU CMake 质量门：分别执行严格警告构建和 UBSan 测试。
-# 用法：bash scripts/run_cpp_quality_gate.sh <source-dir> [ctest-regex]
+# 用法：bash scripts/gates/run_cpp_quality_gate.sh <source-dir> [ctest-regex]
 # 支持 ASan 的环境可额外设置 CPP_LLM_ENABLE_ASAN=1。
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source_dir="${1:-}"
 test_regex="${2:-}"
 

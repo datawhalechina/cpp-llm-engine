@@ -3,7 +3,7 @@
 # 验证性能证据、ServiceCore、真实 HTTP socket 和顺序/并发 A/B。
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 model_path="${CPP_LLM_ENGINE_MODEL_PATH:-${repo_root}/llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf}"
 result_dir="${CPU_SERVICE_LEARNING_RESULT_DIR:-${TMPDIR:-/tmp}/cpp-llm-engine-service-learning}"
 

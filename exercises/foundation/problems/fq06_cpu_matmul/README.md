@@ -17,7 +17,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq06_cpu_matmul/starter /tmp/fq06-answer
-bash scripts/check_foundation_answer.sh /tmp/fq06-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq06-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq06_cpu_matmul`。

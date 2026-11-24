@@ -17,7 +17,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq10_vector_add/starter /tmp/fq10-answer
-bash scripts/check_foundation_answer.sh /tmp/fq10-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq10-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq10_vector_add`。有 CUDA 环境时，再将 `starter/main.cu` 接入独立 CUDA 工程，对照 CPU 结果验证。

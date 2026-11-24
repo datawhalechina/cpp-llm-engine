@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 starter_root="${root_dir}/exercises/foundation/problems"
 tmp_dir="$(mktemp -d /tmp/cpp-llm-engine-foundation-starters.XXXXXX)"
 trap 'rm -rf "${tmp_dir}"' EXIT

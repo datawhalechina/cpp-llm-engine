@@ -3,7 +3,7 @@
 # 验证 Chapter06-08 组件，再运行真实文本生成和双请求 batch。
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 model_path="${CPP_LLM_ENGINE_MODEL_PATH:-${repo_root}/llama.cpp/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf}"
 llama_root="${LLAMA_CPP_ROOT:-${repo_root}/llama.cpp}"
 if [[ -n "${LLAMA_CPP_BUILD_DIR:-}" ]]; then

@@ -17,7 +17,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq02_tensor_shape/starter /tmp/fq02-answer
-bash scripts/check_foundation_answer.sh /tmp/fq02-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq02-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq02_tensor_shape`。

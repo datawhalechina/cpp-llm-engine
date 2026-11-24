@@ -19,7 +19,7 @@
 
 ```bash
 cp -r exercises/foundation/problems/fq08_mini_tensor/starter /tmp/fq08-answer
-bash scripts/check_foundation_answer.sh /tmp/fq08-answer/main.cpp
+bash scripts/workflows/check_foundation_answer.sh /tmp/fq08-answer/main.cpp
 ```
 
 运行 `bash exercises/foundation/run_all.sh`，重点测试 `fq08_mini_tensor`；再用 UBSan/ASan 检查生命周期。

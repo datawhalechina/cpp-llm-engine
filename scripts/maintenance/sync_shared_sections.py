@@ -36,7 +36,7 @@ class DocPair:
     rewrites: tuple[tuple[str, str], ...] = ()
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 PAIRS: tuple[DocPair, ...] = (
     DocPair(

@@ -3,12 +3,12 @@
 # 范围：不下载模型，不启用 GPU，不运行 benchmark。
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 build_root="$(mktemp -d "${TMPDIR:-/tmp}/cpp-llm-release-contracts.XXXXXX")"
 trap 'rm -rf "${build_root}"' EXIT
 
 echo "[release-contracts] test_contracts"
-node "${repo_root}/scripts/check_test_contracts.mjs"
+node "${repo_root}/scripts/checks/check_test_contracts.mjs"
 
 run_suite() {
     local name="$1"
