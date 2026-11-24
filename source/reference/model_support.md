@@ -1,97 +1,86 @@
 # 模型能力与扩展顺序
 
-本教程用模型验证推理引擎对象和执行链路。一个模型被标记为“教程支持”，需要同时接通加载器（Loader）、分词器（Tokenizer）、解码器（Decoder）和固定验证结果；默认模型还需要在普通 CPU 环境复现。
+本教程使用真实模型检查推理引擎是否摆脱单一架构假设。模型被登记为“教程支持”时，至少需要接通外部基线、Loader、Tokenizer、Decoder 和固定正确性结果；进入服务矩阵还需要验证请求隔离、终态和资源释放。
+
+## 模型怎样扩展学习主线
+
+TinyLlama 固定 Llama 稠密基线，其余模型分别改变归一化与位置编码、FFN 路由、Attention 缓存或输入模态。所有模型共同使用同一请求生命周期和 Runtime 接口。
+
+![教程模型与架构学习关系](../assets/diagrams/model-learning-map.svg)
+
+| 模型 | 主要架构差异 | 在教程中回答的问题 |
+| --- | --- | --- |
+| TinyLlama 1.1B Chat | 22 层 Llama、GQA、SwiGLU、Q4_K/Q6_K | 最小稠密模型怎样完成 CPU/CUDA 生成与服务 |
+| Qwen3-0.6B | Q/K Norm、NeoX RoPE、非对称 Q/K/V 头、共享输出权重 | Decoder 能否由配置构造，而不是写死 Llama 参数 |
+| Qwen1.5-MoE-A2.7B | 60 选 4 Router、打包专家、共享专家和混合量化 | 稀疏 FFN 怎样路由、分组执行并合并输出 |
+| DeepSeek-V2-Lite | MLA、解耦位置分支、Dense/MoE 混合层、64 选 6 专家 | Attention 与缓存结构变化怎样影响 Runtime 和后端 |
+| SmolVLM-500M-Instruct | 动态切图、SigLIP、Projector 和统一嵌入 | 视觉输入怎样接入并复用语言生成主线 |
 
 ## 当前模型状态
 
-表中的“已验证”表示仓库内存在可运行入口和对应断言；“部分完成”表示主链已经运行，但列出的交接面仍需补齐；“规划”表示已经确定教学价值和接入顺序。默认回归只检查这些入口与证据路径是否存在，真实模型和 GPU 结果需要在对应环境中单独运行。
+“已验证”表示仓库存在可运行入口和固定断言；“部分完成”表示主链可运行，但仍有明确交接面未接入；“规划”表示已确定教学价值和准入顺序。
 
-| 模型 | 外部基线与加载 | CPU 模型与生成 | CPU 批处理与服务 | CUDA 模型与生成 | CUDA 批处理与服务 |
+| 模型 | 外部基线与加载 | CPU 生成 | CPU 批处理与服务 | CUDA 生成 | CUDA 批处理与服务 |
 | --- | --- | --- | --- | --- | --- |
 | TinyLlama 1.1B Chat | 已验证 | 已验证 | 已验证 | 已验证 | 已验证 |
 | Qwen3-0.6B | 已验证 | 已验证 | 已验证 | 已验证 | 已验证 |
 | Qwen1.5-MoE-A2.7B-Chat | 已验证 | 已验证 | 已验证 | 规划 | 规划 |
 | DeepSeek-V2-Lite | 已验证 | 已验证 | 已验证 | 已验证 | 已验证 |
-| SmolVLM-500M-Instruct | 部分完成：真实资产按需准备 | 已验证 | 部分完成：继续补图片 HTTP 传输 | 已验证：完整 tile、固定网格双图片组批、真实图文 Prompt 与四词元生成通过 CPU/CUDA 对照 | 部分完成：同步/SSE、资源释放和双请求 Decode 组批已验证；服务视觉收集、图片传输与 Prefill 组批待接入 |
+| SmolVLM-500M-Instruct | 部分完成 | 已验证 | 部分完成 | 已验证 | 部分完成 |
 
-机器可校验的状态和证据路径登记在 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/testing/model_capabilities.json"><code>model_capabilities.json</code></a>，运行 `npm run test:check-model-capabilities` 可检查状态词、入口文件和待办边界。该检查不下载模型，也不执行可选 GPU 路径。
+SmolVLM 的“部分完成”表示真实资产按需准备，语言服务生命周期和 CUDA 双请求 Decode 组批已经验证；图片 HTTP 传输、服务视觉收集和 Prefill 组批仍待接入。Qwen1.5-MoE 当前以 CPU 分组路径为默认实现，CUDA 专家执行尚未进入支持矩阵。
 
-TinyLlama 是默认 Llama 基线；Qwen3 用于暴露稠密模型中的结构差异；Qwen1.5-MoE 讲解 Router、Top-K 和共享专家；DeepSeek-V2-Lite 进一步组合 MLA 与混合稠密/MoE 层；SmolVLM 把同一语言模型运行时扩展到视觉输入。DeepSeek-R1-Distill-Qwen-1.5B、Gemma 和 Qwen3-30B-A3B 当前作为后续适配或成熟框架对照，不计入已验证矩阵。
+机器可校验状态登记在 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/testing/model_capabilities.json"><code>model_capabilities.json</code></a>。运行 `npm run test:check-model-capabilities` 可检查状态词、入口文件和待办边界；该检查不下载模型，也不执行可选 GPU 路径。
 
-TinyLlama 继续作为默认模型，因为当前 Llama GGUF 字段模式、权重名称、分词器固定结果和真实解码器测试已有可重复证据。接入另一模型时应逐项处理格式和结构差异，避免把兼容问题误判为数值错误。
+## 新模型怎样进入支持矩阵
 
-## 接入新稠密模型需要改什么
+文件能够被 GGUF Reader 打开只说明容器可读。模型还要经过结构、量化、生成、生命周期和证据检查，才能进入上面的状态表。
 
-Qwen3-0.6B 同样使用 RMSNorm、RoPE、分组查询注意力和 SwiGLU，但层数、隐藏维度、词表、特殊词元、聊天模板和 RoPE 参数与 TinyLlama 不同。它还为每层 Q/K 增加独立 RMSNorm，并允许 LM Head 与词嵌入共享权重。兼容工作按数据流进入已有章节：
+![新模型接入检查链](../assets/diagrams/model-admission-chain.svg)
 
-当前固定 Qwen3 GGUF 包含 28 个解码器块、1024 维隐藏状态、16 个查询头、8 个 K/V 头和 128 维头空间。Chapter01 已验证 311 个张量、`Hello Qwen3` 的固定词元和聊天模板；Chapter04 已执行首层 Q/K Norm、NeoX RoPE、GQA、增量 K/V 和完整 28 层 CPU Decoder。默认四词元输入的 logits 与 llama.cpp 对照满足误差门槛，前五候选完全重合，连续四步贪心词元一致。
+| 检查点 | 主要章节 | 通过条件 |
+| --- | --- | --- |
+| 外部基线 | Chapter00 | 固定模型 revision、文件校验值、提示词和外部结果 |
+| 输入 Schema | Chapter01 | 架构、Metadata、Tokenizer、Tensor 名称、shape 和 dtype 可解释 |
+| 模型结构 | Chapter04 | Attention、FFN、位置编码、Context 和 K/V 拓扑通过局部与全层验证 |
+| 量化格式 | Chapter05 | 所需 block layout、反量化和 Linear 结果通过 CPU Golden |
+| 生成与缓存 | Chapter06–07 | Prefill、Decode、停止词元、请求 Context 和缓存事务成立 |
+| 批处理与服务 | Chapter08、10 | 多请求隔离、批执行、取消、失败和终态释放成立 |
+| 证据归档 | Chapter09 | 环境、版本、原始样本、正确性门槛与性能结论可复查 |
 
-教程量化 Linear 保留 Float32 激活，llama.cpp 的 K-quant 点积会量化激活，因此两条路径不要求逐位相等。验收同时约束平均绝对误差、RMSE、余弦相似度、Top-5 重合和贪心序列；Chapter06 进一步验证真实 Tokenizer、Prefill、Decode、停止和请求隔离；Chapter10 验证 Completion、SSE、双请求调度、分页 K/V、Radix 命中和终态释放。Qwen3 的 CPU 与 CUDA 生成、调度和服务测试均已通过；CUDA 全层 logits 最大误差为 `4.95911e-05`，四个生成词元与 CPU golden 一致，服务组合验收耗时约 `0.80 s`。
+完整运行顺序由 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/USAGE.md">USAGE</a> 导航，代码入口见 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/engine/README.md"><code>code/engine/README.md</code></a> 与 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/multimodal/README.md"><code>code/multimodal/README.md</code></a>，固定数值和性能结论统一登记在[实验资产索引](./experiment_assets.md)。
 
-| 章节 | 需要增加的兼容证据 |
-| --- | --- |
-| Chapter00 | 用 llama.cpp 建立固定版本、固定提示词的外部结果 |
-| Chapter01 | 识别模型架构，解析对应元数据、分词器、聊天模板和权重字段模式 |
-| Chapter04 | 由配置构造 Qwen 解码器，并验证层数、注意力与 FFN 拓扑 |
-| Chapter05 | 为选定 GGUF 量化类型建立数据布局和 Linear 证据 |
-| Chapter06 | 核对预填充、逐词元解码、停止词元与采样结果 |
-| Chapter09 | 保存版本化固定结果、正确性比较和性能记录 |
-| Chapter10 | 复用 ServiceCore；只新增模型选择与请求输入验证 |
+## 当前架构边界
 
-DeepSeek-R1-Distill-Qwen-1.5B 排在 Qwen 稠密模型之后。它基于 Qwen2.5 架构并调整配置和分词器，用于验证架构适配能否复用。DeepSeek-V2-Lite 已完成外部基线、Loader、MLA reference、27 层混合 Decoder、LM Head、CPU 生成与 HTTP/SSE，以及 CUDA 三阶段 MLA、量化 MoE、分块 Tensor Prefill、分页压缩 MLA、跨请求分组批执行和文本 HTTP/SSE。分页与连续 MLA 的短上下文 A/B 已归档；当前遗留集中在更长上下文和更大批量压力测试、并发 HTTP 事件循环以及 MLA score kernel 优化。
+### 稠密模型
 
-Gemma 也经过同一条接入链：Chapter01 识别架构、元数据和权重字段模式，Chapter04 根据配置构造对应解码器，Chapter05 核对量化格式。llama.cpp 或 gemma.cpp 的外部结果作为基线，本教程仍需独立完成上述适配与验证。
+TinyLlama 是默认模型，因为 Llama GGUF 字段、Tokenizer、22 层 Decoder、CPU/CUDA Runtime 和服务已经形成完整证据。Qwen3 在同一稠密主线上增加 Q/K Norm、NeoX RoPE、非对称头和共享输出权重，用于验证配置驱动的模型构造；CPU/CUDA 生成、分页缓存、调度和服务均已通过固定结果验证。
 
-## MoE 学习顺序
+### Qwen1.5-MoE
 
-MoE 教学聚焦一次词元怎样经过路由器、选择 Top-K 专家、按专家重排、执行 FFN，再按路由权重合并。建议按以下顺序建设：
+固定 Q3_K_M GGUF 约 7.44GB，包含 24 层和 60 选 4 专家。当前 CPU 路径已经接通真实 Tokenizer、分层 K/V、Router、共享专家、混合量化 Linear、完整生成、跨请求专家分组、调度和动态准入。后续 CUDA 模型支持需要同时覆盖设备端专家权重组织、分组 GEMV、路由元数据和端到端收益；单个专家计算核只构成组件证据。
 
-首个真实目标选择 Qwen1.5-MoE-A2.7B-Chat。该模型总参数约 14.3B、每个词元激活约 2.7B；当前固定的 Q3_K_M GGUF 约 7.44GB，可以在本教程的 12GB 单卡目标上建立量化外部基线。Chapter01 已验证 24 层、411 个张量和 60 选 4 布局；Chapter04/05 已以双词元 24 层对照验证 NeoX RoPE、因果 Attention、分层 K/V、MoE、残差、最终 RMSNorm、Q6_K LM Head 和混合量化 Linear。Chapter06 已接入请求级 Context、真实 Tokenizer、Prefill、Decode 与贪心生成；Chapter08/10 继续验证跨请求专家分组、连续调度、动态准入和终态释放。
+### DeepSeek-V2-Lite 当前接入层级
 
-```bash
-bash code/chapter00_quickstart/download_qwen15_moe.sh
-bash code/chapter00_quickstart/run_qwen15_moe_baseline.sh
-bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh
-bash code/engine/scripts/run_qwen15_moe_generation.sh
-```
+固定 Q2_K GGUF 约 6.43GB，包含 27 层、MLA 压缩 K/V、首层 Dense FFN 和后续 64 选 6 MoE。CPU 与 CUDA 已完成 Loader、Q2_K/IQ4_NL Linear、完整 Decoder、Generation Runtime、分页 MLA、跨请求专家分组和文本 HTTP/SSE。当前扩展重点是更长上下文与更大批量压力测试、并发 HTTP 事件循环和 MLA score kernel 优化；具体数值与 Nsight 结果见[实验资产索引](./experiment_assets.md)。
 
-1. 已用 llama.cpp 运行固定 Qwen1.5-MoE GGUF，并记录架构、文件校验值和生成结果。
-2. Chapter01 已建立独立 MoE Schema，核对真实 Router、专家和共享专家权重。
-3. Chapter04 已在小尺寸固定输入上实现稳定 Top-K、选中专家与共享专家加权合并，并覆盖并列分数、非法 Top-K、非有限输入和失败原子性。
-4. Chapter05 已把首层真实量化专家权重接入统一 Linear，并用 llama.cpp 中间张量核对 Top-4 与共享专家合并结果。
-5. Chapter04 已用双词元验证 NeoX RoPE、因果 Attention、连续 K/V 负载和完整 layer-0 输出。
-6. Chapter04 已顺序加载 24 层权重；局部路径的 Top-K 全部匹配 llama.cpp，累计路径记录量化误差触发的路由分叉和最终隐藏状态误差。
-7. 最终 RMSNorm 与 Q6_K LM Head 已通过 logits、Top-5 和贪心词元对照。
-8. 每请求 Context 保存 24 层历史 K/V；Chapter06 Runtime 与真实 Tokenizer 已通过固定文本生成测试。
-9. 按专家分组的分发/合并索引已接入 Chapter08 批执行；Chapter09 的 EXP-CPU-13～18 依次验证 MoE 子层、完整 Decoder、batch 范围、多步 Decode、固定队列和 Chapter10 动态准入。
+### SmolVLM 多模态
 
-当前分组路径是 CPU 默认实现，逐词元路径作为同权重、同路由的正确性和性能对照保留。实验覆盖最多四个请求和四步 Decode，并未建立开放环到达率或 HTTP 并发吞吐结论。
+SmolVLM 使用 IDEFICS3 图片路径、SigLIP Vision Encoder 和 Projector，把视觉向量转换为语言模型宽度后进入统一嵌入。CPU 已建立逐阶段 Golden、真实图文生成和服务生命周期；CUDA 已接通完整视觉 tile、双图片视觉组批、图文生成和双请求 Decode 组批。图片网络传输与服务端 Prefill 组批继续由[多模态扩展教程](../extensions/multimodal/intro.md)跟踪。
 
-“激活参数较少”表示每个词元只执行少量专家，模型部署仍需容纳其余专家权重。Qwen3-30B-A3B 每个词元激活约 3B 参数，总参数约 30B。DeepSeek-V2-Lite 总参数约 16B，并额外引入多头潜在注意力（MLA）；固定 Q2_K GGUF 约 6.43GB，已用于 CPU/CUDA 单卡正确性、生成和批执行验证。
+## 规划模型
 
-## DeepSeek-V2-Lite 当前接入层级
+| 模型 | 教学价值 | 进入实现前需要满足 |
+| --- | --- | --- |
+| DeepSeek-R1-Distill-Qwen-1.5B | 验证 Qwen2.5 架构与推理模型 Tokenizer/模板复用 | Qwen 稠密适配链保持稳定，并定义独立固定输出 |
+| Gemma | 验证另一套 Metadata、权重名称和 Decoder 配置 | 先完成外部基线与 Chapter01 Schema，不直接复用 Llama 字段 |
+| Qwen3-30B-A3B | 学习较新的 MoE 架构与更大专家集合 | 明确消费级设备内存方案，并先通过较小 MoE 的 CUDA 证据链 |
 
-```bash
-bash code/chapter00_quickstart/download_deepseek_v2_lite.sh
-bash code/chapter00_quickstart/run_deepseek_v2_lite_baseline.sh
-bash code/chapter01_tensor_loader/run_deepseek_v2_lite_schema.sh
-bash code/chapter04_attention/scripts/run_deepseek_v2_lite_layer_capture.sh
-bash code/engine/scripts/run_deepseek_v2_lite_generation.sh
-bash code/chapter08_scheduling/scripts/run_deepseek_v2_lite_batch.sh
-bash code/chapter09_performance/scripts/run_deepseek2_moe_batch_runtime_ab.sh
-bash code/chapter10_serving/scripts/run_deepseek_v2_lite_service.sh
-bash code/engine/scripts/run_deepseek_v2_lite_http_server.sh --check
-CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_model.sh
-CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_runtime.sh
-CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_batch.sh
-CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_serving.sh
-```
-
-Chapter00 固定社区 GGUF revision、文件大小和 SHA256，并用 llama.cpp 建立短文本外部结果。Chapter01 识别 `deepseek2` 架构，归一化旧版与新版 MLA 元数据，检查 27 层、377 个张量、首层稠密 FFN、后续 64 选 6 专家和共享专家，并装配组合或拆分 K/V-B 权重。Chapter04 已用 CPU reference 证明低秩缓存与显式展开 Attention 数值一致。Chapter05 已实现固定 GGUF 所需的 Q2_K 与 IQ4_NL reference、scalar fused 和 policy。双词元第 0 层输出 MAE 为 `0.000891898`；第 1 层最终输出 MAE 为 `0.00128932`、余弦相似度为 `0.999859`。完整 27 层 logits 与 llama.cpp 的余弦相似度为 `0.999616`，贪心词元同为 `185`。Chapter06 使用真实 Tokenizer 和同一 Generation Runtime 从 `Hello` 生成固定词元 `11 304`，解码为 `, I`。Chapter08 验证两个独立 MLA Context 进入同一次 Decode batch，Chapter10 验证动态准入、Completion、SSE、指标和 socket 回环。CUDA 路径进一步验证三阶段 MLA、量化专家、27 层 Runtime、双请求 grouped batch 和 ServiceCore；Chapter09 保存配对实验与 Nsight 证据。
+规划状态表示教学价值和接入顺序已经确定。相应 GGUF 仍需从外部基线和输入 Schema 开始，通过完整检查链后再更新支持矩阵。
 
 ## 版本与资料
 
-模型接入记录模型仓库、revision、文件校验值、量化类型、分词器配置和聊天模板，使上游文件更新后仍能复现固定结果。架构参数以模型发布方资料为准：
+模型接入记录模型仓库、revision、文件校验值、量化类型、Tokenizer 配置和聊天模板，使上游文件更新后仍能复现固定结果。架构参数以发布方资料为准：
 
 - [Qwen3 官方说明](https://qwenlm.github.io/blog/qwen3/)与 [Qwen3-0.6B 配置](https://huggingface.co/Qwen/Qwen3-0.6B/blob/main/config.json)
 - [DeepSeek-R1-Distill-Qwen-1.5B 模型卡](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B)

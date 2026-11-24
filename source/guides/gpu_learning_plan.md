@@ -42,7 +42,7 @@ TinyLlama 与 Qwen3 提供完整稠密 GPU 基线：真实模型加载、完整�
 | 输入 | 模型、量化格式、提示词、批量和上下文长度 |
 | 执行 | 命令、退出状态、CPU/CUDA 数值差异和关键输出 |
 | 资源 | 峰值显存、工作区、CUDA 流、同步点和 K/V 布局 |
-| 性能 | 预热次数、测量轮数、原始样本、统计量和工作负载范围 |
+| 性能 | 预热次数、测量轮数、原始样本、统计量和负载范围 |
 | 下一次学习 | 选择一个模型差异、一项计算核变化或一个待解释指标 |
 
 ## 任务 1：固定 CUDA 环境
@@ -106,7 +106,7 @@ CUDA_HOME=/usr/local/cuda-12.8 bash code/chapter09_performance/scripts/run_cuda_
 
 ## 任务 6：接入服务并建立性能证据
 
-最后让同一个 GPU 执行器进入 Chapter10 的同步响应、SSE、取消和终态释放，再由 Chapter09 固定工作负载并记录性能结果。
+最后让同一个 GPU 执行器进入 Chapter10 的同步响应、SSE、取消和终态释放，再由 Chapter09 固定负载并记录性能结果。
 
 ```bash
 CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_real_cuda_serving.sh

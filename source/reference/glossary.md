@@ -136,7 +136,7 @@
 | 激活量化 | activation quantization | 对 Prefill/Decode 产生的中间 Tensor 进行静态或动态低精度表示 | [Chapter05 Runtime Quantization](../chapter05_quantization/08_quantization_in_serving_runtime.md) | [F-QUANT-03](./formulas.md#f-quant-03) |
 | K/V Cache 量化 | KV cache quantization | 用低精度 payload 和 scale metadata 保存请求级 key/value 历史 | [Chapter07 Production Extensions](../chapter07_kv_cache/next/06_production_extensions.md) | [F-QUANT-04](./formulas.md#f-quant-04) |
 | 融合内核 | fused kernel | 在一次 kernel 或紧密循环中完成原本分离的多个阶段 | Chapter05、GPU 路线 | [F-QUANT-02](./formulas.md#f-quant-02) |
-| 性能基准 | benchmark | 在固定 workload 和环境下测量延迟、吞吐与资源使用 | Foundation F13、Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
+| 性能基准 | benchmark | 在固定负载和环境下测量延迟、吞吐与资源使用 | Foundation F13、Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
 | 性能剖析 | profiling | 将性能结果归因到阶段、算子、带宽或同步 | Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
 | 首词元延迟 | Time to First Token, TTFT | 请求接收到首个生成词元的时间 | Chapter09-10 | [F-PERF-01](./formulas.md#f-perf-01) |
 | 每词元输出时间 | Time per Output Token, TPOT | 首词元之后每个输出词元的平均耗时 | Chapter09-10 | [F-PERF-01](./formulas.md#f-perf-01) |
@@ -185,8 +185,8 @@
 | 回归测试 | regression test | 防止已通过行为在后续修改中退化的自动化检查 | Foundation F04、Chapter09 | - |
 | 运行时错误检测器 | Sanitizer | 由编译器插桩，在程序运行时发现越界、释放后使用、未定义行为等问题；`ASan` 检查内存，`UBSan` 检查未定义行为 | [Foundation 调试与测试](../foundation/04_debugging_testing_basics.md) | - |
 | 故障注入 | fault injection | 在指定执行阶段主动制造失败，用于验证错误传播、事务回滚、终态与资源守恒 | [Foundation 调试与测试](../foundation/04_debugging_testing_basics.md) | - |
-| A/B 实验 | A/B experiment | 固定 workload 和环境，只改变一个目标因素的对照测量 | Foundation F13、Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
-| 配对性能实验 | paired benchmark | 在相同工作负载下交替两条路径的执行顺序，保留成对样本以降低固定顺序偏差 | Foundation F13、Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
+| A/B 实验 | A/B experiment | 固定负载和环境，只改变一个目标因素的对照测量 | Foundation F13、Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
+| 配对性能实验 | paired benchmark | 在相同负载下交替两条路径的执行顺序，保留成对样本以降低固定顺序偏差 | Foundation F13、Chapter09 | [F-PERF-02](./formulas.md#f-perf-02) |
 | 墙钟时间 | wall-clock time, elapsed time | 从入口到结果可用按真实时钟经过的时间，包含计算、同步、搬运、调度和等待 | Chapter09 | - |
 
 ## 参考框架与格式

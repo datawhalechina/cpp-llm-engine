@@ -26,6 +26,10 @@
 | 验证与归因 | Golden、Benchmark、ProfileRecord | 执行结果 → 正确性与性能证据 | Chapter09 |
 | 服务接入 | ServiceCore、HTTP Adapter、ResponseWriter | 外部请求 → Completion 或 SSE | Chapter10 |
 
+下图连接 Chapter06–10 的运行对象，并把 Chapter09 放在横向证据层。阅读时区分“谁选择工作”“谁推进请求”“谁保存状态”和“谁执行计算”。
+
+![Chapter06 到 Chapter10 请求生命周期知识图谱](../assets/diagrams/runtime-system-knowledge-map.svg)
+
 系统中的核心调用顺序如下：
 
 ```text
@@ -50,26 +54,13 @@ ServiceCore
 | 生成运行时（`Runtime`） | 提交预填充/逐词元解码、采样结果和单请求终态 | Chapter06 |
 | BlockTable、Paged K/V | 映射逻辑位置与物理块，并支持预留、提交和回滚 | Chapter07 |
 | Scheduler | 根据请求状态和资源预算选择本步候选 | Chapter08 |
-| EvidenceRecord | 记录工作负载、环境、样本和比较结论 | Chapter09 |
+| EvidenceRecord | 记录负载、环境、样本和比较结论 | Chapter09 |
 | ServiceCore | 管理准入、取消、超时和统一释放 | Chapter10 |
 | HTTP Adapter、ResponseWriter | 把协议请求转换为服务调用并输出同步或流式响应 | Chapter10 |
 
-```mermaid
-flowchart LR
-    Client[客户端 / API] --> Input[输入处理] --> Request[请求]
-    Request --> Service[ServiceCore] --> Scheduler[Scheduler] --> Runtime[Runtime]
-    Runtime --> Executor[Executor] --> Model[Model + Context]
-    Model --> Operator[Operator] --> Backend[CPU / CUDA Backend]
-    Tensor[Tensor / Weights] --> Model
-    Cache[KV Cache] <--> Model
-    Workspace[Workspace] --> Backend
-    Runtime --> Output[流式输出 / 结果]
-    Runtime -. 验证证据 .-> Evidence[测试 / 性能基准 / 性能剖析]
-```
-
 ## CPU 主线与 GPU 扩展
 
-教程先用 CPU 固定正确性和接口，再在同一套公共接口上接入 GPU。GPU 替换后端、计算核和内存执行路径，不建立第二套请求运行时。多模态则在解码器前增加图片处理，并把统一嵌入序列交给已有 CPU 或 GPU 路径。
+教程先用 CPU 固定正确性和接口，再在稳定算子与数据边界下接入 GPU。ServiceCore、Scheduler、Runtime、Model 和请求 Context 继续共享；后端、计算核、Tensor Storage 与工作区根据设备分叉。多模态在解码器前增加图片处理，并把统一嵌入序列交给已有 CPU 或 GPU 路径。
 
 ![推理引擎 CPU 主线与 GPU 扩展架构](../assets/diagrams/inference-engine-cpu-gpu-architecture.svg)
 
@@ -82,36 +73,30 @@ flowchart LR
 | Decoder | 组合 Embedding、Attention、FFN 和 K/V | CPU 可运行实现 | 复用结构并替换计算路径 |
 | Runtime | Prefill、Decode、Sampling 和 Request | 完整主线 | 复用请求推进语义 |
 
-当前 GPU 公共层包含资源 RAII、`CudaTensor`、可复用工作区、`CudaExecutionContext`、cuBLAS MatMul、量化 GEMV、RoPE、连续/分页 K/V 和 GQA Attention。执行上下文持有 stream、handle 和临时显存，上层算子不直接分配设备内存。
+GPU 公共层把设备资源、Tensor、工作区、执行上下文和计算后端组合在一起。执行上下文持有 stream、库 handle 和临时显存，上层算子通过公共接口提交计算，不直接管理设备分配。当前实现对象与验证入口统一查阅 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/README.md"><code>code/cuda/README.md</code></a>。
 
 ## 策略怎样分配到 CPU 与 GPU
 
 请求选择、资源所有权、状态提交和失败回滚先建立平台无关或 CPU 可运行语义；设备内存访问、并行归约和计算核融合再由 CUDA 后端实现。
 
-| 策略 | CPU 或平台无关部分 | GPU 部分 | 当前状态 |
+| 策略 | CPU 或平台无关部分 | GPU 部分 | 教程落点 |
 | --- | --- | --- | --- |
-| Continuous Batching | 步骤计划、词元/块预算、终态和回滚 | 执行张量批次 | CPU 与真实 CPU/CUDA 批次已接通 |
-| Paged K/V | BlockTable、预留、提交、裁剪和回收 | 分页数据与按页表读取的 GQA | CPU/CUDA 单请求和双请求批次已验证 |
-| FlashAttention | 三阶段参考结果与分块在线 Softmax | tile、片上存储、Warp 归约与融合计算核 | CUDA 候选实现已通过正确性；端到端收益尚不稳定 |
-| Radix Cache | 前缀树、估算/采用、共享块引用和释放 | 复用命中页表读取 K/V | CPU/CUDA Context 采用与缓存感知排序已验证 |
-| MTP / 推测解码 | 候选、接受规则和状态回滚 | 并行验证多个候选词元 | 规划中 |
-| MLA | 压缩 K/V、位置编码分支、分页事务与三阶段参考结果 | CUDA 三阶段 MLA、分页压缩载荷、直接页表读取与分块 Tensor Prefill | 连续与分页 CUDA 真实模型已验证；短上下文成本同量级，分页路径按资源管理价值保留 |
-| Prefill/Decode 分离 | 实例角色、路由和 K/V 传输协议 | 各实例的阶段执行 | 集群级扩展参照 |
+| Continuous Batching | 步骤计划、词元/块预算、终态和回滚 | 执行张量批次 | Chapter08；证据查实验资产 |
+| Paged K/V | BlockTable、预留、提交、裁剪和回收 | 分页数据与按页表读取的 GQA | Chapter07–08 |
+| FlashAttention | 三阶段参考结果与分块在线 Softmax | tile、片上存储、Warp 归约与融合计算核 | Chapter04 原理、Chapter09 A/B |
+| Radix Cache | 前缀树、估算/采用、共享块引用和释放 | 复用命中页表读取 K/V | Chapter07 缓存、Chapter08 排序 |
+| 推测解码 / MTP | Chapter06 定义候选、接受规则、停止与请求回滚；Chapter07 管理 Draft/Target K/V | 批量验证多个候选词元，Chapter08 再组织多请求验证批次 | 扩展路线：先固定 CPU 语义与接受结果 |
+| MLA | 压缩 K/V、位置编码分支、分页事务与三阶段参考结果 | CUDA 三阶段 MLA、分页压缩载荷、直接页表读取与分块 Tensor Prefill | Chapter04、07；模型状态查模型能力表 |
+| Prefill/Decode 分离 | 实例角色、路由和 K/V 传输协议 | 各实例的阶段执行 | 集群扩展；单机 Chapter08 提供调度接口坐标 |
+| 分布式执行 | 拓扑、全局请求状态、故障语义和通信契约 | Tensor/Pipeline/Expert Parallel、跨节点 K/V 与集合通信 | 独立扩展；复用单机请求与资源契约 |
 
-## 公共接口与验证顺序
+模型路径的完成状态见[模型能力表](./model_support.md)，正确性和性能数字见[实验资产](./experiment_assets.md)。
 
-`code/core` 提供跨章共享的接口和数据规则，各章保留自己的教学对象和正确性测试。新增后端按以下顺序进入主线：
+## 跨层接口怎样交接
 
-```text
-CPU 参考实现固定输入输出和错误行为
-  -> 章节实现适配公共接口
-  -> 增加跨章集成测试
-  -> GPU 后端复用同一接口
-  -> 性能基准固定工作负载
-  -> 性能剖析解释计算核、带宽和同步成本
-```
+`code/core` 提供跨章共享的数据规则和错误语义，各章保留自己的教学对象。接口只传递相邻层真正需要的状态：Operator 不拥有请求，Scheduler 不解释 K/V 数值，Transport 不直接调用模型计算。
 
-| 对象 | 公共接口与当前接入 |
+| 交接点 | 稳定约束 |
 | --- | --- |
 | Tensor view | Chapter02 提供 shape、stride、storage offset、dtype 与 device 布局约定 |
 | MatMul | Chapter03 通过 `MatmulRequest`、`MatmulBackend` 和 `Status` 接入 CPU 参考实现 |
@@ -119,23 +104,4 @@ CPU 参考实现固定输入输出和错误行为
 | Decoder | Chapter04 教学层和 `code/model` 真实模型共同适配结构与执行接口 |
 | Runtime 资源 | Chapter07–10 通过事务、BatchRunner 和 ServiceCore 交接请求状态 |
 
-默认回归核对 CPU 章节、公共接口和可选资产声明；真实设备数值与性能实验使用 CUDA 和 Chapter09 专用入口。
-
-```bash
-bash scripts/gates/run_regression_baseline.sh
-CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
-```
-
-## 从问题定位入口
-
-| 观察到的问题 | 先检查 | 阅读入口 |
-| --- | --- | --- |
-| 词元或模型配置错误 | 分词器、元数据、张量字段模式 | [Chapter01 输入要求](../chapter01_tensor_loader/04_input_contract_and_tokenizer.md) |
-| shape 或局部数值错误 | Tensor view、Operator、CPU 参考实现 | Chapter02–04 |
-| CPU/CUDA 结果不同 | Operator 接口、Context 位置、Backend | Chapter03–06、[CPU 主线与 GPU 扩展](#cpu-主线与-gpu-扩展) |
-| 长上下文结果异常 | position、K/V append、BlockTable | [Chapter06 K/V 语义](../chapter06_generation/next/06_single_request_kv_semantics.md)、[Chapter07](../chapter07_kv_cache/next/intro.md) |
-| 多请求卡住或资源未释放 | Request 终态、Scheduler、ServiceCore | Chapter06–08、Chapter10 |
-| 性能下降 | 工作负载、阶段计时、热点 | [Chapter09 性能剖析](../chapter09_performance/next/05_profiling_tools.md) |
-| HTTP/SSE 行为异常 | Adapter、Writer、终态回调 | [Chapter10 Transport](../chapter10_serving/next/04_transport.md) |
-
-成熟框架怎样实现这些对象，按问题进入[推理生态项目索引](./ecosystem/README.md)。图片输入怎样接入同一执行路径，见[多模态扩展教程](../extensions/multimodal/intro.md)。
+运行与验收命令统一由[使用说明](https://github.com/datawhalechina/cpp-llm-engine/blob/main/USAGE.md)和各章代码 README 维护；实现问题按 [Reference 首页](./README.md)分流。成熟框架怎样实现这些对象，进入[推理生态项目索引](./ecosystem/README.md)；图片输入怎样接入同一执行路径，见[多模态扩展教程](../extensions/multimodal/intro.md)。

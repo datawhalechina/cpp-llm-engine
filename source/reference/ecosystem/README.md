@@ -1,5 +1,7 @@
 # 推理生态项目索引
 
+本目录只维护外部项目在教程中的对照用途和源码入口。教程自己的对象关系统一由[系统与执行架构](../architecture.md)解释；各章框架对照负责说明“本章实现与生产实现差在哪里”，项目卡不重复章内原理和本教程完成状态。
+
 ## 先区分五类对照
 
 | 类型 | 代表对象 | 在教程中的用途 |
@@ -37,10 +39,16 @@
 | --- | --- | --- |
 | 深入 Tensor、算子和 Decoder | Chapter02–05 | Tiny-VLLM、nano-vLLM、TensorRT-LLM |
 | 深入缓存、调度与服务 | Chapter06–10 | vLLM、Mini-SGLang、SGLang |
-| 继续做性能优化 | Chapter09 的 workload、Profiling 和 A/B | TensorRT-LLM、DeepInfer |
+| 继续做性能优化 | Chapter09 的负载、Profiling 和 A/B | TensorRT-LLM、DeepInfer |
 | 扩展模型格式或本地交付 | Chapter00–01、模型支持表 | llama.cpp、Ollama |
 | 扩展多模态输入 | [多模态扩展教程](../../extensions/multimodal/intro.md) | Transformers、llama.cpp、vLLM、SGLang |
 
 ## 项目卡包含什么
 
 项目按本地交付、教学实现和生产框架分为三页。每个项目使用“阅读目的、重点对象、对应章节”模板；正文解释稳定概念，具体源码位置以链接的项目版本为准。
+
+| 页面 | 收录范围 | 不混入的内容 |
+| --- | --- | --- |
+| [本地推理与产品交付](./local_and_delivery.md) | llama.cpp、Ollama 等单机基线和交付工具 | 教学型或数据中心推理框架 |
+| [教学型推理项目](./teaching_projects.md) | 用较短代码展示引擎控制流的项目 | 本教程自己的章节摘要 |
+| [生产级推理框架](./production_frameworks.md) | 调度、缓存、设备执行和规模化服务框架 | 安装教程和动态能力排行榜 |

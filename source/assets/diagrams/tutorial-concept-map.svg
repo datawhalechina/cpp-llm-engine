@@ -95,40 +95,40 @@
   <path d="M926 190 H948" class="stage-line"/>
   <path d="M1076 190 H1098" class="stage-line"/>
 
-  <text x="48" y="296" class="section">三条横向观察线 · 数据进入计算，计算进入持续运行的系统</text>
+  <text x="48" y="296" class="section">三层代码架构 · 数据与状态进入模型计算，再进入持续运行的服务</text>
 
   <rect x="100" y="318" width="260" height="92" class="card" fill="#fef3c7"/>
-  <text x="230" y="351" text-anchor="middle" class="label">数据层</text>
-  <text x="230" y="378" text-anchor="middle" class="small">模型 · 张量 / 视图 · 上下文</text>
+  <text x="230" y="351" text-anchor="middle" class="label">数据与状态层</text>
+  <text x="230" y="378" text-anchor="middle" class="small">Model · Tensor / View · Context</text>
   <text x="230" y="398" text-anchor="middle" class="tiny">形状、布局、所有权与请求状态</text>
 
   <rect x="500" y="318" width="280" height="92" class="card" fill="#dbeafe"/>
-  <text x="640" y="351" text-anchor="middle" class="label">算子层</text>
-  <text x="640" y="378" text-anchor="middle" class="small">算子 · 后端 · 解码器</text>
-  <text x="640" y="398" text-anchor="middle" class="tiny">CPU / CUDA 实现同一数值语义</text>
+  <text x="640" y="351" text-anchor="middle" class="label">算子与模型层</text>
+  <text x="640" y="378" text-anchor="middle" class="small">Operator · Decoder · Backend</text>
+  <text x="640" y="398" text-anchor="middle" class="tiny">公共结构连接 CPU / CUDA 执行路径</text>
 
   <rect x="920" y="318" width="260" height="92" class="card" fill="#dcfce7"/>
-  <text x="1050" y="351" text-anchor="middle" class="label">系统层</text>
-  <text x="1050" y="378" text-anchor="middle" class="small">运行时 · 调度器 · 服务核心</text>
+  <text x="1050" y="351" text-anchor="middle" class="label">运行时与服务层</text>
+  <text x="1050" y="378" text-anchor="middle" class="small">Runtime · Scheduler · ServiceCore</text>
   <text x="1050" y="398" text-anchor="middle" class="tiny">资源、测量、HTTP / SSE 与终态回收</text>
 
   <path d="M360 364 H495" class="line"/>
   <path d="M780 364 H915" class="line"/>
 
-  <text x="48" y="464" class="section">能力扩展 · 不复制主线，只替换输入或执行后端</text>
+  <text x="48" y="464" class="section">扩展路线与工程参照 · 复用主线，替换输入或执行后端</text>
 
   <rect x="48" y="486" width="365" height="120" class="card" fill="#fef3c7"/>
-  <text x="70" y="518" class="label">SmolVLM 多模态 CPU 扩展</text>
-  <text x="70" y="545" class="small">动态切图 · 视觉编码器 · 投影层</text>
-  <text x="70" y="568" class="small">图文嵌入 · 解码器 · 服务核心</text>
-  <text x="70" y="591" class="tiny">真实图片、同步/流式输出与性能基线已闭环</text>
+  <text x="70" y="518" class="label">SmolVLM 多模态扩展</text>
+  <text x="70" y="545" class="small">动态切图 · 视觉编码器 · 统一嵌入</text>
+  <text x="70" y="568" class="small">CPU / CUDA 图文生成与请求组批</text>
+  <text x="70" y="591" class="tiny">复用语言 Decoder、调度与服务主线</text>
   <path d="M230 410 V481" class="dash"/>
 
   <rect x="458" y="486" width="365" height="120" class="card" fill="#dbeafe"/>
   <text x="480" y="518" class="label">CUDA 执行扩展</text>
-  <text x="480" y="545" class="small">设备 / 流 · cuBLAS · 量化 GEMV</text>
-  <text x="480" y="568" class="small">RoPE · 分页 K/V · GQA · 批执行</text>
-  <text x="480" y="591" class="tiny">TinyLlama / Qwen3 真实生成与服务已闭环</text>
+  <text x="480" y="545" class="small">量化 GEMV · 分页 GQA / MLA · MoE</text>
+  <text x="480" y="568" class="small">Prefill · Decode · 请求批执行</text>
+  <text x="480" y="591" class="tiny">TinyLlama / Qwen3 / DeepSeek 已闭环</text>
   <path d="M640 410 V481" class="dash"/>
 
   <rect x="868" y="486" width="364" height="120" class="card" fill="#f1f5f9"/>
@@ -138,12 +138,7 @@
   <text x="890" y="591" class="tiny">真实基线、算法骨架与生产工程坐标</text>
   <path d="M1050 410 V481" class="dash"/>
 
-  <text x="48" y="658" class="section">教学证据链</text>
+  <text x="48" y="658" class="section">教学证据链 · 每项能力都要经过实现与验证</text>
   <rect x="48" y="676" width="1184" height="48" rx="24" fill="#0f172a"/>
-  <text x="166" y="706" text-anchor="middle" class="badge" fill="#f8fafc">算法与数据契约</text>
-  <text x="410" y="706" text-anchor="middle" class="badge" fill="#bfdbfe">C++ 可运行实现</text>
-  <text x="650" y="706" text-anchor="middle" class="badge" fill="#bbf7d0">CTest / 数值基准</text>
-  <text x="884" y="706" text-anchor="middle" class="badge" fill="#fde68a">基准测试 / 性能剖析</text>
-  <text x="1100" y="706" text-anchor="middle" class="badge" fill="#fbcfe8">框架源码坐标</text>
-  <path d="M268 700 H310 M510 700 H552 M750 700 H792 M984 700 H1026" stroke="#94a3b8" stroke-width="2"/>
+  <text x="640" y="706" text-anchor="middle" class="badge" fill="#f8fafc">原理与契约　→　C++ 可运行实现　→　正确性验证　→　性能证据　→　成熟框架对照</text>
 </svg>

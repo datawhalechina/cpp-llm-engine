@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="540" viewBox="0 0 1240 540" role="img" aria-labelledby="title desc">
+  <title id="title">新模型接入检查链</title>
+  <desc id="desc">新模型依次经过外部基线、输入字段模式、模型结构、量化格式、生成运行时、批处理与服务以及证据归档，全部通过后才进入教程支持矩阵。</desc>
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8f3e7"/><stop offset="1" stop-color="#e5f0ec"/></linearGradient><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#315650"/></marker><style>.title{font:700 28px 'Noto Sans CJK SC',sans-serif;fill:#173832}.sub{font:500 15px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.chapter{font:700 12px 'Noto Sans CJK SC',sans-serif;fill:#8b5b20}.head{font:700 14px 'Noto Sans CJK SC',sans-serif;fill:#173832}.small{font:500 11px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.inverse{fill:#fff}.box{stroke:#315650;stroke-width:1.7;rx:12}.line{stroke:#58756f;stroke-width:1.8;fill:none;marker-end:url(#arrow)}</style></defs>
+  <rect width="1240" height="540" fill="url(#bg)"/>
+  <text x="50" y="50" class="title">新模型接入：七个检查点共同定义支持范围</text>
+  <text x="50" y="78" class="sub">文件加载建立起点，后续检查继续覆盖结构、数值、请求状态和服务生命周期。</text>
+
+  <rect x="35" y="145" width="145" height="120" class="box" fill="#fff1cf"/><text x="107" y="171" text-anchor="middle" class="chapter">CHAPTER00</text><text x="107" y="199" text-anchor="middle" class="head">外部基线</text><text x="107" y="224" text-anchor="middle" class="small">固定 revision</text><text x="107" y="244" text-anchor="middle" class="small">提示词与结果</text>
+  <rect x="205" y="145" width="145" height="120" class="box" fill="#f4ead9"/><text x="277" y="171" text-anchor="middle" class="chapter">CHAPTER01</text><text x="277" y="199" text-anchor="middle" class="head">输入 Schema</text><text x="277" y="224" text-anchor="middle" class="small">Metadata</text><text x="277" y="244" text-anchor="middle" class="small">Tokenizer · Weights</text>
+  <rect x="375" y="145" width="145" height="120" class="box" fill="#e7f2e9"/><text x="447" y="171" text-anchor="middle" class="chapter">CHAPTER04</text><text x="447" y="199" text-anchor="middle" class="head">模型结构</text><text x="447" y="224" text-anchor="middle" class="small">Attention · FFN</text><text x="447" y="244" text-anchor="middle" class="small">Context · K/V</text>
+  <rect x="545" y="145" width="145" height="120" class="box" fill="#e4eef9"/><text x="617" y="171" text-anchor="middle" class="chapter">CHAPTER05</text><text x="617" y="199" text-anchor="middle" class="head">量化格式</text><text x="617" y="224" text-anchor="middle" class="small">Block layout</text><text x="617" y="244" text-anchor="middle" class="small">Linear Golden</text>
+  <rect x="715" y="145" width="145" height="120" class="box" fill="#e7f2e9"/><text x="787" y="171" text-anchor="middle" class="chapter">CHAPTER06–07</text><text x="787" y="199" text-anchor="middle" class="head">生成与缓存</text><text x="787" y="224" text-anchor="middle" class="small">Prefill · Decode</text><text x="787" y="244" text-anchor="middle" class="small">请求 Context</text>
+  <rect x="885" y="145" width="145" height="120" class="box" fill="#f4ead9"/><text x="957" y="171" text-anchor="middle" class="chapter">CHAPTER08 / 10</text><text x="957" y="199" text-anchor="middle" class="head">批处理与服务</text><text x="957" y="224" text-anchor="middle" class="small">多请求隔离</text><text x="957" y="244" text-anchor="middle" class="small">终态与释放</text>
+  <rect x="1055" y="145" width="150" height="120" class="box" fill="#dcece7"/><text x="1130" y="171" text-anchor="middle" class="chapter">CHAPTER09</text><text x="1130" y="199" text-anchor="middle" class="head">证据归档</text><text x="1130" y="224" text-anchor="middle" class="small">正确性 · A/B</text><text x="1130" y="244" text-anchor="middle" class="small">环境与版本</text>
+  <path d="M180 205H205M350 205H375M520 205H545M690 205H715M860 205H885M1030 205H1055" class="line"/>
+
+  <rect x="105" y="330" width="300" height="82" class="box" fill="#f7fbf9"/><text x="255" y="360" text-anchor="middle" class="head">格式门</text><text x="255" y="386" text-anchor="middle" class="small">字段、shape、dtype、词元与权重名称可解释</text>
+  <rect x="470" y="330" width="300" height="82" class="box" fill="#f7fbf9"/><text x="620" y="360" text-anchor="middle" class="head">数值门</text><text x="620" y="386" text-anchor="middle" class="small">局部 Golden、logits、候选词元与生成结果满足门槛</text>
+  <rect x="835" y="330" width="300" height="82" class="box" fill="#f7fbf9"/><text x="985" y="360" text-anchor="middle" class="head">生命周期门</text><text x="985" y="386" text-anchor="middle" class="small">多请求、失败回滚、取消、释放与性能记录完整</text>
+  <path d="M277 265V330M617 265V330M957 265V330" class="line"/>
+  <rect x="260" y="460" width="720" height="45" rx="15" fill="#173832"/>
+  <text x="620" y="489" text-anchor="middle" class="head inverse">三道门全部通过，才登记为“教程支持”</text>
+</svg>

@@ -1,70 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
-  <title id="title">推理引擎 CPU 主线与 GPU 扩展架构</title>
-  <desc id="desc">输入、公共契约、算子、Decoder、Runtime 和服务层通过同一套上层接口连接 CPU 与 GPU 后端。</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="680" viewBox="0 0 1240 680" role="img" aria-labelledby="title desc">
+  <title id="title">推理引擎共享控制面与 CPU CUDA 执行后端</title>
+  <desc id="desc">服务、调度、生成运行时和模型上下文组成共享控制面；模型通过稳定算子边界调用 CPU 或 CUDA 后端，两条路径使用共同的正确性和性能证据。</desc>
   <defs>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
-      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
-    </marker>
-    <style>
-      .title { font: 700 27px sans-serif; fill: #0f172a; }
-      .label { font: 700 16px sans-serif; fill: #0f172a; }
-      .small { font: 14px sans-serif; fill: #475569; }
-      .box { stroke: #334155; stroke-width: 2; rx: 14; }
-      .input { fill: #fef3c7; }
-      .shared { fill: #dcfce7; }
-      .cpu { fill: #dbeafe; }
-      .gpu { fill: #fce7f3; stroke-dasharray: 8 6; }
-      .observe { fill: #e2e8f0; stroke-dasharray: 5 5; }
-      .line { stroke: #334155; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
-      .dash { stroke: #64748b; stroke-width: 2; stroke-dasharray: 7 6; fill: none; }
-    </style>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8f3e7"/><stop offset="1" stop-color="#e5f0ec"/></linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#315650"/></marker>
+    <style>.title{font:700 28px 'Noto Sans CJK SC',sans-serif;fill:#173832}.sub{font:500 15px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.section{font:700 14px 'Noto Sans CJK SC',sans-serif;fill:#8b5b20}.head{font:700 16px 'Noto Sans CJK SC',sans-serif;fill:#173832}.small{font:500 12px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.code{font:500 12px 'JetBrains Mono',monospace;fill:#49615c}.inverse{fill:#fff}.inverseSub{fill:#d7e5e1}.box{stroke:#315650;stroke-width:1.8;rx:14}.line{stroke:#4f7069;stroke-width:2;fill:none;marker-end:url(#arrow)}.soft{stroke:#78908a;stroke-width:1.7;fill:none}</style>
   </defs>
-  <rect width="1280" height="760" fill="#f8fafc"/>
-  <text x="54" y="52" class="title">推理引擎架构：公共契约连接 CPU 主线与 GPU 扩展</text>
+  <rect width="1240" height="680" fill="url(#bg)"/>
+  <text x="50" y="50" class="title">CPU 与 CUDA：共享控制面，只在执行后端分叉</text>
+  <text x="50" y="78" class="sub">请求状态、调度和服务生命周期保持一致；设备差异集中在数据存储、计算核和工作区。</text>
 
-  <rect x="54" y="92" width="230" height="78" class="box input"/>
-  <text x="169" y="126" text-anchor="middle" class="label">输入与权重</text>
-  <text x="169" y="151" text-anchor="middle" class="small">Tokenizer / GGUF / Tensor</text>
-  <rect x="330" y="92" width="230" height="78" class="box shared"/>
-  <text x="445" y="126" text-anchor="middle" class="label">Core Contract</text>
-  <text x="445" y="151" text-anchor="middle" class="small">Shape / DType / Device / Ownership</text>
-  <path d="M284 131 H330" class="line"/>
+  <text x="50" y="120" class="section">共享请求与模型主线</text>
+  <rect x="50" y="145" width="210" height="90" class="box" fill="#fff1cf"/><text x="155" y="176" text-anchor="middle" class="head">ServiceCore</text><text x="155" y="201" text-anchor="middle" class="small">准入 · HTTP/SSE</text><text x="155" y="221" text-anchor="middle" class="small">取消、超时与释放</text>
+  <rect x="300" y="145" width="210" height="90" class="box" fill="#e7f2e9"/><text x="405" y="176" text-anchor="middle" class="head">Scheduler</text><text x="405" y="201" text-anchor="middle" class="small">请求选择 · Token 预算</text><text x="405" y="221" text-anchor="middle" class="small">连续批处理</text>
+  <rect x="550" y="145" width="220" height="90" class="box" fill="#e4eef9"/><text x="660" y="176" text-anchor="middle" class="head">Runtime + Executor</text><text x="660" y="201" text-anchor="middle" class="small">Prefill · Decode · Sample</text><text x="660" y="221" text-anchor="middle" class="small">推进请求状态</text>
+  <rect x="810" y="145" width="250" height="90" class="box" fill="#f7fbf9"/><text x="935" y="176" text-anchor="middle" class="head">Model + Context</text><text x="935" y="201" text-anchor="middle" class="small">Decoder · position · K/V</text><text x="935" y="221" text-anchor="middle" class="small">共享权重，请求独占状态</text>
+  <rect x="1090" y="145" width="110" height="90" class="box" fill="#fff1cf"/><text x="1145" y="176" text-anchor="middle" class="head">模型资产</text><text x="1145" y="201" text-anchor="middle" class="small">GGUF</text><text x="1145" y="221" text-anchor="middle" class="small">Tokenizer</text>
+  <path d="M260 190H300" class="line"/><path d="M510 190H550" class="line"/><path d="M770 190H810" class="line"/><path d="M1090 190H1060" class="line"/>
 
-  <rect x="606" y="92" width="230" height="78" class="box shared"/>
-  <text x="721" y="126" text-anchor="middle" class="label">Operator</text>
-  <text x="721" y="151" text-anchor="middle" class="small">MatMul / Linear / Attention</text>
-  <path d="M560 131 H606" class="line"/>
-  <rect x="882" y="92" width="330" height="78" class="box shared"/>
-  <text x="1047" y="126" text-anchor="middle" class="label">Decoder + Runtime</text>
-  <text x="1047" y="151" text-anchor="middle" class="small">Embedding / KV Cache / Request / Scheduler</text>
-  <path d="M836 131 H882" class="line"/>
+  <rect x="250" y="290" width="740" height="82" class="box" fill="#f4ead9"/>
+  <text x="620" y="320" text-anchor="middle" class="head">稳定算子与数据边界</text>
+  <text x="620" y="345" text-anchor="middle" class="code">Tensor shape / dtype / ownership · Linear · Attention · Norm · K/V transaction</text>
+  <text x="620" y="363" text-anchor="middle" class="small">边界规定输入、输出和失败行为；具体后端决定数据放在哪里、怎样并行计算</text>
+  <path d="M935 235V270H620V290" class="line"/>
 
-  <rect x="260" y="238" width="760" height="92" class="box shared"/>
-  <text x="640" y="275" text-anchor="middle" class="label">Service-facing control flow</text>
-  <text x="640" y="301" text-anchor="middle" class="small">Prefill -> Decode -> Sampling -> Streaming -> Reclaim</text>
-  <path d="M1047 170 V238" class="line"/>
-  <path d="M445 170 V238" class="dash"/>
+  <text x="50" y="420" class="section">设备执行分叉</text>
+  <rect x="80" y="445" width="500" height="125" class="box" fill="#fff1cf"/>
+  <text x="330" y="478" text-anchor="middle" class="head">CPU Backend</text><text x="330" y="503" text-anchor="middle" class="small">Host Tensor · 连续/分页 K/V · 线程工作区</text><text x="330" y="526" text-anchor="middle" class="small">标量参考 → 融合路径 → SIMD → 多线程</text><text x="330" y="549" text-anchor="middle" class="small">优先固定算法语义、错误边界和可调试结果</text>
+  <rect x="660" y="445" width="500" height="125" class="box" fill="#e4eef9"/>
+  <text x="910" y="478" text-anchor="middle" class="head">CUDA Backend</text><text x="910" y="503" text-anchor="middle" class="small">Device Tensor · Stream/Event · 持久工作区</text><text x="910" y="526" text-anchor="middle" class="small">cuBLAS · 量化 GEMV · 分页 GQA/MLA · MoE</text><text x="910" y="549" text-anchor="middle" class="small">优化带宽、并行归约、计算核融合和批执行</text>
+  <path d="M620 372V410H330V445" class="line"/><path d="M620 410H910V445" class="line"/>
 
-  <rect x="80" y="405" width="500" height="180" class="box cpu"/>
-  <text x="330" y="443" text-anchor="middle" class="label">CPU Backend（当前主线）</text>
-  <text x="330" y="474" text-anchor="middle" class="small">Reference -> Fused -> SIMD -> Threads</text>
-  <text x="330" y="505" text-anchor="middle" class="small">Host Tensor / KV Cache / 回归测试</text>
-  <text x="330" y="536" text-anchor="middle" class="small">目标：正确性、可调试、CPU First Success</text>
-  <path d="M640 330 V370 H330 V405" class="line"/>
-
-  <rect x="700" y="405" width="500" height="180" class="box gpu"/>
-  <text x="950" y="443" text-anchor="middle" class="label">GPU Backend（稳定契约后的扩展）</text>
-  <text x="950" y="474" text-anchor="middle" class="small">CUDA / cuBLAS / FlashAttention / Custom Kernel</text>
-  <text x="950" y="505" text-anchor="middle" class="small">Device Tensor / Stream / Event / GPU KV Cache</text>
-  <text x="950" y="536" text-anchor="middle" class="small">目标：带宽、吞吐、并行度和服务规模</text>
-  <path d="M640 330 V370 H950 V405" class="line"/>
-
-  <rect x="170" y="650" width="300" height="62" class="box observe"/>
-  <text x="320" y="676" text-anchor="middle" class="label">Benchmark / Regression</text>
-  <text x="320" y="699" text-anchor="middle" class="small">验证行为和性能变化</text>
-  <rect x="790" y="650" width="300" height="62" class="box observe"/>
-  <text x="940" y="676" text-anchor="middle" class="label">Profiling / A-B Evidence</text>
-  <text x="940" y="699" text-anchor="middle" class="small">解释瓶颈并决定是否保留</text>
-  <path d="M330 585 V620 H320 V650" class="dash"/>
-  <path d="M950 585 V620 H940 V650" class="dash"/>
+  <path d="M330 570V598H620M910 570V598H620" class="soft"/><path d="M620 598V615" class="line"/>
+  <rect x="170" y="615" width="900" height="45" rx="15" fill="#173832"/>
+  <text x="620" y="643" text-anchor="middle" class="head inverse">共同证据：CPU Golden → 跨后端数值对照 → 真实模型 → A/B → 性能剖析</text>
 </svg>

@@ -123,7 +123,7 @@ npm run docs:check-links
 | 文档检查 | `npm run docs:check-links` | 链接有效且 VitePress 站点可以完整构建 |
 | 真实环境 | 引擎集成、CUDA 或多模态对应脚本 | 指定模型、设备或输入路径真实运行通过 |
 
-性能基准比较固定环境和工作负载下的表现，正确性由独立测试和数值门禁保证。实验条件与结果入口见[实验资产表](source/reference/experiment_assets.md)。
+性能基准比较固定环境和负载下的表现，正确性由独立测试和数值门禁保证。实验条件与结果入口见[实验资产表](source/reference/experiment_assets.md)。
 
 ## 阅读代码的方法
 
