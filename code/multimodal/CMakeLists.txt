@@ -152,6 +152,30 @@ if(MULTIMODAL_ENABLE_CUDA)
         cpp_llm_engine_llama_cpu_model
         cpp_llm_engine_llama_cuda_model
     )
+    if(MULTIMODAL_ENABLE_LLAMA_CPP_TOKENIZER)
+        if(NOT TARGET chapter06_generation)
+            add_subdirectory(
+                ${CMAKE_CURRENT_SOURCE_DIR}/../chapter06_generation
+                ${CMAKE_CURRENT_BINARY_DIR}/chapter06_generation
+            )
+        endif()
+        target_sources(multimodal_cuda_smolvlm_context_inspect PRIVATE
+            ../engine/src/embedding_request_executor.cpp
+        )
+        target_include_directories(multimodal_cuda_smolvlm_context_inspect PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/../engine/include
+        )
+        target_compile_definitions(multimodal_cuda_smolvlm_context_inspect PRIVATE
+            CPP_LLM_MULTIMODAL_HAS_REAL_TOKENIZER=1
+        )
+        target_link_libraries(multimodal_cuda_smolvlm_context_inspect PRIVATE
+            chapter01_real_tokenizer
+            chapter06_generation
+        )
+        set_target_properties(multimodal_cuda_smolvlm_context_inspect PROPERTIES
+            BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"
+        )
+    endif()
 endif()
 
 if(MULTIMODAL_ENABLE_CBLAS)
@@ -216,14 +240,18 @@ if(MULTIMODAL_ENABLE_SERVICE_INTEGRATION)
         message(FATAL_ERROR
             "MULTIMODAL_ENABLE_SERVICE_INTEGRATION requires MULTIMODAL_ENABLE_LLAMA_CPP_TOKENIZER")
     endif()
-    add_subdirectory(
-        ${CMAKE_CURRENT_SOURCE_DIR}/../chapter06_generation
-        ${CMAKE_CURRENT_BINARY_DIR}/chapter06_generation
-    )
-    add_subdirectory(
-        ${CMAKE_CURRENT_SOURCE_DIR}/../chapter10_serving
-        ${CMAKE_CURRENT_BINARY_DIR}/chapter10_serving
-    )
+    if(NOT TARGET chapter06_generation)
+        add_subdirectory(
+            ${CMAKE_CURRENT_SOURCE_DIR}/../chapter06_generation
+            ${CMAKE_CURRENT_BINARY_DIR}/chapter06_generation
+        )
+    endif()
+    if(NOT TARGET chapter10_serving)
+        add_subdirectory(
+            ${CMAKE_CURRENT_SOURCE_DIR}/../chapter10_serving
+            ${CMAKE_CURRENT_BINARY_DIR}/chapter10_serving
+        )
+    endif()
     target_sources(multimodal_vision_projector_inspect PRIVATE
         ../engine/src/embedding_request_executor.cpp
     )
@@ -236,6 +264,14 @@ if(MULTIMODAL_ENABLE_SERVICE_INTEGRATION)
     target_compile_definitions(multimodal_vision_projector_inspect PRIVATE
         CPP_LLM_MULTIMODAL_HAS_SERVICE=1
     )
+    if(MULTIMODAL_ENABLE_CUDA)
+        target_link_libraries(multimodal_cuda_smolvlm_context_inspect PRIVATE
+            chapter10_serving
+        )
+        target_compile_definitions(multimodal_cuda_smolvlm_context_inspect PRIVATE
+            CPP_LLM_MULTIMODAL_HAS_SERVICE=1
+        )
+    endif()
 endif()
 
 add_executable(multimodal_preprocessor_test tests/image_preprocessor_test.cpp)
