@@ -16,7 +16,7 @@ Foundation 帮助你解决进入推理引擎代码前最常见的问题：怎样
 | --- | --- | --- |
 | 判断是否具备题库所需语法 | [F00 C++ 就绪自测](./00_cpp_readiness.md) | 选择弱基础路线或直接进入 F01 |
 | 构建、运行和调试 C++ 程序 | [F01 C++](./01_cxx_basics.md)、[F02 CMake](./02_cmake_build_basics.md)、[F04 调试测试](./04_debugging_testing_basics.md) | 进入 Chapter 00，构建并运行真实模型基线 |
-| 理解所有权、Tensor、view 和数据布局 | [F05 对象设计](./05_oop_and_design_basics.md)、[F06 数据结构](./06_data_structure_algorithm_basics.md)、[F08 概念映射](./08_pytorch_to_cpp_bridge.md) | 阅读 Chapter 01-03 的 Loader、Tensor 与 Operator |
+| 理解所有权、Tensor、稳定选择、前缀树和数据布局 | [F05 对象设计](./05_oop_and_design_basics.md)、[F06 数据结构](./06_data_structure_algorithm_basics.md)、[F08 概念映射](./08_pytorch_to_cpp_bridge.md) | 阅读 Chapter01–04、Chapter07 与多模态输入路径 |
 | 亲手组装一个可测试的小工程 | [F09 最小项目](./09_minimal_cpp_cuda_project.md) | 构建 demo，并用 CTest 验证 library 和资源对象 |
 | 理解请求并发、Worker 和异步完成 | [F10 并发基础](./10_concurrency_basics.md) | 阅读 Chapter08 调度与 Chapter10 服务并发 |
 | 比较 CPU、CUDA 或量化结果 | [F11 数值验证](./11_numerical_validation.md) | 阅读 Chapter03–05 的 Golden、误差与模型决策证据 |

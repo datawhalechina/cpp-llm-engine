@@ -2,7 +2,7 @@
 
 推理引擎的数据结构选择由访问方式决定：数值计算关注连续布局，请求管理关注顺序和状态，权重加载关注名称查找。先建立 CPU 参考实现，再考虑优化。
 
-跨章节的具体数据结构、算法、代码入口和验证产物见[教程资产索引](../reference/tutorial_assets.md)。
+跨章节的核心对象关系见[系统与执行架构](../reference/architecture.md)，章节代码和验证入口见[使用说明](https://github.com/datawhalechina/cpp-llm-engine/blob/main/USAGE.md)。
 
 ## 按访问方式选择数据结构
 
@@ -12,6 +12,8 @@
 | 名称查找 | `unordered_map` | 权重、元数据 | 键、缺失处理 |
 | FIFO 顺序 | `deque` / 队列 | 请求队列 | 顺序、容量 |
 | 固定小集合 | `array` | 注意力头、形状、维度 | 栈上布局 |
+| 稳定选择 | `vector` + 排序或小顶堆 | MoE Router Top-K | 分数、并列规则、确定性 |
+| 前缀查找 | 前缀树 | Prompt 前缀与 K/V 块 | 最长匹配、共享所有权 |
 
 ## 布局与复杂度
 
@@ -23,6 +25,46 @@
 | 权重查找 | 一次映射表查找 | 预解析、紧凑索引 |
 
 复杂度只是第一层判断；真实推理还要看缓存、内存带宽、分支和计算核启动。
+
+## 稳定 Top-K 先固定并列规则
+
+MoE Router 会从多个专家分数中选择前 `K` 项。只写“取最大的 K 个”还不够：两个专家分数相同时，CPU 与 GPU 的遍历顺序可能产生不同结果。教程使用稳定规则，把分数作为第一排序键，把专家编号作为第二排序键：
+
+```text
+left before right when:
+  score[left] > score[right]
+  or score[left] == score[right] and left < right
+```
+
+专家数量较小时，可以排序全部编号，复杂度为 `O(E log E)`；专家数量较大且 `K` 很小时，可以用大小为 `K` 的堆把复杂度降为 `O(E log K)`。优化后仍要保留相同的并列规则和输出顺序，否则相同 logits 可能进入不同专家，后续数值对照也会失去确定性。
+
+Foundation 在这里固定“稳定选择”这一通用算法；Softmax、路由权重和专家合并由 Chapter04 继续解释。
+
+## 前缀树怎样连接匹配与所有权
+
+Radix Prefix Cache 按词元序列查找最长可复用前缀。每个节点保存从父节点到当前节点的词元边，并通过子节点映射继续查找：
+
+```text
+root
+  └─ token 10
+       ├─ token 20 -> complete K/V block prefix
+       └─ token 30
+```
+
+查找复杂度与参与匹配的词元数近似成正比。命中节点只回答“哪些完整块可以复用”，物理块是否仍然存活还取决于引用计数：Radix 索引持有一份引用，每个采用该前缀的请求再持有一份。请求结束只释放自己的引用；最后一个所有者释放后，物理块才回到空闲池。
+
+`FQ15` 先练习固定容量、原子申请和释放复用；Chapter07 再增加前缀树、共享块引用和淘汰策略。这样可以分别验证容量管理与共享所有权。
+
+## 图像 Tensor 先固定遍历与展平顺序
+
+多模态预处理会在 HWC、CHW、Patch 网格和词元序列之间转换布局。二维坐标展平到一维连续存储时，必须先固定哪一维变化最快。例如行优先 Patch 网格：
+
+```text
+patch_index = patch_y * patches_per_row + patch_x
+pixel_index_chw = channel * height * width + y * width + x
+```
+
+动态切图、空间合并和 Projector 都依赖确定的遍历顺序。shape 正确但顺序错误时，程序仍能运行，却会把空间位置交给错误的视觉词元。`FQ13` 练习连续 batch 的 shape、stride 和 offset；多模态扩展测试继续验证 Patch 顺序、空间合并和图文嵌入拼接。
 
 ## 从标量循环到 AVX2
 
@@ -47,4 +89,4 @@ for (std::size_t m = 0; m < M; ++m) {
 
 ## 验证与练习
 
-验证时说明数据为什么连续、查找为什么按名称、算法为什么先选可读基线。对应练习见 [Foundation 正文与练习映射](./exercise_map.md)，完成 `FQ03` 和 `FQ06`。
+验证时说明数据为什么连续、查找为什么按名称、Top-K 如何处理并列、共享块由谁持有，以及多维坐标怎样展平。对应练习见 [Foundation 正文与练习映射](./exercise_map.md)：`FQ03`/`FQ06` 建立布局与 CPU 基线，`FQ13` 练习批次布局，`FQ15` 练习块池容量和释放。
