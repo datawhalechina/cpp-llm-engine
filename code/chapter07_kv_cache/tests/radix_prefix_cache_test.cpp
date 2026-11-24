@@ -178,5 +178,51 @@ int main() {
         CPP_LLM_CHECK_EQ(suite, prefixes.cached_blocks(), 1U);
     });
 
+    suite.run("mixed prefix lifecycle preserves shared and private ownership", [&] {
+        CpuPagedKvCache cache(1, 6, 2, 1, 2);
+        RadixPrefixCache prefixes(&cache);
+
+        const auto publish = [&](std::size_t request_id,
+                                 const std::vector<int>& tokens,
+                                 float payload_base) {
+            CPP_LLM_REQUIRE(suite, cache.reserve(request_id, tokens.size()));
+            for (std::size_t token = 0; token < tokens.size(); ++token) {
+                append_token(suite, cache, request_id, token, payload_base + token);
+            }
+            CPP_LLM_REQUIRE(suite, cache.commit_tokens(request_id, tokens.size()));
+            CPP_LLM_REQUIRE(suite, prefixes.publish(tokens, request_id));
+            CPP_LLM_REQUIRE(suite, cache.release(request_id));
+        };
+
+        publish(10, {1, 2, 3, 4}, 10.0f);
+        publish(20, {5, 6, 7, 8}, 20.0f);
+        CPP_LLM_CHECK_EQ(suite, prefixes.cached_blocks(), 4U);
+        CPP_LLM_CHECK_EQ(suite, cache.free_blocks(), 2U);
+
+        const auto match = prefixes.longest_prefix({1, 2, 3, 4, 9, 10});
+        CPP_LLM_REQUIRE(suite, match.token_count == 4U);
+        CPP_LLM_REQUIRE(suite, prefixes.attach(30, match));
+        CPP_LLM_REQUIRE(suite, cache.reserve(30, 6));
+        append_token(suite, cache, 30, 4, 30.0f);
+        append_token(suite, cache, 30, 5, 31.0f);
+        CPP_LLM_REQUIRE(suite, cache.commit_tokens(30, 6));
+        CPP_LLM_CHECK_EQ(suite, cache.block_count(30), 3U);
+
+        CPP_LLM_REQUIRE(suite, cache.trim_to_tokens(30, 4));
+        CPP_LLM_CHECK_EQ(suite, cache.block_count(30), 2U);
+        CPP_LLM_CHECK_EQ(suite, cache.token_count(30), 4U);
+        CPP_LLM_CHECK_EQ(suite, cache.free_blocks(), 2U);
+
+        CPP_LLM_REQUIRE(suite, prefixes.evict_until_free(3));
+        CPP_LLM_CHECK_EQ(
+            suite, prefixes.longest_prefix({1, 2, 3, 4}).token_count, 4U);
+        CPP_LLM_CHECK_EQ(suite, cache.free_blocks(), 3U);
+
+        CPP_LLM_REQUIRE(suite, cache.release(30));
+        CPP_LLM_REQUIRE(suite, prefixes.evict_until_free(cache.total_blocks()));
+        CPP_LLM_CHECK_EQ(suite, prefixes.cached_blocks(), 0U);
+        CPP_LLM_CHECK_EQ(suite, cache.free_blocks(), cache.total_blocks());
+    });
+
     return suite.finish();
 }

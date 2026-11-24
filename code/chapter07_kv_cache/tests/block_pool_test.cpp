@@ -6,6 +6,7 @@
 #include "cpp_llm_engine/testing/fault_injector.h"
 #include "cpp_llm_engine/testing/test.h"
 
+#include <cstdint>
 #include <limits>
 #include <set>
 #include <stdexcept>
@@ -32,6 +33,51 @@ void check_pool_invariants(
         }
     }
     CPP_LLM_CHECK(suite, counted_blocks == pool.used_blocks());
+}
+
+struct RequestSnapshot {
+    bool present = false;
+    std::size_t token_count = 0;
+    std::size_t capacity_tokens = 0;
+    std::vector<std::size_t> physical_blocks;
+};
+
+struct PoolSnapshot {
+    std::size_t free_blocks = 0;
+    std::size_t used_blocks = 0;
+    std::vector<RequestSnapshot> requests;
+};
+
+bool operator==(const RequestSnapshot& left, const RequestSnapshot& right) {
+    return left.present == right.present &&
+        left.token_count == right.token_count &&
+        left.capacity_tokens == right.capacity_tokens &&
+        left.physical_blocks == right.physical_blocks;
+}
+
+bool operator==(const PoolSnapshot& left, const PoolSnapshot& right) {
+    return left.free_blocks == right.free_blocks &&
+        left.used_blocks == right.used_blocks &&
+        left.requests == right.requests;
+}
+
+PoolSnapshot snapshot_pool(
+    const chapter07_kv_cache::KvBlockPool& pool,
+    const std::vector<std::size_t>& request_ids) {
+    PoolSnapshot snapshot;
+    snapshot.free_blocks = pool.free_blocks();
+    snapshot.used_blocks = pool.used_blocks();
+    for (const std::size_t request_id : request_ids) {
+        RequestSnapshot request;
+        request.present = pool.contains(request_id);
+        if (request.present) {
+            request.token_count = pool.token_count(request_id);
+            request.capacity_tokens = pool.capacity_tokens(request_id);
+            request.physical_blocks = pool.physical_blocks(request_id);
+        }
+        snapshot.requests.push_back(std::move(request));
+    }
+    return snapshot;
 }
 
 }  // namespace
@@ -200,6 +246,72 @@ int main() {
             rejected = true;
         }
         CPP_LLM_CHECK(suite, rejected);
+    });
+
+    suite.run("deterministic transaction sequence preserves invariants", [&] {
+        KvBlockPool pool(16, 4);
+        const std::vector<std::size_t> request_ids = {100, 101, 102, 103, 104, 105};
+        std::uint32_t state = 0x5a17c9e3U;
+        const auto next = [&state]() {
+            state = state * 1664525U + 1013904223U;
+            return state;
+        };
+
+        for (std::size_t step = 0; step < 400; ++step) {
+            const std::size_t request_id =
+                request_ids[next() % request_ids.size()];
+            const std::uint32_t operation = next() % 5U;
+            const auto before = snapshot_pool(pool, request_ids);
+            bool succeeded = false;
+
+            if (operation == 0U) {
+                const std::size_t target_tokens = 1U + next() % 32U;
+                succeeded = pool.reserve(request_id, target_tokens);
+            } else if (operation == 1U) {
+                if (!pool.contains(request_id)) {
+                    succeeded = pool.commit_tokens(request_id, 1);
+                } else if ((next() & 1U) == 0U) {
+                    succeeded = pool.commit_tokens(
+                        request_id, pool.capacity_tokens(request_id) + 1U);
+                    CPP_LLM_CHECK(suite, !succeeded);
+                } else {
+                    const std::size_t committed = pool.token_count(request_id);
+                    const std::size_t remaining =
+                        pool.capacity_tokens(request_id) - committed;
+                    succeeded = pool.commit_tokens(
+                        request_id, committed + next() % (remaining + 1U));
+                    CPP_LLM_CHECK(suite, succeeded);
+                }
+            } else if (operation == 2U) {
+                if (pool.contains(request_id)) {
+                    const std::size_t committed = pool.token_count(request_id);
+                    succeeded = pool.trim_to_tokens(
+                        request_id, next() % (committed + 1U));
+                    CPP_LLM_CHECK(suite, succeeded);
+                } else {
+                    succeeded = pool.trim_to_tokens(request_id, 0);
+                }
+            } else if (operation == 3U) {
+                succeeded = pool.release(request_id);
+            } else {
+                const std::size_t committed = pool.contains(request_id)
+                    ? pool.token_count(request_id)
+                    : 0U;
+                succeeded = pool.reserve(request_id, committed + 1U + next() % 8U);
+            }
+
+            if (!succeeded) {
+                CPP_LLM_CHECK(suite, snapshot_pool(pool, request_ids) == before);
+            }
+            check_pool_invariants(suite, pool, request_ids);
+        }
+
+        for (const std::size_t request_id : request_ids) {
+            if (pool.contains(request_id)) {
+                CPP_LLM_CHECK(suite, pool.release(request_id));
+            }
+        }
+        CPP_LLM_CHECK_EQ(suite, pool.free_blocks(), pool.total_blocks());
     });
 
     return suite.finish();
