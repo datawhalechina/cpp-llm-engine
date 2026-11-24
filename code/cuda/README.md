@@ -96,9 +96,9 @@
 
 ## Quantized Linear
 
-`CudaQuantizedMatrix` 保存 packed Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL 权重。单 token 的 `quantized_linear()` 由一个 CUDA block 负责一个输出行，在同一 kernel 内解码、乘加和归约，不创建完整 Float32 权重矩阵。Warp 内使用 shuffle，8 个 Warp 的部分和再由首个 Warp 合并。`quantized_linear_batch()` 接收 `[B,K]` 输入和 `[N,K]` 权重，把最多 4 个输入行组成一个 tile；同一线程解码一次权重后更新多行累加器，直接生成 `[B,N]`。该路径面向教学中的小批量 Decode，更大的 tile 需要继续核对寄存器压力和占用率。DeepSeek 的 K/V-B 在模型加载阶段反量化一次，供压缩 MLA 重复读取；该权重属于模型，不随请求复制。
+`CudaQuantizedMatrix` 保存 packed Q2_K/Q3_K/Q4_K/Q6_K/Q8_0/IQ4_NL 权重。单 token 的 `quantized_linear()` 由一个 CUDA block 负责一个输出行，在同一 kernel 内解码、乘加和归约，不创建完整 Float32 权重矩阵。Warp 内使用 shuffle，8 个 Warp 的部分和再由首个 Warp 合并。`quantized_linear_batch()` 接收 `[B,K]` 输入和 `[N,K]` 权重，把最多 4 个输入行组成一个 tile；同一线程解码一次权重后更新多行累加器，直接生成 `[B,N]`。该路径面向教学中的小批量 Decode，更大的 tile 需要继续核对寄存器压力和占用率。DeepSeek 的 K/V-B 在模型加载阶段反量化一次，供压缩 MLA 重复读取；该权重属于模型，不随请求复制。
 
-Q2_K、Q3_K 与 Q4_K/Q6_K 的通用路径使用 256 线程映射一个 256 元素超块。IQ4_NL 每个 block 只有 32 个元素，单 Warp 路径让每个 lane 解码一个非线性码表元素。Q2_K 每个 lane 从 packed byte 提取四个 2-bit 值；Q3_K 每个 lane 复用 low-2-bit 与 high-bit mask，并由 lane 0/16 广播 6-bit group scale。三者跨 block 累加后直接用 shuffle 归约。`Adaptive`、`AdaptiveIq4Warp` 和 `AdaptiveBlockWarp` 分别保留通用、仅 IQ4_NL、Q2_K 加 IQ4_NL 的回归基线；`AdaptiveAllWarp` 再加入 Q3_K。测试覆盖单向量、批量输入和量化 embedding 行读取，并与 Chapter05 CPU reference 逐项对照。
+Q2_K、Q3_K 与 Q4_K/Q6_K 的通用路径使用 256 线程映射一个 256 元素超块。Q8_0 和 IQ4_NL 每个 block 只有 32 个元素；Q8_0 按 block scale 解码有符号 8-bit 值，IQ4_NL 用单 Warp 查非线性码表。量化 Linear 走融合解码与乘加，embedding lookup 则只反量化指定行；两条路径共享格式契约，但需要分别测试。`Adaptive`、`AdaptiveIq4Warp` 和 `AdaptiveBlockWarp` 分别保留通用、仅 IQ4_NL、Q2_K 加 IQ4_NL 的回归基线；`AdaptiveAllWarp` 再加入 Q3_K。测试覆盖单向量、批量输入和 Q4_K、Q8_0、IQ4_NL embedding 行读取，并与 Chapter05 CPU reference 逐项对照。
 
 EXP-GPU-22 在通用路径上定位到 IQ4_NL batch=1 约 `80%` 的 barrier stall；Q2_K 的主要等待则来自 L1TEX scoreboard，两者不能共用同一个优化判断。EXP-GPU-23～26 依次证明 IQ4_NL 与 Q2_K 单 Warp 能改善微基准和完整模型。EXP-GPU-27 对默认路径重新剖析后，尚未专门优化的 Q3_K 已占长度 32/128 Kernel 时间的约 `13.8%/18.1%`。EXP-GPU-28 将 Q3_K batch 1 的执行指令约从 `10.29M` 降至 `6.52M`，Warp cycles 从 `21.94` 降至 `15.02`；EXP-GPU-29 在完整 Prefill 中复测，长度 32/128 分别改善约 `8.9%/6.5%`，最大 logits 误差不超过 `3.72e-5`。DeepSeek Factory 因此默认使用 `AdaptiveAllWarp`，其余枚举值继续作为逐格式回归基线。
 

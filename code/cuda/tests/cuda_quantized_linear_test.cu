@@ -478,6 +478,15 @@ int main() {
     for (std::size_t index = 0; index < batch_output_host.size(); ++index) {
         CHECK(close_enough(batch_output_host[index], q8_0_batch_expected[index]));
     }
+    CHECK(context.embedding_lookup(q8_0_weights, 1, &embedding_row).is_ok());
+    CHECK(context.download(
+        embedding_row,
+        embedding_host.data(),
+        embedding_host.size() * sizeof(float)).is_ok());
+    CHECK(context.synchronize().is_ok());
+    for (std::size_t index = 0; index < embedding_host.size(); ++index) {
+        CHECK(close_enough(embedding_host[index], q8_0_decoded[256 + index]));
+    }
 
     const std::vector<std::uint8_t> iq4nl_payload = make_iq4nl_payload();
     std::vector<float> iq4nl_decoded;

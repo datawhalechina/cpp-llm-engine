@@ -1,4 +1,4 @@
-// CUDA Backend：实现 GGML Q2_K/Q3_K/Q4_K/Q6_K/IQ4_NL block 到 Float32 workspace 的解码。
+// CUDA Backend：实现 GGML Q2_K/Q3_K/Q4_K/Q6_K/Q8_0/IQ4_NL block 到 Float32 workspace 的解码。
 // 契约：每个线程解码一个权重值，保持 Chapter05 CPU reference 的元素顺序。
 // 验证：cpp_llm_engine_cuda_quantized_linear_test 与 CPU reference 对照。
 #include "cpp_llm_engine/cuda/quantized_dequantize_backend.h"
@@ -149,6 +149,22 @@ __global__ void dequantize_q6k_kernel(
     output[index] = d * static_cast<float>(scale * quant);
 }
 
+__global__ void dequantize_q8_0_kernel(
+    const std::uint8_t* input,
+    float* output,
+    std::size_t elements) {
+    const std::size_t index =
+        static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (index >= elements) return;
+
+    const std::size_t block_index = index / core::kQ8_0BlockElements;
+    const std::size_t local = index % core::kQ8_0BlockElements;
+    const std::uint8_t* block = input + block_index * core::kQ8_0BlockBytes;
+    const float scale = half_bits_to_float(load_u16(block));
+    const auto* quants = reinterpret_cast<const std::int8_t*>(block + 2);
+    output[index] = scale * static_cast<float>(quants[local]);
+}
+
 __global__ void dequantize_q2k_kernel(
     const std::uint8_t* input,
     float* output,
@@ -288,6 +304,12 @@ CudaStatus CudaQuantizedDequantizeBackend::dequantize(
             static_cast<unsigned int>(kBlockSize),
             0,
             stream.native_handle()>>>(input, output, output_elements);
+    } else if (weights.format() == core::WeightFormat::Q8_0) {
+        dequantize_q8_0_kernel<<<
+            static_cast<unsigned int>(blocks),
+            static_cast<unsigned int>(kBlockSize),
+            0,
+            stream.native_handle()>>>(input, output, output_elements);
     } else if (weights.format() == core::WeightFormat::IQ4_NL) {
         dequantize_iq4nl_kernel<<<
             static_cast<unsigned int>(blocks),
@@ -353,6 +375,12 @@ CudaStatus CudaQuantizedDequantizeBackend::dequantize_row(
             stream.native_handle()>>>(input, output, output_elements);
     } else if (weights.format() == core::WeightFormat::Q3K) {
         dequantize_q3k_kernel<<<
+            static_cast<unsigned int>(blocks),
+            static_cast<unsigned int>(kBlockSize),
+            0,
+            stream.native_handle()>>>(input, output, output_elements);
+    } else if (weights.format() == core::WeightFormat::Q8_0) {
+        dequantize_q8_0_kernel<<<
             static_cast<unsigned int>(blocks),
             static_cast<unsigned int>(kBlockSize),
             0,
