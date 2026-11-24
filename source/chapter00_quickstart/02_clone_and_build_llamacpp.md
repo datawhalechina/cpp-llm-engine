@@ -1,6 +1,6 @@
 # 00.2 构建 `llama.cpp` 外部基线
 
-Chapter00 使用固定版本的 `llama.cpp` 产生外部参考结果。CPU 和 CUDA 使用不同构建目录，避免切换配置时删除已经验证的基线。
+Chapter00 使用固定版本的 `llama.cpp` 产生外部参考结果。CPU 和 CUDA 使用不同构建目录，让两套配置及其结果可以同时保留。
 
 ## 获取已验证版本
 
@@ -12,7 +12,7 @@ test -d llama.cpp/.git || git clone https://github.com/ggml-org/llama.cpp.git ll
 git -C llama.cpp checkout "$LLAMA_CPP_COMMIT"
 ```
 
-该 commit 与本章脚本使用的 `llama-simple` 参数和输出格式一致。学习时先使用这个版本，避免外部命令变化干扰排错。
+该提交与本章脚本使用的 `llama-simple` 参数和输出格式一致。学习时先使用这个版本，使命令和输出保持一致。
 
 ## 构建 CPU 基线
 
@@ -24,7 +24,7 @@ cmake --build llama.cpp/build-cpu -j"$(nproc)"
 test -x llama.cpp/build-cpu/bin/llama-simple
 ```
 
-可选 CUDA 构建使用另一目录，不覆盖 CPU 产物：
+可选 CUDA 构建使用另一目录，CPU 产物继续保留：
 
 ```bash
 cmake -S llama.cpp -B llama.cpp/build-cuda \

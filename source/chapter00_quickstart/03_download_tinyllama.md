@@ -11,7 +11,7 @@
 | 量化格式真实 | Q4_K/Q6_K payload 可以进入 Chapter05 实验 |
 | 外部结果可对照 | llama.cpp 和自研实现读取同一 GGUF |
 
-TinyLlama 用于验证执行链，不用于代表更大模型的生成质量。
+TinyLlama 用于验证执行链。生成质量与更大模型的对比属于模型评测主题。
 
 ## 不同模型在教程中的角色
 
@@ -72,7 +72,7 @@ bash code/chapter00_quickstart/run_deepseek_v2_lite_baseline.sh
 bash code/chapter01_tensor_loader/run_deepseek_v2_lite_schema.sh
 ```
 
-前两条命令建立 llama.cpp 外部结果，第三条命令验证教程 Loader 识别 27 层、MLA 压缩维度和混合 Dense/MoE 权重布局。后续章节已经连接 MLA、Q2_K/IQ4_NL Linear、完整 CPU Decoder、Generation Runtime、跨请求专家分组和 HTTP/SSE 服务；具体入口见[模型基线与扩展顺序](../reference/model_support.md#deepseek-v2-lite-当前接入层级)。
+前两条命令建立 llama.cpp 外部结果，第三条命令验证教程加载器识别 27 层、MLA 压缩维度和混合稠密/MoE 权重布局。后续章节依次连接 MLA、Q2_K/IQ4_NL 线性层、完整 CPU 解码器、生成运行时、跨请求专家分组和 HTTP/SSE 服务；具体入口见[模型基线与扩展顺序](../reference/model_support.md#deepseek-v2-lite-当前接入层级)。
 
 这些 Chapter00 入口先建立外部结果。教程自己的实现与验证入口分布在 Chapter01、04～06、08～10，当前支持范围汇总在[模型基线与扩展顺序](../reference/model_support.md)。
 

@@ -6,7 +6,7 @@
 
 | 现象 | 检查命令 | 处理方式 |
 | --- | --- | --- |
-| `llama.cpp` 已存在但不是 Git 仓库 | `test -d llama.cpp/.git` | 将误建目录改名后重新 clone；不要移动正常仓库 |
+| `llama.cpp` 已存在但不是 Git 仓库 | `test -d llama.cpp/.git` | 将误建目录改名后重新克隆，保留已有正常仓库 |
 | 找不到 `llama-simple` | `find llama.cpp -path '*/bin/llama-simple'` | 完成 00.2，或设置 `LLAMA_CPP_BUILD_DIR` |
 | 找不到 GGUF | `ls -lh llama.cpp/models/*.gguf` | 完成 00.3，或设置 `CPP_LLM_ENGINE_MODEL_PATH` |
 | SHA256 不一致 | `sha256sum <model.gguf>` | 删除损坏文件并重新下载 |
@@ -27,7 +27,7 @@ bash code/chapter00_quickstart/run_real_inference.sh
 
 第一条失败时检查 C++/CMake；第二条失败时重做 llama.cpp 构建；前两条通过而第三条失败时，检查 GGUF 和运行参数。
 
-Chapter00 使用已经成熟的 llama.cpp 可执行文件；Chapter01 开始构建本教程自己的 Loader、Tokenizer 和模型接口。因此 Chapter00 能推理但 Chapter01 测试失败，通常说明自研代码、编译环境或输入校验尚未通过，不能用外部基线成功替代对应章节测试。
+Chapter00 使用 llama.cpp 可执行文件建立外部参考；Chapter01 开始构建教程自己的加载器、分词器和模型接口。Chapter00 推理通过而 Chapter01 测试失败时，继续检查自研代码、编译环境和输入校验。两章验证的对象不同，都需要各自通过。
 
 ## 验证与衔接
 
