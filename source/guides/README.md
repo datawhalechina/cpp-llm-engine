@@ -1,12 +1,12 @@
 # 学习与复现指南
 
-这里保存跨章节的学习计划、环境操作和复现流程。CPU 是完整主线，GPU 和多模态在主线契约上扩展执行后端与输入路径。章节原理留在正文，代码结构和命令细节留在对应 `code/<chapter>/README.md`。
+这里保存跨章节的学习计划、环境操作和复现流程。CPU 是完整主线，GPU 和多模态在主线契约上扩展执行后端与输入路径。章节与扩展教程解释原理，代码结构和详细命令留在对应 `code/<chapter>/README.md`。
 
 ## 内容范围
 
 - [cpu_learning_plan.md](./cpu_learning_plan.md)：六个 CPU 主线任务和学习验收记录模板
 - [gpu_learning_plan.md](./gpu_learning_plan.md)：六个 GPU 扩展任务，从设备资源推进到真实模型服务
-- [multimodal_learning_plan.md](./multimodal_learning_plan.md)：六个多模态扩展任务，从图片预处理推进到统一 Runtime
+- [multimodal_learning_plan.md](./multimodal_learning_plan.md)：六个多模态任务及验收入口；原理从[多模态扩展教程](../extensions/multimodal/intro.md)进入
 - [setup_cuda.md](./setup_cuda.md)：CUDA 安装与配置
 - [vllm_service_quickstart.md](./vllm_service_quickstart.md)：用独立 Docker 容器体验 vLLM 的同步与流式服务
 

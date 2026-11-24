@@ -31,9 +31,9 @@ export default defineConfig({
     sidebar: createSidebar(),
     nav: [
       { text: '首页', link: '/' },
-      { text: '教程主入口', link: '/README' },
+      { text: '教程主入口', link: '/chapter00_quickstart/intro' },
       { text: '英文入口', link: '/en/README' },
-      { text: '使用文档', link: '/guide' },
+      { text: '使用说明', link: 'https://github.com/datawhalechina/cpp-llm-engine/blob/main/USAGE.md' },
       { text: 'Foundation 题库', link: '/exercises/foundation/README' },
       { text: '学习指南', link: '/guides/README' },
       { text: '设计参考', link: '/reference/README' },
@@ -84,16 +84,6 @@ function chapterGroup(chapterCode: string, text: string, base: string, pages: Ar
   }
 }
 
-function codeGroup(chapterCode: string, text: string, base: string) {
-  return {
-    text,
-    collapsed: true,
-    items: [
-      { text: `${chapterCode} 代码索引`, link: `${base}` },
-    ],
-  }
-}
-
 function chapterLandingGroup(chapterCode: string, text: string, base: string) {
   return {
     text,
@@ -138,8 +128,8 @@ function createSidebar() {
         text: '开始这里',
         collapsed: false,
         items: [
-          { text: '主入口', link: '/README' },
-          { text: '使用文档', link: '/guide' },
+          { text: '教程首页', link: '/' },
+          { text: '使用说明', link: 'https://github.com/datawhalechina/cpp-llm-engine/blob/main/USAGE.md' },
           { text: 'CPU 六任务学习计划', link: '/guides/cpu_learning_plan' },
           { text: 'GPU 六任务学习计划', link: '/guides/gpu_learning_plan' },
           { text: '多模态六任务学习计划', link: '/guides/multimodal_learning_plan' },
@@ -281,6 +271,17 @@ function createSidebar() {
         ],
       },
       {
+        text: '多模态扩展',
+        collapsed: true,
+        items: [
+          { text: '扩展导读', link: '/extensions/multimodal/intro' },
+          { text: '图片预算与动态切图', link: '/extensions/multimodal/01_image_preprocessing' },
+          { text: 'mmproj 与视觉编码器', link: '/extensions/multimodal/02_vision_encoder' },
+          { text: '投影层与运行时交接', link: '/extensions/multimodal/03_runtime_handoff' },
+          { text: 'Python 与生产框架对照', link: '/extensions/multimodal/04_framework_comparison' },
+        ],
+      },
+      {
         text: '查阅与扩展',
         collapsed: true,
         items: [
@@ -291,7 +292,6 @@ function createSidebar() {
           { text: 'CUDA 安装与配置', link: '/guides/setup_cuda' },
           { text: 'Foundation 题库', link: '/exercises/foundation/README' },
           { text: '参考资料总入口', link: '/reference/README' },
-          { text: '教程资产索引', link: '/reference/tutorial_assets' },
           { text: '实验与验证资产', link: '/reference/experiment_assets' },
           { text: '系统与执行架构', link: '/reference/architecture' },
           { text: '模型基线与扩展顺序', link: '/reference/model_support' },
@@ -308,20 +308,6 @@ function createSidebar() {
         collapsed: false,
         items: [
           { text: '总览', link: '/code/README' },
-          { text: 'Repository Engine First Success', link: '/code/engine' },
-          { text: 'CUDA 公共基础层', link: '/code/cuda' },
-          { text: '多模态 CPU 输入扩展', link: '/code/multimodal' },
-          codeGroup('00', '第 00 章 起跑线', '/code/chapter00_quickstart'),
-          codeGroup('01', '第 01 章 模型权重与 Tensor 对象', '/code/chapter01_tensor_loader'),
-          codeGroup('02', '第 02 章 Tensor 视图与共享存储', '/code/chapter02_tensor_ops'),
-          codeGroup('03', '第 03 章 MatMul 与计算后端', '/code/chapter03_matmul'),
-          codeGroup('04', '第 04 章 Decoder 结构与 Attention', '/code/chapter04_attention'),
-          codeGroup('05', '第 05 章 量化', '/code/chapter05_quantization'),
-          codeGroup('06', '第 06 章 Generation Core', '/code/chapter06_generation'),
-          codeGroup('07', '第 07 章 K/V Cache', '/code/chapter07_kv_cache'),
-          codeGroup('08', '第 08 章 调度与批处理', '/code/chapter08_scheduling'),
-          codeGroup('09', '第 09 章 性能证据', '/code/chapter09_performance'),
-          codeGroup('10', '第 10 章 推理服务', '/code/chapter10_serving'),
         ],
       },
     ],

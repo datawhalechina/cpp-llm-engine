@@ -7,11 +7,11 @@ hero:
   tagline: 从 GGUF、张量、解码器到 K/V Cache、调度与推理服务
   actions:
     - theme: brand
-      text: 进入教程主入口
-      link: /README
+      text: 开始 Chapter00
+      link: /chapter00_quickstart/intro
     - theme: alt
-      text: 看阅读指南
-      link: /guide
+      text: 选择学习路线
+      link: /guides/README
     - theme: alt
       text: English entry
       link: /en/README
@@ -28,8 +28,7 @@ features:
 ## 这是什么
 
 这是一个中文优先的 C++ LLM 推理教程，最终目标是构建可以替换加载器、计算后端、K/V Cache、调度器和传输层的单机 DIY 推理服务框架。
-如果你想先知道怎么读，先看 [阅读指南](/guide)；如果你想直接看主线，从 [教程主入口](/README) 进入。
-环境和硬件建议集中在 [阅读指南](/guide)。
+如果你想先选择 CPU、GPU 或多模态路线，先看[学习与复现指南](/guides/README)；如果你想直接开始主线，从 [Chapter00](/chapter00_quickstart/intro) 进入。完整章节命令和验证层级见[仓库使用说明](https://github.com/datawhalechina/cpp-llm-engine/blob/main/USAGE.md)。
 
 ## 教程主线
 
@@ -42,7 +41,7 @@ features:
 | `chapter04` - `chapter06` | 解码器、量化与生成运行时 |
 | `chapter07` | K/V Cache 与内存管理 |
 | `chapter08` | 调度与批处理 |
-| `chapter09` | 性能证据与优化闭环 |
+| `chapter09` | 性能证据、瓶颈归因与优化决策 |
 | `chapter10` | 服务核心、HTTP/SSE 与资源释放 |
 
 完成主线后，按需查阅 `reference` 和 `guides`：
