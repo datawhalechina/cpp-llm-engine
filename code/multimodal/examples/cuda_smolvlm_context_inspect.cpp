@@ -13,6 +13,7 @@
 #include "chapter06_generation/request.h"
 #include "chapter06_generation/runtime.h"
 #include "chapter06_generation/sampler.h"
+#include "cpp_llm_engine/cuda_embedding_batch_runner.h"
 #include "cpp_llm_engine/embedding_request_executor.h"
 #include "real_tokenizer.h"
 #endif
@@ -92,6 +93,7 @@ bool contains_tokens_in_order(
     }
     return true;
 }
+
 #endif
 
 }  // namespace
@@ -342,6 +344,11 @@ int main(int argc, char** argv) {
     bool service_stream_match = false;
     bool service_metrics_match = false;
     std::size_t service_factory_calls = 0;
+    bool service_batch_match = false;
+    bool service_batch_released = false;
+    std::size_t service_model_batch_calls = 0;
+    std::size_t service_tensor_batch_requests = 0;
+    std::size_t service_batch_workspaces = 0;
     if (mixed_prompt && matched) {
         std::vector<float> cpu_decode_logits;
         std::vector<float> cuda_decode_logits;
@@ -465,8 +472,48 @@ int main(int argc, char** argv) {
                 metrics.released_total == 2 &&
                 metrics.generated_tokens_total == 8 &&
                 service.inflight_size() == 0;
+            cpp_llm_engine::CudaEmbeddingBatchRunner batch_runner(*cuda_model);
+            auto batch_executor_a = cpp_llm_engine::EmbeddingRequestExecutor::create(
+                cuda_model->create_context(embeddings.token_count + 4, &error),
+                embeddings,
+                &error);
+            auto batch_executor_b = cpp_llm_engine::EmbeddingRequestExecutor::create(
+                cuda_model->create_context(embeddings.token_count + 4, &error),
+                embeddings,
+                &error);
+            chapter06_generation::Request batch_request_a(positions);
+            chapter06_generation::Request batch_request_b(positions);
+            chapter10_serving::ServiceCore batch_service(
+                2, 2, {}, {}, {}, &batch_runner);
+            const bool batch_admitted = batch_executor_a != nullptr &&
+                batch_executor_b != nullptr &&
+                batch_service.admit(
+                    903, batch_request_a, sampler, batch_executor_a).accepted() &&
+                batch_service.admit(
+                    904, batch_request_b, sampler, batch_executor_b).accepted();
+            for (std::size_t step = 0;
+                 step < 8 &&
+                     (!batch_request_a.terminal() || !batch_request_b.terminal());
+                 ++step) {
+                const auto stats = batch_service.dispatch_step(runtime, 2048);
+                service_model_batch_calls += stats.model_batch_calls;
+                service_tensor_batch_requests += stats.tensor_batch_requests;
+                if (stats.scheduled_requests == 0) break;
+            }
+            service_batch_workspaces = batch_runner.workspace_count();
+            service_batch_match = batch_admitted &&
+                batch_request_a.finished() && batch_request_b.finished() &&
+                batch_request_a.generated() == runtime_cuda_tokens &&
+                batch_request_b.generated() == runtime_cuda_tokens &&
+                service_model_batch_calls == 3 &&
+                service_tensor_batch_requests == 6 &&
+                service_batch_workspaces == 1;
+            service_batch_released =
+                batch_service.release_terminal() == 2 &&
+                batch_service.inflight_size() == 0;
             matched = matched && service_sync_match && service_stream_match &&
-                service_metrics_match;
+                service_metrics_match && service_batch_match &&
+                service_batch_released;
         }
 #else
         if (service_mode) {
@@ -516,6 +563,16 @@ int main(int argc, char** argv) {
               << "service_metrics_match: "
               << (service_metrics_match ? "true" : "false") << '\n'
               << "service_factory_calls: " << service_factory_calls << '\n'
+              << "service_batch_match: "
+              << (service_batch_match ? "true" : "false") << '\n'
+              << "service_batch_released: "
+              << (service_batch_released ? "true" : "false") << '\n'
+              << "service_model_batch_calls: "
+              << service_model_batch_calls << '\n'
+              << "service_tensor_batch_requests: "
+              << service_tensor_batch_requests << '\n'
+              << "service_batch_workspaces: "
+              << service_batch_workspaces << '\n'
               << "context_positions: " << cpu_context->token_count() << ','
               << cuda_context->position() << '\n'
               << "cpu_cuda_match: " << (matched ? "true" : "false") << '\n';
