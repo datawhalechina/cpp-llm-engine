@@ -1,6 +1,6 @@
 # 10.8 从请求时间线产生指标
 
-指标应来自明确的状态转换，而不是在 HTTP 层估算。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/src/service_core.cpp"><code>ServiceCore</code></a> 使用单调时钟记录 admission、进入 running、首词元和终态；`HttpAdapter` 只把这些事实序列化为 Prometheus 文本。
+指标来自明确的状态转换。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/src/service_core.cpp"><code>ServiceCore</code></a> 使用单调时钟记录准入、进入运行状态、首词元和终态；`HttpAdapter` 把这些事实序列化为 Prometheus 文本。
 
 接受、终态、在途和释放计数的守恒关系见 [`F-SERVE-01`](../../reference/formulas.md#f-serve-01)。
 
@@ -8,24 +8,24 @@
 
 | 指标 | 更新位置 | 回答的问题 |
 | --- | --- | --- |
-| accepted/queue_full/duplicate | admission | 请求是否进入服务 |
-| waiting/running/peak_inflight | admission、提升与释放 | 实例压力有多大 |
-| generated_tokens | Scheduler 返回的 step 统计 | 服务完成多少生成工作 |
+| `accepted/queue_full/duplicate` | 准入 | 请求是否进入服务 |
+| `waiting/running/peak_inflight` | 准入、提升与释放 | 实例压力有多大 |
+| `generated_tokens` | 调度器返回的模型步统计 | 服务完成多少生成工作 |
 | cancelled/timed_out/failed | 统一释放时按 Request 终态计数 | 请求为何停止 |
 | released | 统一释放完成 | 资源是否真正归还 |
-| queue wait | admission → running | 容量或调度等待多久 |
-| TTFT | admission → first token | 用户多久看到响应 |
-| completion | admission → terminal | 请求多久结束 |
+| 排队时间 | 准入 → 运行 | 容量或调度等待多久 |
+| TTFT | 准入 → 首词元 | 用户多久看到响应 |
+| 完成时间 | 准入 → 终态 | 请求多久结束 |
 
-## 指标、日志和 Trace 各自回答什么
+## 指标、日志和链路追踪各自回答什么
 
 | 证据 | 适合回答 | 最小关联键 |
 | --- | --- | --- |
-| Metrics | 总量、速率和延迟分布 | service/model/workload 标签 |
+| 指标 | 总量、速率和延迟分布 | service/model/负载标签 |
 | 结构化日志 | 单次错误和状态转换 | request ID |
-| Trace | 跨 Transport、Scheduler 和 Executor 的耗时 | trace/span ID |
+| 链路追踪（Trace） | 跨传输层、调度器和执行器的耗时 | trace/span ID |
 
-教学实现先提供 counter 和 `_sum/_count`；P50/P99 需要 histogram 或 Chapter09 的原始样本，不能从只有总和与次数的数据中恢复。
+教学实现先提供计数器和 `_sum/_count`。P50/P99 来自直方图或 Chapter09 的原始样本；总和与次数只能计算均值。
 
 ## 验证指标口径
 

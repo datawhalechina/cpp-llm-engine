@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1440" height="820" viewBox="0 0 1440 820" role="img" aria-labelledby="title desc">
   <title id="title">Chapter 10 推理服务主图</title>
-  <desc id="desc">展示 Chapter10 位于调度、性能之后，以及请求从 Transport、准入、等待、运行、调度执行、流式写回到终态释放的生命周期。</desc>
+  <desc id="desc">展示 Chapter10 位于调度、性能之后，以及请求从传输层、准入、等待、运行、调度执行、流式写回到终态释放的生命周期。</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#f7f1e5"/>
@@ -30,7 +30,7 @@
   </defs>
 
   <rect width="1440" height="820" rx="28" fill="url(#bg)"/>
-  <text x="70" y="62" class="title">Chapter 10 · 把推理 Runtime 变成持续服务</text>
+  <text x="70" y="62" class="title">Chapter 10 · 把推理运行时变成持续服务</text>
   <text x="70" y="92" class="subtitle">网络负责连接，服务核心负责生命周期，Scheduler 负责每一步执行选择</text>
 
   <text x="70" y="136" class="section">在推理主线中的位置</text>
@@ -45,7 +45,7 @@
   <text x="583" y="195" text-anchor="middle" class="chapter">Chapter 09</text>
   <text x="583" y="219" text-anchor="middle" class="chapter-sub">性能证据</text>
   <text x="971" y="190" text-anchor="middle" class="chapter">Chapter 10 · 推理服务</text>
-  <text x="971" y="216" text-anchor="middle" class="chapter-sub">准入 · 生命周期 · Transport · 可观测性</text>
+  <text x="971" y="216" text-anchor="middle" class="chapter-sub">准入 · 生命周期 · 传输层 · 可观测性</text>
   <text x="1289" y="195" text-anchor="middle" class="chapter">客户端</text>
   <text x="1289" y="219" text-anchor="middle" class="chapter-sub">HTTP / SSE</text>
   <path d="M382 202 H421" stroke="#315f56" stroke-width="3" marker-end="url(#arrow)"/>
@@ -60,21 +60,21 @@
     <rect x="790" y="330" width="260" height="140" rx="19" fill="#163f38"/>
     <rect x="1085" y="340" width="285" height="120" rx="17" fill="#ffffff" stroke="#d89570" stroke-width="2"/>
   </g>
-  <text x="172" y="376" text-anchor="middle" class="box-title">Transport / Adapter</text>
+  <text x="172" y="376" text-anchor="middle" class="box-title">传输层 / 适配器</text>
   <text x="172" y="407" text-anchor="middle" class="box-sub">解析请求 · 连接事件</text>
   <text x="172" y="434" text-anchor="middle" class="code">HTTP · SSE · Writer</text>
 
-  <text x="412" y="376" text-anchor="middle" class="box-title">准入与 waiting</text>
+  <text x="412" y="376" text-anchor="middle" class="box-title">准入与等待队列</text>
   <text x="412" y="407" text-anchor="middle" class="box-sub">ID · 容量 · 优先级 · 缓存估算</text>
   <text x="412" y="434" text-anchor="middle" class="code">admit()</text>
 
-  <text x="652" y="376" text-anchor="middle" class="box-title">running 集合</text>
+  <text x="652" y="376" text-anchor="middle" class="box-title">运行集合</text>
   <text x="652" y="407" text-anchor="middle" class="box-sub">请求状态 · Executor · 时间戳</text>
   <text x="652" y="434" text-anchor="middle" class="code">ServiceCore</text>
 
   <text x="920" y="370" text-anchor="middle" class="chapter">调度并执行一个 step</text>
   <text x="920" y="402" text-anchor="middle" class="chapter-sub">Chapter08 Scheduler</text>
-  <text x="920" y="426" text-anchor="middle" class="chapter-sub">→ Chapter07 KV / Chapter06 Runtime</text>
+  <text x="920" y="426" text-anchor="middle" class="chapter-sub">→ Chapter07 K/V / Chapter06 运行时</text>
   <text x="920" y="451" text-anchor="middle" class="code white">dispatch_step()</text>
 
   <text x="1227" y="376" text-anchor="middle" class="box-title">词元写回</text>

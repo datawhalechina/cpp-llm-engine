@@ -1,18 +1,18 @@
-# 10.7 区分连接并发、请求并发和 Tensor Batch
+# 10.7 区分连接并发、请求并发和张量组批
 
-“同时处理多个请求”可能发生在不同层。连接线程并发不等于模型并行，<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/src/request_worker.cpp"><code>RequestWorkerPool</code></a> 的请求级重叠也不等于一次 Tensor batch 调用。
+“同时处理多个请求”可能发生在不同层。连接线程并发表示网络层可同时接入；<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/src/request_worker.cpp"><code>RequestWorkerPool</code></a> 表示多个独立上下文在线程中重叠；张量组批则表示多个请求进入同一次模型调用。
 
 | 并发层级 | 实际发生什么 | 当前证据 |
 | --- | --- | --- |
-| Transport 接入 | 网络库可以接收多个连接；当前在 Adapter 前串行化 | cpp-httplib 回环与互斥入口 |
-| ServiceCore 多请求状态 | waiting/running 可以保存多个请求，但 API 由单线程调用 | admission 与状态测试 |
-| 请求级 Worker | 独立 Executor/Context 在 CPU 线程重叠 | sequential/parallel A/B |
-| Step batch | 一个调度步选择多个请求 | Chapter08 StepBatchPlan |
-| Tensor batch | 多行激活进入一次模型/算子调用 | Chapter08 批量执行证据 |
+| 传输层接入 | 网络库可以接收多个连接；当前在适配器前串行化 | cpp-httplib 回环与互斥入口 |
+| `ServiceCore` 多请求状态 | 等待/运行集合可以保存多个请求，API 由单线程调用 | 准入与状态测试 |
+| 请求级工作线程 | 独立执行器与上下文在 CPU 线程重叠 | 顺序/并行 A/B |
+| 模型步组批 | 一个调度步选择多个请求 | Chapter08 `StepBatchPlan` |
+| 张量组批 | 多行激活进入一次模型或算子调用 | Chapter08 批量执行证据 |
 
-下图从连接入口一直追踪到模型调用。当前 socket 层可以出现多个连接，但进入 Adapter/ServiceCore 前会串行化；ServiceCore 保存多个请求不等于它支持多线程调用。只有多个请求的激活进入同一次模型调用时，才属于真实 Tensor Batch。
+下图从连接入口一直追踪到模型调用。当前套接字层可以出现多个连接，但进入 `HttpAdapter` 和 `ServiceCore` 前会串行化；`ServiceCore` 保存多个请求不表示它支持多线程调用。多个请求的激活进入同一次模型调用时，才属于张量组批。
 
-![连接并发、请求并发与 Tensor Batch](../../assets/diagrams/chapter10-concurrency-layers.svg)
+![连接并发、请求并发与张量组批](../../assets/diagrams/chapter10-concurrency-layers.svg)
 
 ## 并发对象必须隔离
 
@@ -24,7 +24,7 @@
 | 模型权重、只读调度配置 | Deadline、流式 Writer、错误状态 |
 | 统计定义 | 单请求时间戳和词元顺序 |
 
-`RequestWorkerPool` 证明两个独立 Context 可以在 CPU 线程中重叠执行，但它绕过 StepBatchPlan，且使用 BlockPool 时会拒绝运行。Chapter08 Tensor batch 则把多行激活交给同一次模型调用。两条路径回答不同问题，不能用 Worker 并发结果代替批量模型执行证据。
+`RequestWorkerPool` 证明两个独立上下文可以在 CPU 线程中重叠执行，但它绕过 `StepBatchPlan`，且使用 `BlockPool` 时会拒绝运行。Chapter08 张量组批则把多行激活交给同一次模型调用。两条路径分别验证线程隔离和模型批执行，结果不可互相替代。
 
 ## 验证并发隔离
 

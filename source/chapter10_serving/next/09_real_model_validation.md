@@ -1,6 +1,6 @@
 # 10.9 用真实模型验证服务
 
-确定性 Executor 适合覆盖状态机。TinyLlama 与 Qwen3 验证稠密模型的 CPU/CUDA 服务，Qwen1.5-MoE 验证动态准入和专家分组能否穿过 ServiceCore，DeepSeek-V2-Lite 验证 MLA-MoE、Completion 与 SSE。模型复用同一组 ServiceCore 和 Scheduler；进入 HTTP 的路径再复用 Adapter。Factory 负责把具体模型装配到统一执行接口。
+确定性执行器适合覆盖状态机。TinyLlama 与 Qwen3 验证稠密模型的 CPU/CUDA 服务，Qwen1.5-MoE 验证动态准入和专家分组能否穿过 `ServiceCore`，DeepSeek-V2-Lite 验证 MLA-MoE、Completion 与 SSE。模型复用同一组服务核心和调度器；进入 HTTP 的路径再复用适配器。工厂对象负责把具体模型装配到统一执行接口。
 
 ## 真实对象怎样组装
 
@@ -14,15 +14,15 @@
 
 ## 分层运行真实验证
 
-| 入口 | 覆盖范围 | 不代表什么 |
+| 入口 | 覆盖范围 | 还需补充的验证 |
 | --- | --- | --- |
-| 真实 ServiceCore smoke | Model/Context、双请求 batch 和生命周期 | 网络端到端性能 |
-| HTTP `--check` | 串行 Adapter 入口下的 socket、Completion、SSE 和 metrics | 并发 HTTP 服务或高并发压测 |
-| CUDA Service smoke | CUDA Executor、分页 Decode batch、Completion/SSE、取消、超时和释放 | 融合 PagedAttention 或 socket 服务 |
-| 服务 Benchmark | 固定 workload 的 TTFT、吞吐和内存 | 开放环生产负载 |
-| sequential/parallel A/B | 请求级 CPU 重叠 | Tensor batch 收益 |
+| 真实服务核心冒烟测试 | 模型/上下文、双请求组批和生命周期 | 网络端到端性能另测 |
+| HTTP `--check` | 串行适配器入口下的套接字、Completion、SSE 和指标 | 并发 HTTP 与高并发压测另测 |
+| CUDA 服务冒烟测试 | CUDA 执行器、分页解码组批、Completion/SSE、取消、超时和释放 | 融合 PagedAttention 与套接字服务分别验证 |
+| 服务性能基准 | 固定负载的 TTFT、吞吐和内存 | 开放环生产负载另建实验 |
+| 顺序/并行 A/B | 请求级 CPU 重叠 | 张量组批收益由批执行实验验证 |
 
-归档结果使用 Chapter09 的 workload ID、环境和正确性字段。正文解释验证方法，具体机器上的数字进入实验资产索引。
+归档结果使用 Chapter09 的负载 ID、环境和正确性字段。正文解释验证方法，具体机器上的数字进入实验资产索引。
 
 双请求 ServiceCore smoke 在 admission 时绑定请求 ID 和分页数据面，再把 Decode 候选交给 `RealLlamaExecutorFactory::decode_batch()`。验证同时检查 batch 调用计数、逐请求 golden、`paged_payload_active`、Context 隔离、BlockPool 提交数和终态释放。请求级并行 Worker 仍使用独立连续 Context；它用于比较 CPU 请求重叠，不等同于共享模型的 Tensor batch。
 

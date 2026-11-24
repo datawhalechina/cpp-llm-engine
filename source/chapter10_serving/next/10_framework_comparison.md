@@ -1,6 +1,6 @@
-# 10.10 对照成熟推理服务架构
+# 10.10 对照生产推理服务架构
 
-教学 ServiceCore 把一个进程内的请求生命周期拆清楚。成熟框架保留这些对象，同时增加多进程 Worker、完整 API、分布式缓存、租户策略和故障恢复。
+教学 `ServiceCore` 展示一个进程内的请求生命周期。生产框架保留相似对象，同时增加多进程工作进程、完整 API、分布式缓存、租户策略和故障恢复。
 
 ## 对象映射
 
@@ -17,13 +17,13 @@ Python 服务常用 FastAPI 或 Starlette 定义路由、解析请求并输出�
 
 ## 教学实现与生产实现
 
-| 问题 | 成熟系统增加的对象 | 工程影响 |
+| 问题 | 生产系统增加的对象 | 工程影响 |
 | --- | --- | --- |
 | API 与推理引擎分进程 | IPC、序列化、引擎客户端 | 取消和流式事件跨进程传递 |
 | 多 GPU/多节点执行 | distributed executor、worker group | 资源与失败域扩大 |
 | 多租户和优先级 | policy、quota、preemption | admission 与 Scheduler 策略分离 |
 | 前缀与分层缓存 | prefix index、host/remote cache | 生命周期不再等同单请求 |
-| 生产观测 | histogram、trace、request log | 指标基数与隐私治理 |
+| 生产观测 | 直方图、链路追踪、请求日志 | 指标基数与隐私处理 |
 
 ## 继续阅读源码
 
