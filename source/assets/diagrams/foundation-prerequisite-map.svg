@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">Foundation 前置能力与章节关系</title>
+  <desc id="desc">将 C++、构建测试、数据结构、并发、数值验证和 CUDA 基础连接到推理引擎各章节所需的工程能力。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8f3e7"/><stop offset="1" stop-color="#e7f1ed"/></linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#355b54"/></marker>
+    <style>
+      .title{font:700 28px 'Noto Sans CJK SC',sans-serif;fill:#173832}.sub{font:500 15px 'Noto Sans CJK SC',sans-serif;fill:#5b706b}.group{font:700 17px 'Noto Sans CJK SC',sans-serif;fill:#173832}.head{font:700 15px 'Noto Sans CJK SC',sans-serif;fill:#173832}.small{font:500 12px 'Noto Sans CJK SC',sans-serif;fill:#5b706b}.box{stroke:#355b54;stroke-width:1.8;rx:12}.line{stroke:#6d8781;stroke-width:1.8;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1200" height="650" fill="url(#bg)"/>
+  <text x="50" y="50" class="title">Foundation：从基础能力进入推理引擎</text>
+  <text x="50" y="78" class="sub">按当前缺口选择基础内容；中间能力桥梁说明它会在哪类代码中再次出现。</text>
+
+  <text x="70" y="118" class="group">基础主题</text><text x="500" y="118" class="group">能力桥梁</text><text x="920" y="118" class="group">对应章节</text>
+
+  <rect x="55" y="140" width="260" height="64" class="box" fill="#fff4d7"/><text x="75" y="166" class="head">C++ 对象与所有权</text><text x="75" y="188" class="small">值、引用、移动、RAII、错误边界</text>
+  <rect x="55" y="220" width="260" height="64" class="box" fill="#fff4d7"/><text x="75" y="246" class="head">CMake、CTest 与调试</text><text x="75" y="268" class="small">目标、链接、测试、Sanitizer</text>
+  <rect x="55" y="300" width="260" height="64" class="box" fill="#fff4d7"/><text x="75" y="326" class="head">容器、视图与数据结构</text><text x="75" y="348" class="small">连续存储、树、队列、稳定选择</text>
+  <rect x="55" y="380" width="260" height="64" class="box" fill="#fff4d7"/><text x="75" y="406" class="head">线程、同步与请求状态</text><text x="75" y="428" class="small">互斥、条件变量、Worker、终态</text>
+  <rect x="55" y="460" width="260" height="64" class="box" fill="#fff4d7"/><text x="75" y="486" class="head">数值验证与性能测量</text><text x="75" y="508" class="small">容差、Golden、基准、性能剖析</text>
+  <rect x="55" y="540" width="260" height="64" class="box" fill="#e7eef9"/><text x="75" y="566" class="head">CUDA 资源与常用库</text><text x="75" y="588" class="small">设备内存、Stream、cuBLAS、事件</text>
+
+  <rect x="440" y="140" width="300" height="82" class="box" fill="#e2eee9"/><text x="590" y="170" text-anchor="middle" class="head">资源对象与生命周期</text><text x="590" y="194" text-anchor="middle" class="small">Storage · Model · Context · Workspace</text>
+  <rect x="440" y="244" width="300" height="82" class="box" fill="#e2eee9"/><text x="590" y="274" text-anchor="middle" class="head">Tensor、View 与数据布局</text><text x="590" y="298" text-anchor="middle" class="small">shape · stride · offset · block layout</text>
+  <rect x="440" y="348" width="300" height="82" class="box" fill="#e2eee9"/><text x="590" y="378" text-anchor="middle" class="head">稳定接口与事务状态</text><text x="590" y="402" text-anchor="middle" class="small">Status · Contract · reserve/commit/rollback</text>
+  <rect x="440" y="452" width="300" height="82" class="box" fill="#e2eee9"/><text x="590" y="482" text-anchor="middle" class="head">可复查的工程证据</text><text x="590" y="506" text-anchor="middle" class="small">单元测试 · 集成测试 · Benchmark</text>
+
+  <rect x="850" y="140" width="300" height="64" class="box" fill="#f7fbf9"/><text x="870" y="166" class="head">Chapter00–01：构建、加载与模型对象</text><text x="870" y="188" class="small">工具链、GGUF、配置、权重所有权</text>
+  <rect x="850" y="220" width="300" height="64" class="box" fill="#f7fbf9"/><text x="870" y="246" class="head">Chapter02–05：数据与计算</text><text x="870" y="268" class="small">Tensor、算子、Decoder、量化格式</text>
+  <rect x="850" y="300" width="300" height="64" class="box" fill="#f7fbf9"/><text x="870" y="326" class="head">Chapter06–08：请求运行时</text><text x="870" y="348" class="small">生成状态、分页缓存、连续批处理</text>
+  <rect x="850" y="380" width="300" height="64" class="box" fill="#f7fbf9"/><text x="870" y="406" class="head">Chapter10：并发服务</text><text x="870" y="428" class="small">准入、取消、超时、HTTP/SSE</text>
+  <rect x="850" y="460" width="300" height="64" class="box" fill="#f7fbf9"/><text x="870" y="486" class="head">Chapter09：性能证据</text><text x="870" y="508" class="small">负载、样本、归因和 A/B</text>
+  <rect x="850" y="540" width="300" height="64" class="box" fill="#e7eef9"/><text x="870" y="566" class="head">CUDA 与多模态扩展</text><text x="870" y="588" class="small">替换执行后端或扩展输入路径</text>
+
+  <path d="M315 172H440" class="line"/><path d="M315 252H400V181H440" class="line"/><path d="M315 332H440" class="line"/><path d="M315 412H440" class="line"/><path d="M315 492H440" class="line"/><path d="M315 572H780V572H850" class="line"/>
+  <path d="M740 181H850" class="line"/><path d="M740 285H800V252H850" class="line"/><path d="M740 375H790V332H850" class="line"/><path d="M740 405H790V412H850" class="line"/><path d="M740 493H850" class="line"/>
+</svg>

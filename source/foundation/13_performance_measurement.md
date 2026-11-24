@@ -7,7 +7,7 @@
 | 项目 | 需要记录的内容 |
 | --- | --- |
 | 环境 | CPU/GPU、编译器、构建类型、线程数或 CUDA 版本 |
-| 工作负载 | 模型、shape、batch、context、decode step |
+| 负载 | 模型、shape、batch、context、decode step |
 | 路径 | 参考实现与候选实现的明确选择参数 |
 | 正确性 | 相同输入下的误差、词元或资源状态 |
 | 样本 | 预热次数、正式次数、原始耗时和统计量 |

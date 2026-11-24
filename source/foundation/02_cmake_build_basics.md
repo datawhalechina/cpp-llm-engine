@@ -1,6 +1,6 @@
 # F02 CMake 与构建基础
 
-CMake 在本教程中负责把源码、library、app 和 test 组织成可重复构建的 target。先掌握 target 依赖，再进入 Chapter 00 和后续章节。
+CMake 在本教程中把源码、库、应用和测试组织成可重复构建的目标（target）。先掌握目标依赖，再进入 Chapter 00 和后续章节。
 
 ## Target 与依赖关系
 
@@ -45,7 +45,7 @@ enable_testing()
 add_test(NAME core_test COMMAND core_test)
 ```
 
-编译选项优先挂在 target 上，不用全局变量污染其他模块。
+把编译选项挂在对应目标上，可以避免全局选项影响其他模块。
 
 ## 验证与练习
 

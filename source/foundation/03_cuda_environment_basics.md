@@ -18,7 +18,7 @@ CUDA 学习先解决“环境是否可用”和“CPU 结果如何作为基线�
 | --- | --- | --- |
 | CPU | 正确性、调试、回归和基线性能 | 默认路径，贯穿 Chapter 01-10 |
 | CUDA | 设备内存、计算核和加速对照 | FQ10、Chapter03 以后 |
-| 外部框架 | 展示成熟实现的选择 | llama.cpp、vLLM、TensorRT-LLM |
+| 外部框架 | 展示生产实现的选择 | llama.cpp、vLLM、TensorRT-LLM |
 
 `GGML_CUDA=ON` 是 llama.cpp 的构建选项；教程自己的代码使用类似 `ENABLE_CUDA` 的构建目标选项。学习重点是构建开关如何改变代码路径，而不是记住某个项目的变量名。
 
@@ -50,4 +50,4 @@ CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
 | `PinnedHostBuffer` | 页锁定主机内存和可重叠复制前提 | `cudaMallocHost/cudaFreeHost`、移动和重复释放 |
 | `CudaStream` / `CudaEvent` | 异步顺序、同步边界和 GPU 经过时间 | 同一 CUDA 流串联 H2D、计算核、D2H，并由事件记录完成时间 |
 | 同步/异步 H2D/D2H | 主机指针、偏移、容量和 CUDA 流边界 | 真实计算核前后数据正确，无效句柄和越界在入队前拒绝 |
-| `CudaElementwiseBackend` | 网格/线程块、非整除边界和后端设备身份 | 向量加法与 CPU 基准结果一致，固定工作负载用事件多轮计时 |
+| `CudaElementwiseBackend` | 网格/线程块、非整除边界和后端设备身份 | 向量加法与 CPU 基准结果一致，固定负载用事件多轮计时 |
