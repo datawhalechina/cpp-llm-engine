@@ -47,4 +47,6 @@ Prompt 解析产生文本片段和图片片段。文本词元经过 Token Embedd
 
 图片上传协议属于 Transport 设计。多模态输入层先把图片与 Prompt 转换为 Executor，Chapter10 再管理准入、同步/流式输出、断连和资源释放；multipart、base64、大小限制和图片缓存可以在不改变 Runtime 契约的前提下扩展。
 
-图文嵌入、32 层 Decoder、真实 Prompt、动态切图服务和 CUDA Context 的固定结果统一查[多模态验证资产](../../reference/experiment_assets.md#多模态cuda-与正确性资产)。下一步阅读 [Python 与生产框架对照](./04_framework_comparison.md)，再按[多模态六任务学习计划](../../guides/multimodal_learning_plan.md)运行验证。
+图文嵌入、32 层 Decoder、真实 Prompt、动态切图服务和 CUDA Context 的固定结果统一查[多模态验证资产](../../reference/experiment_assets.md#多模态cuda-与正确性资产)。CUDA 路径已把 6 个前缀文本词元、64 行视觉向量和 18 个后缀文本词元组成 `88x960` 序列，并复用 Chapter06 Runtime 完成四词元 CPU/CUDA 贪心生成对照。首个词元来自 Prefill logits，后续三个词元由逐词元 Decode 推进，因此四词元生成只增加三次 Context Decode。
+
+服务验收让 Executor Factory 为同步与 SSE 请求分别创建 CUDA Context。两个请求生成相同四词元并独立释放，说明 Chapter10 无需识别视觉向量即可管理多模态终态。这仍是顺序服务检查；图片 HTTP 传输、视觉请求组批和语言模型批执行是后续交接点。继续阅读 [Python 与生产框架对照](./04_framework_comparison.md)，再按[多模态六任务学习计划](../../guides/multimodal_learning_plan.md)运行验证。

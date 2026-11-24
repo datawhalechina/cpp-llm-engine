@@ -44,4 +44,4 @@ CUDA 路径保留量化载荷并由融合 GEMV 解码，同时使用两个隐藏
 
 ![SigLIP 视觉编码器的逐层权重执行](../../assets/diagrams/siglip-encoder-streaming.svg)
 
-CPU、NumPy 与 CUDA 的固定误差、checksum 和资源结果统一查 [VAL-MM-01、VAL-MM-02 与 VAL-MM-CUDA-03～05](../../reference/experiment_assets.md#多模态cuda-与正确性资产)。下一步进入[投影层与运行时交接](./03_runtime_handoff.md)。
+CPU、NumPy 与 CUDA 的固定误差、checksum 和资源结果统一查 [VAL-MM-01、VAL-MM-02 与 VAL-MM-CUDA-03～07](../../reference/experiment_assets.md#多模态cuda-与正确性资产)。其中完整 CUDA tile 执行 1024 个 Patch，并由 Projector 输出 64 行语言宽度向量。下一步进入[投影层与运行时交接](./03_runtime_handoff.md)。

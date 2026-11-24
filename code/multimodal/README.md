@@ -20,7 +20,7 @@ CUDA Backend ─────┘                              │
 
 当前资产覆盖 IDEFICS3 动态切图、单张视觉 tile 预处理、mmproj schema、Float32 Patch/Position Embedding、使用真实 Q8_0 权重的 12 层 SigLIP Vision Encoder、IDEFICS3 Projector，以及图文 embedding 序列拼接。
 
-可选 CUDA 适配已覆盖 Patch/Position Embedding、SigLIP Encoder、IDEFICS3 Projector 和语言 Context 交接。`CudaSiglipEncoder` 将 12 层真实 Q8_0 packed 权重常驻设备，复用一个 workspace 和两个 hidden buffer。`CudaSmolvlmVisionPipeline` 已用真实图片左上 `4×4` patch 子网格串起三个设备阶段，并把一行视觉 embedding 送入 32 层 SmolVLM CUDA Context；完整 1024-token tile、图文混合序列和生成仍待接入。
+可选 CUDA 适配已覆盖 Patch/Position Embedding、SigLIP Encoder、IDEFICS3 Projector 和语言 Context 交接。`CudaSiglipEncoder` 将 12 层真实 Q8_0 packed 权重常驻设备，复用一个 workspace 和两个 hidden buffer。`CudaSmolvlmVisionPipeline` 同时提供左上 `4×4` 快速检查和完整 `32×32` tile 对照；完整 tile 将 1024 个 Patch 变为 64 行视觉 embedding。真实分词器产生的 24 个文本词元与这 64 行视觉向量组成 `88x960` 序列，并已通过 Chapter06 Runtime 完成四词元 CPU/CUDA 贪心生成对照。同步 Completion 与 SSE 已使用独立 CUDA Context 验证；图片 HTTP 传输和真实请求组批仍待接入。
 
 | 资产 | 输入与输出 | 当前验证 |
 | --- | --- | --- |
@@ -44,8 +44,8 @@ CUDA Backend ─────┘                              │
 | `multimodal_cuda_vision_encoder_inspect` | 真实 mmproj -> 12 层 CUDA Encoder | 4 token 最大误差 `7.03e-5`、余弦相似度 `0.9999999999` |
 | `CudaIdefics3Projector` | 设备视觉网格 -> 设备语言宽度 embedding | 空间合并顺序、F32 Linear 与失败路径 |
 | `CudaSmolvlmVisionPipeline` | Host patch -> 设备视觉 embedding | 三阶段间 hidden 不回传 Host；工作区按 token shape 复用 |
-| `multimodal_cuda_vision_pipeline_inspect` | 真实图片 + mmproj -> `1x960` | 左上 `4x4` patch 最大误差 `1.43e-4`、余弦相似度 `1` |
-| `multimodal_cuda_smolvlm_context_test` | 真实视觉 embedding -> 32 层 CUDA LLM Context | logits 最大误差 `4.01e-5`、余弦相似度 `1`、贪心词元一致 |
+| `multimodal_cuda_vision_pipeline_inspect` | 真实图片 + mmproj -> `1x960` 或 `64x960` | 快速 `4x4` 窗口与完整 `32x32` tile 均通过 CPU/CUDA 对照 |
+| `multimodal_cuda_smolvlm_context_test` | 真实视觉 embedding -> 32 层 CUDA LLM Context | 快速单行与完整 64 行 Prefill 均通过 CPU/CUDA logits、位置和贪心词元对照 |
 | `run_siglip_block` | hidden states + F32 权重 -> 单 Block 输出 | 合成 LayerNorm、全注意力、GELU、双 residual |
 | `multimodal_vision_embedding_inspect` | 真实图片 + mmproj -> 首 patch embedding | `1x768`、checksum、`payload=f32-valid` |
 | `load_siglip_block_weights` | F32/Q8_0 payload -> `SiglipBlockWeights` | 合成装配测试；FFN legacy 名称交换 |
@@ -105,9 +105,9 @@ Patch projection 把每个展平 patch 映射到 hidden width，并加入对应 
 
 4-patch 验证中，每层解码后权重为 `28,351,488` bytes，进程最大 RSS 为 `46,600` KiB。该值验证少量 patch 的逐层释放策略，不代表完整 1024-token tile 的运行峰值。
 
-CUDA 路径保留 12 层 packed Q8_0 权重。4-token 真实对照只重建一次 workspace，最大绝对误差为 `7.03e-5`。完整 1024-token tile 的显存与性能需由 Chapter09 另建实验。
+CUDA 路径保留 12 层 packed Q8_0 权重。4-token 真实对照只重建一次 workspace，最大绝对误差为 `7.03e-5`。完整 1024-token tile 同样只构建一次 workspace，经过 12 层 Encoder 和 Projector 后得到 `64x960`，与 CPU CBLAS 参考实现的最大误差为 `2.365e-4`、余弦相似度为 `1`；显存和性能仍需由 Chapter09 单独测量。
 
-`CudaSmolvlmVisionPipeline` 在 Host 完成图片解码、缩放、归一化和 patch 提取，随后把 Patch/Position、12 层 Encoder 与 Projector 串在同一 CUDA Context 中。三个视觉阶段之间的 hidden 不回传 Host；当前真实图片验收选取左上 `4×4` patch 子网格，输出一行 width 960 视觉 embedding。语言 Context 对照会把该行下载到 Host，再由 `prefill_embeddings()` 上传到语言模型自己的 CUDA Context。这个中转先固定两个执行层的接口和数值边界，不代表设备直连或完整 tile 性能。
+`CudaSmolvlmVisionPipeline` 在 Host 完成图片解码、缩放、归一化和 patch 提取，随后把 Patch/Position、12 层 Encoder 与 Projector 串在同一 CUDA Context 中。三个视觉阶段之间的 hidden 不回传 Host；快速模式选取左上 `4×4` patch 子网格，完整模式执行全部 `32×32` patch。语言 Context 对照仍会把视觉结果下载到 Host，再由 `prefill_embeddings()` 上传到语言模型自己的 CUDA Context。这个中转固定两个执行层的接口和数值边界，设备直连与完整图文生成是下一阶段。
 
 ## IDEFICS3 Projector
 
@@ -180,6 +180,18 @@ bash code/multimodal/scripts/run_cuda_real_pipeline.sh
 
 成功输出包含 `output_shape: 1x960`、`workspace_rebuilds: 1` 和 `cpu_cuda_match: true`。该入口读取默认 PPM fixture，也可以把 mmproj 与图片路径作为前两个参数传入。
 
+完整视觉 tile 使用同一入口的 `full-tile` 模式，并启用 CPU CBLAS 参考实现：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/multimodal/scripts/run_cuda_real_pipeline.sh \
+  llama.cpp/models/smolvlm-500m/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf \
+  code/multimodal/tests/fixtures/two_by_two.ppm \
+  full-tile
+```
+
+成功输出包含 `selected_grid: 32x32`、`output_shape: 64x960`、`workspace_rebuilds: 1` 和 `cpu_cuda_match: true`。
+
 继续把该视觉 embedding 送入 SmolVLM 的 32 层 CUDA 语言 Context：
 
 ```bash
@@ -187,7 +199,46 @@ CUDA_HOME=/usr/local/cuda-12.8 \
 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh
 ```
 
-脚本通过 CTest 运行真实模型测试，核对 CPU/CUDA logits、贪心词元和 Context 位置。当前视觉与语言 Context 分别拥有执行资源，视觉结果经 Host 中转后进入语言 Prefill；该测试只覆盖一行视觉 embedding，用于固定接口正确性，不代表设备直连或完整图文生成。
+脚本默认通过 CTest 运行单行快速测试，核对 CPU/CUDA logits、贪心词元和 Context 位置。视觉与语言 Context 分别拥有执行资源，视觉结果经 Host 中转后进入语言 Prefill；默认模式用于快速固定接口，完整模式继续验证 64 行视觉 Prefill。
+
+完整 64 行视觉 Prefill 使用 `full-tile` 模式：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/multimodal/scripts/run_cuda_smolvlm_context.sh \
+  llama.cpp/models/smolvlm-500m/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf \
+  llama.cpp/models/smolvlm-500m/SmolVLM-500M-Instruct-Q8_0.gguf \
+  code/multimodal/tests/fixtures/two_by_two.ppm \
+  full-tile
+```
+
+该入口要求 `visual_tokens: 64`、`context_positions: 64,64` 和 `cpu_cuda_match: true`。继续使用真实 SmolVLM Prompt、分词器和单步 Decode：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/multimodal/scripts/run_cuda_smolvlm_context.sh \
+  llama.cpp/models/smolvlm-500m/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf \
+  llama.cpp/models/smolvlm-500m/SmolVLM-500M-Instruct-Q8_0.gguf \
+  code/multimodal/tests/fixtures/two_by_two.ppm \
+  mixed-prompt \
+  "What historic event is shown? Answer in one short sentence."
+```
+
+该模式把 6 个前缀文本词元、64 行视觉向量和 18 个后缀文本词元组成 `88x960` 序列。CPU/CUDA Prefill 的首个贪心词元均为 `216`，后续 Decode 生成 `41,31,33`，四词元序列一致；Runtime 最终把两端 Context 位置推进到 `91`。视觉输出目前经 Host 组装后进入语言 Context；设备直连、图片 HTTP 传输和 CUDA 批量服务属于下一阶段。
+
+在相同图文输入上验证 Chapter10 同步 Completion、SSE 与终态释放：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+bash code/multimodal/scripts/run_cuda_smolvlm_context.sh \
+  llama.cpp/models/smolvlm-500m/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf \
+  llama.cpp/models/smolvlm-500m/SmolVLM-500M-Instruct-Q8_0.gguf \
+  code/multimodal/tests/fixtures/two_by_two.ppm \
+  mixed-service \
+  "What historic event is shown? Answer in one short sentence."
+```
+
+该模式为同步与 SSE 请求分别创建 CUDA Context。成功输出包含 `service_sync_match: true`、`service_stream_match: true`、`service_metrics_match: true`、`service_factory_calls: 2` 和 `cpu_cuda_match: true`。这项检查验证请求隔离与资源释放；两个请求仍按顺序执行，不代表模型批处理已经接通。
 
 若本机已有 `llama.cpp/tools/mtmd/test-1.jpeg`，可以对 JPEG 做额外检查：
 

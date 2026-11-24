@@ -88,8 +88,9 @@ CMake 选项决定编译哪些后端，运行参数从已编译能力中选择�
 | 多模态 CUDA 组件 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda.sh` | 合成 Patch/Position、单个 SigLIP 编码块与投影层的 CPU/CUDA 对照 |
 | 多模态真实 CUDA 编码块 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_block.sh` | 真实 mmproj Q8_0 第 0 编码块与 CPU 参考实现一致 |
 | 多模态真实 CUDA 编码器 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_encoder.sh` | 真实 mmproj 12 层 Q8_0 编码器与 CPU 参考实现一致 |
-| 多模态真实图片 CUDA 流水线 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_pipeline.sh` | 图片小窗口在设备端完成 Patch/Position、12 层编码器与投影层 |
-| 多模态 CUDA 语言交接 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh` | 一行真实视觉嵌入进入 32 层 SmolVLM CUDA 执行上下文，并与 CPU 候选分数对照 |
+| 多模态真实图片 CUDA 流水线 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_pipeline.sh` | 快速窗口或完整 tile 在设备端完成 Patch/Position、12 层编码器与投影层 |
+| 多模态 CUDA 图文生成 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh ... mixed-prompt` | 真实分词器、完整视觉 tile、32 层图文预填充与四词元生成通过 CPU/CUDA 对照 |
+| 多模态 CUDA 服务 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh ... mixed-service` | 每请求独立 CUDA Context、同步 Completion、SSE 和终态资源释放 |
 
 修改 CUDA 后端、真实 CUDA 模型/Context 或服务接入后，依次运行纵向验收：
 

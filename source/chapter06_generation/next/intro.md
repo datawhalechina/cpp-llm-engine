@@ -9,7 +9,7 @@ Chapter04 已经固定 Decoder 的计算顺序，Chapter05 让真实量化权重
 | A 请求状态验证 | 用小词表、确定性 logits 和 Greedy 跟踪请求状态 | 固定 token、阶段、停止条件和回调顺序 |
 | B 真实模型生成 | 接入 TinyLlama、Qwen3、Qwen1.5-MoE 和 DeepSeek-V2-Lite 的 Tokenizer、完整 Decoder 和请求专属模型执行上下文 | 稠密、标准 MoE 与 MLA-MoE 架构的固定生成词元、文本结果和请求状态 |
 | G GPU 扩展坐标 | 保持 Request 和停止语义不变，将模型执行器替换为设备后端 | TinyLlama、Qwen3 已通过真实文本验证；DeepSeek 已接入固定词元 Runtime |
-| M 多模态扩展坐标 | 视觉嵌入进入模型后复用预填充、逐词元解码、采样和终态语义 | CPU SmolVLM 复用同一生成运行时；CUDA 路径提供单行视觉嵌入进入 32 层执行上下文的对照 |
+| M 多模态扩展坐标 | 视觉嵌入进入模型后复用预填充、逐词元解码、采样和终态语义 | CPU SmolVLM 复用同一生成运行时；CUDA 路径已用完整图文序列完成四词元生成对照 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
@@ -51,4 +51,4 @@ Chapter04 已经固定 Decoder 的计算顺序，Chapter05 让真实量化权重
 | L3 可选 DeepSeek CUDA Runtime | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_runtime.sh` | 固定生成词元、分块 Prefill、27 层状态和重复请求隔离通过 | 学习 MLA-MoE GPU 生成时选做 |
 | L3 可选 CUDA | `bash code/engine/scripts/run_real_cuda_generation.sh` | `Hello TinyLlama` 生成 CPU/CUDA 相同的四个 golden token，重复请求结果一致 | 有 NVIDIA GPU、模型和 llama.cpp 时选做 |
 | L3 可选 Qwen3 CUDA | `bash code/engine/scripts/run_qwen3_cuda_generation.sh` | 自动读取 28 层架构，真实 Tokenizer、四个 golden token 与重复请求隔离通过 | 完成 Qwen3 CUDA Runtime 后执行 |
-| L3 可选 SmolVLM CUDA Context | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh` | 真实视觉 embedding 的 CPU/CUDA logits、贪心词元和 Context 位置一致 | 学习多模态 GPU 交接时选做 |
+| L3 可选 SmolVLM CUDA 生成 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh ... mixed-prompt` | 完整 tile、真实文本与四词元生成的 CPU/CUDA 结果一致 | 学习多模态 GPU 交接时选做 |
