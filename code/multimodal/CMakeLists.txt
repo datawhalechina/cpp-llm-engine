@@ -265,6 +265,9 @@ if(MULTIMODAL_ENABLE_SERVICE_INTEGRATION)
         CPP_LLM_MULTIMODAL_HAS_SERVICE=1
     )
     if(MULTIMODAL_ENABLE_CUDA)
+        target_sources(multimodal_cuda_smolvlm_context_inspect PRIVATE
+            ../engine/src/cuda_embedding_batch_runner.cpp
+        )
         target_link_libraries(multimodal_cuda_smolvlm_context_inspect PRIVATE
             chapter10_serving
         )

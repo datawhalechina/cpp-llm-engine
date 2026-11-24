@@ -235,6 +235,7 @@ add_library(cpp_llm_engine
 
 if(CPP_LLM_ENGINE_ENABLE_CUDA)
     add_library(cpp_llm_engine_cuda_runtime
+        src/cuda_embedding_batch_runner.cpp
         src/real_deepseek2_cuda_executor_factory.cpp
         src/real_llama_cuda_executor_factory.cpp
     )
@@ -243,6 +244,7 @@ if(CPP_LLM_ENGINE_ENABLE_CUDA)
     )
     target_link_libraries(cpp_llm_engine_cuda_runtime
         PUBLIC cpp_llm_engine_model_cuda chapter06_generation chapter07_kv_cache
+        PRIVATE cpp_llm_engine
     )
     target_compile_features(cpp_llm_engine_cuda_runtime PUBLIC cxx_std_17)
     add_executable(cuda_llama_layer_weights_test

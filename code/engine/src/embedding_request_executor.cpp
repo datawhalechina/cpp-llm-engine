@@ -107,4 +107,13 @@ std::size_t EmbeddingRequestExecutor::context_token_count() const {
     return context_->token_count();
 }
 
+core::DecoderExecutionContext* EmbeddingRequestExecutor::decoder_context() {
+    return context_.get();
+}
+
+const core::DecoderExecutionContext*
+EmbeddingRequestExecutor::decoder_context() const {
+    return context_.get();
+}
+
 }  // namespace cpp_llm_engine

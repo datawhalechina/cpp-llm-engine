@@ -32,6 +32,8 @@ public:
     bool prefilled() const;
     std::size_t embedding_storage_bytes() const;
     std::size_t context_token_count() const;
+    core::DecoderExecutionContext* decoder_context();
+    const core::DecoderExecutionContext* decoder_context() const;
 
 private:
     EmbeddingRequestExecutor(

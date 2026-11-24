@@ -87,6 +87,7 @@ int main() {
             std::move(context), std::move(embeddings), &error);
         CPP_LLM_REQUIRE(suite, executor != nullptr);
         CPP_LLM_CHECK(suite, error.empty());
+        CPP_LLM_CHECK_EQ(suite, executor->decoder_context(), observed);
         CPP_LLM_CHECK_EQ(suite, executor->embedding_storage_bytes(), 12 * sizeof(float));
 
         chapter06_generation::GenerationConfig config;
