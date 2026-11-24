@@ -61,5 +61,5 @@
 
   <rect x="315" y="430" width="680" height="75" rx="14" fill="#fffdf7" stroke="#78928b" stroke-width="2"/>
   <text x="342" y="461" class="body">4-patch 验证：12 层 C++ ↔ NumPy checksum；decoded 单层权重 28,351,488 bytes</text>
-  <text x="342" y="488" class="small">当前进程最大 RSS 46,600 KiB · 不代表完整 1024-token workload 峰值</text>
+  <text x="342" y="488" class="small">当前进程最大 RSS 46,600 KiB · 不代表完整 1024-token负载峰值</text>
 </svg>

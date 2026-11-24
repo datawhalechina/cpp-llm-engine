@@ -97,11 +97,11 @@ CUDA 模型持有量化 embedding、分层 Decoder 权重、final norm 和 LM He
 
 `prefill_tokens()` 继续补上批量 embedding、最后一行 RMSNorm 和 LM Head，并在 Context 内按 token 数复用 Prefill workspace。`prefill_embeddings()` 接收已经由文本或视觉输入层准备好的 `[T,D]` Float32 序列，两者共用同一个事务式 Prefill 主体：输入、容量、上传、分层执行或输出失败时不推进 position。22 层最终 logits 与顺序执行最大误差为 `1.19e-05`；reset 后重复相同 shape，workspace 创建次数保持 1。SmolVLM 的 Q8_0 权重也通过同一上传边界和 32 层 Context 对照。连续 CUDA Executor 已使用 token 入口，绑定分页数据面的请求仍保留逐 token 路径。
 
-Qwen1.5-MoE 路径把 Chapter01 的 Router、三组 packed experts 和共享专家权重交给 `run_real_moe_feed_forward()`。执行器先对 60 个 Router 分数做 Softmax，再只为 Top-4 专家创建 View；Q3_K/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0 均进入 Chapter05 统一 Linear。`run_qwen2_moe_prefill_layer()` 连接 RMSNorm、带 bias 的 Q/K/V、NeoX RoPE、因果 Attention、MoE 和双残差，并按词元返回旋转后的 K/V 负载。
+Qwen1.5-MoE 路径把 Chapter01 的 Router、三组 packed experts 和共享专家权重交给 `run_real_moe_feed_forward()`。执行器先对 60 个 Router 分数做 Softmax，再只为 Top-4 专家创建 View；Q3_K/Q4_K/Q5_0/Q5_1/Q5_K/Q6_K/Q8_0 均进入 Chapter05 统一 Linear。`run_qwen2_moe_prefill_layer()` 连接 RMSNorm、带 bias 的 Q/K/V、NeoX RoPE、因果 Attention、MoE 和双残差，并按词元返回旋转后的 K/V 载荷。
 
 多词元 MoE 先构造按专家索引的 assignment 表，每个活跃专家只创建一次 packed View，再把组内输入交给 Gate、Up、Down 的 batch Linear，最后将加权输出写回原 token 行。这里的“组”是同一层中命中同一专家的 `(token, route_slot)` 集合，不是请求组或 K/V 槽位；一个 Top-K 词元会进入 K 个专家组。Q3_K 与 Q5_K batch backend 会让同一个量化块只解码一次并服务多个输入行；其他格式按各自 backend 的 batch 能力执行。`RealMoeBatchMode` 在同一份权重和路由上切换 `RowWise` 与 `Grouped`，默认使用后者。
 
-EXP-CPU-13～18 从第一层 MoE 子层逐步扩展到完整 Decoder、batch 1/2/4、多步 Decode、Chapter08 固定队列和 Chapter10 动态准入。各层数值与生成词元闸门均通过；性能结论限于归档 workload，不外推为开放环或 HTTP 吞吐。
+EXP-CPU-13～18 从第一层 MoE 子层逐步扩展到完整 Decoder、batch 1/2/4、多步 Decode、Chapter08 固定队列和 Chapter10 动态准入。各层数值与生成词元闸门均通过；性能结论限于归档负载，不外推为开放环或 HTTP 吞吐。
 
 多请求 Decode 采用按层交错：每个请求先从自己的历史 K/V 计算 Attention，再把该层所有请求的归一化 FFN 输入交给同一张专家 assignment 表，最后按请求拆回输出。全部请求完成后才提交本层 K/V；后续层或 LM Head 失败时，Model 恢复整批请求的 24 层状态。层级测试将该路径与逐请求执行逐元素对照。
 

@@ -28,7 +28,7 @@
 | `row_dispatch_backend.h/.cu` | 索引行收集、加权散回与视觉空间合并数据重排 |
 | `vision_elementwise_backend.h/.cu` | 视觉 Block 使用的标准 LayerNorm、bias 广播与 GELU |
 | `vision_attention_backend.h/.cu` | 固定长度图片序列的 packed 双向注意力与 batch 隔离 |
-| `cuda_quantized_linear_test.cu` | CPU reference、融合 GEMV、批量回退、错误路径和固定 workload 计时 |
+| `cuda_quantized_linear_test.cu` | CPU reference、融合 GEMV、批量回退、错误路径和固定负载计时 |
 | `quantized_gemv_matrix.cu` | Q4_K/Q6_K 的 batch=1/2/4/8 专项矩阵与逐行正确性对照 |
 | `core/rope_contract.h` | 固定原地 RoPE 的连续布局、旋转维度、位置和频率参数 |
 | `rope_backend.h/.cu` | 每线程处理一个相邻分量对的 CUDA RoPE backend |
@@ -105,11 +105,11 @@ EXP-GPU-22 在通用路径上定位到 IQ4_NL batch=1 约 `80%` 的 barrier stal
 
 NCU 基线显示 Q4_K kernel 的 L1TEX 等待明显，而 DRAM 吞吐和 occupancy 不是首要限制。EXP-GPU-09 的 Warp 元数据广播、EXP-GPU-10 的 shared payload 和 EXP-GPU-11 的显式 FMA 分别回退约 `10.1%`、`1.6%` 和 `4.3%` cycles，代码不保留这些候选。EXP-GPU-12 使用 `__ushort_as_half` 与 `__half2float` 替换手写 FP16 位解码，cycles 约减少 `28.8%`，真实双请求 logits 保持一致；当前代码保留原生 half 转换，后续优化重新聚焦 L1/TEX payload 访问。
 
-固定 workload 使用 `rows=256`、`cols=256`、warmup 1 次和测量 10 次。计时在权重与输入上传后开始，包含融合 kernel、主机提交以及末尾同步，不包含 H2D/D2H。RTX 5070 Ti Laptop / CUDA 12.8 上，本次 Q4_K 与 Q6_K 主机均值约为 `0.0041 ms` 和 `0.0044 ms`；真实 TinyLlama 优化前后证据登记为 EXP-GPU-02/03。
+固定负载使用 `rows=256`、`cols=256`、warmup 1 次和测量 10 次。计时在权重与输入上传后开始，包含融合 kernel、主机提交以及末尾同步，不包含 H2D/D2H。RTX 5070 Ti Laptop / CUDA 12.8 上，本次 Q4_K 与 Q6_K 主机均值约为 `0.0041 ms` 和 `0.0044 ms`；真实 TinyLlama 优化前后证据登记为 EXP-GPU-02/03。
 
 EXP-GPU-06 记录初版批量融合路径：真实双请求分页 Decode 的两轮 Tensor Batch/顺序执行中位数比例为 `0.922/0.919`。EXP-GPU-08 将批次改为最多 4 行共享一次权重解码，并使用 Warp 归约；两轮比例为 `0.466/0.612`。EXP-GPU-12 再把手写 FP16 解码替换为 CUDA 原生 half 转换，顺序 Decode 降至 `35.12/30.54 ms`，Tensor Batch 降至 `19.80/17.02 ms`，logits 保持一致。这些结果支持当前小批量融合路径，不代表大 batch 量化 GEMM 已完成。
 
-批次扩展使用独立矩阵入口：`bash code/chapter09_performance/scripts/run_cuda_quantized_gemv_matrix.sh`。可执行程序默认测量 `batch=1/2/4/8`，也可用 `--batch N --format q4|q6 --iterations N` 缩小 workload。EXP-GPU-13 中 batch 1→4 的 Q4_K/Q6_K 时间基本不变，batch=8 约翻倍，说明固定 4 行 tile 在 batch=1/2 时会保留无效行状态，在 batch=8 时则需要两个 y 方向 block。
+批次扩展使用独立矩阵入口：`bash code/chapter09_performance/scripts/run_cuda_quantized_gemv_matrix.sh`。可执行程序默认测量 `batch=1/2/4/8`，也可用 `--batch N --format q4|q6 --iterations N` 缩小负载。EXP-GPU-13 中 batch 1→4 的 Q4_K/Q6_K 时间基本不变，batch=8 约翻倍，说明固定 4 行 tile 在 batch=1/2 时会保留无效行状态，在 batch=8 时则需要两个 y 方向 block。
 
 EXP-GPU-14 为通过正确性门禁的两条实现增加 `CudaQuantizedGemvPath`：`FixedTile4` 始终实例化 4 行 tile，`Adaptive` 对 batch=1/2/其他分别选择 1/2/4 行。RTX 5070 Ti Laptop 上，自适应路径把共享内存从 `128 B` 降到 `32/64 B`，执行指令减少约 `21%`～`37%`，Q4_K batch 1/2 的 kernel cycles 约下降 `17%/19%`，Q6_K 约下降 `33%/30%`。L1 命中率基本不变，占用率仅提高约 2.5～3.1 个百分点，说明主要收益来自删除无效 tile 行对应的指令，而不是改变缓存局部性。EXP-GPU-15 的真实 TinyLlama 双请求 Decode 中，Tensor Batch 两轮中位数从 `15.758/16.096 ms` 降到 `13.195/13.028 ms`，顺序 Decode 平均基本持平，logits 最大误差为 `0`。
 
@@ -135,11 +135,11 @@ RoPE 请求使用连续 `[tokens, heads, head_dim]` 布局，在原 Tensor 上�
 
 `compute_online()` 让一个 query/head 使用一个线程块，按 32 个 key 分块，在 kernel 内合并最大值、指数和与 Value 累加，不再申请完整 score workspace。它当前只支持 `Dh <= 128`，覆盖 TinyLlama 的 `Dh=64`。每个 128-thread block 包含 4 个 Warp；4 个 Warp 并行计算 4 个 key 的 QK 点积，并在 Warp 内用 shuffle 完成归约，再由各维线程更新 Value 累加。
 
-第一版用整个线程块逐 key 做共享内存树形归约，固定 workload 的三阶段与融合在线均值分别为 `0.224739 ms` 和 `0.296630 ms`，约回退 32%，因此被性能门禁拒绝。改为 4-Warp key 并行后，三轮融合均值为 `0.069920 / 0.069715 / 0.069805 ms`，对应三阶段 `0.223427 / 0.226054 / 0.223434 ms`。这个微基准支持把 v2 标记为 FA2-inspired 候选。
+第一版用整个线程块逐 key 做共享内存树形归约，固定负载的三阶段与融合在线均值分别为 `0.224739 ms` 和 `0.296630 ms`，约回退 32%，因此被性能门禁拒绝。改为 4-Warp key 并行后，三轮融合均值为 `0.069920 / 0.069715 / 0.069805 ms`，对应三阶段 `0.223427 / 0.226054 / 0.223434 ms`。这个微基准支持把 v2 标记为 FA2-inspired 候选。
 
 `CudaExecutionContext` 通过 `CudaAttentionPath` 显式选择三阶段或融合路径，默认仍为三阶段。真实 TinyLlama 2 层与 22 层双步对照均通过；22 层 hidden 和 logits 最大差异分别为 `7.63e-06` 和 `9.18e-06`，greedy token 保持 `3561`。这项双步对照固定真实单-query Decode 数值，再由后续 Tensor Prefill 和端到端实验补齐多-query 证据。
 
-CUDA 库只接收 `CudaAttentionPath` 等类型化策略，不读取命令行或环境变量。进程入口负责把 `--attention-path three-stage|fused-online` 转成枚举，再经执行器工厂写入请求 Context。CMake 选项决定 CUDA 代码是否参与构建，运行期参数选择已编译实现，benchmark 的 `--batch` 等参数只改变 workload；三者不能互相替代。
+CUDA 库只接收 `CudaAttentionPath` 等类型化策略，不读取命令行或环境变量。进程入口负责把 `--attention-path three-stage|fused-online` 转成枚举，再经执行器工厂写入请求 Context。CMake 选项决定 CUDA 代码是否参与构建，运行期参数选择已编译实现，benchmark 的 `--batch` 等参数只改变负载；三者不能互相替代。
 
 随后增加的 `prefill_sequence()` 复用 `[T,D]` 批量算子，并让融合 Attention 一次处理多个 query；TinyLlama 22 层、2-token embedding Prefill 与逐 token 顺序执行的最大误差为 `3.05e-05`。`RealLlamaCudaContext::prefill_tokens()` 再接入批量 embedding、最终 logits 和按 shape 复用的持久 workspace，22 层 logits 最大误差为 `1.19e-05`。连续与分页 CUDA Executor 都使用 Tensor Prefill，真实 Runtime 保持 golden token `3561 12053`。
 

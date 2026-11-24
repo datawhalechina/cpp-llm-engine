@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="670" viewBox="0 0 1200 670" role="img" aria-labelledby="title desc">
+  <title id="title">纯文本输入与图文输入的执行路径对比</title>
+  <desc id="desc">纯文本只经过分词和词元嵌入，图文输入额外经过图片预处理、视觉编码器和投影层；两条路径组成统一嵌入后，共用语言模型预填充、解码、缓存、调度与服务。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8f2e5"/>
+      <stop offset="1" stop-color="#deece7"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#284b45"/>
+    </marker>
+    <style>
+      .title { font: 700 28px 'Noto Sans CJK SC', sans-serif; fill: #173832; }
+      .subtitle { font: 500 15px 'Noto Sans CJK SC', sans-serif; fill: #5d716c; }
+      .lane { font: 700 18px 'Noto Sans CJK SC', sans-serif; fill: #173832; }
+      .heading { font: 700 16px 'Noto Sans CJK SC', sans-serif; fill: #173832; }
+      .body { font: 500 14px 'Noto Sans CJK SC', sans-serif; fill: #284b45; }
+      .small { font: 500 12px 'Noto Sans CJK SC', sans-serif; fill: #60756f; }
+      .box { stroke: #284b45; stroke-width: 2; rx: 14; }
+      .laneBox { fill: none; stroke-width: 2; rx: 18; }
+      .flow { stroke: #284b45; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1200" height="670" fill="url(#bg)"/>
+  <text x="55" y="55" class="title">纯文本与图文：输入处理不同，生成主线相同</text>
+  <text x="55" y="84" class="subtitle">图文增加视觉输入成本；统一 embedding 后共用 Decoder、K/V Cache、Scheduler 与 Service，无需第二套 Runtime</text>
+
+  <rect x="45" y="120" width="1110" height="150" class="laneBox" stroke="#b68743" stroke-dasharray="8 6"/>
+  <text x="70" y="151" class="lane">纯文本输入</text>
+  <rect x="70" y="175" width="160" height="66" class="box" fill="#fff6dc"/>
+  <text x="112" y="202" class="heading">文本</text>
+  <text x="92" y="226" class="small">prompt string</text>
+  <rect x="285" y="175" width="180" height="66" class="box" fill="#fff6dc"/>
+  <text x="328" y="202" class="heading">Tokenizer</text>
+  <text x="320" y="226" class="small">text -&gt; token ids</text>
+  <rect x="520" y="175" width="210" height="66" class="box" fill="#f3e7d4"/>
+  <text x="548" y="202" class="heading">Token Embedding</text>
+  <text x="562" y="226" class="small">[T, language width]</text>
+  <path d="M230 208 H285" class="flow"/>
+  <path d="M465 208 H520" class="flow"/>
+
+  <rect x="45" y="295" width="1110" height="190" class="laneBox" stroke="#4f8277" stroke-dasharray="8 6"/>
+  <text x="70" y="326" class="lane">图文输入</text>
+  <rect x="70" y="350" width="160" height="66" class="box" fill="#fff6dc"/>
+  <text x="112" y="377" class="heading">文本</text>
+  <text x="92" y="401" class="small">prompt + media marker</text>
+  <rect x="285" y="350" width="180" height="66" class="box" fill="#fff6dc"/>
+  <text x="328" y="377" class="heading">Tokenizer</text>
+  <text x="312" y="401" class="small">text rows · width D</text>
+  <path d="M230 383 H285" class="flow"/>
+
+  <rect x="70" y="430" width="160" height="42" class="box" fill="#e7eff9"/>
+  <text x="112" y="457" class="heading">图片</text>
+  <rect x="285" y="430" width="180" height="42" class="box" fill="#e7eff9"/>
+  <text x="312" y="457" class="heading">Patch / SigLIP</text>
+  <rect x="520" y="430" width="210" height="42" class="box" fill="#e7eff9"/>
+  <text x="574" y="457" class="heading">Projector</text>
+  <path d="M230 451 H285" class="flow"/>
+  <path d="M465 451 H520" class="flow"/>
+
+  <rect x="790" y="350" width="290" height="122" class="box" fill="#dcece7"/>
+  <text x="826" y="382" class="heading">Embedding Composition</text>
+  <text x="820" y="411" class="body">text + visual -&gt; [P, D]</text>
+  <text x="820" y="440" class="small">视觉行替换媒体占位位置</text>
+  <path d="M465 383 H790" class="flow"/>
+  <path d="M730 451 H790" class="flow"/>
+
+  <rect x="790" y="175" width="290" height="66" class="box" fill="#f3e7d4"/>
+  <text x="820" y="202" class="heading">统一 Embedding 序列</text>
+  <text x="846" y="226" class="small">纯文本 [T,D]</text>
+  <path d="M730 208 H790" class="flow"/>
+
+  <rect x="250" y="505" width="830" height="35" rx="12" fill="#f8eadf" stroke="#284b45" stroke-width="2"/>
+  <text x="690" y="528" class="body" text-anchor="middle">统一 Embedding 边界：两类输入在此交接给语言模型</text>
+  <path d="M1080 208 H1120 V522 H1080" class="flow"/>
+  <path d="M935 472 V505" class="flow"/>
+
+  <rect x="45" y="555" width="1110" height="95" class="box" fill="#e7f3e8"/>
+  <text x="65" y="585" class="heading">共享主线</text>
+
+  <rect x="170" y="575" width="220" height="52" rx="11" fill="#f7fbf9" stroke="#4f8277" stroke-width="1.8"/>
+  <text x="198" y="597" class="heading">Language Decoder</text>
+  <text x="224" y="617" class="small">Prefill / Decode</text>
+
+  <rect x="430" y="575" width="190" height="52" rx="11" fill="#f7fbf9" stroke="#4f8277" stroke-width="1.8"/>
+  <text x="464" y="597" class="heading">请求 Context</text>
+  <text x="485" y="617" class="small">K/V Cache</text>
+
+  <rect x="660" y="575" width="200" height="52" rx="11" fill="#f7fbf9" stroke="#4f8277" stroke-width="1.8"/>
+  <text x="704" y="597" class="heading">Scheduler</text>
+  <text x="696" y="617" class="small">Continuous Batch</text>
+
+  <rect x="900" y="575" width="180" height="52" rx="11" fill="#f7fbf9" stroke="#4f8277" stroke-width="1.8"/>
+  <text x="947" y="597" class="heading">Service</text>
+  <text x="957" y="617" class="small">HTTP / SSE</text>
+
+  <path d="M280 540 V575" class="flow"/>
+  <path d="M390 601 H430" class="flow"/>
+  <path d="M620 601 H660" class="flow"/>
+  <path d="M860 601 H900" class="flow"/>
+</svg>

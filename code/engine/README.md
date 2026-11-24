@@ -16,7 +16,7 @@ Factory 的名称表示它负责按统一规则创建和装配 Executor，而不
 
 ## 启动参数与内部配置
 
-可执行程序负责把命令行和环境默认值转换为类型化配置，Engine 内部不解析 `argv`。统一数据流为 `CLI -> Options/枚举 -> Factory -> Executor/Context -> Backend`。构建期开关继续由 CMake 管理，请求级生成参数进入 `GenerationConfig`，benchmark 的 batch 和迭代次数只属于 workload。
+可执行程序负责把命令行和环境默认值转换为类型化配置，Engine 内部不解析 `argv`。统一数据流为 `CLI -> Options/枚举 -> Factory -> Executor/Context -> Backend`。构建期开关继续由 CMake 管理，请求级生成参数进入 `GenerationConfig`，benchmark 的 batch 和迭代次数只属于负载。
 
 实现选择应满足三项条件：候选仍受维护、已通过正确性门禁、存在清晰的类型化枚举。未知值必须在加载模型前失败，程序应打印最终生效配置。实验编号、结果目录和优化名称只用于登记证据，不得隐式切换实现。
 
@@ -100,7 +100,7 @@ bash code/engine/scripts/run_real_cuda_serving.sh
 
 Chapter09 的真实 Attention 入口将命令行 `--attention-path three-stage|fused-online` 转换为 `CudaAttentionMode`；量化 GEMV 实验同样把 `--gemv-path fixed-four|adaptive` 转换为 `CudaQuantizedGemvMode`。Factory 把类型化策略下发给请求 Context 和持久化 batch workspace，字符串不会进入 Model 或 kernel。Attention 的 `compare` 会在同一进程中核对两条路径；GEMV 使用独立进程和交错执行顺序，避免时钟与热状态固定偏向其中一条路径。
 
-`real_tinyllama_cuda_adaptive_gemv_matrix` 复用同一个 Factory 和模型权重，按单元重新创建请求 Context。Prefill 后先通过 Chapter07 事务接口为完整 Decode 区间预留分页块，再开始计时；每次批量 Decode 成功后统一提交控制面的 token count，然后进入下一步。这与 Chapter08 调度器“先 reserve、执行成功后 commit”的契约一致，也能覆盖上下文恰好填满物理块的边界。多步 Decode 持续更新 token、position 和分页 K/V，最后比较顺序执行与 Tensor Batch 的 logits。命令行只定义 workload，路径仍通过 `CudaQuantizedGemvMode` 下发。
+`real_tinyllama_cuda_adaptive_gemv_matrix` 复用同一个 Factory 和模型权重，按单元重新创建请求 Context。Prefill 后先通过 Chapter07 事务接口为完整 Decode 区间预留分页块，再开始计时；每次批量 Decode 成功后统一提交控制面的 token count，然后进入下一步。这与 Chapter08 调度器“先 reserve、执行成功后 commit”的契约一致，也能覆盖上下文恰好填满物理块的边界。多步 Decode 持续更新 token、position 和分页 K/V，最后比较顺序执行与 Tensor Batch 的 logits。命令行只定义负载，路径仍通过 `CudaQuantizedGemvMode` 下发。
 
 EXP-GPU-16 使用该入口覆盖 batch 1/2、上下文 `16/128` 和 Decode `1/8` 步。Adaptive 在 batch 1 的 Tensor Batch 延迟降低约 `18.4%`～`23.1%`，在 batch 2 降低约 `12.9%`～`14.7%`；两轮反向执行顺序下全部 logits 最大误差为 `0`。该结果只支持当前小 batch、Q4_K TinyLlama 和 RTX 5070 Ti Laptop 环境，不直接外推其他模型或设备。
 

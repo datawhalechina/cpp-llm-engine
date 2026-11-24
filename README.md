@@ -83,9 +83,15 @@ Chapter04–05 建立注意力（Attention）与量化线性层（Linear）的�
 | Qwen3-0.6B | Q/K 归一化、NeoX 旋转位置编码、非对称 Q/K/V 头和共享输出层 | CPU/CUDA 生成与服务已通过固定结果验证 |
 | Qwen1.5-MoE-A2.7B | 60 选 4 专家路由、紧凑专家权重、共享专家和混合量化 | CPU 24 层生成、按专家分组批执行、调度与服务已验证 |
 | DeepSeek-V2-Lite | 多头潜在注意力（MLA）、混合稠密/MoE 层、64 选 6 专家路由与共享专家 | CPU/CUDA 27 层生成、分页 MLA、分块预填充与文本服务已验证 |
-| SmolVLM-500M | 视觉编码器（Vision Encoder）、投影层（Projector）与视觉词元序列 | CPU 图文推理与服务生命周期已验证；CUDA 已完成完整视觉 tile、图文生成及同步/SSE 服务生命周期对照 |
+| SmolVLM-500M | 视觉编码器（Vision Encoder）、投影层（Projector）与视觉词元序列 | CPU 图文推理与服务生命周期已验证；CUDA 已完成完整视觉 tile、双图片视觉组批、图文生成与双请求解码组批 |
 
 各模型分阶段的可运行入口和适用范围见[模型能力与扩展顺序](source/reference/model_support.md)。
+
+### 多模态扩展
+
+纯文本经过分词和词元嵌入后进入语言解码器；图文输入先把图片转换为同宽度的视觉嵌入，再与文本嵌入组成统一序列。此后的预填充、逐词元解码、K/V Cache、调度和服务继续复用同一条推理主线。
+
+![纯文本输入与图文输入的执行路径对比](source/assets/diagrams/text-vs-multimodal-input.svg)
 
 ## 当前可运行能力
 

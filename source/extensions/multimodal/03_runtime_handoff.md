@@ -27,6 +27,12 @@ Prompt 解析产生文本片段和图片片段。文本词元经过 Token Embedd
 ![文本占位符展开为视觉嵌入](../../assets/diagrams/multimodal-embedding-composition.svg)
 ![SmolVLM Prompt、图片块与 Decoder 序列](../../assets/diagrams/smolvlm-prompt-chunks.svg)
 
+## 纯文本与图文输入的差别
+
+纯文本经过 Tokenizer 和 Token Embedding 后即可进入语言 Decoder。图文输入多出图片预处理、Vision Encoder、Projector 和嵌入组装；这些阶段把图片转换为与文本嵌入同宽的向量。两条路径形成统一 embedding 后，共用 Language Decoder、Prefill、Decode、K/V Cache、调度与服务。
+
+![纯文本输入与图文输入的执行路径对比](../../assets/diagrams/text-vs-multimodal-input.svg)
+
 ## 进入生成运行时
 
 `EmbeddingRequestExecutor` 持有统一嵌入和独立 Decoder Context，并实现 Chapter06 的 `RequestModelExecutor`。Prefill 消费整段嵌入，后续 Decode 消费上一步生成词元。
@@ -43,7 +49,7 @@ Prompt 解析产生文本片段和图片片段。文本词元经过 Token Embedd
 
 ## 服务与性能边界
 
-阶段指标分别记录图片解码、动态切图、Prompt 分词、Vision Encoder、Projector、嵌入组装和语言 Prefill。共享模型权重、请求中间量与进程 RSS 使用不同口径，比较前需要固定工作负载和统计范围。
+阶段指标分别记录图片解码、动态切图、Prompt 分词、Vision Encoder、Projector、嵌入组装和语言 Prefill。共享模型权重、请求中间量与进程 RSS 使用不同口径，比较前需要固定负载和统计范围。
 
 图片上传协议属于 Transport 设计。多模态输入层先把图片与 Prompt 转换为 Executor，Chapter10 再管理准入、同步/流式输出、断连和资源释放；multipart、base64、大小限制和图片缓存可以在不改变 Runtime 契约的前提下扩展。
 

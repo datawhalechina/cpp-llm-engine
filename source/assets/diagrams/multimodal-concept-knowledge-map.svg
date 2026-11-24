@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="690" viewBox="0 0 1240 690" role="img" aria-labelledby="title desc">
+  <title id="title">多模态前端与语言运行时概念关系</title>
+  <desc id="desc">展示 IDEFICS3 提示词、图片切分、SigLIP、Projector 和统一嵌入契约的关系，以及它们怎样复用语言 Decoder、请求运行时、缓存、调度和服务。</desc>
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8f3e7"/><stop offset="1" stop-color="#e5f0ec"/></linearGradient><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#315650"/></marker><style>.title{font:700 28px 'Noto Sans CJK SC',sans-serif;fill:#173832}.sub{font:500 15px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.section{font:700 17px 'Noto Sans CJK SC',sans-serif;fill:#173832}.head{font:700 15px 'Noto Sans CJK SC',sans-serif;fill:#173832}.small{font:500 12px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.box{stroke:#315650;stroke-width:1.8;rx:13}.line{stroke:#4f7069;stroke-width:1.9;fill:none;marker-end:url(#arrow)}.dash{stroke:#7c918c;stroke-width:1.6;stroke-dasharray:6 5;fill:none;marker-end:url(#arrow)}</style></defs>
+  <rect width="1240" height="690" fill="url(#bg)"/>
+  <text x="50" y="50" class="title">多模态：扩展输入前端，复用语言生成主线</text>
+  <text x="50" y="78" class="sub">知识图谱关注组件职责与复用边界；具体张量流和请求组批在后续小节展开。</text>
+
+  <text x="55" y="120" class="section">图文模型结构</text>
+  <rect x="55" y="145" width="250" height="92" class="box" fill="#fff1cf"/><text x="180" y="175" text-anchor="middle" class="head">IDEFICS3 Prompt</text><text x="180" y="199" text-anchor="middle" class="small">文本片段 · 图片位置 · media marker</text><text x="180" y="219" text-anchor="middle" class="small">决定图文内容在序列中的顺序</text>
+  <rect x="350" y="145" width="250" height="92" class="box" fill="#e4eef9"/><text x="475" y="175" text-anchor="middle" class="head">图片预算与动态切图</text><text x="475" y="199" text-anchor="middle" class="small">缩放 · 补边 · 全局图 · 局部 tile</text><text x="475" y="219" text-anchor="middle" class="small">决定视觉 token 数量与排列</text>
+  <rect x="645" y="145" width="250" height="92" class="box" fill="#e4eef9"/><text x="770" y="175" text-anchor="middle" class="head">SigLIP Vision Encoder</text><text x="770" y="199" text-anchor="middle" class="small">Patch · 双向 Attention · GELU FFN</text><text x="770" y="219" text-anchor="middle" class="small">图片 → 视觉隐藏状态</text>
+  <rect x="940" y="145" width="250" height="92" class="box" fill="#e7f2e9"/><text x="1065" y="175" text-anchor="middle" class="head">Projector</text><text x="1065" y="199" text-anchor="middle" class="small">空间合并 · 宽度映射</text><text x="1065" y="219" text-anchor="middle" class="small">视觉宽度 → 语言模型宽度</text>
+  <path d="M305 191H350" class="dash"/><path d="M600 191H645" class="line"/><path d="M895 191H940" class="line"/>
+
+  <rect x="330" y="290" width="580" height="92" class="box" fill="#f4ead9"/><text x="620" y="320" text-anchor="middle" class="head">统一 Embedding 契约</text><text x="620" y="345" text-anchor="middle" class="small">文本行与视觉行具有相同 hidden width，并按 Prompt 位置组成 [P, D]</text><text x="620" y="365" text-anchor="middle" class="small">这是多模态前端与语言模型之间的核心交接边界</text>
+  <path d="M180 237V270H430V290" class="line"/><path d="M1065 237V270H810V290" class="line"/>
+
+  <text x="55" y="430" class="section">共享语言主线</text>
+  <rect x="55" y="455" width="250" height="92" class="box" fill="#f7fbf9"/><text x="180" y="485" text-anchor="middle" class="head">Language Decoder</text><text x="180" y="509" text-anchor="middle" class="small">Prefill 统一嵌入</text><text x="180" y="529" text-anchor="middle" class="small">Decode 继续消费生成词元</text>
+  <rect x="350" y="455" width="250" height="92" class="box" fill="#f7fbf9"/><text x="475" y="485" text-anchor="middle" class="head">Request + Context</text><text x="475" y="509" text-anchor="middle" class="small">每个请求独占位置与 K/V</text><text x="475" y="529" text-anchor="middle" class="small">图文身份进入缓存键</text>
+  <rect x="645" y="455" width="250" height="92" class="box" fill="#f7fbf9"/><text x="770" y="485" text-anchor="middle" class="head">Scheduler + Batch</text><text x="770" y="509" text-anchor="middle" class="small">视觉阶段按 tile 组批</text><text x="770" y="529" text-anchor="middle" class="small">语言阶段按请求组批</text>
+  <rect x="940" y="455" width="250" height="92" class="box" fill="#f7fbf9"/><text x="1065" y="485" text-anchor="middle" class="head">Service</text><text x="1065" y="509" text-anchor="middle" class="small">同步 Completion · SSE</text><text x="1065" y="529" text-anchor="middle" class="small">取消、超时与资源释放</text>
+  <path d="M620 382V415H180V455" class="line"/><path d="M305 501H350" class="line"/><path d="M600 501H645" class="line"/><path d="M895 501H940" class="line"/>
+
+  <text x="55" y="595" class="section">执行后端与框架边界</text>
+  <rect x="55" y="615" width="350" height="50" class="box" fill="#fff1cf"/><text x="230" y="645" text-anchor="middle" class="head">CPU：逐阶段 Golden 与真实模型基线</text>
+  <rect x="445" y="615" width="350" height="50" class="box" fill="#e4eef9"/><text x="620" y="645" text-anchor="middle" class="head">CUDA：视觉组批与语言解码组批</text>
+  <rect x="835" y="615" width="350" height="50" class="box" fill="#e7f2e9"/><text x="1010" y="645" text-anchor="middle" class="head">Transformers / llama.cpp / vLLM / SGLang 对照</text>
+  <path d="M180 547V605" class="dash"/><path d="M770 547V605" class="dash"/><path d="M1065 547V605" class="dash"/>
+</svg>
