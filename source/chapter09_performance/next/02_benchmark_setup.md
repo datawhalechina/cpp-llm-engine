@@ -1,6 +1,6 @@
 # 09.2 建立可重复的性能基准入口
 
-Benchmark 入口需要完成环境登记、预热、重复运行和结果落盘。计时循环内只保留被测路径，模型下载、构建、日志格式化和结果写文件不能混入核心耗时。
+性能基准入口需要完成环境登记、预热、重复运行和结果落盘。计时循环只执行被测路径；模型下载、构建、日志格式化和结果写文件放在计时范围之外。
 
 ## 一次实验的执行顺序
 
@@ -9,17 +9,17 @@ Benchmark 入口需要完成环境登记、预热、重复运行和结果落盘�
 | 准备 | 固定代码版本、构建类型、编译器、硬件和运行参数 | `environment` 与实验说明 |
 | 校验 | 运行正确性闸门 | `correctness` |
 | 预热 | 执行不计入样本的若干轮 | `warmup_iterations` |
-| 测量 | 重复执行固定 workload | 原始 `samples` |
+| 测量 | 重复执行固定负载 | 原始 `samples` |
 | 聚合 | 计算中位数、均值和范围 | `statistics` |
 | 落盘 | 保存原始数据，不覆盖基线 | 实验结果文件 |
 
-下图把预热和测量放在同一时间轴上。预热轮次不会进入 `samples`；正式测量的每一轮都先保留原始记录，再计算聚合值并写入独立证据文件。
+下图把预热和测量放在同一时间轴上。预热轮次单独记录；正式测量的每一轮先保留原始记录，再计算聚合值并写入独立证据文件。
 
 ![一次可重复 Benchmark 的时间轴](../../assets/diagrams/chapter09-benchmark-timeline.svg)
 
 ## 参数必须说明改变了什么
 
-性能入口常用命令行参数，但不同参数不能混为一类。实现参数选择被测代码路径，例如 `--attention-path three-stage|fused-online`；负载参数只改变 batch、长度或迭代次数；输出参数只决定证据保存位置。程序应输出最终生效值，遇到未知值立即退出。
+性能入口常用命令行参数，并按用途分为三类。实现参数选择被测代码路径，例如 `--attention-path three-stage|fused-online`；负载参数改变批大小、长度或迭代次数；输出参数决定证据保存位置。程序应输出最终生效值，遇到未知值立即退出。
 
 ```text
 命令行字符串
@@ -29,7 +29,7 @@ Benchmark 入口需要完成环境登记、预热、重复运行和结果落盘�
     -> 预热与测量
 ```
 
-`CHAPTER09_CUDA_EXPERIMENT_ID` 这类环境变量只标记实验身份，不能选择 kernel。Attention A/B 入口支持 `--attention-path compare|three-stage|fused-online`；量化 GEMV 矩阵用 `--batch`、`--format` 和 `--iterations` 选择 workload。EXP-GPU-14 通过正确性和 NCU 门禁后，固定 4 行与自适应 tile 才进入 `--path fixed-four|adaptive`；真实模型入口再用 `--gemv-path` 接收相同策略。失败候选仍只保留为证据，不进入运行期枚举。
+`CHAPTER09_CUDA_EXPERIMENT_ID` 这类环境变量只标记实验身份，不能选择 kernel。Attention A/B 入口支持 `--attention-path compare|three-stage|fused-online`；量化 GEMV 矩阵用 `--batch`、`--format` 和 `--iterations` 选择负载。EXP-GPU-14 通过正确性和 NCU 门禁后，固定 4 行与自适应 tile 才进入 `--path fixed-four|adaptive`；真实模型入口再用 `--gemv-path` 接收相同策略。失败候选仍只保留为证据，不进入运行期枚举。
 
 脚本末尾的 `PASS` 只能说明执行完成，不能代替性能结论。自动决策文件分别保存 `execution_status`、`correctness` 和 `decision`：前两项通过后，比较器才按主指标与保护指标给出 `KEEP`、`REJECT` 或 `INCONCLUSIVE`。原始样本、策略阈值和每轮变化率必须与决策一起落盘。
 
@@ -50,7 +50,7 @@ Benchmark 入口需要完成环境登记、预热、重复运行和结果落盘�
 
 ## 复用已有实验结果
 
-已有结果只有保留每轮样本时才能转换为统一证据；只有均值或 P50 的文件保留作历史参考。Chapter07 的教学性能基准和真实批次结果包含 `samples`，可以通过导入器转换：
+保留每轮样本的已有结果可以转换为统一证据；只有均值或 P50 的文件继续作为历史参考。Chapter07 的教学性能基准和真实批次结果包含 `samples`，可以通过导入器转换：
 
 ```bash
 node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
@@ -58,11 +58,11 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
   --output-dir /tmp/chapter09-evidence
 ```
 
-新的服务性能基准按轮保存预填充、解码、端到端时间、首词元延迟、吞吐和正确性。升级旧基线时使用原工作负载重新测量，聚合值不能反向生成原始样本。
+新的服务性能基准按轮保存预填充、解码、端到端时间、首词元延迟、吞吐和正确性。升级旧基线时使用原负载重新测量，聚合值不能反向生成原始样本。
 
 ## 验证实验入口
 
-默认回归会运行 `chapter09_legacy_import_test`，检查保留原始样本的结果可以迁移，只有聚合值的文件必须被拒绝：
+默认回归会运行 `chapter09_legacy_import_test`，检查原始样本能够迁移，并拒绝缺少逐轮样本的输入：
 
 ```bash
 bash code/chapter09_performance/scripts/run.sh

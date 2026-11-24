@@ -1,6 +1,6 @@
 # 09.7 用单变量 A/B 验证优化
 
-A/B 实验只改变一个待验证因素。baseline 与 experiment 必须通过相同正确性闸门，并使用相同 workload、模型、后端、构建类型、编译器和硬件身份。
+A/B 实验只改变一个待验证因素。baseline 与 experiment 必须通过相同正确性闸门，并使用相同负载、模型、后端、构建类型、编译器和硬件身份。
 
 当前比较器还要求两侧使用相同的预热次数和测量次数。策略必须在实验前选择延迟或吞吐作为主指标；主指标没有改善时，即使保护指标没有越界，也不会输出 `KEEP`。真实服务入口默认预热 1 轮、测量 3 轮。
 
@@ -25,20 +25,20 @@ A/B 实验只改变一个待验证因素。baseline 与 experiment 必须通过�
 | baseline 冷启动、experiment 已预热 | 缓存状态不同 |
 | 只保留最快的一次 | 选择偏差掩盖波动 |
 | 输出错误但速度更快 | 计算任务已经改变 |
-| 不同输入长度共用 workload ID | Prefill/Decode 比例不可比 |
+| 不同输入长度共用负载 ID | Prefill/Decode 比例不可比 |
 
 ## 用配对顺序和矩阵检查结论
 
-同一进程中先运行哪条路径，可能改变缓存、温度和设备时钟。教程的 CUDA 自适应 GEMV 与 CPU MoE 实验分别采用 `baseline-first` 和 `experiment-first` 两轮顺序，把同一工作负载下的样本配对保存。两轮方向不一致时，结论应标记为证据不足，而不是挑选有利的一轮。
+同一进程中先运行哪条路径，可能改变缓存、温度和设备时钟。教程的 CUDA 自适应 GEMV 与 CPU MoE 实验分别采用 `baseline-first` 和 `experiment-first` 两轮顺序，把同一负载下的样本配对保存。两轮方向不一致时，结论应标记为证据不足，而不是挑选有利的一轮。
 
-单点 A/B 只回答一个工作负载。候选实现通过后，再改变 batch、上下文长度或 Decode 步数形成适用范围矩阵；每个单元仍执行正确性检查和反向顺序。矩阵中的控制组若也出现大幅波动，应先检查环境和测量流程，再解释实现差异。
+单点 A/B 只回答一个负载。候选实现通过后，再改变 batch、上下文长度或 Decode 步数形成适用范围矩阵；每个单元仍执行正确性检查和反向顺序。矩阵中的控制组若也出现大幅波动，应先检查环境和测量流程，再解释实现差异。
 
 ## 验证比较器
 
-<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/src/comparison.cpp"><code>compare()</code></a> 先检查正确性、环境、workload、预热和测量轮数，再计算主指标与保护指标。执行：
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/src/comparison.cpp"><code>compare()</code></a> 先检查正确性、环境、负载、预热和测量轮数，再计算主指标与保护指标。执行：
 
 ```bash
 bash code/chapter09_performance/scripts/run.sh
 ```
 
-`chapter09_comparison_test` 应覆盖 `KEEP`、`REJECT`、`NOT_COMPARABLE` 和 `INVALID`，并证明主指标未改善时不会输出 `KEEP`。有真实模型时，`bash code/chapter09_performance/scripts/run_real_evidence.sh ab` 还会生成 `real-service-ab-decision.json`，其中保存 baseline、experiment、workload、阈值、变化和结论。`09.8` 把这四种结果转换为保留、回退或重测动作。
+`chapter09_comparison_test` 应覆盖 `KEEP`、`REJECT`、`NOT_COMPARABLE` 和 `INVALID`，并证明主指标未改善时不会输出 `KEEP`。有真实模型时，`bash code/chapter09_performance/scripts/run_real_evidence.sh ab` 还会生成 `real-service-ab-decision.json`，其中保存 baseline、experiment、负载、阈值、变化和结论。`09.8` 把这四种结果转换为保留、回退或重测动作。

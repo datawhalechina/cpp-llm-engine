@@ -20,7 +20,7 @@
 | --- | --- |
 | 身份 | `schema_version`、`experiment_id`、`workload_id` |
 | 环境 | model、backend、device、hardware、host concurrency、build、compiler |
-| 工作负载 | 请求数、输入/输出长度、执行模式、预热与迭代数 |
+| 负载 | 请求数、输入/输出长度、执行模式、预热与迭代数 |
 | 正确性 | 是否通过及检查项 |
 | 样本 | 每轮总时间、阶段时间、吞吐和内存 |
 | 聚合 | count、min、max、mean、median |
@@ -30,7 +30,7 @@
 | 对比记录部分 | 必要内容 |
 | --- | --- |
 | 引用 | baseline 与 experiment 的身份 |
-| 可比性 | workload 和关键环境字段是否一致 |
+| 可比性 | 负载和关键环境字段是否一致 |
 | 策略 | 显式主指标，以及延迟、吞吐和内存允许的回退阈值 |
 | 变化 | 延迟、吞吐和阶段差异 |
 | 决策 | `KEEP`、`REJECT` 或 `NOT_COMPARABLE` |

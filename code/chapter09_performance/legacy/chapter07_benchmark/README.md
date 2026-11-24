@@ -28,7 +28,7 @@ bash code/chapter07_benchmark/scripts/run.sh
 
 `runtime_benchmark` 输出的是 Chapter 06 CPU runtime 的实测结果；`main_benchmark` 中的固定 trace 只用于演示结果格式。比较结果时固定输入、设备、编译选项和脚本版本；benchmark 输出用于支持决策，不替代正确性测试。
 
-`multi_request_benchmark` 对同一个教学 CPU Runtime 分别使用 Round-robin 和 `TensorBatchScheduler`，每种模式测量 1、2、4 个请求。脚本默认使用 Release、warmup=1、iterations=3，并将结果写入 `code/chapter07_benchmark/results/chapter07_cpu_baseline.json`。schema v2 保存 `EXP-CPU-01`、稳定 workload ID、执行模式、模型调用次数、环境、逐轮样本和统计值；`correctness`、请求完成数和生成 token 数仍是硬性验收条件。
+`multi_request_benchmark` 对同一个教学 CPU Runtime 分别使用 Round-robin 和 `TensorBatchScheduler`，每种模式测量 1、2、4 个请求。脚本默认使用 Release、warmup=1、iterations=3，并将结果写入 `code/chapter07_benchmark/results/chapter07_cpu_baseline.json`。schema v2 保存 `EXP-CPU-01`、稳定负载 ID、执行模式、模型调用次数、环境、逐轮样本和统计值；`correctness`、请求完成数和生成 token 数仍是硬性验收条件。
 
 可通过 `CHAPTER07_BUILD_TYPE`、`CHAPTER07_WARMUP`、`CHAPTER07_ITERATIONS` 和 `CHAPTER07_RESULT_DIR` 覆盖默认条件。比较两组结果时必须使用相同设置。
 

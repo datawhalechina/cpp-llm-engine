@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
   <title id="title">Chapter09 从端到端时间下钻到硬件原因</title>
-  <desc id="desc">热点分析从请求级 TTFT、ITL 和完成时间开始，依次缩小到 Runtime 阶段、Decoder 模块、算子、函数或 Kernel，最后用指令、带宽、缓存和同步指标解释原因。每一级保留同一 workload 身份和上一级证据。</desc>
+  <desc id="desc">热点分析从请求级 TTFT、ITL 和完成时间开始，依次缩小到 Runtime 阶段、Decoder 模块、算子、函数或 Kernel，最后用指令、带宽、缓存和同步指标解释原因。每一级保留同一负载身份和上一级证据。</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#52606d"/></marker>
     <style>
@@ -13,7 +13,7 @@
   </defs>
   <rect width="1200" height="650" rx="24" fill="#f8fafc"/>
   <text x="48" y="52" class="title">Chapter09 · 热点归因按层缩小，不从 Kernel 猜起</text>
-  <text x="48" y="80" class="text">每次下钻只回答更具体的问题，并保留相同 workload 与上一级测量</text>
+  <text x="48" y="80" class="text">每次下钻只回答更具体的问题，并保留相同负载与上一级测量</text>
 
   <rect x="92" y="120" width="1016" height="76" rx="16" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
   <text x="120" y="151" class="label">1 请求级结果</text><text x="310" y="151" class="text">TTFT · ITL · 完成时间 · 吞吐</text>

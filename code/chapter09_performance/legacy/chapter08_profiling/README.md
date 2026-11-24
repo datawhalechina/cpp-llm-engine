@@ -1,6 +1,6 @@
 # Chapter 08：Profiling Evidence 性能证据
 
-本目录不重新实现 Runtime，也不伪造硬件 trace。它保留重构前的结果文件、experiment/workload 身份和 correctness-first A/B 判定。当前学习说明见 [Chapter09 Performance](../../../../source/chapter09_performance/next/intro.md)。
+本目录不重新实现 Runtime，也不伪造硬件 trace。它保留重构前的结果文件、experiment/负载身份和 correctness-first A/B 判定。当前学习说明见 [Chapter09 Performance](../../../../source/chapter09_performance/next/intro.md)。
 
 ## 本章资产总览
 
@@ -17,7 +17,7 @@
 | `scripts/run.sh` | 消费 Chapter 07 与归档真实服务基线，并执行轻量回归 |
 | `scripts/run_real_service_ab.sh` | 重新采集真实服务 experiment，与归档 baseline 做同条件回归 A/B |
 | `scripts/run_real_q6k_down_ab.sh` | 只切换 FFN down backend 的三轮 scalar/AVX2 A/B |
-| `scripts/compare_q6k_down_profiles.mjs` | 校验 workload、正确性和计时闭合后生成 Q6_K A/B 判定 |
+| `scripts/compare_q6k_down_profiles.mjs` | 校验负载、正确性和计时闭合后生成 Q6_K A/B 判定 |
 | `scripts/run_real_q4k_ffn_ab.sh` | 只切换 FFN gate/up backend 的三轮 scalar/AVX2 A/B |
 | `scripts/compare_q4k_ffn_profiles.mjs` | 归档 Q4_K 实验的 `KEEP` 或 `REJECT` 判定 |
 | `scripts/run_real_q4k_attention_ab.sh` | 只切换 QKV/out backend 的三轮 scalar/AVX2 A/B |
@@ -41,7 +41,7 @@
 bash code/chapter08_profiling/scripts/run.sh
 ```
 
-脚本默认选择 `request_count=4` 的 Chapter 07 JSON 场景，先生成阶段报告，再执行同构 baseline/experiment 的 A/B smoke。这个 A/B 只验证 JSON 适配、correctness 和判定逻辑，不代表优化收益；真实实验必须替换 experiment 输入，并保持 workload、硬件、编译选项和 correctness 条件一致。
+脚本默认选择 `request_count=4` 的 Chapter 07 JSON 场景，先生成阶段报告，再执行同构 baseline/experiment 的 A/B smoke。这个 A/B 只验证 JSON 适配、correctness 和判定逻辑，不代表优化收益；真实实验必须替换 experiment 输入，并保持负载、硬件、编译选项和 correctness 条件一致。
 
 默认脚本还会读取 `code/chapter09_serving/results/tinyllama_service_cpu_baseline.json`，报告真实模型的 prefill、decode、Runtime overhead、双请求 TTFT/完成时间差、权重 payload、已提交 KV、进程峰值 RSS 和瓶颈范围，但不会重新运行 638 MiB 模型。需要重新采集真实 experiment 时执行：
 
@@ -49,7 +49,7 @@ bash code/chapter08_profiling/scripts/run.sh
 bash code/chapter08_profiling/scripts/run_real_service_ab.sh
 ```
 
-该脚本默认使用归档 JSON 作为 baseline，以当前工作树重新构建并采集 `warmup=1/iterations=3` experiment。它验证环境、workload、correctness 和 5% 总延迟回退阈值，定位是回归/可重复性检查，不是单变量优化收益。
+该脚本默认使用归档 JSON 作为 baseline，以当前工作树重新构建并采集 `warmup=1/iterations=3` experiment。它验证环境、负载、correctness 和 5% 总延迟回退阈值，定位是回归/可重复性检查，不是单变量优化收益。
 
 Q6_K down 单变量实验执行：
 
@@ -59,7 +59,7 @@ bash code/chapter08_profiling/scripts/run_real_q6k_down_ab.sh
 
 脚本使用同一 Release 可执行文件、模型、prompt、token 数和三轮迭代，只把 FFN down 从 scalar fused 切换为 AVX2/FMA fused。只有 golden、计时闭合、down 延迟和 Decoder 总延迟全部通过才输出 `KEEP`。
 
-Q4_K gate/up 使用同一套 workload 和正确性闸门：
+Q4_K gate/up 使用同一套负载和正确性闸门：
 
 ```bash
 bash code/chapter08_profiling/scripts/run_real_q4k_ffn_ab.sh

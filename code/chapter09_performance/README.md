@@ -1,10 +1,10 @@
 # Chapter 09 代码：性能证据与优化决策
 
-本目录把一次性能实验整理成可复查证据：固定环境和工作负载，通过正确性检查，保存逐轮样本，再比较实现差异。原理与学习顺序见 [`Chapter09 导读`](../../source/chapter09_performance/next/intro.md)，已归档实验的工作负载、结果路径和适用边界见[实验资产登记表](../../source/reference/experiment_assets.md)。
+本目录把一次性能实验整理成可复查证据：固定环境和负载，通过正确性检查，保存逐轮样本，再比较实现差异。原理与学习顺序见 [`Chapter09 导读`](../../source/chapter09_performance/next/intro.md)，已归档实验的负载、结果路径和适用边界见[实验资产登记表](../../source/reference/experiment_assets.md)。
 
 ## 代码架构
 
-Chapter08、Chapter10 或专项 Kernel 入口产生原始样本；Benchmark 记录端到端结果，Profiler 附件解释热点原因。可进入统一证据链的样本由迁移器规范化为 `EvidenceRecord`，专项 A/B 和矩阵实验则保留配对顺序与工作负载维度。`EvidenceRecord::valid()` 检查 schema、环境、工作负载和正确性；`summarize()` 从逐轮样本生成统计值；两份记录有效且可比时，`compare()` 才给出决策。
+Chapter08、Chapter10 或专项计算核入口产生原始样本；性能基准记录端到端结果，性能剖析附件解释热点原因。导入器把已有样本转换为 `EvidenceRecord`，专项 A/B 和矩阵实验保留配对顺序与负载维度。`EvidenceRecord::valid()` 检查格式、环境、负载和正确性；`summarize()` 从逐轮样本生成统计值；两份记录有效且可比时，`compare()` 给出决策。
 
 ```text
 Runtime / Scheduler / Service / Kernel
@@ -34,13 +34,13 @@ EvidenceRecord / 专项决策 -> KEEP / REJECT / 重测
 | 顺序 | 资产 | 阅读重点 | 验证 |
 | --- | --- | --- | --- |
 | 1 | `statistics.h/.cpp` | 统计值怎样从原始样本产生 | `chapter09_statistics_test` |
-| 2 | `evidence_record.h/.cpp` | 环境、工作负载和正确性字段 | `chapter09_evidence_contract_test` |
+| 2 | `evidence_record.h/.cpp` | 环境、负载和正确性字段 | `chapter09_evidence_contract_test` |
 | 3 | `comparison.h/.cpp` | 可比性、主指标和保护指标 | `chapter09_comparison_test` |
 | 4 | `import_legacy_evidence.mjs` | 旧结果怎样进入统一格式 | `chapter09_legacy_import_test` |
 | 5 | `results/raw/`、`results/evidence/` | 原始样本和统一记录 | `chapter09_versioned_evidence_test` |
 | 6 | `results/benchmark/`、`results/profile/` | A/B 结果与性能剖析附件 | 实验资产登记表 |
 
-比较前必须确认两份记录各自有效，并且模型、后端、设备、硬件、构建信息与工作负载一致。主指标改善用于判断收益，延迟、吞吐、内存和正确性保护指标用于阻止以明显回退换取单项提升。
+比较前必须确认两份记录各自有效，并且模型、后端、设备、硬件、构建信息与负载一致。主指标改善用于判断收益，延迟、吞吐、内存和正确性保护指标用于阻止以明显回退换取单项提升。
 
 ## 运行默认验证
 
@@ -50,7 +50,7 @@ EvidenceRecord / 专项决策 -> KEEP / REJECT / 重测
 bash code/chapter09_performance/scripts/run.sh
 ```
 
-脚本运行统计、证据格式、版本迁移、真实证据桥接和比较决策测试。它验证证据链代码，不测量当前机器的真实性能。
+脚本运行统计、记录格式、旧结果导入、真实样本转换和比较决策测试。它验证数据处理流程；真实性能由下面的专项入口测量。
 
 旧结果保留逐轮样本时，可以转换为统一记录：
 
@@ -60,11 +60,11 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
   --output-dir /tmp/chapter09-evidence
 ```
 
-只有均值或 P50 的历史文件不能还原原始样本，迁移器会拒绝这类输入。
+迁移器要求输入保留逐轮样本；只有均值或 P50 的历史文件继续作为只读参考。
 
 ## 选择实验入口
 
-先根据问题选择入口，不要把局部 Kernel、完整 Runtime、调度和服务结果混为同一层证据。
+先根据问题选择入口，并区分局部计算核、完整运行时、调度和服务四层证据。
 
 ### CPU 与 MoE
 
@@ -79,7 +79,7 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
 | 收益能否穿过固定调度队列 | `scripts/run_qwen15_moe_scheduling_ab.sh` |
 | 收益能否穿过动态请求接纳和终态释放 | `scripts/run_qwen15_moe_service_ab.sh` |
 
-这些入口采用固定工作负载、正确性闸门和反向执行顺序。具体实验编号、样本数量、结果数值与结论范围只在[实验资产登记表](../../source/reference/experiment_assets.md#cpu-runtimedecoder-与服务实验)维护。
+这些入口采用固定负载、正确性闸门和反向执行顺序。具体实验编号、样本数量、结果数值与结论范围只在[实验资产登记表](../../source/reference/experiment_assets.md#cpu-runtimedecoder-与服务实验)维护。
 
 ### CUDA
 
@@ -88,7 +88,7 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
 | 端到端时间主要落在哪些 Kernel | `scripts/run_cuda_profile.sh` |
 | 三阶段与融合在线 Attention 怎样比较 | `scripts/run_cuda_attention_ab.sh` |
 | 分页 Tensor Prefill 是否优于逐词元路径 | `scripts/run_cuda_paged_prefill_ab.sh` |
-| 双请求 Tensor Batch 是否优于顺序 Decode | `scripts/run_cuda_batch_ab.sh` |
+| 双请求张量组批是否优于顺序解码 | `scripts/run_cuda_batch_ab.sh` |
 | 分页融合 Attention 是否值得替换默认路径 | `scripts/run_cuda_paged_attention_ab.sh` |
 | Q4_K/Q6_K GEMV 怎样随 batch 扩展 | `scripts/run_cuda_quantized_gemv_matrix.sh` |
 | 自适应 tile 的局部原因指标是否成立 | `scripts/run_cuda_adaptive_gemv_ab.sh` |
@@ -104,7 +104,7 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
 | Q2_K 与 IQ4_NL 的 batch 扩展和首要停顿原因是什么 | `scripts/run_deepseek2_cuda_gemv_matrix.sh` |
 | 32 线程 IQ4_NL 是否优于通用 256 线程归约 | `scripts/run_deepseek2_cuda_iq4_warp_ab.sh` |
 | IQ4_NL 单 Warp 收益能否进入完整 27 层 Prefill | `scripts/run_deepseek2_cuda_iq4_warp_runtime_ab.sh` |
-| Q2_K 单 Warp payload 复用能否减少 L1TEX 等待 | `scripts/run_deepseek2_cuda_q2_warp_ab.sh` |
+| Q2_K 单线程束载荷复用能否减少 L1TEX 等待 | `scripts/run_deepseek2_cuda_q2_warp_ab.sh` |
 | 固定 IQ4_NL 优化后，Q2_K 收益能否进入完整 Prefill | `scripts/run_deepseek2_cuda_q2_warp_runtime_ab.sh` |
 | Q2_K/IQ4_NL 优化后，完整 Prefill 的热点迁移到哪里 | `scripts/run_deepseek2_cuda_optimized_profile.sh` |
 | Q3_K 位平面与分组 scale 复用能否改善融合 GEMV | `scripts/run_deepseek2_cuda_q3_warp_ab.sh` |
@@ -117,17 +117,17 @@ CUDA 入口需要相应模型、CUDA Toolkit，性能剖析入口还需要 Nsigh
 
 DeepSeek Tensor Prefill 剖析入口通过 `CHAPTER09_DEEPSEEK2_TENSOR_PREFILL_PROFILE_MLA_PATH=legacy|absorbed` 显式选择路径，默认值为 `absorbed`。结果元数据会记录该选择，避免把优化前后的 Kernel 分布混在同一结论中。
 
-DeepSeek 量化 GEMV 使用两级证据。格式矩阵先固定权重形状与 batch，分别确认 Q2_K 的 L1TEX 等待和 IQ4_NL 的 barrier 等待；格式专用 A/B 再只改变线程组织，并以 CPU reference、执行指令和吞吐解释变化。真实模型实验逐项叠加优化：EXP-GPU-24 只切换 IQ4_NL，EXP-GPU-26 固定已验证的 IQ4_NL 后只切换 Q2_K。只有完整 27 层 Prefill 的反向顺序配对也改善且 logits 保持一致时，Factory 才切换默认路径。
+DeepSeek 量化 GEMV 使用两级证据。格式矩阵固定权重形状与批大小，定位 Q2_K 和 IQ4_NL 的主要停顿；格式专用 A/B 只改变线程组织，并以 CPU 参考结果、执行指令和吞吐解释变化。真实模型实验再逐项叠加已经验证的优化，完整 27 层预填充保持 logits 一致且端到端时间改善后，工厂才切换默认路径。设备 Router、设备端专家分组和热点迁移的实验编号、配置与结果见[实验资产登记表](../../source/reference/experiment_assets.md)。
 
-默认路径改变后，用 `run_deepseek2_cuda_optimized_profile.sh` 重新捕获完整 Prefill。默认 `block-warp + packed` 复现 EXP-GPU-27；设置 `GEMV_PATH=all-warp` 生成 EXP-GPU-30；再设置 `MOE_PATH=device-router` 生成 EXP-GPU-32。三项实验都固定 absorbed MLA，只按登记组合改变 GEMV 或 MoE 路径，用于判断默认值切换后的热点迁移，不与早期 EXP-GPU-20 的 absorbed MLA profile 混用。
+### 多模态
 
-EXP-GPU-28/29 对 Q3_K 重复同一门禁：微基准与 NCU 先解释位平面复用，再在完整 Prefill 中固定 Q2_K、IQ4_NL、MLA 和 MoE 路径。Q3_K 端到端收益成立后，Factory 才从 `AdaptiveBlockWarp` 切换到 `AdaptiveAllWarp`。
+| 要回答的问题 | 入口 | 当前证据 |
+| --- | --- | --- |
+| CPU 动态切图、视觉编码、语言生成和服务的端到端时间怎样分布 | `code/multimodal/scripts/run_real_service_benchmark.sh` | 重复样本、阶段统计、固定输出和资源释放 |
+| CUDA 视觉流水线与图文生成是否保持 CPU 语义 | `code/multimodal/scripts/run_cuda_smolvlm_context.sh ... mixed-prompt` | 完整图文序列、四词元生成和 CPU/CUDA 对照 |
+| CUDA 服务能否隔离请求并组批解码 | `code/multimodal/scripts/run_cuda_smolvlm_context.sh ... mixed-service` | 同步/SSE、双请求解码组批和终态释放 |
 
-EXP-GPU-31 固定 absorbed MLA、all-Warp GEMV 和 packed 专家执行，只把 Router/Top-K 从 Host 移到设备。候选路径仍向 Host 回传 `[T,K]` 紧凑结果并建立专家分组，因此该实验只决定路由计算位置；后续 EXP-GPU-32/33 分别完成传输复查和设备分组 A/B。
-
-EXP-GPU-32 表明完整 hidden D2H 已被紧凑路由结果替代：长度 128 的 D2H 字节从 `27.673 MB` 降到 `0.569 MB`。`3117` 次小型 H2D 保持不变，对应 Host 建组后的行号和权重，因此 EXP-GPU-33 继续验证设备建组，而没有融合只占约 `1.0%` Kernel 时间的 Router。
-
-EXP-GPU-33 固定设备 Router，只比较 Host 建组与设备建组。设备候选在长度 32/128 的中位数比例为 `1.225/0.998`，正确性完全一致但没有稳定端到端收益。结果支持保留 `DeviceGroupedDispatch` 作为可复现实验路径，不支持切换 Factory 默认值。
+现有 CUDA 多模态证据回答正确性、组合关系和请求隔离，尚未形成视觉阶段与语言阶段的端到端性能 A/B。新增性能结论时，应先固定图片、切图数量、文本提示和输出长度，再分别记录视觉预处理、Vision Encoder、Projector、预填充与解码样本。
 
 ## 结果目录
 
@@ -139,17 +139,17 @@ EXP-GPU-33 固定设备 Router，只比较 Host 建组与设备建组。设备�
 | `results/profile/` | nsys、ncu 和阶段归因附件 | 只解释原因 |
 | `results/legacy/` | 重构前历史结果 | 仅追溯 |
 
-默认脚本把临时结果写入 `/tmp`，不会覆盖仓库基线。需要归档新结果时，先登记新的实验与工作负载身份，再提交原始样本、环境信息、正确性结果和决策文件。
+默认脚本把临时结果写入 `/tmp`，仓库中的基线保持不变。归档结果的字段和登记位置见[实验资产登记表](../../source/reference/experiment_assets.md)。
 
 ## 扩展入口
 
 新增性能入口时按以下顺序建设：
 
-1. 定义工作负载、baseline、候选实现、主指标和保护指标。
+1. 定义负载、baseline、候选实现、主指标和保护指标。
 2. 让两条路径通过相同的正确性闸门。
 3. 保存逐轮样本，并用反向顺序或独立进程控制执行顺序影响。
 4. 从局部计算逐层复核到 Decoder、Runtime、Scheduler 或 Service。
 5. 用矩阵说明结论覆盖的 batch、上下文和 Decode 步数。
-6. 将结果登记到实验资产表，README 只增加稳定入口。
+6. 将结果登记到实验资产表，并在本页保留稳定入口。
 
 CPU、CUDA、多模态和服务实验复用同一证据结构；平台专属 profiler 只负责归因，不改变统一比较规则。

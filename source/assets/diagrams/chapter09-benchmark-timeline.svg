@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 610" role="img" aria-labelledby="title desc">
   <title id="title">Chapter09 一次可重复 Benchmark 的时间轴</title>
-  <desc id="desc">实验先固定环境和工作负载并通过正确性校验，再执行不计入样本的预热轮次，随后重复测量并保存每轮原始样本，最后聚合统计并写入带身份的证据文件。</desc>
+  <desc id="desc">实验先固定环境和负载并通过正确性校验，再执行不计入样本的预热轮次，随后重复测量并保存每轮原始样本，最后聚合统计并写入带身份的证据文件。</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#52606d"/></marker>
     <style>
@@ -21,7 +21,7 @@
   <rect x="324" y="122" width="218" height="102" rx="16" fill="#fff7ed" stroke="#f59e0b" stroke-width="2"/>
   <text x="433" y="156" text-anchor="middle" class="label">2 正确性闸门</text><text x="433" y="184" text-anchor="middle" class="text">输出、状态、资源</text><text x="433" y="207" text-anchor="middle" class="text">失败则停止性能结论</text>
   <rect x="600" y="122" width="218" height="102" rx="16" fill="#ede9fe" stroke="#a78bfa" stroke-width="2"/>
-  <text x="709" y="156" text-anchor="middle" class="label">3 预热</text><text x="709" y="184" text-anchor="middle" class="text">执行固定 workload</text><text x="709" y="207" text-anchor="middle" class="text">不写入 samples</text>
+  <text x="709" y="156" text-anchor="middle" class="label">3 预热</text><text x="709" y="184" text-anchor="middle" class="text">执行固定负载</text><text x="709" y="207" text-anchor="middle" class="text">不写入 samples</text>
   <rect x="876" y="114" width="276" height="118" rx="16" fill="#0f766e"/>
   <text x="1014" y="152" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">4 重复测量</text><text x="1014" y="181" text-anchor="middle" font-size="13" fill="#d9fffa">计时区间只保留被测路径</text><text x="1014" y="205" text-anchor="middle" font-size="13" fill="#d9fffa">每轮保存 MeasurementSample</text>
   <path d="M266 173H319" class="line"/><path d="M542 173H595" class="line"/><path d="M818 173H871" class="line"/>
@@ -43,7 +43,7 @@
   <text x="122" y="504" class="small">聚合值用于阅读，samples 用于复查和重新比较</text>
   <rect x="684" y="410" width="420" height="118" rx="17" fill="#e8f1ff" stroke="#60a5fa" stroke-width="2"/>
   <text x="710" y="446" class="label">6 写入独立证据文件</text>
-  <text x="710" y="477" class="text">身份 + 环境 + workload + correctness + samples + summary</text>
+  <text x="710" y="477" class="text">身份 + 环境 + 负载 + 正确性 + 原始样本 + 汇总</text>
   <text x="710" y="504" class="small">不覆盖 baseline；A/B 记录只引用两份测量</text>
   <path d="M1014 232V376H306V405" class="line"/>
   <path d="M516 469H679" class="line"/>

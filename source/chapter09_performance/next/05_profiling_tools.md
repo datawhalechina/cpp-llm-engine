@@ -1,6 +1,6 @@
 # 09.5 按问题选择性能剖析工具
 
-Profiling 应从低开销的总量观测开始，确认问题范围后再使用更细的工具。直接进入指令或 Kernel 级分析，容易在尚未固定 workload 时得到无法复现的热点。
+Profiling 应从低开销的总量观测开始，确认问题范围后再使用更细的工具。直接进入指令或 Kernel 级分析，容易在尚未固定负载时得到无法复现的热点。
 
 | 顺序 | 问题 | CPU 常用方法 | CUDA 常用方法 |
 | --- | --- | --- | --- |
@@ -31,7 +31,7 @@ Nsight Compute（`ncu`）会重放选中的 CUDA Kernel 并采集硬件计数器
 | `nsys` | Kernel 总时间、实例数、CUDA API 和同步 | `.nsys-rep`、Kernel 汇总 CSV | 某个 Kernel 的硬件瓶颈已经确定 |
 | `ncu` | DRAM 吞吐、L2 命中、占用率、Warp stall | `.ncu-rep`、单 Kernel 指标 | 请求端到端一定变快 |
 
-本教程先运行已固定 workload 的脚本，避免手工命令遗漏模型和正确性闸门：
+本教程先运行已固定负载的脚本，避免手工命令遗漏模型和正确性闸门：
 
 ```bash
 CHAPTER09_CUDA_PAGED_ATTENTION_PROFILE=1 \
@@ -42,7 +42,7 @@ bash code/chapter09_performance/scripts/run_cuda_paged_attention_ab.sh
 
 定位到 GEMV 后，再用 NCU 比较同一 kernel 的 cycles、共享内存、寄存器和 L1/TEX 指标。需要解释原因时继续采集 Compute、Instruction、Memory、Scheduler 和 Warp State section，核对指令数量、活跃与可调度 Warp、主要停顿和缓存事务。EXP-GPU-14 中固定 4 行与自适应 tile 采用相同矩阵、相同 launch 次数和独立进程；自适应实现的指令数减少约 `21%`～`37%`，共享内存减少 `50%`～`75%`，但 L1 命中率基本不变。这组指标把原因定位为减少无效 tile 行工作，而不是缓存策略改变。EXP-GPU-15 随后用真实 Decode 得出 `KEEP`，EXP-GPU-16 再确认收益覆盖 batch 1/2、上下文 16/128 和 Decode 1/8 步；三层证据共同支持默认路径变更。
 
-确定单个 Kernel 是热点后，再对最小可执行 workload 使用 `ncu`。下面的命令只展示调用结构；Kernel 名称和可用指标会随 CUDA、GPU 架构与 Nsight Compute 版本变化，运行前先用 `ncu --query-metrics` 核对本机支持项。
+确定单个 Kernel 是热点后，再对最小可执行负载使用 `ncu`。下面的命令只展示调用结构；Kernel 名称和可用指标会随 CUDA、GPU 架构与 Nsight Compute 版本变化，运行前先用 `ncu --query-metrics` 核对本机支持项。
 
 ```bash
 ncu --set basic \
@@ -55,7 +55,7 @@ ncu --set basic \
 
 EXP-GPU-09～12 展示了 NCU 指标怎样改变优化方向。元数据广播和 shared payload 看似减少全局读取，却增加了 shuffle 或 barrier，最终 cycles 回退；原生 half 转换直接删除手写规格化分支，使 Q4_K kernel cycles 下降约 `28.8%`。判断时同时读取 `Elapsed Cycles` 与 `SM Frequency`，避免把动态时钟变化误判为代码收益。
 
-分析完成后必须回到相同 workload 的端到端 A/B：`nsys` 决定热点优先级，`ncu` 解释硬件原因，墙钟样本和正确性闸门决定实现是否保留。
+分析完成后必须回到相同负载的端到端 A/B：`nsys` 决定热点优先级，`ncu` 解释硬件原因，墙钟样本和正确性闸门决定实现是否保留。
 
 ## 记录 GPU 运行状态
 
@@ -69,4 +69,4 @@ EXP-GPU-09～12 展示了 NCU 指标怎样改变优化方向。元数据广播�
 bash code/chapter09_performance/scripts/run_real_evidence.sh profile
 ```
 
-脚本调用 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/engine/scripts/run_real_decoder_profile.sh"><code>run_real_decoder_profile.sh</code></a>，默认重复三轮，并在结果目录的 `profile/tinyllama-decoder-profile.txt` 保存 Decoder 阶段证据。文件先记录 experiment、workload、模型、CPU、编译器和构建类型，再记录正确性与阶段平均耗时；这些身份字段缺失时脚本直接失败。当前三轮归档结果见 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/results/profile/tinyllama-decoder-scalar.txt"><code>tinyllama-decoder-scalar.txt</code></a>。
+脚本调用 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/engine/scripts/run_real_decoder_profile.sh"><code>run_real_decoder_profile.sh</code></a>，默认重复三轮，并在结果目录的 `profile/tinyllama-decoder-profile.txt` 保存 Decoder 阶段证据。文件先记录 experiment、负载、模型、CPU、编译器和构建类型，再记录正确性与阶段平均耗时；这些身份字段缺失时脚本直接失败。当前三轮归档结果见 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter09_performance/results/profile/tinyllama-decoder-scalar.txt"><code>tinyllama-decoder-scalar.txt</code></a>。
