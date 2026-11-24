@@ -18,9 +18,14 @@
 #include <vector>
 
 int main(int argc, char** argv) {
-    if (argc != 3) {
+    if (argc != 3 && argc != 4) {
         std::cerr << "usage: multimodal_cuda_vision_pipeline_inspect "
-                     "<mmproj.gguf> <image>\n";
+                     "<mmproj.gguf> <image> [--full-tile]\n";
+        return 2;
+    }
+    const bool full_tile = argc == 4 && std::string(argv[3]) == "--full-tile";
+    if (argc == 4 && !full_tile) {
+        std::cerr << "unknown vision pipeline option: " << argv[3] << '\n';
         return 2;
     }
 
@@ -63,7 +68,15 @@ int main(int argc, char** argv) {
     }
 
     const std::size_t source_grid = config.image_size / config.patch_size;
-    const std::size_t selected_grid = config.merge_size;
+    const std::size_t selected_grid =
+        full_tile ? source_grid : config.merge_size;
+    const auto cpu_backend = full_tile
+        ? multimodal::VisionComputeBackend::Cblas
+        : multimodal::VisionComputeBackend::ScalarReference;
+    if (!multimodal::vision_compute_backend_available(cpu_backend)) {
+        std::cerr << "full-tile CPU reference requires the CBLAS backend\n";
+        return 1;
+    }
     std::vector<std::size_t> positions;
     multimodal::PatchTensor selected;
     selected.patch_count = static_cast<int>(selected_grid * selected_grid);
@@ -95,8 +108,9 @@ int main(int argc, char** argv) {
         return 1;
     }
     multimodal::FloatMatrix embedding;
-    if (!multimodal::embed_patches_at_positions(
-            selected, positions, patch_weights, &embedding, &error)) {
+    if (!multimodal::embed_patches_at_positions_with_backend(
+            selected, positions, patch_weights, cpu_backend,
+            &embedding, &error)) {
         std::cerr << "CPU embedding failed: " << error << '\n';
         return 1;
     }
@@ -111,17 +125,17 @@ int main(int argc, char** argv) {
     multimodal::FloatMatrix encoded;
     std::vector<multimodal::SiglipLayerSummary> summaries;
     multimodal::SiglipEncoderStats stats;
-    if (!multimodal::run_siglip_encoder(
+    if (!multimodal::run_siglip_encoder_with_backend(
             embedding, config.block_count, config.attention_head_count,
-            config.layer_norm_epsilon, provider, post_norm, &encoded,
+            config.layer_norm_epsilon, provider, post_norm, cpu_backend, &encoded,
             &summaries, &stats, &error)) {
         std::cerr << "CPU encoder failed: " << error << '\n';
         return 1;
     }
     multimodal::Idefics3ProjectorTrace expected;
-    if (!multimodal::run_idefics3_projector(
+    if (!multimodal::run_idefics3_projector_with_backend(
             encoded, selected_grid, selected_grid, config.merge_size,
-            projector_weights, &expected, &error)) {
+            projector_weights, cpu_backend, &expected, &error)) {
         std::cerr << "CPU projector failed: " << error << '\n';
         return 1;
     }
@@ -169,12 +183,20 @@ int main(int argc, char** argv) {
         cosine >= 0.9999;
     std::cout << std::setprecision(10)
               << "source_image: " << image.width << 'x' << image.height << '\n'
+              << "vision_mode: "
+              << (full_tile ? "full-tile" : "top-left-window") << '\n'
+              << "cpu_backend: "
+              << (full_tile ? "cblas" : "scalar") << '\n'
               << "selected_grid: " << selected_grid << 'x' << selected_grid << '\n'
               << "positions: ";
-    for (std::size_t index_value = 0; index_value < positions.size();
-         ++index_value) {
-        if (index_value != 0) std::cout << ',';
-        std::cout << positions[index_value];
+    if (full_tile) {
+        std::cout << positions.front() << ".." << positions.back();
+    } else {
+        for (std::size_t index_value = 0; index_value < positions.size();
+             ++index_value) {
+            if (index_value != 0) std::cout << ',';
+            std::cout << positions[index_value];
+        }
     }
     std::cout << '\n'
               << "output_shape: " << expected.output.rows << 'x'
