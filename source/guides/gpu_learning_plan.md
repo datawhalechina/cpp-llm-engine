@@ -4,7 +4,7 @@ GPU 路线在 CPU 已验证的算法和公共接口上替换设备内存、计�
 
 TinyLlama 与 Qwen3 提供完整稠密 GPU 基线：真实模型加载、完整解码器、生成、分页 K/V、批量执行和服务均有验证入口。DeepSeek-V2-Lite 继续覆盖分页 MLA、权重吸收、MoE 专家执行、格式专用量化 GEMV 和设备端路由。三种模型复用同一生成运行时、调度和服务约定。
 
-环境安装与故障排查见 [CUDA 安装与配置](./setup_cuda.md)，代码对象与测试清单见 [`code/cuda/README.md`](/code/cuda)。
+环境安装与故障排查见 [CUDA 安装与配置](./setup_cuda.md)，代码对象与测试清单见 [`code/cuda/README.md`](https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/README.md)。
 
 ![GPU 六任务学习路线](../assets/diagrams/gpu-six-task-learning-route.svg)
 

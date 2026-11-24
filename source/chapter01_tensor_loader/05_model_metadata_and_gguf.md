@@ -2,6 +2,8 @@
 
 真实模型文件同时保存模型元数据、分词器配置、张量索引和权重数据。本节沿 GGUF Reader、Metadata Adapter、Tensor Loader 和 Model Builder 追踪这些信息如何变成后续章节使用的内部对象。
 
+GGUF 数据区对齐、张量偏移和字节范围的统一计算见 [`F-LOAD-01`](../reference/formulas.md#f-load-01)。
+
 模型元数据（metadata）是模型的配置说明，例如隐藏维度为多少、包含多少个解码器块、使用多少个注意力头。模型结构约束（schema）是检查规则：它根据架构和元数据，确认文件中确实存在所需权重，并检查每个权重的形状。两者的关系可以先记成：
 
 ```text

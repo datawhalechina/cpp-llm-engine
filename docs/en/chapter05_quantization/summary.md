@@ -21,4 +21,4 @@
 
 - Prerequisites: this chapter sits on top of the Chapter 04 Decoder and still depends on the Chapter 03 operator boundary.
 - Later use: Chapter 06 executes the quantized model through the generation runtime, Chapter 07 manages paged K/V, and Chapter 09 measures that chain.
-- Code index: open [the Chapter 03 intro](/en/chapter03_matmul/intro) and [the chapter code index](/code/chapter05_quantization).
+- Code index: open [the Chapter 05 intro](/en/chapter05_quantization/intro) and [the chapter code README](https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/README.md).

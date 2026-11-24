@@ -21,4 +21,4 @@
 
 - Prerequisites: this chapter depends on the Decoder from Chapter 04 and the quantized Linear path from Chapter 05.
 - Later use: Chapters 07-10 add K/V management, scheduling, performance evidence, and ServiceCore.
-- Code index: open [the Chapter 03 intro](/en/chapter03_matmul/intro) and [the chapter code index](/code/chapter06_generation).
+- Code index: open [the Chapter 06 intro](/en/chapter06_generation/intro) and [the chapter code README](https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/README.md).

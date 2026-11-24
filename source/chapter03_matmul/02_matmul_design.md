@@ -2,6 +2,8 @@
 
 两个矩阵能够相乘，需要满足 `lhs.cols == rhs.rows`。代码还要知道数据地址、行优先步长和输出位置，才能把数学公式变成一次安全的内存访问。
 
+本章 Linear、MatMul 和权重转置统一采用 [`F-LINEAR-01`](../reference/formulas.md#f-linear-01) 的 shape 约定。
+
 ## 先固定输入和输出形状
 
 本章使用连续行优先布局：

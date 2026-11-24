@@ -8,7 +8,7 @@ CUDA 指南只处理安装、版本选择和故障定位。环境可用后，按
 
 | 学习目标 | 所需环境 | 入口 |
 | --- | --- | --- |
-| 阅读正文、运行 CPU 章节和默认回归 | C++17 编译器、CMake、Git、Node.js | [使用说明](/guide) |
+| 阅读正文、运行 CPU 章节和默认回归 | C++17 编译器、CMake、Git、Node.js | [学习与复现指南](./README.md) |
 | 编译 CUDA Kernel、cuBLAS 和设备资源测试 | NVIDIA GPU、驱动、CUDA Toolkit | `code/cuda/scripts/run.sh` |
 | 运行真实 TinyLlama CUDA Runtime 与服务 | 上述环境和 TinyLlama GGUF | `code/engine/scripts/run_real_cuda_runtime.sh` |
 

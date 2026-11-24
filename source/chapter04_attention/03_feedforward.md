@@ -34,6 +34,8 @@ return fc2_.forward(activated);
 
 TinyLlama 的 FFN 不是简单地把 ReLU 换成 SiLU。它使用三组权重并在两个升维分支之间执行逐元素门控：
 
+SwiGLU 的 gate、up、down 计算与代码归属见 [`F-FFN-01`](../reference/formulas.md#f-ffn-01)。
+
 ```text
 gate = gate_proj(x)
 up = up_proj(x)

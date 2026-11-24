@@ -22,9 +22,9 @@ Chapter00 使用 llama.cpp 建立外部基线，后续章节再把同一模型�
 | 模型 | 适合学习什么 | 教程当前状态 |
 | --- | --- | --- |
 | TinyLlama 1.1B Chat Q4_K_M | 从 GGUF、Decoder、生成到服务的完整主线 | 默认模型，CPU/CUDA 真实链路已接通 |
-| Qwen3-0.6B | 权重命名、Tokenizer、聊天模板、Q/K Norm、NeoX RoPE 和 Decoder 配置适配 | CPU/CUDA 推理服务纵向闭环已接通 |
-| Qwen1.5-MoE-A2.7B-Chat | Router、Top-K、共享专家与专家执行 | CPU 24 层生成、批执行、调度与服务闭环已接通 |
-| DeepSeek-V2-Lite Q2_K | MLA、压缩 K/V 与稠密/MoE 混合层 | CPU 27 层 Decoder、生成、请求组批和服务闭环已接通 |
+| Qwen3-0.6B | 权重命名、Tokenizer、聊天模板、Q/K Norm、NeoX RoPE 和 Decoder 配置适配 | CPU/CUDA 生成与服务已通过固定结果验证 |
+| Qwen1.5-MoE-A2.7B-Chat | Router、Top-K、共享专家与专家执行 | CPU 24 层生成、批执行、调度与服务已验证 |
+| DeepSeek-V2-Lite Q2_K | MLA、压缩 K/V 与稠密/MoE 混合层 | CPU 27 层 Decoder、生成、请求组批和服务已验证 |
 
 ## 下载与校验
 

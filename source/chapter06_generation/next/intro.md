@@ -6,9 +6,9 @@ Chapter04 已经固定 Decoder 的计算顺序，Chapter05 让真实量化权重
 
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
-| A 教学闭环 | 用小词表、确定性 logits 和 Greedy 跟踪请求状态 | 固定 token、阶段、停止条件和回调顺序 |
-| B 真实执行闭环 | 接入 TinyLlama、Qwen3、Qwen1.5-MoE 和 DeepSeek-V2-Lite 的 Tokenizer、完整 Decoder 和请求专属模型执行上下文 | 稠密、标准 MoE 与 MLA-MoE 架构的固定生成词元、文本结果和请求状态 |
-| G GPU 扩展坐标 | 保持 Request 和停止语义不变，将模型执行器替换为设备后端 | TinyLlama、Qwen3 已完成真实文本闭环；DeepSeek 已接入固定词元 Runtime |
+| A 请求状态验证 | 用小词表、确定性 logits 和 Greedy 跟踪请求状态 | 固定 token、阶段、停止条件和回调顺序 |
+| B 真实模型生成 | 接入 TinyLlama、Qwen3、Qwen1.5-MoE 和 DeepSeek-V2-Lite 的 Tokenizer、完整 Decoder 和请求专属模型执行上下文 | 稠密、标准 MoE 与 MLA-MoE 架构的固定生成词元、文本结果和请求状态 |
+| G GPU 扩展坐标 | 保持 Request 和停止语义不变，将模型执行器替换为设备后端 | TinyLlama、Qwen3 已通过真实文本验证；DeepSeek 已接入固定词元 Runtime |
 | M 多模态扩展坐标 | 视觉嵌入进入模型后复用预填充、逐词元解码、采样和终态语义 | CPU SmolVLM 复用同一生成运行时；CUDA 路径提供单行视觉嵌入进入 32 层执行上下文的对照 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |

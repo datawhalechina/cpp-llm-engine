@@ -28,7 +28,7 @@ public:
 };
 ```
 
-默认 `Tokenizer` 用固定字母映射建立最小闭环：字母转换为整数，未知字符转换为 `0`。它适合验证接口、越界行为和编码/解码，但这些整数不构成 TinyLlama 的真实分词结果。
+默认 `Tokenizer` 用固定字母映射建立最小编码/解码测试：字母转换为整数，未知字符转换为 `0`。它适合验证接口、越界行为和往返转换，但这些整数不构成 TinyLlama 的真实分词结果。
 
 `RealTokenizer` 位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter01_tensor_loader/src/real_tokenizer.cpp"><code>real_tokenizer.cpp</code></a>。它读取真实 GGUF vocabulary，并调用 llama.cpp tokenizer API 执行模型规定的规则：
 

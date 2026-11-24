@@ -2,6 +2,8 @@
 
 模型输出的是每个候选词元的 logits，生成循环需要把它们变成一个词元 ID。采样器（`Sampler`）只负责选择，Runtime 在提交词元后判断 EOS 和长度上限；分开这两个动作可以独立验证数值决策与生命周期。
 
+Greedy 与 Temperature Softmax 的统一定义和数值边界见 [`F-SAMPLE-01`](../../reference/formulas.md#f-sample-01)。
+
 ## Greedy 采样基线
 
 当前默认实现是 Greedy Sampler，代码位于 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter06_generation/src/sampler.cpp"><code>sampler.cpp</code></a>。它返回最大 logit 所在的索引：

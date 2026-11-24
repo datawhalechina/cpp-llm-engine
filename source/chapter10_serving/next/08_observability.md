@@ -2,6 +2,8 @@
 
 指标应来自明确的状态转换，而不是在 HTTP 层估算。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/src/service_core.cpp"><code>ServiceCore</code></a> 使用单调时钟记录 admission、进入 running、首词元和终态；`HttpAdapter` 只把这些事实序列化为 Prometheus 文本。
 
+接受、终态、在途和释放计数的守恒关系见 [`F-SERVE-01`](../../reference/formulas.md#f-serve-01)。
+
 ## 核心计数与延迟
 
 | 指标 | 更新位置 | 回答的问题 |

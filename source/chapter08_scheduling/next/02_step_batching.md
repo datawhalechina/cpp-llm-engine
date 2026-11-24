@@ -2,6 +2,8 @@
 
 Continuous Batching 不在请求开始时固定整批，而是在每个 step 重新读取运行集合。`StepBatchPlanner` 先生成只读计划，`ContinuousBatchScheduler` 再预留缓存、执行模型并提交结果。
 
+词元预算、请求槽位和增量 K/V 块需求的统一计算见 [`F-SCHED-01`](../../reference/formulas.md#f-sched-01)。
+
 ## 计划同时表达候选和预算
 
 Decode 每次消费一个词元。Prefill 默认消费剩余输入；Executor 支持分块时，Planner 才能按剩余预算截断。

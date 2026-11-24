@@ -1,6 +1,6 @@
 # CPU 六任务学习计划
 
-这组任务用于完成一条可运行、可解释、可验证的 CPU 纵向链路。六个任务从真实推理基线开始，经过输入、张量、算子、解码器和生成运行时，最终落到最小推理服务。
+这组任务用于完成一条可运行、可解释、可验证的 CPU 学习路径。六个任务从真实推理基线开始，经过输入、张量、算子、解码器和生成运行时，最终组成最小推理服务。
 
 任务按可验证产物组织正文、代码和练习，每项任务对应一份可保存的学习记录。
 
@@ -19,7 +19,7 @@
 | 3 | 建立张量、视图、算子与矩阵乘法底座 | Chapter02、Chapter03 | 共享存储的视图与正确的 CPU 矩阵乘法后端 | C++ 工具链 |
 | 4 | 完成真实解码器 CPU 前向 | Chapter04、Chapter05、`code/engine` | TinyLlama 22 层预填充/解码与 llama.cpp 基准结果对齐 | GGUF；AVX2 实验需要 CPU 支持 |
 | 5 | 完成生成、K/V 与调度链 | Chapter06、Chapter07、Chapter08 | 单请求生成、分页 K/V、chunked prefill 和多请求批次可运行 | 组件路径只需 CPU；真实验收需要 GGUF |
-| 6 | 完成性能证据与最小 CPU 服务 | Chapter09、Chapter10 | 可比较的性能证据、服务核心、HTTP/SSE 和指标闭环 | CPU；真实模型路径需要 GGUF，AVX2 为可选实验 |
+| 6 | 完成性能证据与最小 CPU 服务 | Chapter09、Chapter10 | 可比较的性能结果，以及 HTTP、SSE 和指标验证 | CPU；真实模型路径需要 GGUF，AVX2 为可选实验 |
 
 六项任务以标量（scalar）路径为共同基线，AVX2 是 x86_64 上的选做性能实验。Linux 或 WSL2 可用 `lscpu | grep -i -E 'avx2|fma'` 检查指令集；输出同时包含 `avx2` 和 `fma` 时再运行对应实验。
 
@@ -111,7 +111,7 @@
 | 任务卡 | 内容 |
 | --- | --- |
 | 主阅读入口 | [`Chapter02 导读`](../chapter02_tensor_ops/intro.md)，随后进入 [`Chapter03`](../chapter03_matmul/intro.md) |
-| 主验证命令 | `bash scripts/run_tensor_operator_learning.sh` |
+| 主验证命令 | `bash scripts/workflows/run_tensor_operator_learning.sh` |
 | 学习记录 | `tensor-and-operator.md`：存储/视图约定、错误输入和矩阵乘法输出 |
 | 张量视图 | 变形、切片、共享存储、步长、偏移和越界测试通过 |
 | 公共接口 | 能说明 `TensorContract`、`Status`、`Operator` 和 `Backend` 的调用关系 |
@@ -125,7 +125,7 @@
 | 任务卡 | 内容 |
 | --- | --- |
 | 主阅读入口 | [`Chapter04 导读`](../chapter04_attention/intro.md)，量化细节按需进入 [`Chapter05`](../chapter05_quantization/intro.md) |
-| 主验证命令 | `CPP_LLM_ENGINE_MODEL_PATH=... bash scripts/run_real_decoder_learning.sh` |
+| 主验证命令 | `CPP_LLM_ENGINE_MODEL_PATH=... bash scripts/workflows/run_real_decoder_learning.sh` |
 | 学习记录 | `real-decoder.md`：结构约定、量化后端、基准词元和适用范围 |
 | 解码器结构 | 因果注意力、前馈网络、残差和 `DecoderLayer` CPU 测试通过 |
 | TinyLlama 数学 | 能在真实执行上下文中定位 RMSNorm、RoPE、GQA、SwiGLU、最终归一化和 LM Head |
@@ -141,7 +141,7 @@
 | 任务卡 | 内容 |
 | --- | --- |
 | 主阅读入口 | [`Chapter06 导读`](../chapter06_generation/next/intro.md) |
-| 主验证命令 | `CPP_LLM_ENGINE_MODEL_PATH=... bash scripts/run_generation_runtime_learning.sh` |
+| 主验证命令 | `CPP_LLM_ENGINE_MODEL_PATH=... bash scripts/workflows/run_generation_runtime_learning.sh` |
 | 学习记录 | `generation-runtime.md`：状态迁移、调度步计划、分块和物理块回滚 |
 | 单请求生成 | 预填充、逐词元解码、贪心采样、EOS 和词元预算测试通过 |
 | 多请求状态 | 执行器、取消、超时、失败和资源状态相互隔离 |
@@ -155,7 +155,7 @@
 | 任务卡 | 内容 |
 | --- | --- |
 | 主阅读入口 | [`Chapter09 导读`](../chapter09_performance/next/intro.md)，随后进入 [`Chapter10`](../chapter10_serving/next/intro.md) |
-| 主验证命令 | `CPP_LLM_ENGINE_MODEL_PATH=... bash scripts/run_cpu_service_learning.sh` |
+| 主验证命令 | `CPP_LLM_ENGINE_MODEL_PATH=... bash scripts/workflows/run_cpu_service_learning.sh` |
 | 学习记录 | `cpu-service.md`：请求数、词元预算、正确性、TTFT、吞吐和环境 |
 | 服务核心 | 准入、等待/运行、调度步分发、取消、超时和统一释放测试通过 |
 | HTTP/SSE 接口约定 | 同步响应、流式输出、错误映射和指标测试通过 |

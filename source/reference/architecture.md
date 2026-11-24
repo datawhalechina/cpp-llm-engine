@@ -40,14 +40,19 @@ ServiceCore
 
 | 对象 | 保存或决定什么 | 主要落点 |
 | --- | --- | --- |
+| Storage、Tensor View | 保存数据，并用 shape、stride 和 offset 描述观察方式 | Chapter01–02 |
 | Model | 模型配置、只读权重和 Context 创建规则 | Chapter01、`code/model` |
 | Context | 当前请求位置、分层 K/V 和执行状态 | Chapter04、`code/model` |
 | Operator | MatMul、Attention、Norm 等数值语义和输入输出约束 | Chapter03–05 |
 | Backend | 同一 Operator 的 CPU、CUDA、库或融合实现 | Chapter03、05、`code/cuda` |
+| Request、TokenHistory | 保存请求状态、已提交词元和停止条件 | Chapter06 |
 | Executor | 把 Runtime 的 Prefill/Decode 调用适配到 Model 与 Context | Chapter06、`code/engine` |
 | 生成运行时（`Runtime`） | 提交预填充/逐词元解码、采样结果和单请求终态 | Chapter06 |
+| BlockTable、Paged K/V | 映射逻辑位置与物理块，并支持预留、提交和回滚 | Chapter07 |
 | Scheduler | 根据请求状态和资源预算选择本步候选 | Chapter08 |
+| EvidenceRecord | 记录工作负载、环境、样本和比较结论 | Chapter09 |
 | ServiceCore | 管理准入、取消、超时和统一释放 | Chapter10 |
+| HTTP Adapter、ResponseWriter | 把协议请求转换为服务调用并输出同步或流式响应 | Chapter10 |
 
 ```mermaid
 flowchart LR
@@ -117,7 +122,7 @@ CPU 参考实现固定输入输出和错误行为
 默认回归核对 CPU 章节、公共接口和可选资产声明；真实设备数值与性能实验使用 CUDA 和 Chapter09 专用入口。
 
 ```bash
-bash scripts/run_regression_baseline.sh
+bash scripts/gates/run_regression_baseline.sh
 CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
 ```
 
@@ -133,4 +138,4 @@ CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh
 | 性能下降 | 工作负载、阶段计时、热点 | [Chapter09 性能剖析](../chapter09_performance/next/05_profiling_tools.md) |
 | HTTP/SSE 行为异常 | Adapter、Writer、终态回调 | [Chapter10 Transport](../chapter10_serving/next/04_transport.md) |
 
-成熟框架怎样实现这些对象，按问题进入[推理生态项目索引](./ecosystem/README.md)。图片输入怎样接入同一执行路径，见[多模态学习计划](../guides/multimodal_learning_plan.md)。
+成熟框架怎样实现这些对象，按问题进入[推理生态项目索引](./ecosystem/README.md)。图片输入怎样接入同一执行路径，见[多模态扩展教程](../extensions/multimodal/intro.md)。

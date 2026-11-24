@@ -1,4 +1,4 @@
-# 10.9 用真实模型验证服务闭环
+# 10.9 用真实模型验证服务
 
 确定性 Executor 适合覆盖状态机。TinyLlama 与 Qwen3 验证稠密模型的 CPU/CUDA 服务，Qwen1.5-MoE 验证动态准入和专家分组能否穿过 ServiceCore，DeepSeek-V2-Lite 验证 MLA-MoE、Completion 与 SSE。模型复用同一组 ServiceCore 和 Scheduler；进入 HTTP 的路径再复用 Adapter。Factory 负责把具体模型装配到统一执行接口。
 
@@ -26,9 +26,9 @@
 
 双请求 ServiceCore smoke 在 admission 时绑定请求 ID 和分页数据面，再把 Decode 候选交给 `RealLlamaExecutorFactory::decode_batch()`。验证同时检查 batch 调用计数、逐请求 golden、`paged_payload_active`、Context 隔离、BlockPool 提交数和终态释放。请求级并行 Worker 仍使用独立连续 Context；它用于比较 CPU 请求重叠，不等同于共享模型的 Tensor batch。
 
-## 验证真实服务闭环
+## 验证真实服务行为
 
-确认 TinyLlama GGUF 已存在后运行默认 socket 闭环：
+确认 TinyLlama GGUF 已存在后运行默认 socket 服务测试：
 
 ```bash
 bash code/engine/scripts/run_real_http_server.sh --check
@@ -40,7 +40,7 @@ Qwen3 使用同一服务对象，但固定模型、prompt 和 golden 不同：
 bash code/chapter10_serving/scripts/run_qwen3_serving.sh
 ```
 
-两条 CPU 路径都要求同步 Completion、SSE、metrics 和固定 token golden 成立，两个请求的 Context/K/V 不串扰，Radix 前缀在调度提升时命中，终态后服务条目和请求块释放。`10.10` 将这个单进程闭环映射到成熟服务架构。
+两条 CPU 路径都要求同步 Completion、SSE、metrics 和固定 token golden 成立，两个请求的 Context/K/V 不串扰，Radix 前缀在调度提升时命中，终态后服务条目和请求块释放。`10.10` 将这些单进程行为映射到成熟服务架构。
 
 Qwen1.5-MoE 使用 Chapter09 的动态准入实验验证 ServiceCore 生命周期：两个请求运行后再接纳两个请求，两种专家执行路径必须得到相同输出、批量调用和终态计数。
 

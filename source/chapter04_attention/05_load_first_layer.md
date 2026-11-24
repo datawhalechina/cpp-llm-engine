@@ -72,7 +72,7 @@ TinyLlama 与 Qwen3 的 RoPE 配对方式也不同。TinyLlama 旋转相邻维 `
 bash code/chapter04_attention/scripts/run_real_structure.sh
 ```
 
-准备好固定 Qwen3 GGUF 后，可运行首层执行闭环：
+准备好固定 Qwen3 GGUF 后，可运行首层输出对照：
 
 ```bash
 bash code/chapter04_attention/scripts/run_qwen3_first_layer.sh

@@ -6,6 +6,8 @@
 
 输入 `[T,D]` 中的每一行表示一个词元。LayerNorm 只在该行的 `D` 个特征上计算均值和方差，不混合不同词元，也不改变形状：
 
+LayerNorm 与真实模型 RMSNorm 的统一公式见 [`F-NORM-01`](../reference/formulas.md#f-norm-01) 和 [`F-NORM-02`](../reference/formulas.md#f-norm-02)。
+
 ```text
 mean = sum(x_i) / D
 variance = sum((x_i - mean)^2) / D

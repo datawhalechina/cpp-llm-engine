@@ -1,10 +1,8 @@
 # 07.6 前缀复用与生产扩展
 
-多个请求具有相同提示词（prompt）时，可以共享已经计算并提交的完整 K/V 块。`RadixPrefixCache` 按词元路径建立索引，CPU 和 CUDA 请求命中后引用这些只读块，再为后续词元分配私有块。
+多个请求具有相同提示词（prompt）时，`RadixPrefixCache` 可以索引已经计算并提交的完整 K/V 块。CPU 和 CUDA 请求命中后引用这些只读块，只为未命中的后缀分配私有块和执行计算。
 
 ## 前缀复用增加什么
-
-两个请求拥有相同提示词时，独占缓存会重复计算并保存 K/V。前缀缓存为已计算的词元序列建立索引，让新请求引用只读前缀块，只计算未命中的后缀。
 
 索引沿词元逐个匹配，只在块边界记录可共享结果。假设块大小为 4，命中 6 个词元时只能复用前 4 个；剩余 2 个仍需计算。这样不会让两个请求共享一个仍可能继续写入的半满块。
 
@@ -46,27 +44,16 @@ scale 可以按 Tensor、层、head、token 或 block 保存。粒度越细越�
 | 验证 | 连续/分页结果一致 | 内存、长上下文 logits、token 与吞吐共同验证 |
 | 教程入口 | CPU/CUDA 可运行实现 | 原理与扩展设计 |
 
-## 教学对象怎样对应成熟系统
+## 框架对照与继续阅读
 
-阅读框架源码时继续追踪三个问题：谁分配物理块，谁保存真实 K/V，Attention 怎样获得地址信息。CPU 与 GPU 可以使用不同数据布局和执行内核，但都要维护同一组请求所有权和提交语义。
+阅读框架源码时沿着三个问题追踪：谁分配物理块，谁保存真实 K/V，Attention 怎样获得地址信息。CPU 与 GPU 可以使用不同数据布局和执行内核，但都要维护相同的请求所有权和提交语义。
 
-| 教程对象 | 成熟系统中的方向 | 生产环境继续处理 |
+| 教程对象 | 项目入口 | 重点追踪 |
 | --- | --- | --- |
-| `BlockTable` | 请求到物理 K/V 页的映射 | 设备元数据、批量更新、跨步持久化 |
-| `KvBlockPool` | Cache manager / block allocator | 显存容量、抢占、交换、并发安全 |
-| `CpuPagedKvCache` | Cache engine / Paged Attention 数据面 | GPU kernel、布局优化、多数据类型 |
-| 连续与分页对照 | Reference / optimized backend | 数值误差、吞吐、回退策略 |
-| `RadixPrefixCache` | Prefix / Radix Cache | 并发锁、批量更新和分层淘汰策略 |
+| 连续 K/V 与请求 Context | [llama.cpp](/reference/ecosystem/local_and_delivery#llama-cpp) | 单机 Context 怎样拥有并增长真实模型 K/V |
+| `BlockTable`、`KvBlockPool` | [vLLM](/reference/ecosystem/production_frameworks#vllm) | Cache manager 怎样分配物理块并把地址元数据交给 Attention |
+| 分页缓存最小骨架 | [nano-vLLM](/reference/ecosystem/teaching_projects#nano-vllm) | 页表、缓存分配和模型执行怎样传递状态 |
+| `RadixPrefixCache` | [Mini-SGLang](/reference/ecosystem/teaching_projects#mini-sglang)、[SGLang](/reference/ecosystem/production_frameworks#sglang) | 前缀匹配、引用、释放、淘汰和缓存感知调度怎样协作 |
+| CUDA 分页载荷与 Attention | [TensorRT-LLM](/reference/ecosystem/production_frameworks#tensorrt-llm) | 设备布局、K/V 数据类型和高性能 Attention kernel 怎样连接 |
 
-## 继续阅读框架源码
-
-llama.cpp 适合观察单机 Context 与真实模型 K/V；vLLM 适合追踪缓存管理、块表和 Attention metadata；Mini-SGLang 与 SGLang 展示 Radix 前缀复用和调度协作；TensorRT-LLM 展示 GPU K/V 与高性能 Attention kernel。Chapter08 接下来只通过 `KvCacheTransaction` 预留和回收资源，不直接读取 K/V 数值。
-
-| 项目卡 | 重点追踪 |
-| --- | --- |
-| [llama.cpp](/reference/ecosystem/local_and_delivery#llama-cpp) | Context 怎样拥有并增长真实模型 K/V |
-| [vLLM](/reference/ecosystem/production_frameworks#vllm) | Cache manager、块表与 Attention metadata |
-| [nano-vLLM](/reference/ecosystem/teaching_projects#nano-vllm) | 紧凑代码中的页表与缓存分配骨架 |
-| [Mini-SGLang](/reference/ecosystem/teaching_projects#mini-sglang) | Radix Cache 的匹配、引用和释放 |
-| [SGLang](/reference/ecosystem/production_frameworks#sglang) | 前缀缓存、多级缓存与调度扩展 |
-| [TensorRT-LLM](/reference/ecosystem/production_frameworks#tensorrt-llm) | GPU K/V 与 Attention kernel 的工程入口 |
+Chapter08 接下来通过 `KvCacheTransaction` 预留和回收资源，K/V 数值继续由本章的数据面管理。

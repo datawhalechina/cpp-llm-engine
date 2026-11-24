@@ -19,6 +19,8 @@
 | `M/N/K` | MatMul 三个逻辑维度 | `[M,K] × [K,N] -> [M,N]` |
 | `L` | Decoder layer 数 | TinyLlama 为 22 |
 | `S` | 已缓存的序列长度 | KV Cache 当前 token 数 |
+| `Dr` | rotary dimension | 每个 head 中参与 RoPE 的维度数，`Dr <= Dh` |
+| `Dc` | MLA latent dimension | 每个词元缓存的低秩 K/V 宽度 |
 
 ## 模型文件与加载
 
@@ -130,7 +132,7 @@ K: [T, Hkv, Dh] or [B, T, Hkv, Dh]
 V: [T, Hkv, Dh] or [B, T, Hkv, Dh]
 ```
 
-代码对应：Chapter04 Attention 和 Chapter01 真实 TinyLlama Decoder。
+代码对应：Chapter04 Attention 教学实现，以及 `code/model` 的真实模型 Decoder；Chapter01 负责读取 Q/K/V 权重与模型配置。
 
 <a id="f-attn-02"></a>
 ### F-ATTN-02 Scaled Dot-Product Attention
@@ -157,7 +159,7 @@ kv_head(query_head) = floor(query_head / group_size)
 required: Hq % Hkv == 0
 ```
 
-代码对应：Chapter01 TinyLlama GQA 与 `code/cuda` 三阶段 GQA backend。验证重点：head 边界、K/V width、每组映射和 prefill/decode 一致性。
+代码对应：Chapter04 GQA 教学实现、`code/model` 的真实模型 Decoder 与 `code/cuda` 三阶段 GQA backend；Chapter01 负责读取 head 数和权重。验证重点：head 边界、K/V width、每组映射和 prefill/decode 一致性。
 
 <a id="f-attn-04"></a>
 ### F-ATTN-04 分块在线 Softmax
@@ -179,21 +181,25 @@ output = o / l
 <a id="f-attn-05"></a>
 ### F-ATTN-05 多头潜在注意力与权重吸收
 
-MLA 为每个历史词元保存低秩 latent `c_t` 和位置分支 `k_t^R`。当前头的非位置 Key 与 Value 可由上投影恢复：
+MLA 为每个历史词元保存行向量形式的低秩 latent `c_t` 和位置分支 `k_t^R`。下面沿用 F-LINEAR-01 的行向量与权重转置约定：
 
 ```text
-k_t^C = W_K c_t
-v_t   = W_V c_t
-score_t = q^C · k_t^C + q^R · k_t^R
+c_t:   [1, Dc]
+W_K:   [Dq, Dc]
+W_V:   [Dv, Dc]
+
+k_t^C = c_t × W_K^T
+v_t   = c_t × W_V^T
+score_t = q^C × (k_t^C)^T + q^R × (k_t^R)^T
 ```
 
 矩阵乘法结合律允许把非位置 Key 投影吸收到 Query，把 Value 投影移到历史聚合之后：
 
 ```text
-q_absorbed = q^C W_K
-score_t = q_absorbed · c_t + q^R · k_t^R
-c_attended = sum_t softmax(score)_t c_t
-output = W_V c_attended
+q_absorbed = q^C × W_K
+score_t = q_absorbed × c_t^T + q^R × (k_t^R)^T
+c_attended = sum_t softmax(score)_t × c_t
+output = c_attended × W_V^T
 ```
 
 两种顺序保持相同的压缩缓存、位置分支和 Softmax 语义；权重吸收减少对每个历史位置重复执行的投影。代码对应：Chapter04 MLA CPU reference、`CudaMlaCache` 和 absorbed CUDA 路径。验证重点：显式展开与低秩路径一致、连续与分页缓存一致、吸收前后 logits 与词元一致。
@@ -201,16 +207,57 @@ output = W_V c_attended
 <a id="f-rope-01"></a>
 ### F-ROPE-01 Rotary Position Embedding
 
-RoPE 对 Q/K 的相邻二维分量做位置相关旋转，不直接修改 V。
+RoPE 对 Q/K 的二维分量对做位置相关旋转，V 保持原值。基础角度只使用参与旋转的宽度 `Dr`；`Dr < Dh` 时，其余维度保持原值。
 
 ```text
-theta(i, position) = position / base^(2i / Dh)
+theta(i, position) = position / base^(2i / Dr)
 
-y[2i]     = x[2i] × cos(theta) - x[2i+1] × sin(theta)
-y[2i + 1] = x[2i] × sin(theta) + x[2i+1] × cos(theta)
+y[first(i)]  = x[first(i)] × cos(theta) - x[second(i)] × sin(theta)
+y[second(i)] = x[first(i)] × sin(theta) + x[second(i)] × cos(theta)
 ```
 
-代码对应：Chapter06 `position_encoding` 和 Chapter01 真实 Decoder。验证重点：position 0、不同位置、Q/K 同规则和 rotary dimension。
+代码对应：Chapter06 `position_encoding`、`code/model` 的真实模型 Decoder 和 `code/cuda` RoPE backend；Chapter01 负责读取频率、配对方式和缩放参数。验证重点：position 0、不同位置、Q/K 同规则和 rotary dimension。
+
+<a id="f-rope-02"></a>
+### F-ROPE-02 相邻配对与前后半维配对
+
+TinyLlama 使用相邻维配对；Qwen 使用前半维与后半维配对。两种路径使用相同旋转公式，只改变每个分量对的索引。
+
+```text
+pairs_per_head = Dr / 2
+
+Adjacent:
+first(i) = 2i
+second(i) = 2i + 1
+
+SplitHalf / NeoX:
+first(i) = i
+second(i) = i + pairs_per_head
+
+required: Dr is even
+required: 0 < Dr <= Dh
+```
+
+代码对应：core `RotaryPairing`、`code/cuda` RoPE backend 和 Qwen3 真实 Decoder。验证重点：两种配对逐元素 CPU/CUDA 一致，未参与旋转的维度保持原值。
+
+<a id="f-rope-03"></a>
+### F-ROPE-03 YaRN 频率插值
+
+DeepSeek-V2-Lite 在 partial RoPE 上使用 YaRN。实现先计算原始角度，再根据频率维度的位置，在外推角度和按扩展因子缩小的插值角度之间平滑过渡。
+
+```text
+theta_extrapolated(i) = position / base^(2i / Dr)
+theta_interpolated(i) = theta_extrapolated(i) / factor
+ramp(i) = clamp(1 - (i - correction_start) /
+                        (correction_end - correction_start), 0, 1)
+theta_yarn(i) = ramp(i) × theta_extrapolated(i)
+              + (1 - ramp(i)) × theta_interpolated(i)
+
+required: factor >= 1
+required when factor > 1: original_context > 0
+```
+
+`correction_start` 与 `correction_end` 由 `Dr`、原始上下文长度、`beta_fast` 和 `beta_slow` 计算。代码对应：core `YarnRotaryScaling`、DeepSeek CPU Decoder 和 CUDA RoPE backend。验证重点：`factor = 1` 退化为基础 RoPE、边界频率连续、CPU/CUDA 逐元素一致。
 
 ## FFN
 
@@ -225,7 +272,7 @@ hidden = SiLU(X × W_gate^T) elementwise_mul (X × W_up^T)
 Y = hidden × W_down^T
 ```
 
-代码对应：Chapter01 真实 TinyLlama FFN。Chapter04 教学 FFN 使用 ReLU，不能把两者写成同一个实现。
+代码对应：Chapter04 的 MoE 专家和 `code/model` 的真实 Llama/MoE FFN；Chapter01 负责加载 gate、up、down 权重，Chapter05 提供量化 Linear。Chapter04 基础 `FeedForward` 使用两层 Linear 与 ReLU，作为进入 SwiGLU 前的教学实现。
 
 <a id="f-ffn-02"></a>
 ### F-FFN-02 MoE Router、Top-K 与专家合并
@@ -252,16 +299,28 @@ y = y_routed + y_shared
 ## KV Cache 与内存
 
 <a id="f-kv-01"></a>
-### F-KV-01 KV Cache Payload
+### F-KV-01 GQA K/V Cache Payload
 
-单请求连续 KV Cache 同时保存每层的 key 和 value。
+稠密 GQA Decoder 为单个请求保存每层的 key 和 value。
 
 ```text
 elements = L × 2 × S × Hkv × Dh
 bytes = elements × bytes_per_element
 ```
 
-代码对应：Model `RealLlamaCpuContext`、Chapter04 连续 KV，以及 Chapter07 `CpuPagedKvCache`。Block KV 改变物理分配与寻址，不改变逻辑 K/V 元素数。
+代码对应：Model `RealLlamaCpuContext`、Chapter04 连续 K/V，以及 Chapter07 `CpuPagedKvCache`。分页改变物理分配与寻址，不改变 GQA 的逻辑 K/V 元素数。
+
+<a id="f-kv-02"></a>
+### F-KV-02 MLA Cache Payload
+
+MLA 不保存每个 K/V head 的完整向量，而是为每层、每个历史词元保存低秩 latent 和位置 Key。
+
+```text
+elements = L × S × (Dc + Dr)
+bytes = elements × bytes_per_element
+```
+
+代码对应：DeepSeek 请求 Context、Chapter07 `CpuPagedMlaCache` 和 CUDA 分页 MLA Cache。验证重点：连续与分页地址解释一致、位置 Key 独立保存、提交或回滚后词元数与载荷一致。
 
 <a id="f-sched-01"></a>
 ### F-SCHED-01 调度预算与 KV Block 数
@@ -270,14 +329,17 @@ bytes = elements × bytes_per_element
 
 ```text
 scheduled_tokens = sum(tokens_selected_for_request[i])
-required_blocks(tokens) = ceil(tokens / tokens_per_block)
+
+target_tokens[i] = committed_tokens[i] + tokens_selected_for_request[i]
+target_blocks[i] = ceil(target_tokens[i] / tokens_per_block)
+additional_blocks[i] = max(target_blocks[i] - current_blocks[i], 0)
 
 required: scheduled_tokens <= step_token_budget
 required: scheduled_requests <= available_request_slots
-required: sum(required_blocks[i]) <= free_blocks
+required: sum(additional_blocks[i]) <= free_blocks
 ```
 
-代码对应：Chapter07 `KvBlockPool`、Chapter08 `StepScheduler` 和 Chapter10 `ServiceCore::dispatch_step()`。验证重点：预算不足不执行、整除边界、终态释放和 block 复用。
+共享前缀采用后，`current_blocks` 包含请求已经持有的共享块和私有块，因此只为目标长度缺少的部分申请新块。代码对应：Chapter07 `KvBlockPool`、Chapter08 `StepScheduler` 和 Chapter10 `ServiceCore::dispatch_step()`。验证重点：已有部分块、整除边界、共享前缀、预算不足不执行、终态释放和 block 复用。
 
 ## Quantization
 
@@ -291,12 +353,18 @@ symmetric:  x_approx = scale × q
 asymmetric: x_approx = scale × (q - zero_point)
 
 Q8_0: x_approx = block_scale × signed_q8
+Q2_K: x_approx = block_scale × group_scale × q2
+                   - block_min × group_min
+Q3_K: x_approx = block_scale × group_scale × signed_q3
 Q4_K: x_approx = block_scale × group_scale × q4
                    - block_min × group_min
+Q5_K: x_approx = block_scale × group_scale × q5
+                   - block_min × group_min
 Q6_K: x_approx = block_scale × group_scale × signed_q6
+IQ4_NL: x_approx = block_scale × nonlinear_codebook[q4_index]
 ```
 
-这些是解释参数层级的概念公式；实际实现还必须按格式完成 half 转换、bit unpack 和分组索引。代码对应：Chapter05 Q4_K/Q6_K/Q8_0 reference、fused CPU kernel 和 CUDA dequantize backend。
+Q5_0 与 Q5_1 使用 32 元素 block；Q5_1 比 Q5_0 多保存一个 block minimum。上式用于解释参数层级，实际实现还要按格式完成 half 转换、bit unpack、码表查询和分组索引。代码对应：Chapter05 九种 GGUF 格式的 reference 与 fused CPU 路径，以及 Q2_K/Q3_K/Q4_K/Q6_K/Q8_0/IQ4_NL CUDA 路径。
 
 <a id="f-quant-02"></a>
 ### F-QUANT-02 压缩率与误差
@@ -317,7 +385,9 @@ relative_error = absolute_error / max(abs(reference), epsilon)
 动态对称量化先从当前激活计算 scale，再让低精度矩阵 kernel 消费整数输入。实际实现可以按 Tensor、row 或 token 选择更细粒度。
 
 ```text
-activation_scale = max(abs(x)) / qmax
+max_abs = max(abs(x))
+activation_scale = max_abs / qmax          if max_abs > 0
+activation_scale = 1                       if max_abs = 0
 q_x = clamp(round(x / activation_scale), -qmax, qmax)
 
 W8A8 accumulation:
@@ -366,8 +436,12 @@ if global_index < element_count:
 temperature 改变 logits 的相对尖锐程度；Greedy 直接选择最大 logit，不需要随机采样。
 
 ```text
-p[i] = exp(logit[i] / temperature) / sum(exp(logit[j] / temperature))
+scaled[i] = logit[i] / temperature
+p[i] = exp(scaled[i] - max(scaled)) /
+       sum_j(exp(scaled[j] - max(scaled)))
 greedy_token = argmax(logit)
+
+required for temperature sampling: temperature > 0
 ```
 
 代码对应：Chapter06 当前可执行实现为 Greedy；Temperature、Top-K 和 Top-P 仍是扩展项。
@@ -381,6 +455,9 @@ greedy_token = argmax(logit)
 
 ```text
 cosine_similarity(x, y) = dot(x, y) / (norm(x) * norm(y))
+
+required: length(x) = length(y) > 0
+required: norm(x) > 0 and norm(y) > 0
 ```
 
 结果接近 `1` 表示两个向量方向相近，接近 `0` 表示整体变化方向缺少相关性，接近 `-1` 表示方向相反。它对整体缩放不敏感，因此不能替代最大误差、平均绝对误差、Top-K 重合或贪心词元检查。教程用它比较 hidden state 和 logits 的整体数值结构。
@@ -408,8 +485,11 @@ RMSE = sqrt(sum_i((x[i] - r[i])^2) / N)
 queue_wait = dispatch_time - accepted_time
 TTFT = first_token_time - accepted_time
 completion_latency = finished_time - accepted_time
-TPOT = (finished_time - first_token_time) / max(generated_tokens - 1, 1)
+TPOT = (finished_time - first_token_time) / (generated_tokens - 1)
+required: generated_tokens >= 2
 ```
+
+TPOT 需要至少两个生成词元；只有一个生成词元时记为 `N/A`，不把请求收尾时间当作词元间隔。
 
 代码对应：Chapter09 性能证据、Chapter10 `ServiceMetrics`。
 
@@ -501,7 +581,10 @@ Projector 先把每个 `merge_size × merge_size` 的相邻视觉 token 按空�
 ```text
 T_projector = T_vision / merge_size²
 D_merged = merge_size² × D_vision
-Y[T_projector, D_llm] = X_merged[T_projector, D_merged] × W[D_merged, D_llm] + b
+W_proj: [D_llm, D_merged]
+b: [D_llm]
+Y[T_projector, D_llm] =
+    X_merged[T_projector, D_merged] × W_proj^T + b
 
 SmolVLM baseline:
 T_projector = 1024 / 4² = 64

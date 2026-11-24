@@ -1,6 +1,6 @@
 # 06.8 验证真实模型单请求生成
 
-合成 logits 可以稳定验证状态和停止条件，但不能证明 Tokenizer、完整 Decoder、量化权重和模型 K/V 已经连通。真实模型闭环保持同一个 `Request -> Runtime -> Sampler` 控制流，只把教学执行器替换为真实模型 Context。TinyLlama 是默认基线，Qwen3 验证第二种稠密架构，Qwen1.5-MoE 验证标准专家模型，DeepSeek-V2-Lite 验证压缩 MLA 与混合稠密/MoE 层。
+合成 logits 可以稳定验证状态和停止条件，但不能证明 Tokenizer、完整 Decoder、量化权重和模型 K/V 已经连通。真实模型验证保持同一个 `Request -> Runtime -> Sampler` 控制流，只把教学执行器替换为真实模型 Context。TinyLlama 是默认基线，Qwen3 验证第二种稠密架构，Qwen1.5-MoE 验证标准专家模型，DeepSeek-V2-Lite 验证压缩 MLA 与混合稠密/MoE 层。
 
 ## 文本怎样进入 Generation Core
 
@@ -73,7 +73,7 @@ bash code/chapter06_generation/scripts/run_qwen3_generation.sh
 
 输出中的 `architecture: qwen3` 证明架构来自模型文件，golden 与请求隔离检查证明 Chapter06 控制流无需为 Qwen3 复制一套实现。
 
-准备好 Qwen1.5-MoE 固定 GGUF 后，运行专家模型的相同生成闭环：
+准备好 Qwen1.5-MoE 固定 GGUF 后，运行专家模型的生成测试：
 
 ```bash
 bash code/engine/scripts/run_qwen15_moe_generation.sh
@@ -81,7 +81,7 @@ bash code/engine/scripts/run_qwen15_moe_generation.sh
 
 入口使用真实分词器执行 24 层 Prefill 和 Decode，默认生成词元 `11 358`，解码为 `, I`。输出 `qwen15_moe_text_generation: PASS` 表示文本、模型执行和请求状态已经连通。
 
-准备好 DeepSeek-V2-Lite 固定 GGUF 后，运行 MLA-MoE 模型的生成闭环：
+准备好 DeepSeek-V2-Lite 固定 GGUF 后，运行 MLA-MoE 模型的生成测试：
 
 ```bash
 bash code/engine/scripts/run_deepseek_v2_lite_generation.sh

@@ -21,4 +21,4 @@
 
 - Prerequisites: this chapter builds on the Chapter 03 MatMul boundary plus the Foundation design and data-layout basics.
 - Later use: `chapter05_quantization` applies the same structure with quantized weights; `chapter06_generation` then keeps using this `DecoderLayer` in the runtime.
-- Code index: open [the Chapter 03 intro](/en/chapter03_matmul/intro) and [the chapter code index](/code/chapter04_attention).
+- Code index: open [the Chapter 04 intro](/en/chapter04_attention/intro) and [the chapter code README](https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/README.md).

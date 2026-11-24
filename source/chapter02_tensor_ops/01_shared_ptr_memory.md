@@ -15,6 +15,8 @@ Chapter01 的权重张量已经区分逻辑形状和物理字节。Chapter02 使
 
 维数（`rank`）是形状中轴的数量。教程实现接受 1–4 维，连续布局的步长从最后一维向前计算：
 
+元素数量与连续步长的统一定义见 [`F-TENSOR-01`](../reference/formulas.md#f-tensor-01) 和 [`F-TENSOR-02`](../reference/formulas.md#f-tensor-02)。
+
 | 维数 | 示例形状 | 连续步长 | 推理对象 |
 | --- | --- | --- | --- |
 | 1 | `[hidden]` | `[1]` | 归一化权重、单个向量 |

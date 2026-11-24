@@ -32,6 +32,8 @@ def linear_fused(packed_weight, input_vector):
 
 ## CUDA 融合 GEMV 怎样访问内存和归约
 
+一维 CUDA 线程索引、Grid 向上取整和尾部边界保护见 [`F-CUDA-01`](../reference/formulas.md#f-cuda-01)。本节在该基础上继续讨论量化 block、Warp 归约和批量权重复用。
+
 GEMV 是通用矩阵向量乘法（General Matrix-Vector Multiplication）。Decode 每次只提交一个激活向量，Linear 因而呈现 GEMV 形状。对于权重矩阵 `W[N,K]` 和输入 `x[K]`，第 `r` 个输出为：
 
 ```text

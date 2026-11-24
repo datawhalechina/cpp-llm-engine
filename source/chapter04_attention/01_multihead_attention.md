@@ -6,6 +6,8 @@ Chapter03 已经固定矩阵乘法的形状、布局和计算后端分层；本�
 
 ## Q、K、V 怎样产生输出
 
+Q/K/V 投影、缩放点积、GQA 头映射和分块在线 Softmax 的统一写法见 [`F-ATTN-01`](../reference/formulas.md#f-attn-01) 到 [`F-ATTN-04`](../reference/formulas.md#f-attn-04)。RoPE 的基础旋转、两种维度配对和 YaRN 插值分别见 [`F-ROPE-01`](../reference/formulas.md#f-rope-01)、[`F-ROPE-02`](../reference/formulas.md#f-rope-02) 和 [`F-ROPE-03`](../reference/formulas.md#f-rope-03)。
+
 设词元数为 `T`、隐藏维度为 `D`、注意力头数为 `H`，每个头的宽度为 `Dh = D / H`。`D` 必须能被 `H` 整除。
 
 ```text
@@ -38,6 +40,8 @@ output = weight @ V
 | TinyLlama CPU 执行上下文 | 词元隐藏向量与分层 KV | 执行 GQA、RoPE、KV Cache 和 22 个解码器块 |
 
 ## MLA 为什么保存低秩 K/V
+
+MLA 展开与权重吸收的矩阵关系见 [`F-ATTN-05`](../reference/formulas.md#f-attn-05)，压缩缓存容量见 [`F-KV-02`](../reference/formulas.md#f-kv-02)。
 
 标准 MHA 或 GQA 把每个历史词元的 K/V 按注意力头写入缓存。DeepSeek-V2-Lite 的多头潜在注意力（MLA）先把 K/V 信息压缩成低秩向量，并把带 RoPE 的 Key 位置分支单独保存。以当前固定模型为例，每个词元持久保存 512 维潜在 K/V 与 64 维位置 Key；计算 Attention 时，再把潜在向量展开成 16 个头各自使用的 128 维非位置 Key 和 128 维 Value。
 

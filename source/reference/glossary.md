@@ -76,6 +76,9 @@
 | 层归一化 | LayerNorm | 使用均值和方差归一化 hidden state | Chapter04 | [F-NORM-01](./formulas.md#f-norm-01) |
 | 均方根归一化 | RMSNorm | 不减均值、按均方根缩放 hidden state | Chapter04、真实 Decoder | [F-NORM-02](./formulas.md#f-norm-02) |
 | 旋转位置编码 | Rotary Position Embedding, RoPE | 对 Q/K 二维分量施加位置相关旋转 | Chapter04-05 | [F-ROPE-01](./formulas.md#f-rope-01) |
+| 前后半维 RoPE 配对 | split-half / NeoX RoPE pairing | 将旋转宽度的前半维与后半维一一配对，Qwen 模型使用该索引方式 | Chapter04 | [F-ROPE-02](./formulas.md#f-rope-02) |
+| 部分旋转位置编码 | partial RoPE | 只旋转每个注意力头的前 `Dr` 维，其余维度保持原值 | Chapter04、DeepSeek 路线 | [F-ROPE-01](./formulas.md#f-rope-01) |
+| YaRN | Yet another RoPE extensioN | 在原始与插值 RoPE 频率之间平滑过渡，用于扩展上下文长度 | Chapter04、DeepSeek 路线 | [F-ROPE-03](./formulas.md#f-rope-03) |
 | 前馈网络 | Feed-Forward Network, FFN | Transformer block 中 Attention 后的非线性变换 | Chapter04 | [F-FFN-01](./formulas.md#f-ffn-01) |
 | 门控激活 | SwiGLU | 使用 SiLU gate 与 up 分支逐元素相乘的 FFN 结构 | Chapter04、真实 Decoder | [F-FFN-01](./formulas.md#f-ffn-01) |
 | 解码器 | Decoder | 组合 Attention、FFN、Residual 和 Norm 的生成模型主体 | Chapter04 | [F-ATTN-02](./formulas.md#f-attn-02) |
@@ -108,6 +111,7 @@
 | 连续批处理 | continuous batching | 每个调度 step 按请求状态重新组成执行 batch | Chapter08 | [F-PERF-02](./formulas.md#f-perf-02) |
 | 词元预算 | token budget | 单个调度步允许处理的词元上限 | Chapter08 | [F-SCHED-01](./formulas.md#f-sched-01) |
 | KV 块池 | KV block pool | 按固定大小 block 分配、复用和回收 KV Cache 容量的资源池 | Chapter07 | [F-SCHED-01](./formulas.md#f-sched-01) |
+| Radix 前缀缓存 | Radix Prefix Cache | 用压缩前缀树索引词元序列及其 K/V 块，支持最长前缀匹配和共享块引用 | Chapter07 | [F-KV-01](./formulas.md#f-kv-01) |
 | K/V 块内槽位 | KV block slot | 一个物理 K/V 块中保存某个逻辑 token 的位置偏移；由 `token_index % block_size` 得到 | [Chapter07 块表映射](../chapter07_kv_cache/next/02_block_mapping.md) | [F-KV-01](./formulas.md#f-kv-01) |
 | 分页注意力 | PagedAttention | 通过逻辑 block 到物理 block 的映射读取非连续 KV Cache 的注意力方法 | Chapter07 | [F-KV-01](./formulas.md#f-kv-01) |
 | 采样器 | Sampler | 根据 logits 选择下一 token 的组件 | Chapter06 | [F-SAMPLE-01](./formulas.md#f-sample-01) |
@@ -151,14 +155,19 @@
 
 | 中文术语 | 英文或缩写 | 定义 | 首次学习 | 相关公式 |
 | --- | --- | --- | --- | --- |
-| 多模态推理 | multimodal inference | 同一请求联合处理文本、图片或其他模态 | [多模态学习计划](../guides/multimodal_learning_plan.md) | [F-MM-01](./formulas.md#f-mm-01) |
-| 动态切图 | dynamic tiling | 按原图长宽比和图片 token 预算生成局部切片与全局概览图 | [多模态学习计划](../guides/multimodal_learning_plan.md) | [F-MM-01](./formulas.md#f-mm-01) |
+| 多模态推理 | multimodal inference | 同一请求联合处理文本、图片或其他模态 | [多模态扩展教程](../extensions/multimodal/intro.md) | [F-MM-01](./formulas.md#f-mm-01) |
+| IDEFICS3 | IDEFICS3 | SmolVLM 使用的图文模型结构，定义图片切分、视觉编码、投影和图片占位方式 | [多模态扩展教程](../extensions/multimodal/intro.md) | - |
+| 模态处理器 | multimodal processor, Processor | 把聊天模板、文本和媒体输入转换为词元、模态张量及占位位置的前端组件 | [Python 与生产框架对照](../extensions/multimodal/04_framework_comparison.md) | - |
+| 模态编码器 | modality encoder, tower | 把图片、音频或视频特征转换为模态隐藏状态的模型组件；tower 是部分框架使用的源码名称 | [Python 与生产框架对照](../extensions/multimodal/04_framework_comparison.md) | - |
+| 占位区间 | placeholder range | 记录一段模态向量应替换提示词中哪些连续位置的起点和长度 | [Python 与生产框架对照](../extensions/multimodal/04_framework_comparison.md) | - |
+| 模态内容哈希 | multimodal content hash | 由媒体内容和处理参数得到的稳定身份，用于判断预处理结果或语言前缀能否复用 | [Python 与生产框架对照](../extensions/multimodal/04_framework_comparison.md) | - |
+| 动态切图 | dynamic tiling | 按原图长宽比和图片 token 预算生成局部切片与全局概览图 | [图片预算与动态切图](../extensions/multimodal/01_image_preprocessing.md) | [F-MM-01](./formulas.md#f-mm-01) |
 | 图像块 | image patch | Vision Transformer 输入的固定大小局部像素块 | 多模态输入链路 | [F-MM-02](./formulas.md#f-mm-02) |
 | 全局概览图 | overview image | 动态切图时保留整图关系的固定大小输入 | 多模态输入链路 | [F-MM-02](./formulas.md#f-mm-02) |
 | 局部切片 | local tile | 从 refined image 裁出的固定大小高分辨率输入 | 多模态输入链路 | [F-MM-02](./formulas.md#f-mm-02) |
 | 视觉编码器 | Vision Encoder | 将图像 patch 转换为视觉 hidden state 的 Transformer | 多模态输入链路 | [F-ATTN-02](./formulas.md#f-attn-02) |
-| SigLIP | Sigmoid Loss for Language Image Pre-training | SmolVLM 使用的视觉编码器家族；教程关注其编码 Block，不展开预训练目标 | [多模态学习计划](../guides/multimodal_learning_plan.md) | [F-ATTN-02](./formulas.md#f-attn-02) |
-| 双向全注意力 | bidirectional full attention | 每个视觉 token 可以读取同一视觉序列中的全部位置，不使用语言 Decoder 的因果遮罩 | [多模态学习计划](../guides/multimodal_learning_plan.md) | [F-ATTN-02](./formulas.md#f-attn-02) |
+| SigLIP | Sigmoid Loss for Language Image Pre-training | SmolVLM 使用的视觉编码器家族；教程关注其编码 Block，不展开预训练目标 | [mmproj 与视觉编码器](../extensions/multimodal/02_vision_encoder.md) | [F-ATTN-02](./formulas.md#f-attn-02) |
+| 双向全注意力 | bidirectional full attention | 每个视觉 token 可以读取同一视觉序列中的全部位置，不使用语言 Decoder 的因果遮罩 | [mmproj 与视觉编码器](../extensions/multimodal/02_vision_encoder.md) | [F-ATTN-02](./formulas.md#f-attn-02) |
 | 视觉投影器 | Projector | 将视觉 hidden state 合并并映射到 LLM embedding width | 多模态输入链路 | [F-MM-04](./formulas.md#f-mm-04) |
 | 视觉嵌入 | visual embedding | Projector 输出并插入语言模型序列的连续向量 | 多模态输入链路 | - |
 | 图像 token 预算 | image-token budget | 控制图片像素预算、tile 数和上下文占用的运行参数 | 多模态输入链路 | [F-MM-01](./formulas.md#f-mm-01) |

@@ -84,6 +84,6 @@ bash code/chapter00_quickstart/run_deepseek_v2_lite_baseline.sh
 | 方向 | 后续入口 |
 | --- | --- |
 | 模型加载与分词 | [Chapter01](../../source/chapter01_tensor_loader/intro.md) |
-| 自研 CPU 执行主线 | [Chapter02–06 教程资产](../../source/reference/tutorial_assets.md) |
+| 自研 CPU 执行主线 | [Chapter02–10 使用说明](../../USAGE.md) |
 | 可选 CUDA 环境 | [CUDA 环境指南](../../source/guides/setup_cuda.md) |
 | 其他模型与架构 | [模型支持状态](../../source/reference/model_support.md) |
