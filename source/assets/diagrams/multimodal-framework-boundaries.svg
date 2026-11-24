@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">vLLM、SGLang 与本教程的多模态边界</title>
+  <desc id="desc">三条横向流程分别展示模态前端、嵌入交接点和共享语言运行时。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8f3e8"/>
+      <stop offset="1" stop-color="#e7f1ee"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#314b45"/>
+    </marker>
+    <style>
+      .title { font: 700 28px 'Noto Sans CJK SC', sans-serif; fill: #17352f; }
+      .subtitle { font: 500 15px 'Noto Sans CJK SC', sans-serif; fill: #58716a; }
+      .head { font: 700 16px 'Noto Sans CJK SC', sans-serif; fill: #8a5a36; }
+      .framework { font: 700 21px 'Noto Sans CJK SC', sans-serif; fill: #17352f; }
+      .label { font: 700 16px 'Noto Sans CJK SC', sans-serif; fill: #17352f; }
+      .body { font: 500 13px 'Noto Sans CJK SC', sans-serif; fill: #405a53; }
+      .lane { fill: rgba(255,255,255,.48); stroke: #b8c8c3; stroke-width: 1.5; rx: 18; }
+      .box { stroke: #314b45; stroke-width: 1.8; rx: 13; }
+      .arrow { stroke: #314b45; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .split { stroke: #9db2ac; stroke-width: 1.5; stroke-dasharray: 7 6; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="720" fill="url(#bg)"/>
+  <text x="55" y="54" class="title">模态前端各自实现，统一嵌入之后复用语言运行时</text>
+  <text x="55" y="83" class="subtitle">比较处理器、交接数据和共享组件，不按文件名强行对应三个项目</text>
+
+  <text x="55" y="122" class="head">框架</text>
+  <text x="260" y="122" class="head">模态专用前端</text>
+  <text x="610" y="122" class="head">交接数据</text>
+  <text x="865" y="122" class="head">共享语言运行时</text>
+  <line x1="585" y1="100" x2="585" y2="665" class="split"/>
+  <line x1="835" y1="100" x2="835" y2="665" class="split"/>
+
+  <rect x="40" y="145" width="1120" height="145" class="lane"/>
+  <text x="65" y="205" class="framework">vLLM</text>
+  <text x="65" y="231" class="body">生产推理框架</text>
+  <rect x="245" y="170" width="300" height="92" class="box" fill="#e8f0fa"/>
+  <text x="267" y="204" class="label">多模态处理器 + 模态编码器</text>
+  <text x="267" y="230" class="body">更新提示词，执行编码器 / 投影器</text>
+  <rect x="615" y="170" width="185" height="92" class="box" fill="#fff3d7"/>
+  <text x="635" y="204" class="label">占位区间</text>
+  <text x="635" y="230" class="body">输入嵌入 + 范围</text>
+  <rect x="870" y="170" width="250" height="92" class="box" fill="#e7f3e8"/>
+  <text x="892" y="201" class="label">引擎核心</text>
+  <text x="892" y="227" class="body">调度器 / K/V / 输出处理</text>
+  <path d="M545 216 H615" class="arrow"/>
+  <path d="M800 216 H870" class="arrow"/>
+
+  <rect x="40" y="315" width="1120" height="145" class="lane"/>
+  <text x="65" y="375" class="framework">SGLang</text>
+  <text x="65" y="401" class="body">前缀复用框架</text>
+  <rect x="245" y="340" width="300" height="92" class="box" fill="#e8f0fa"/>
+  <text x="267" y="374" class="label">多模态处理器 + Rust 预处理</text>
+  <text x="267" y="400" class="body">解码、切块、归一化、特征提取</text>
+  <rect x="615" y="340" width="185" height="92" class="box" fill="#fff3d7"/>
+  <text x="635" y="374" class="label">占位词元</text>
+  <text x="635" y="400" class="body">模态哈希 + 特征</text>
+  <rect x="870" y="340" width="250" height="92" class="box" fill="#e7f3e8"/>
+  <text x="892" y="371" class="label">模型运行器</text>
+  <text x="892" y="397" class="body">Radix Cache / 调度器 / 服务</text>
+  <path d="M545 386 H615" class="arrow"/>
+  <path d="M800 386 H870" class="arrow"/>
+
+  <rect x="40" y="485" width="1120" height="145" class="lane"/>
+  <text x="65" y="545" class="framework">本教程</text>
+  <text x="65" y="571" class="body">可逐阶段检查</text>
+  <rect x="245" y="510" width="300" height="92" class="box" fill="#e8f0fa"/>
+  <text x="267" y="544" class="label">图片处理 + SigLIP + 投影器</text>
+  <text x="267" y="570" class="body">CPU 参考与 CUDA 后端逐阶段对照</text>
+  <rect x="615" y="510" width="185" height="92" class="box" fill="#fff3d7"/>
+  <text x="635" y="544" class="label">统一嵌入</text>
+  <text x="635" y="570" class="body">来源映射 + 请求上下文</text>
+  <rect x="870" y="510" width="250" height="92" class="box" fill="#e7f3e8"/>
+  <text x="892" y="541" class="label">Chapter06–10</text>
+  <text x="892" y="567" class="body">生成 / K/V / 调度 / 服务</text>
+  <path d="M545 556 H615" class="arrow"/>
+  <path d="M800 556 H870" class="arrow"/>
+
+  <rect x="245" y="654" width="875" height="38" rx="12" fill="#f7fbf9" stroke="#6d8b83" stroke-width="1.5"/>
+  <text x="268" y="679" class="body">稳定交接条件：向量宽度一致、位置可追踪、展开长度可计入上下文与 K/V 预算</text>
+</svg>

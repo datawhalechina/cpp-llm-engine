@@ -19,7 +19,7 @@
       .arrow { stroke: #334b45; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
     </style>
   </defs>
-  <rect width="1200" height="700" fill="url(#bg)"/>
+  <rect width="1200" height="620" fill="url(#bg)"/>
   <text x="60" y="60" class="title">多模态扩展的是输入与模型，不复制推理引擎</text>
   <text x="60" y="90" class="subtitle">文本 / 图片是能力轴，CPU / GPU 是执行轴；两条输入路径在 embedding sequence 汇合</text>
 

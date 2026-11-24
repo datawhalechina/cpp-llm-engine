@@ -1,14 +1,16 @@
 # 推理生态项目索引
 
-## 先区分三类对照
+## 先区分五类对照
 
 | 类型 | 代表对象 | 在教程中的用途 |
 | --- | --- | --- |
 | Python 数值与模型接口 | PyTorch、Transformers | 复算算子、观察张量语义、核对配置和分词器接口 |
+| 本地 C++ 基线 | llama.cpp | 对照真实推理、GGUF、CPU/GPU 执行和本地服务 |
 | 教学型推理实现 | Tiny-VLLM、nano-vLLM、Mini-SGLang | 用较短代码追踪模型执行、缓存和调度控制流 |
-| 真实运行与生产推理引擎 | llama.cpp、vLLM、SGLang、TensorRT-LLM、DeepInfer | 核对真实模型结果，并观察吞吐、设备执行和服务约束 |
+| 生产推理框架 | vLLM、SGLang、TensorRT-LLM、DeepInfer | 观察吞吐、设备执行、缓存、调度和部署约束 |
+| 产品交付工具 | Ollama | 观察模型管理、运行参数和本地 API 怎样组成用户工作流 |
 
-三类对象回答的问题不同。PyTorch 的矩阵结果可以作为算子基准，但不能替代服务调度证据；nano-vLLM 的紧凑控制流适合学习对象关系，但不能代表生产容量；生产框架用于寻找扩展后的职责边界，也不直接替代本教程的固定测试。
+每类对象承担不同的对照任务：Python 接口提供独立数值和配置参照，llama.cpp 固定本地真实模型基线，教学实现帮助追踪控制流，生产框架展示规模扩大后的职责边界，交付工具展示推理能力怎样成为可用产品。教程自己的测试与实验继续作为实现验收依据。
 
 先在[推理引擎系统与执行架构](../architecture.md)确定问题所在的系统位置，再按问题选择项目卡，查看源码对象和对应教程章节。
 
@@ -37,18 +39,7 @@
 | 深入缓存、调度与服务 | Chapter06–10 | vLLM、Mini-SGLang、SGLang |
 | 继续做性能优化 | Chapter09 的 workload、Profiling 和 A/B | TensorRT-LLM、DeepInfer |
 | 扩展模型格式或本地交付 | Chapter00–01、模型支持表 | llama.cpp、Ollama |
-| 扩展多模态输入 | [多模态学习计划](../../guides/multimodal_learning_plan.md) | llama.cpp、DeepInfer |
-
-## 项目类型
-
-分类只用于避免误读，不代表项目只能承担一种职责。
-
-| 类型 | 项目 | 阅读目的 |
-| --- | --- | --- |
-| 本地 C++ 基线 | llama.cpp | 对照真实推理、GGUF 和 CPU 执行路径 |
-| 教学型实现 | Tiny-VLLM、nano-vLLM、Mini-SGLang | 观察被压缩后的 kernel、模型或 Runtime 骨架 |
-| 生产推理框架 | vLLM、SGLang、TensorRT-LLM、DeepInfer | 观察规模扩大后的执行、调度、缓存和部署约束 |
-| 交付工具 | Ollama | 观察推理能力怎样包装为本地产品 |
+| 扩展多模态输入 | [多模态扩展教程](../../extensions/multimodal/intro.md) | Transformers、llama.cpp、vLLM、SGLang |
 
 ## 项目卡包含什么
 

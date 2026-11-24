@@ -17,11 +17,12 @@ vLLM、SGLang、TensorRT-LLM 和 DeepInfer 分别提供调度缓存、GPU 执行
 | 调度器 | [`scheduler.py`](https://github.com/vllm-project/vllm/blob/main/vllm/v1/core/sched/scheduler.py) | 等待和运行请求怎样组成执行计划 |
 | K/V 管理 | [`kv_cache_manager.py`](https://github.com/vllm-project/vllm/blob/main/vllm/v1/core/kv_cache_manager.py) | 块何时分配、提交和释放 |
 | EngineCore | [`engine/core.py`](https://github.com/vllm-project/vllm/blob/main/vllm/v1/engine/core.py) | 调度、执行和输出怎样协作 |
+| 多模态处理 | [多模态处理设计](https://docs.vllm.ai/en/latest/design/mm_processing/) | Processor 怎样生成占位区间并缓存处理结果 |
 | 性能基准 | [`benchmarks`](https://github.com/vllm-project/vllm/tree/main/benchmarks) | 离线、在线和延迟负载怎样区分 |
 
 ### 对应章节
 
-Chapter04–06 对照模型执行与生成，Chapter07–08 对照分页缓存和连续批处理，Chapter09–10 对照服务负载与 EngineCore。
+Chapter04–06 对照模型执行与生成，Chapter07–08 对照分页缓存和连续批处理，Chapter09–10 对照服务负载与 EngineCore；[多模态框架对照](../../extensions/multimodal/04_framework_comparison.md)继续检查 Processor、占位区间和共享运行时。
 
 <a id="sglang"></a>
 ## SGLang
@@ -37,11 +38,12 @@ Chapter04–06 对照模型执行与生成，Chapter07–08 对照分页缓存�
 | 调度器 | [`scheduler.py`](https://github.com/sgl-project/sglang/blob/main/python/sglang/srt/managers/scheduler.py) | 词元与缓存预算怎样进入调度循环 |
 | Radix Cache | [`radix_cache.py`](https://github.com/sgl-project/sglang/blob/main/python/sglang/srt/mem_cache/radix_cache.py) | 前缀匹配、锁定、插入和淘汰怎样改变所有权 |
 | SRT 运行时 | [`python/sglang/srt`](https://github.com/sgl-project/sglang/tree/main/python/sglang/srt) | API、调度器、执行器和缓存怎样分层 |
+| 多模态接入 | [新模型接入说明](https://github.com/sgl-project/sglang/blob/main/docs/docs/supported-models/support_new_models.mdx) | 占位词元、模态哈希和图片特征怎样进入共享运行时 |
 | 性能基准 | [`benchmark`](https://github.com/sgl-project/sglang/tree/main/benchmark) | 服务和缓存负载怎样定义 |
 
 ### 对应章节
 
-Chapter06 对照请求推进，Chapter07 对照前缀缓存，Chapter08 对照缓存感知调度，Chapter09–10 对照服务指标和网络入口。
+Chapter06 对照请求推进，Chapter07 对照前缀缓存，Chapter08 对照缓存感知调度，Chapter09–10 对照服务指标和网络入口；[多模态框架对照](../../extensions/multimodal/04_framework_comparison.md)继续检查 Processor 与 Radix Cache 的连接。
 
 <a id="tensorrt-llm"></a>
 ## TensorRT-LLM

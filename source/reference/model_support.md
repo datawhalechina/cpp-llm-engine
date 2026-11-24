@@ -26,7 +26,7 @@ Qwen3-0.6B 同样使用 RMSNorm、RoPE、分组查询注意力和 SwiGLU，但�
 
 当前固定 Qwen3 GGUF 包含 28 个解码器块、1024 维隐藏状态、16 个查询头、8 个 K/V 头和 128 维头空间。Chapter01 已验证 311 个张量、`Hello Qwen3` 的固定词元和聊天模板；Chapter04 已执行首层 Q/K Norm、NeoX RoPE、GQA、增量 K/V 和完整 28 层 CPU Decoder。默认四词元输入的 logits 与 llama.cpp 对照满足误差门槛，前五候选完全重合，连续四步贪心词元一致。
 
-教程量化 Linear 保留 Float32 激活，llama.cpp 的 K-quant 点积会量化激活，因此两条路径不要求逐位相等。验收同时约束平均绝对误差、RMSE、余弦相似度、Top-5 重合和贪心序列；Chapter06 进一步验证真实 Tokenizer、Prefill、Decode、停止和请求隔离；Chapter10 验证 Completion、SSE、双请求调度、分页 K/V、Radix 命中和终态释放。Qwen3 的 CPU 与 CUDA 推理服务纵向闭环均已通过；CUDA 全层 logits 最大误差为 `4.95911e-05`，四个生成词元与 CPU golden 一致，服务组合验收耗时约 `0.80 s`。
+教程量化 Linear 保留 Float32 激活，llama.cpp 的 K-quant 点积会量化激活，因此两条路径不要求逐位相等。验收同时约束平均绝对误差、RMSE、余弦相似度、Top-5 重合和贪心序列；Chapter06 进一步验证真实 Tokenizer、Prefill、Decode、停止和请求隔离；Chapter10 验证 Completion、SSE、双请求调度、分页 K/V、Radix 命中和终态释放。Qwen3 的 CPU 与 CUDA 生成、调度和服务测试均已通过；CUDA 全层 logits 最大误差为 `4.95911e-05`，四个生成词元与 CPU golden 一致，服务组合验收耗时约 `0.80 s`。
 
 | 章节 | 需要增加的兼容证据 |
 | --- | --- |
@@ -62,7 +62,7 @@ bash code/engine/scripts/run_qwen15_moe_generation.sh
 5. Chapter04 已用双词元验证 NeoX RoPE、因果 Attention、连续 K/V 负载和完整 layer-0 输出。
 6. Chapter04 已顺序加载 24 层权重；局部路径的 Top-K 全部匹配 llama.cpp，累计路径记录量化误差触发的路由分叉和最终隐藏状态误差。
 7. 最终 RMSNorm 与 Q6_K LM Head 已通过 logits、Top-5 和贪心词元对照。
-8. 每请求 Context 保存 24 层历史 K/V；Chapter06 Runtime 与真实 Tokenizer 文本闭环已经通过。
+8. 每请求 Context 保存 24 层历史 K/V；Chapter06 Runtime 与真实 Tokenizer 已通过固定文本生成测试。
 9. 按专家分组的分发/合并索引已接入 Chapter08 批执行；Chapter09 的 EXP-CPU-13～18 依次验证 MoE 子层、完整 Decoder、batch 范围、多步 Decode、固定队列和 Chapter10 动态准入。
 
 当前分组路径是 CPU 默认实现，逐词元路径作为同权重、同路由的正确性和性能对照保留。实验覆盖最多四个请求和四步 Decode，并未建立开放环到达率或 HTTP 并发吞吐结论。

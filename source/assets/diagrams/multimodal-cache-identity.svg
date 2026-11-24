@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">多模态内容身份与缓存键</title>
+  <desc id="desc">展示图片字节、处理参数、内容哈希、处理结果缓存和语言前缀缓存之间的关系。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8f3e8"/>
+      <stop offset="1" stop-color="#e8f2ed"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#314b45"/>
+    </marker>
+    <style>
+      .title { font: 700 28px 'Noto Sans CJK SC', sans-serif; fill: #17352f; }
+      .subtitle { font: 500 15px 'Noto Sans CJK SC', sans-serif; fill: #58716a; }
+      .label { font: 700 17px 'Noto Sans CJK SC', sans-serif; fill: #17352f; }
+      .body { font: 500 14px 'Noto Sans CJK SC', sans-serif; fill: #405a53; }
+      .small { font: 500 12px 'Noto Sans CJK SC', sans-serif; fill: #58716a; }
+      .box { stroke: #314b45; stroke-width: 1.8; rx: 14; }
+      .arrow { stroke: #314b45; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #8a5a36; stroke-width: 2; fill: none; stroke-dasharray: 7 6; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1200" height="650" fill="url(#bg)"/>
+  <text x="55" y="54" class="title">同一张图片能否复用，取决于内容与处理参数</text>
+  <text x="55" y="83" class="subtitle">文件名不是稳定身份；缩放、切图和模板配置变化时，处理结果也会变化</text>
+
+  <rect x="65" y="145" width="210" height="100" class="box" fill="#e8f0fa"/>
+  <text x="90" y="183" class="label">媒体内容</text>
+  <text x="90" y="211" class="body">图片字节 / UUID</text>
+
+  <rect x="65" y="325" width="210" height="100" class="box" fill="#fff3d7"/>
+  <text x="90" y="363" class="label">处理参数</text>
+  <text x="90" y="391" class="body">尺寸 / 切图 / 模板</text>
+
+  <rect x="365" y="235" width="215" height="115" class="box" fill="#f3e7d4"/>
+  <text x="390" y="275" class="label">模态内容哈希</text>
+  <text x="390" y="303" class="body">内容 + 参数 -> 稳定键</text>
+  <text x="390" y="328" class="small">相同输入产生相同身份</text>
+
+  <rect x="670" y="125" width="245" height="115" class="box" fill="#e7f3e8"/>
+  <text x="695" y="165" class="label">处理结果缓存</text>
+  <text x="695" y="193" class="body">处理器输出 / 视觉特征</text>
+  <text x="695" y="218" class="small">避免重复图片预处理</text>
+
+  <rect x="670" y="345" width="245" height="115" class="box" fill="#e7f3e8"/>
+  <text x="695" y="385" class="label">语言前缀身份</text>
+  <text x="695" y="413" class="body">占位词元 + 模态哈希</text>
+  <text x="695" y="438" class="small">用于判断前缀是否相同</text>
+
+  <rect x="995" y="235" width="150" height="115" class="box" fill="#fff"/>
+  <text x="1018" y="275" class="label">共享运行时</text>
+  <text x="1018" y="303" class="body">K/V 与调度</text>
+  <text x="1018" y="328" class="small">按稳定身份复用</text>
+
+  <path d="M275 195 H320 Q340 195 340 255 H365" class="arrow"/>
+  <path d="M275 375 H320 Q340 375 340 325 H365" class="arrow"/>
+  <path d="M580 275 H620 Q640 275 640 183 H670" class="arrow"/>
+  <path d="M580 310 H620 Q640 310 640 402 H670" class="arrow"/>
+  <path d="M915 183 H950 Q970 183 970 270 H995" class="arrow"/>
+  <path d="M915 402 H950 Q970 402 970 315 H995" class="arrow"/>
+
+  <rect x="65" y="515" width="1080" height="78" rx="14" fill="#f7fbf9" stroke="#6d8b83" stroke-width="1.5"/>
+  <text x="90" y="547" class="label">框架侧重点</text>
+  <text x="90" y="575" class="body">vLLM：缓存多模态处理结果　　SGLang：让模态哈希参与 Radix 前缀身份　　本教程当前：记录来源与长度，跨请求模态缓存属于后续扩展</text>
+</svg>
