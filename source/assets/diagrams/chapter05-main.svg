@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
-  <title id="title">Chapter 05 用同一输入比较浮点与量化 Linear</title>
-  <desc id="desc">Chapter 05 位于 Decoder 结构和 Generation Runtime 之间。A 线解释量化误差，B 线接入真实 GGUF 权重，G 线替换 Linear 执行后端，M 线复用 Q8_0 权重路径。</desc>
+  <title id="title">Chapter 05 用同一输入比较浮点与量化线性层</title>
+  <desc id="desc">Chapter 05 位于解码器结构和生成运行时之间。A 线解释量化误差，B 线接入真实 GGUF 权重，G 线替换线性层执行后端，M 线复用 Q8_0 权重路径。</desc>
   <defs>
     <style>text { font-family: "Noto Sans CJK SC", "Droid Sans Fallback", sans-serif !important; }</style>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
@@ -22,8 +22,8 @@
   </defs>
 
   <rect width="1200" height="680" rx="24" fill="url(#background)"/>
-  <text x="54" y="55" font-size="27" font-weight="700" fill="#172033">Chapter 05：用同一输入比较浮点与量化 Linear</text>
-  <text x="54" y="84" font-size="15" fill="#52606d">权重表示和执行后端可以改变，Linear 输入输出与 Runtime 调用方式保持不变</text>
+  <text x="54" y="55" font-size="27" font-weight="700" fill="#172033">Chapter 05：用同一输入比较浮点与量化线性层</text>
+  <text x="54" y="84" font-size="15" fill="#52606d">权重表示和执行后端可以改变，线性层输入输出与运行时调用方式保持不变</text>
 
   <!-- Position in the engine -->
   <rect x="54" y="112" width="1092" height="124" rx="18" fill="#ffffff" stroke="#d8e2e8"/>
@@ -31,15 +31,15 @@
   <g text-anchor="middle">
     <rect x="102" y="163" width="254" height="50" rx="12" fill="#e7f6f3"/>
     <text x="229" y="185" font-size="15" font-weight="700" fill="#0f5f59">Chapter 04</text>
-    <text x="229" y="203" font-size="13" fill="#376963">Decoder 结构与 Linear 语义</text>
+    <text x="229" y="203" font-size="13" fill="#376963">解码器结构与线性层语义</text>
 
     <rect x="473" y="155" width="254" height="66" rx="13" fill="#c45b16" filter="url(#shadow)"/>
     <text x="600" y="183" font-size="16" font-weight="700" fill="#ffffff">Chapter 05</text>
-    <text x="600" y="204" font-size="14" fill="#fff2e8">量化权重与 Linear 后端</text>
+    <text x="600" y="204" font-size="14" fill="#fff2e8">量化权重与线性层后端</text>
 
     <rect x="844" y="163" width="254" height="50" rx="12" fill="#e8f1f7"/>
     <text x="971" y="185" font-size="15" font-weight="700" fill="#28536b">Chapter 06</text>
-    <text x="971" y="203" font-size="13" fill="#476878">请求状态与 Generation Runtime</text>
+    <text x="971" y="203" font-size="13" fill="#476878">请求状态与生成运行时</text>
   </g>
   <path d="M356 188 H473" fill="none" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
   <path d="M727 188 H844" fill="none" stroke="#52606d" stroke-width="2" marker-end="url(#arrow)"/>
@@ -62,7 +62,7 @@
     <text x="355" y="347" font-size="12" fill="#52606d">Float32 / reference</text>
 
     <rect x="488" y="294" width="170" height="72" rx="14" fill="#e8f1f7" stroke="#79a4ba"/>
-    <text x="573" y="322" font-size="14" font-weight="700" fill="#28536b">浮点 Linear</text>
+    <text x="573" y="322" font-size="14" font-weight="700" fill="#28536b">浮点线性层</text>
     <text x="573" y="347" font-size="12" fill="#52606d">产生基线输出</text>
 
     <rect x="706" y="294" width="144" height="72" rx="14" fill="#ffffff" stroke="#79a4ba"/>
@@ -74,7 +74,7 @@
     <text x="355" y="447" font-size="12" fill="#6f5438">整数值 + scale + block</text>
 
     <rect x="488" y="386" width="170" height="88" rx="14" fill="#c45b16" filter="url(#shadow)"/>
-    <text x="573" y="417" font-size="14" font-weight="700" fill="#ffffff">量化 Linear</text>
+    <text x="573" y="417" font-size="14" font-weight="700" fill="#ffffff">量化线性层</text>
     <text x="573" y="442" font-size="12" fill="#fff2e8">reference / fused / CUDA</text>
     <text x="573" y="460" font-size="11" fill="#ffe1cf">外部接口保持一致</text>
 
@@ -85,7 +85,7 @@
     <rect x="914" y="306" width="232" height="148" rx="17" fill="#ffffff" stroke="#0f766e" stroke-width="2"/>
     <text x="1030" y="339" font-size="15" font-weight="700" fill="#0f5f59">用证据决定是否保留</text>
     <text x="1030" y="369" font-size="13" fill="#52606d">输出误差</text>
-    <text x="1030" y="395" font-size="13" fill="#52606d">权重 payload 大小</text>
+    <text x="1030" y="395" font-size="13" fill="#52606d">权重载荷大小</text>
     <text x="1030" y="421" font-size="13" fill="#52606d">延迟与执行路径</text>
   </g>
 

@@ -1,10 +1,10 @@
 # 05.5 在量化权重上执行线性计算
 
-Decoder 上层只需要提交激活、权重格式和输出空间，不应因权重采用 Q2_K、Q4_K、Q6_K、Q8_0 或 IQ4_NL 而改变调用方式。本节用 reference 与 fused 两条路径证明：执行策略可以变化，Linear 的 shape 和数值契约保持不变。
+解码器上层提交激活、权重格式和输出空间。Q2_K、Q4_K、Q6_K、Q8_0 或 IQ4_NL 由线性层内部选择对应实现。本节比较参考实现与融合路径：执行方法可以变化，线性层的输入输出形状保持一致。
 
 ## 从参考路径到融合线性层
 
-reference 路径先还原完整浮点权重，再执行 `W * input`；fused 路径读取一个量化 block 后立即完成乘加，不创建完整权重数组。下面的算法镜像省略 backend 注册、SIMD 指令、CUDA workspace 和错误恢复，只比较两条路径决定结果的动作。
+参考路径先还原完整浮点权重，再执行 `W * input`；融合路径读取一个量化分块后立即完成乘加，省去完整权重数组。下面的算法镜像省略计算后端注册、SIMD 指令、CUDA 工作区和错误恢复，只比较两条路径决定结果的动作。
 
 ```python
 def linear_reference(packed_weight, input_vector):
@@ -28,7 +28,7 @@ def linear_fused(packed_weight, input_vector):
 | 选择执行路径 | `QuantizedLinearPolicy` | 格式、backend 与硬件能力匹配 |
 | 返回统一结果 | `compute_quantized_linear()`、`compute_quantized_linear_batch()` | reference、单行与 batch 容差一致 |
 
-实现顺序为 `Scalar reference -> fused scalar -> SIMD fused -> CUDA dequantize + SGEMM baseline -> CUDA fused GEMV -> CUDA batched fused GEMV`。每增加一条路径，先与上一层做数值回归，再进入 benchmark。
+学习顺序为“标量参考 → 标量融合 → SIMD 融合 → CUDA 反量化加 SGEMM 基线 → CUDA 融合 GEMV → CUDA 批量融合 GEMV”。每条路径先与参考结果做数值比较，再进入性能实验。
 
 ## CUDA 融合 GEMV 怎样访问内存和归约
 
@@ -52,21 +52,21 @@ Q2_K、Q4_K 和 Q6_K 的一个 super-block 都表示 256 个权重。当前映�
 
 IQ4_NL 的一个 block 只有 32 个权重。若继续启动 256 个线程，只有首个 Warp 能对应这 32 个元素，其余 Warp 仍要参与同步和最终归约。[格式基线实验](../reference/experiment_assets.md#exp-gpu-22)显示，IQ4_NL batch=1 的 Warp 周期约 `80%` 消耗在 barrier 等待；这不是量化公式的问题，而是线程块形状与数据块形状不匹配。专用路径改为每个输出行只启动一个 32 线程 Warp，每个 lane 解码一个元素，跨 block 累加后用 shuffle 归约，不再申请共享部分和或执行 block barrier。
 
-[单 Warp 微基准](../reference/experiment_assets.md#exp-gpu-23)中，batch=1/2/4/8 的两轮时间均降低约 `41%`～`59%`；batch=1 的执行指令从约 `6.62M` 降到 `2.27M`，显存吞吐从 `10.59 GB/s` 升至 `29.51 GB/s`。微基准只能说明 kernel 机制成立，[真实 DeepSeek 实验](../reference/experiment_assets.md#exp-gpu-24)继续固定吸收式 MLA 与 packed MoE，只替换 IQ4_NL GEMV：长度 32/128 的完整 27 层 Prefill 中位数分别降低约 `25.1%/15.2%`，logits 最大误差为 `0`。因此 DeepSeek CUDA Factory 默认选择单 Warp IQ4_NL；通用路径继续作为 A/B 基线，Q2_K 的 L1TEX 等待仍需单独优化。
+[单线程束微基准](../reference/experiment_assets.md#exp-gpu-23)先证明专用线程组织减少了无效指令和同步；[真实 DeepSeek 实验](../reference/experiment_assets.md#exp-gpu-24)再固定 MLA 与 MoE 路径，只替换 IQ4_NL GEMV。局部原因与完整 27 层预填充均通过门禁后，DeepSeek CUDA 工厂才默认选择单线程束 IQ4_NL；通用路径继续作为 A/B 基线。
 
 Q2_K 虽然表示 256 个权重，但一个 super-block 只保存 64-byte 量化 payload、16-byte scale/min 和 4-byte 全局系数。通用 256 线程映射让四组线程重复读取同一批 packed quant，并让许多线程请求相同的 scale。单 Warp 路径改为每个 lane 在一个半块中只读取一个 packed byte，再依次提取其中四个 2-bit quant；lane 0 和 16 加载两组 scale 后用 shuffle 广播。一个 Warp 仍覆盖全部 256 个权重，只是把并行的重复读取改成 lane 内的四次乘加。
 
-[Q2_K 单 Warp 微基准](../reference/experiment_assets.md#exp-gpu-25)中，batch=1/2/4/8 的两轮时间均改善；batch=1 的执行指令约从 `5.75M` 降至 `2.81M`，Warp cycles 从 `25.40` 降至 `8.96`，显存吞吐从 `19.78` 升至 `40.82 GB/s`。[真实模型实验](../reference/experiment_assets.md#exp-gpu-26)随后固定 IQ4_NL 单 Warp，只切换 Q2_K：长度 32/128 的完整 Prefill 分别改善约 `25.0%/20.5%`，最大 logits 误差不超过 `4.01e-5`。DeepSeek CUDA Factory 因而采用同时覆盖 Q2_K 与 IQ4_NL 的 block-aware 路径；两条旧路径继续用于分离格式影响。
+[Q2_K 单线程束微基准](../reference/experiment_assets.md#exp-gpu-25)验证载荷复用减少了指令、等待和重复读取；[真实模型实验](../reference/experiment_assets.md#exp-gpu-26)固定 IQ4_NL 路径后只切换 Q2_K。完整预填充与候选分数门禁同时通过后，DeepSeek CUDA 工厂采用覆盖 Q2_K 与 IQ4_NL 的分块感知路径；旧路径用于分离格式影响。
 
 Q3_K 的 256 个权重由三部分组成：64-byte low-2-bit payload、32-byte high-bit mask 和 12-byte packed group scale。通用路径让每个线程重复解析 scale 字节；单 Warp 路径则让每个 lane 读取一个 low-bit byte 与一个 mask byte，依次处理两个 half 中的四个 group。lane 0 和 16 解码 6-bit scale 后广播，最终仍覆盖全部 256 个权重。
 
-[Q3_K 单 Warp 微基准](../reference/experiment_assets.md#exp-gpu-28)显示 batch 1、4、8 的两轮结果均改善，batch 2 对执行顺序敏感；batch 1 的执行指令约从 `10.29M` 降至 `6.52M`，Warp cycles 从 `21.94` 降至 `15.02`，显存吞吐从 `14.06` 升至 `15.81 GB/s`。[真实模型实验](../reference/experiment_assets.md#exp-gpu-29)固定 Q2_K 与 IQ4_NL 单 Warp，只切换 Q3_K：长度 32/128 的完整 Prefill 分别改善约 `8.9%/6.5%`，最大 logits 误差不超过 `3.72e-5`。因此 Factory 默认路径继续扩展到 Q3_K；旧的 block-aware 路径保留为 Q3_K 单变量基线。
+[Q3_K 单线程束微基准](../reference/experiment_assets.md#exp-gpu-28)先检查位平面与分组缩放复用，[真实模型实验](../reference/experiment_assets.md#exp-gpu-29)再固定 Q2_K 与 IQ4_NL 路径，只切换 Q3_K。端到端收益与候选分数门禁成立后，工厂默认路径扩展到 Q3_K；旧的分块感知路径保留为单变量基线。
 
 批量输入按最多 4 行组成一个 tile。同一线程解码一个权重后，分别与 tile 中各行对应的激活相乘，随后对每行独立做 Warp 归约。这样 batch=2 时同一 packed 权重只读取和解码一次；代价是每个线程持有多个累加器，因此 tile 继续增大前需要用 Nsight Compute 检查寄存器压力和占用率。
 
-[批量权重复用实验](../reference/experiment_assets.md#exp-gpu-08)后的 Nsight Compute 基线显示：Q4_K kernel 的 Compute/L1 吞吐约为 `72.1%/76.5%`，DRAM 吞吐仅 `4.7%`，40 个寄存器/线程，实际 occupancy 约 `90.9%`。Warp 平均约 `32.8%` 的指令间周期在等待 L1TEX scoreboard。元数据广播、shared payload 和显式 FMA 三个候选分别回退约 `10.1%`、`1.6%` 和 `4.3%` cycles，均未保留。[原生 FP16 解码实验](../reference/experiment_assets.md#exp-gpu-12)用 CUDA 原生 half 指令替换手写 FP16 位解码后，cycles 从 `140,093` 降至 `99,725`，约减少 `28.8%`；瓶颈随之转移到 L1/TEX，下一轮才适合继续研究 payload 布局。
+[批量权重复用实验](../reference/experiment_assets.md#exp-gpu-08)使用 Nsight Compute 区分计算、缓存、寄存器与线程束停顿。元数据广播、共享载荷和显式 FMA 候选增加了额外指令或同步，因此没有保留；[原生 FP16 解码实验](../reference/experiment_assets.md#exp-gpu-12)删除手写位解码后通过门禁，热点随之转移到 L1/TEX。正文保留优化因果，具体计数器与周期记录由实验资产表维护。
 
-[自适应 tile 局部实验](../reference/experiment_assets.md#exp-gpu-14)继续检查 batch 形状造成的无效工作。自适应 tile 将 batch=1/2 的共享内存从 `128 B` 降为 `32/64 B`，执行指令减少约 `21%`～`37%`。L1 命中率基本不变，占用率只小幅提高，说明 cycles 下降主要来自省去空输入行的累加与归约。[真实双请求实验](../reference/experiment_assets.md#exp-gpu-15)随后确认 Tensor Batch Decode 两轮均改善且 logits 不变，因此默认执行路径采用自适应 tile；固定 4 行实现只用于 A/B 基线。
+[自适应分块局部实验](../reference/experiment_assets.md#exp-gpu-14)检查批量形状造成的无效工作。批量为 1 或 2 时，较小分块减少空输入行的累加、共享内存和归约；[真实双请求实验](../reference/experiment_assets.md#exp-gpu-15)随后确认张量组批解码和候选分数门禁成立，因此默认执行路径采用自适应分块，固定 4 行实现只用于 A/B 基线。
 
 | 阶段 | 数据位置 | 发生的动作 | 避免的成本 |
 | --- | --- | --- | --- |
@@ -75,7 +75,7 @@ Q3_K 的 256 个权重由三部分组成：64-byte low-2-bit payload、32-byte h
 | Warp 与 block 归约 | shuffle + 8 个共享部分和 | Warp 内归约后由首个 Warp 合并 | 减少整块同步和共享内存流量 |
 | 写回 | `output[b,r]` | 每个 block 写回 tile 内各请求的 Float32 结果 | 避免额外矩阵读取 |
 
-同一[批量权重复用实验](../reference/experiment_assets.md#exp-gpu-08)还在两个不同长度请求、一次分页 Decode 上复测该设计。两轮 `batch/sequential` 中位数比例为 `0.466/0.612`，逐请求 logits 完全一致；Nsight Systems 中 Q4_K/Q6_K kernel 仍占 GPU kernel 时间约 `96.5%`。结果支持保留 4 行 tile 和 Warp 归约，也说明后续仍需继续减少量化解码与权重读取成本。
+同一[批量权重复用实验](../reference/experiment_assets.md#exp-gpu-08)还在不同长度请求和分页解码上复测该设计。逐请求候选分数保持一致，端到端样本支持保留批量权重复用和线程束归约；性能剖析同时表明量化解码与权重读取仍是主要热点。
 
 ![256 元素量化块的 CUDA 融合 GEMV 内存访问与块归约](../assets/diagrams/chapter05-cuda-fused-gemv.svg)
 
@@ -102,7 +102,7 @@ auto status = chapter05_quantization::compute_quantized_linear(
 | CUDA fused GEMV | 无完整浮点权重副本 | 解码、点积与行归约在同一 kernel | 单 token Decode 与真实生成优化 |
 | CUDA batched fused GEMV | 无完整浮点权重副本 | 一个二维网格计算 `[B,N]` | 小批量多请求 Decode |
 
-真实 Decoder 按 Attention、FFN 和 LM Head 分别保存 policy。Q4_K gate/up、Q6_K down、Q4_K QKV/out 复用同一 dispatcher，只改变对应作用域的策略。生产框架怎样把 quant method、硬件和 kernel 绑定，见 [`05.7 量化实现与成熟框架对照`](./07_tensorrt_gemma_vllm_comparison.md)。
+真实解码器按注意力、FFN 和 LM Head 分别保存执行策略。Q4_K gate/up、Q6_K down、Q4_K QKV/out 复用同一分派器，只改变对应作用域的策略。生产框架怎样把量化方法、硬件和计算内核绑定，见 [`05.7 量化实现与框架对照`](./07_tensorrt_gemma_vllm_comparison.md)。
 
 下图从公共线性层请求开始，展示格式分派、CPU/CUDA 路径和共同的数值基线。并列后端是可替换实现，不表示按顺序全部执行。
 
@@ -110,9 +110,9 @@ auto status = chapter05_quantization::compute_quantized_linear(
 
 ## Packed 权重与激活视图
 
-`QuantizedMatrixView` 保存 packed payload 指针、字节数、权重行列和量化格式；它不提供普通 Float32 Tensor 的索引语义。`compute_quantized_linear_views()` 让 Chapter02 的 Float32 激活通过公共只读/可写 View 进入现有 policy 和 backend：rank-1 表示单 token，rank-2 表示多个 token 行。
+`QuantizedMatrixView` 保存打包载荷指针、字节数、权重行列和量化格式。`compute_quantized_linear_views()` 让 Chapter02 的 Float32 激活通过公共只读/可写视图进入执行策略和计算后端：一维表示单词元，二维表示多个词元行。
 
-rank-2 会构造 `LinearBatchRequest`。Q3_K、Q4_K、Q5_K、Q6_K 和 Q8_0 的 scalar fused backend 只遍历一次 packed 权重，把同一个解码值分别累加到各输入行；这样得到的是 CPU 单线程批量 GEMV，而不是逐行重复解码权重。Qwen1.5-MoE 先按专家分组，再用该接口执行组内 Gate、Up 和 Down。`RealMoeBatchMode` 保留逐行路径作为同一二进制中的实验基线；[真实首层专家分组实验](../reference/experiment_assets.md#exp-cpu-13)在双词元输入中测得分组/逐行中位数比例 `0.597`，路由一致且最大输出误差约 `6.1e-10`。该实验只计 Router、专家和共享专家，不包含 Attention、K/V、LM Head 或服务调度。AVX2 backend 目前通过公共兼容路径逐行执行，尚未提供专用多行 SIMD kernel。
+rank-2 会构造 `LinearBatchRequest`。Q3_K、Q4_K、Q5_K、Q6_K 和 Q8_0 的标量批量后端只遍历一次打包权重，把同一个解码值分别累加到各输入行；Q5_K 使用完整块临时值，其余格式在各自后端中组织解码与点积。这样得到的是 CPU 单线程批量 GEMV，而不是逐行重复解码权重。Qwen1.5-MoE 先按专家分组，再用该接口执行组内 Gate、Up 和 Down。`RealMoeBatchMode` 保留逐行路径作为同一二进制中的实验基线；[真实首层专家分组实验](../reference/experiment_assets.md#exp-cpu-13)验证分组路径保持路由和输出一致，并减少重复解码。AVX2 后端目前通过公共兼容路径逐行执行，尚未提供专用多行 SIMD 计算核。
 
 所有 batch 行必须连续且宽度相同，输出采用 `[batch, output_rows]`。适配器先写临时结果，整批成功后才提交到输出 View；非连续激活必须由调用方显式 `contiguous()`，packed 权重也必须严格匹配格式对应的 block 字节数。
 

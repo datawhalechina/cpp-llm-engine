@@ -1,6 +1,6 @@
 # 05.8 量化在生成运行时中的位置
 
-前面几个小节已经把 INT8 权重、反量化和精度验证连起来。本节继续追踪量化选择怎样进入真实 Decoder，以及 Generation Runtime 为什么不需要感知具体权重格式。
+前面几个小节已经把 INT8 权重、反量化和精度验证连起来。本节继续追踪量化选择怎样进入真实解码器，以及生成运行时怎样通过统一执行接口使用不同权重格式。
 
 ## 权重量化进入运行时的路径
 
@@ -33,9 +33,9 @@ Chapter05 的可运行路径采用仅权重量化，输入激活和累加结果�
 
 ## 从 Runtime 进入量化 Decoder
 
-Chapter06 的 `Runtime` 只调用 `RequestModelExecutor::prefill()` 和 `decode()`。真实模型适配器为每个请求创建独立 `RealLlamaCpuContext`，Context 保存 position 和分层 K/V；22 层 Decoder 内部遇到 Linear 时，再由 Chapter05 的 policy 选择具体后端。这样替换权重格式或 CPU/CUDA 实现时，Request、Sampler 和停止条件不需要改变。
+Chapter06 的运行时调用 `RequestModelExecutor::prefill()` 和 `decode()`。真实模型适配器为每个请求创建独立 `RealLlamaCpuContext`，上下文保存位置和分层 K/V；22 层解码器执行线性层时，由 Chapter05 的策略选择具体后端。请求、采样器和停止条件继续使用相同的模型执行接口。
 
-返回路径同样稳定：Decoder 产生 logits，Executor 把 logits 交还 Runtime，Sampler 选择下一个 token。图中的三种 backend 是可替换分支，不会在一次 Linear 中依次执行；CUDA 已接入真实 TinyLlama Runtime，单 token 与 batch 根据输入形状选择不同量化路径。
+返回时，解码器产生候选分数，执行器把候选分数交还运行时，采样器选择下一个词元。图中的三种计算后端是可替换分支，一次线性计算只选择其中一种；CUDA 路径根据单词元或批量输入形状选择量化实现。
 
 ![Chapter05 到 Chapter06 的模型执行接口交接](../assets/diagrams/chapter05-06-execution-handoff.svg)
 
@@ -47,11 +47,11 @@ Chapter06 的 `Runtime` 只调用 `RequestModelExecutor::prefill()` 和 `decode(
 - 专用 INT8 / INT4 kernel 才能进一步减少计算成本。
 - KV cache、调度或采样占主导时，端到端优化应转向对应阶段。
 
-量化链路先用 reference 和真实 Decoder 证明数值正确。固定 workload、延迟、吞吐、热点归因和真实服务内存口径随后进入 Chapter09 的性能证据链。K/V Cache 量化的布局与生命周期继续在 [`07.6 前缀复用与生产扩展`](../chapter07_kv_cache/next/06_production_extensions.md) 说明。
+量化链路先用 reference 和真实 Decoder 证明数值正确。固定负载、延迟、吞吐、热点归因和真实服务内存口径随后进入 Chapter09 的性能证据链。K/V Cache 量化的布局与生命周期继续在 [`07.6 前缀复用与生产扩展`](../chapter07_kv_cache/next/06_production_extensions.md) 说明。
 
 ## 验证与衔接
 
-先运行 Chapter05 默认测试确认格式、Linear policy 和 backend 数值，再运行真实 Decoder 学习入口验证 22 层生成和双请求隔离。成熟框架中的对象映射见 [`05.7 量化实现与成熟框架对照`](./07_tensorrt_gemma_vllm_comparison.md)；[`Chapter06 Generation Runtime`](../chapter06_generation/next/intro.md) 继续使用相同 Executor 契约组织请求生命周期。
+先运行 Chapter05 默认测试确认格式、线性层策略和计算后端数值，再运行真实解码器入口验证 22 层生成和双请求隔离。生产框架中的对象映射见 [`05.7 量化实现与框架对照`](./07_tensorrt_gemma_vllm_comparison.md)；[`Chapter06 生成运行时`](../chapter06_generation/next/intro.md) 继续使用相同执行器接口组织请求生命周期。
 
 | 验收层级 | 执行入口 | 通过条件 |
 | --- | --- | --- |

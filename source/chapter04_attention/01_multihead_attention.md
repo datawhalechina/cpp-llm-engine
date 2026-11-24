@@ -1,6 +1,6 @@
 # 04.1 多头注意力
 
-Chapter03 已经固定矩阵乘法的形状、布局和计算后端分层；本节把同样的计算语义放进第一个模型结构：输入先生成 Q、K、V，再按注意力头计算相关性并聚合 V。Chapter04 的教学线性层保留本地可读循环，注意力通过独立计算后端执行。学习时重点追踪每一步形状，而不是先记住公式名称。
+Chapter03 已经固定矩阵乘法的形状、布局和计算后端分层；本节把相同的乘加公式放进第一个模型结构：输入先生成 Q、K、V，再按注意力头计算相关性并聚合 V。Chapter04 的教学线性层保留可直接阅读的循环，注意力通过独立计算后端执行。阅读时先追踪每一步形状，再对应公式名称。
 
 教学 `MultiHeadAttention` 接收连续二维输入 `[T,D]`；跨章张量适配器接收 `[T,H,Dh]` 或 `[B,T,H,Dh]`。两条路径最终都把连续缓冲区交给同一个 `AttentionRequest`。
 
@@ -31,7 +31,7 @@ weight = softmax(score)
 output = weight @ V
 ```
 
-当前代码维护三种输入形态，它们表达同一套注意力语义：
+代码提供三种输入形态，它们执行相同的注意力计算：
 
 | 路径 | 输入布局 | 当前用途 |
 | --- | --- | --- |
@@ -43,7 +43,7 @@ output = weight @ V
 
 MLA 展开与权重吸收的矩阵关系见 [`F-ATTN-05`](../reference/formulas.md#f-attn-05)，压缩缓存容量见 [`F-KV-02`](../reference/formulas.md#f-kv-02)。
 
-标准 MHA 或 GQA 把每个历史词元的 K/V 按注意力头写入缓存。DeepSeek-V2-Lite 的多头潜在注意力（MLA）先把 K/V 信息压缩成低秩向量，并把带 RoPE 的 Key 位置分支单独保存。以当前固定模型为例，每个词元持久保存 512 维潜在 K/V 与 64 维位置 Key；计算 Attention 时，再把潜在向量展开成 16 个头各自使用的 128 维非位置 Key 和 128 维 Value。
+标准 MHA 或 GQA 把每个历史词元的 K/V 按注意力头写入缓存。DeepSeek-V2-Lite 的多头潜在注意力（MLA）先把 K/V 信息压缩成低秩向量，并把带 RoPE 的键位置分支单独保存。该模型为每个词元持久保存 512 维潜在 K/V 与 64 维位置键；计算注意力时，再把潜在向量展开成 16 个头各自使用的 128 维非位置键和 128 维值向量。
 
 ```text
 隐藏状态
@@ -57,7 +57,7 @@ score = (Q_nope · K_nope + Q_rope · K_rope) / sqrt(192)
 output = softmax(score + causal_mask) @ V
 ```
 
-位置 Key 对所有查询头共享，非位置 Key 和 Value 由每个头自己的上投影权重恢复。持久缓存因此按词元增长 `512 + 64` 个数，而完整展开缓存需要按头保存 K/V。这里节省的是请求生命周期内反复保留的缓存；CPU reference 为了清楚展示数学过程，仍会在一次调用内建立临时展开工作区。
+位置键由所有查询头共享，非位置键和值向量由每个头自己的上投影权重恢复。持久缓存因此按词元增长 `512 + 64` 个数，而完整展开缓存需要按头保存 K/V。这里减少的是请求生命周期内持续保留的缓存；CPU 参考实现会在一次调用内建立临时展开工作区，以便逐步核对计算。
 
 | 对象 | 持久还是临时 | 当前代码布局 |
 | --- | --- | --- |
@@ -69,7 +69,7 @@ output = softmax(score + causal_mask) @ V
 
 ![MLA 压缩缓存与临时展开数据流](../assets/diagrams/chapter04-mla-cache-flow.svg)
 
-<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/mla_attention.cpp"><code>mla_attention.cpp</code></a> 接收已经投影并完成 RoPE 的 Query、低秩缓存和 K/V 上投影权重。测试先通过低秩路径计算结果，再显式展开完整 K/V 并交给标准 CPU Attention；两条路径逐元素一致。该 CPU 入口固定 MLA 的算法语义，真实量化权重和权重吸收由 Model/CUDA 路径继续连接。
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/mla_attention.cpp"><code>mla_attention.cpp</code></a> 接收已经投影并完成 RoPE 的查询、低秩缓存和 K/V 上投影权重。测试先通过低秩路径计算结果，再显式展开完整 K/V 并交给标准 CPU 注意力；两条路径逐元素一致。真实量化权重和权重吸收由模型与 CUDA 路径继续连接。
 
 真实 DeepSeek-V2-Lite 对照由 `run_deepseek_v2_lite_layer_capture.sh` 提供。它通过 llama.cpp 回调捕获首层的归一化输入、Query、K/V-A、共享 RoPE Key、压缩 latent、Attention 输出、FFN 输入和层输出。算法测试回答“低秩路径是否正确”，真实捕获回答“固定 GGUF 的节点名称、shape 和参考数值是什么”；自研首层需要同时通过两类证据。
 
@@ -89,7 +89,7 @@ value_output = W_V @ c_attended
 
 旧顺序先为每个词元计算 `W_K @ c_t`，新顺序只为每个 Query 计算一次 `q_nope @ W_K`；旧 Value 路径为每个输出维和历史词元重复 latent 点积，新路径先把历史聚合成一个 `c_attended`。CUDA 中一个 `(query, head)` 线程块把 512 维 absorbed Query 或聚合 latent 放入 shared memory，再让线程并行处理历史词元或 Value 维。概率工作区、因果遮罩、RoPE 分支和压缩缓存布局保持不变。
 
-EXP-GPU-17 中，参考 kernel 占一次双请求 Decode 的 `99.9%` GPU kernel 时间；三阶段实现将完整 grouped Decode 从约 `31.8 s` 降到约 `0.45 s`。随后 EXP-GPU-20 在相同 27 层模型中比较三阶段基线和权重吸收：长度 32 的 absorbed/legacy 中位数比例为 `0.515`，长度 128 为 `0.169`；logits 最大误差不超过 `5.73e-5`，贪心词元一致。教程因此把权重吸收设为 DeepSeek CUDA Factory 默认路径，同时保留类型化 legacy 入口用于教学 A/B。
+真实模型实验先确认三阶段实现消除了按 Value 维重复计算分数的主要开销，再比较三阶段基线与权重吸收。权重吸收在短、长上下文中都通过候选分数和词元门禁，并成为 DeepSeek CUDA 的默认 MLA 路径；三阶段实现继续作为类型化 A/B 基线。实验负载、逐轮样本和误差见[实验资产登记表](../reference/experiment_assets.md#exp-gpu-17)。
 
 ```bash
 CUDA_HOME=/usr/local/cuda-12.8 \
@@ -181,21 +181,11 @@ output = o / l
 
 `FA2-inspired` 表示教学内核只吸收分块在线 Softmax、线程块并行和 Warp 工作划分等关键思想。它只覆盖本教程需要的推理前向、因果掩码和 GQA，不包含官方实现的反向传播、完整数据类型、变长序列、全部 head size 和跨架构调优，因此不能标记为“FlashAttention-2 实现”。
 
-CUDA `compute_online()` 已把在线状态合并、key tile 和 Value 聚合放进一个 kernel，并消除完整 score workspace。第一版为每个 key 执行线程块归约，固定 workload 慢于三阶段路径；第二版改为 4 个 Warp 并行处理 4 个 key，并用 Warp shuffle 归约，三轮微基准均约为三阶段路径的 31%。因此第二版可以标记为 FA2-inspired 候选，并通过显式开关进入真实 Runtime A/B；它仍不是默认实现。
+CUDA `compute_online()` 把在线状态合并、键分块和值聚合放进一个计算内核，并省去完整分数工作区。计算内核使用 4 个线程束并行处理 4 个键，再用线程束洗牌完成归约。TinyLlama 的两层和 22 层对照检查隐藏状态、候选分数和贪心词元；多词元预填充则检查批量投影、逐位置 RoPE、K/V 写入和因果注意力。连续缓存追加 K/V，分页缓存根据块表写入物理槽位；分页寻址与事务进入 [`07.4 分页注意力`](../chapter07_kv_cache/next/04_paged_attention.md)继续学习。
 
-真实 TinyLlama 的 2 层和 22 层单-query 双步对照已经通过，融合路径保持 hidden、logits 和 greedy token。它验证带历史 K/V 的真实 Decode 数值；多 token Tensor Prefill 由下一个实验单独验证。
+Chapter09 的[融合注意力端到端实验](../reference/experiment_assets.md#exp-gpu-04)分别测量完整张量预填充和一次解码。当前测量中，三阶段路径具有更稳定的端到端结果，因此作为默认实现；融合路径用于观察在线 Softmax、显存访问和计算内核组织的影响。
 
-多 token Decoder Prefill 现已增加：连续 `[T,D]` embedding 经过批量投影、逐位置 RoPE、K/V 写入和因果 Attention。TinyLlama 22 层、2-token 结果与顺序执行一致。随后补入批量 embedding、最终 logits 和按 shape 复用的持久 workspace；连续 CUDA Executor 追加连续 K/V，分页 CUDA Executor 根据 BlockTable 写入物理槽位。分页寻址与事务进入 [`07.4 分页 Attention`](../chapter07_kv_cache/next/04_paged_attention.md)继续学习。
-
-Chapter09 的[融合 Attention 端到端实验](../reference/experiment_assets.md#exp-gpu-04)用 32-token Prompt 分别测量完整 Tensor Prefill 和一次 Decode。融合路径通过 logits 与 greedy token 检查，但两轮独立中位数一次回退、一次改善，没有稳定端到端收益。因此三阶段路径继续作为默认实现；融合路径保留为可读算法、显存访问和 kernel 调优之间的教学对照。
-
-| 实验版本 | QK 工作划分 | 固定 workload 结果 | 决策 |
-| --- | --- | --- | --- |
-| 三阶段 golden | score、Softmax、Value 三个 kernel | 约 `0.223–0.226 ms` | 保留正确性与回退基线 |
-| 融合 v1 | 整个线程块逐 key 树形归约 | `0.296630 ms` | 拒绝接入 |
-| 融合 v2 | 4 个 Warp 并行处理 4 个 key，Warp shuffle 归约 | 约 `0.0697–0.0699 ms` | 进入真实模型候选验证 |
-
-Prefill 同时处理多个 query，二维分块和融合计算可以避免较大的 score workspace，是本路线的主要性能实验。单 token decode 只有一个 query，瓶颈通常转向读取不断增长的 K/V；此时分页布局、GQA 和内存访问比照搬 Prefill tile 更重要。Chapter09 必须分别记录两种 workload，不能用 Prefill 的加速结果代表 Decode。
+预填充同时处理多个查询，二维分块和融合计算可以减少分数工作区。单词元解码只有一个查询，瓶颈通常转向读取不断增长的 K/V。Chapter09 因此分别记录两种负载，避免用预填充结果推断解码性能。
 
 论文入口：[FlashAttention-1](https://arxiv.org/abs/2205.14135)、[FlashAttention-2](https://arxiv.org/abs/2307.08691)、[FlashAttention-3](https://arxiv.org/abs/2407.08608)、[FlashAttention-4](https://arxiv.org/abs/2603.05451)。
 
@@ -220,7 +210,7 @@ Qwen1.5-MoE 的 position 0 只能看到一个 K/V，Softmax 权重恒为 1，因
 bash code/chapter04_attention/scripts/run_qwen15_moe_prefill_compare.sh
 ```
 
-固定模型含 16 个 K/V 头、每头 128 维，因此两个词元的单层 K 和 V 负载各有 `2 × 16 × 128 = 4096` 个元素。layer-0 Attention 残差 MAE 为 `0.0002315`、层输出 MAE 为 `0.0005157`。继续执行 layer-1 后，两层最终输出 MAE 为 `0.0019475`、余弦相似度为 `0.999999`，证明 hidden 和分层 K/V 已能跨层交接。
+固定模型含 16 个 K/V 头、每头 128 维，因此两个词元的单层 K 和 V负载各有 `2 × 16 × 128 = 4096` 个元素。layer-0 Attention 残差 MAE 为 `0.0002315`、层输出 MAE 为 `0.0005157`。继续执行 layer-1 后，两层最终输出 MAE 为 `0.0019475`、余弦相似度为 `0.999999`，证明 hidden 和分层 K/V 已能跨层交接。
 
 24 层入口进一步区分局部误差与累计误差：局部路径每层都使用 llama.cpp 的上一层输出，可以判断当前层的 Attention、MoE 和 Top-K 是否正确；累计路径继续使用教程自己的输出，可以观察量化误差是否跨过 Router 的 Top-K 边界。固定模型的局部 Top-K 全部一致，24 层 K/V 各有 `24 × 4096 = 98304` 个元素。累计路径有 3 个词元位置选择了不同专家，最终 hidden 仍保持 `0.997824` 的余弦相似度。最终 RMSNorm 和 Q6_K LM Head 把末词元转换为 151936 维 logits；累计 logits 余弦相似度为 `0.999401`，贪心词元 `151643` 与 llama.cpp 一致。llama.cpp 在模型最后一层只保留末词元隐藏状态用于计算 logits，因此最终层核对 2048 个元素，其余层核对两个词元的 4096 个元素。
 

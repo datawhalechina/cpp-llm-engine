@@ -2,14 +2,14 @@
 
 ## 本章导读
 
-Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本章在这些语义上实现教学线性层，并把 Chapter02 的公共视图接入归一化、前馈网络、残差和完整 `DecoderLayer`。Chapter 05 将真实 GGUF 低比特权重接入量化线性层，Chapter 06 再为请求加入逐词元生成状态。
+Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本章在同一乘加公式上实现教学线性层，并把 Chapter02 的公共视图接入归一化、前馈网络、残差和完整 `DecoderLayer`。Chapter 05 将真实 GGUF 低比特权重接入量化线性层，Chapter 06 再为请求加入逐词元生成状态。
 
 | 学习线 | 本章怎样学习 | 可验证产物 |
 | --- | --- | --- |
-| A 单层验证 | 用小尺寸 MHA、LayerNorm、稠密/MoE FFN 和双残差学习单层数据流，再用请求 Context 连接预填充与逐词元解码 | 单层输出、MoE 路由、因果掩码、连续 KV 追加、请求隔离和失败原子性测试 |
+| A 单层验证 | 用小尺寸 MHA、LayerNorm、稠密/MoE FFN 和双残差学习单层数据流，再用请求上下文连接预填充与逐词元解码 | 单层输出、MoE 路由、因果掩码、连续 K/V 追加、请求隔离和失败后状态测试 |
 | B 真实 CPU | 先用 3D/4D Q/K/V 适配器核对通用注意力布局，再比较 TinyLlama/Qwen3 稠密 Decoder、Qwen1.5-MoE 专家路由和 DeepSeek-V2-Lite MLA | 稠密、MoE、MLA 三类结构的分层 K/V、路由、logits 与真实模型证据 |
-| G GPU 扩展 | 保持解码器顺序和请求状态语义不变，把 Linear、RoPE、GQA、归一化和 FFN 换成 CUDA 后端 | 真实 2/22 层对照、Tensor Prefill、融合在线 Attention 与端到端 A/B |
-| M 多模态扩展 | 视觉编码器复用归一化、Attention、FFN 和双残差结构；视觉向量进入语言 Decoder 后复用请求 Context | SigLIP Block、视觉投影和统一 embedding 序列测试 |
+| G GPU 扩展 | 保持解码器顺序和请求状态不变，把线性层、RoPE、GQA、归一化和 FFN 换成 CUDA 后端 | TinyLlama、Qwen3 与 DeepSeek 分层对照，张量预填充、融合在线注意力与端到端 A/B |
+| M 多模态扩展 | 视觉编码器复用归一化、注意力、FFN 和双残差结构；视觉向量进入语言解码器后复用请求上下文 | SigLIP 块、视觉投影和统一嵌入序列测试 |
 
 | 本章新术语 | 先这样理解 | 首次解释 |
 | --- | --- | --- |
@@ -24,34 +24,31 @@ Chapter 03 已经固定矩阵乘法的形状、布局和计算后端分层；本
 
 ![Chapter 04 主图：解码器结构与注意力](../assets/diagrams/chapter04-main.svg)
 
+下图把公共 Decoder 骨架与不同模型的结构选择放在一起。先定位发生变化的组件，再进入对应实现。
+
+![Decoder 公共骨架与模型结构差异](../assets/diagrams/chapter04-decoder-knowledge-map.svg)
+
 ## 开始学习
 
-先沿 Q/K/V、双残差和请求状态三条数据流阅读。共享 `DecoderLayer` 保存权重；每个 `DecoderLayerContext` 独占连续 K/V，预填充写入多个位置，逐词元解码再追加一个位置。
+先沿 Q/K/V、双残差和请求状态三条数据流阅读。共享 `DecoderLayer` 保存权重；每个 `DecoderLayerContext` 独占连续 K/V，预填充写入多个位置，逐词元解码再追加一个位置。教学 FFN 使用 ReLU 固定两层结构，真实稠密与 MoE 模型再换成 SwiGLU 和专家路由；两者共享输入输出形状与双残差骨架，不共享具体权重结构。
 
 | 顺序 | 路线 | 页面 | 先看源码 | 读完后应看到什么 |
 | --- | --- | --- | --- | --- |
 | 1 | A/B/G 公共 | [`04.1 多头注意力`](./01_multihead_attention.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/attention_kernel.cpp"><code>attention_kernel.cpp</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/mla_attention.cpp"><code>mla_attention.cpp</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/src/gqa_attention_backend.cu"><code>gqa_attention_backend.cu</code></a> | 标准 Attention、MLA、在线 Softmax 与融合 kernel 怎样逐层建立证据 |
 | 2 | A | [`04.2 层归一化与激活函数`](./02_layernorm_and_activation.md)、[`04.3 前馈网络`](./03_feedforward.md)、[`04.4 解码器层`](./04_decoder_layer.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/decoder_layer.cpp"><code>decoder_layer.cpp</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/decoder_context.cpp"><code>decoder_context.cpp</code></a> | 归一化、注意力、残差和 FFN 组成可执行解码器层，请求上下文连接预填充与解码 |
 | 3 | B | [`04.5 接入首层权重`](./05_load_first_layer.md)、[`04.6 连接真实 TinyLlama 解码器`](./06_real_tinyllama_decoder.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/src/real_llama_cpu_decoder.cpp"><code>real_llama_cpu_decoder.cpp</code></a> | Chapter01 权重怎样映射到 22 层 Model 与请求 Context |
-| 4 | B | [`04.7 解码器成熟框架对照`](./07_framework_comparison.md) | [`解码器数据流图`](./04_decoder_layer.md) | 将教学层和真实模型映射到成熟执行器与 GPU 计算后端 |
+| 4 | B | [`04.7 解码器框架对照`](./07_framework_comparison.md) | [`解码器数据流图`](./04_decoder_layer.md) | 将教学层和真实模型映射到生产执行器与 GPU 计算后端 |
 | 5 | G/M | [`GPU 学习计划`](../guides/gpu_learning_plan.md)、[`多模态视觉编码器`](../extensions/multimodal/02_vision_encoder.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/src/cuda_decoder_layer.cpp"><code>cuda_decoder_layer.cpp</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/multimodal/src/vision_encoder.cpp"><code>vision_encoder.cpp</code></a> | 同一解码器骨架怎样替换计算后端或接收视觉输入 |
 
 ## 验证与下一步
 
 单层解码器数据流成立后，进入 [`Chapter 05`](../chapter05_quantization/intro.md)，让真实模型的九种 GGUF 量化格式在同一 Linear 语义下完成计算。
 
-| 验收层级 | 执行入口 | 通过条件 | 本章要求 |
+| 验收层级 | 执行入口 | 通过条件 | 适用阶段 |
 | --- | --- | --- | --- |
-| L1 默认 CPU | `bash code/chapter04_attention/scripts/run.sh` | 归一化、残差、稠密/MoE FFN、解码器与 3D/4D 注意力通过 CTest；连续 KV 按 2→3 增长，请求互不影响，失败不提交 Context 或输出 | 必做 |
-| L2 真实结构 | `bash code/chapter04_attention/scripts/run_real_structure.sh` | 22 层配置、首层九个权重的名称、shape、dtype 和 payload 通过 CTest；不执行完整 Decoder | 有模型时必做 |
-| L2 可选 Qwen3 首层 | `bash code/chapter04_attention/scripts/run_qwen3_first_layer.sh` | Q/K Norm、16/8 头、128 维头空间、NeoX RoPE、增量 K/V 和因果注意力通过 | 学习模型差异时执行 |
-| L3 可选 Qwen3 全层 | `bash code/chapter04_attention/scripts/run_qwen3_decoder.sh` | 28 层 CPU logits、前五候选和连续四步贪心词元通过 llama.cpp 对照 | 验收第二种稠密架构时执行 |
-| L3 可选 Qwen1.5-MoE | `bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh` | 24 层局部 Top-K 全部匹配 llama.cpp，并核对双词元因果 Attention、逐层 hidden、98304 个 K/V 元素、logits 和贪心词元 | 学习 MoE 真实权重时执行 |
-| L3 可选 DeepSeek MLA | `bash code/chapter04_attention/scripts/run.sh` 中的 `chapter04_mla_attention_test` | 低秩 K/V 缓存路径与显式展开 Attention 逐元素一致，非法位置不提交输出 | 学习 MLA 时执行 |
-| L3 可选 DeepSeek 真实模型 | `bash code/chapter04_attention/scripts/run_deepseek_v2_lite_layer_capture.sh` | 双词元前两层中间节点、完整 27 层 logits 和贪心词元与 llama.cpp 对齐 | 学习 MLA 与混合 Dense/MoE 层时执行 |
-| L3 可选 DeepSeek CUDA 首层 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_dense_layer.sh` | 双词元压缩 MLA 历史和稠密首层输出匹配 CPU 参考 | 学习 MLA 设备执行时选做 |
-| L3 可选 DeepSeek CUDA MoE | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_moe.sh` | 第 1 层压缩 MLA、Top-6、量化专家、双残差与缓存提交匹配 CPU 参考 | 学习 MoE 设备执行时选做 |
-| L3 可选 CUDA | `bash code/engine/scripts/run_real_cuda_decoder.sh` | TinyLlama 2 层与 22 层 hidden、分层 K/V 匹配 CPU 参考实现 | 有 NVIDIA GPU 和模型时选做 |
-| L3 可选 Qwen3 CUDA | `bash code/engine/scripts/run_qwen3_cuda_decoder.sh` | Qwen3 28 层 hidden、分层 K/V、logits、融合 Attention 与 Tensor Prefill匹配 CPU 参考实现 | 验收第二种 CUDA 稠密架构时执行 |
-| L3 可选 SmolVLM CUDA Encoder | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_encoder.sh` | 真实 12 层 Q8_0 SigLIP 输出匹配 CPU reference，跨层 workspace 只建立一次 | 学习视觉 Encoder 设备执行时选做 |
-| L4 CUDA Attention A/B | `bash code/chapter09_performance/scripts/run_cuda_attention_ab.sh` | 三阶段与融合路径均通过 logits/greedy 检查，并保留两轮 Prefill/Decode 样本；收益不稳定时不切换默认路径 | 调优融合内核时必做 |
+| L1 教学单层 | `bash code/chapter04_attention/scripts/run.sh` | 归一化、双残差、稠密/MoE FFN、在线 Softmax、MLA、连续 K/V 与跨章张量接口测试通过 | 学完本章必做 |
+| L2 真实结构 | `bash code/chapter04_attention/scripts/run_real_structure.sh` | TinyLlama 配置及首层权重名称、形状、类型和载荷通过检查 | 本地有模型时执行 |
+| L3 模型扩展 | 按[代码 README](https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/README.md#运行与验证)选择 Qwen3、Qwen1.5-MoE 或 DeepSeek 入口 | 所选模型的归一化、注意力、FFN、K/V、候选分数和词元符合参考结果 | 学习模型差异时选做 |
+| L4 设备与多模态扩展 | 选择 CUDA 解码器、Attention A/B 或 SmolVLM Encoder 入口 | CPU/CUDA 数值门禁通过，性能结论具有独立端到端样本 | 学习 GPU 或多模态路线时选做 |
+
+具体模型命令见代码 README，模型覆盖范围见[模型支持矩阵](../reference/model_support.md)，性能样本见[实验资产登记表](../reference/experiment_assets.md)。

@@ -1,6 +1,6 @@
-# Chapter 04：Attention 与 Decoder 结构
+# Chapter 04：注意力与解码器结构
 
-本目录先用小尺寸 Float32 权重把 LayerNorm、Multi-Head Attention、FFN 和残差连接组成一个可测试的 DecoderLayer，再用真实结构脚本核对模型权重。稠密 FFN 使用 ReLU 建立基础数据流，教学型 MoE FFN 额外展示 Router、稳定 Top-K、专家 SwiGLU 与共享专家合并。原理和图解见 [Chapter04 导读](../../source/chapter04_attention/intro.md)。
+本目录先用小尺寸 Float32 权重把层归一化、多头注意力、FFN 和残差连接组成可测试的 `DecoderLayer`，再用真实结构脚本核对模型权重。ReLU 两层 FFN 展示最小数据流；真实稠密模型使用 SwiGLU，教学 MoE 进一步展示路由器、稳定 Top-K、专家 SwiGLU 与共享专家合并。原理和图解见 [Chapter04 导读](../../source/chapter04_attention/intro.md)。
 
 ## 代码架构
 
@@ -44,9 +44,9 @@ MLA Attention
 | 8 | `scripts/run_real_structure.sh` | 调用 Chapter01 核对 TinyLlama 首层九个权重 | `real_tinyllama_first_layer_structure_test`，real_model |
 | 9 | `../model/src/real_qwen2_moe_layer.cpp` | NeoX RoPE、因果 Attention、连续 K/V 与真实 MoE 的单层执行 | llama.cpp 单层、两层与 24 层中间张量对照 |
 
-连续 K/V 在本章表达数值和请求状态语义；Chapter07 将相同逻辑位置映射到分页存储。
+连续 K/V 在本章保存数值和请求位置；Chapter07 将相同逻辑位置映射到分页存储。
 
-DeepSeek-V2-Lite 当前包含四层证据：`src/mla_attention.cpp` 用小尺寸 Float32 数据核对低秩缓存语义；`code/model/src/real_deepseek2_dense_layer.cpp` 连接 CPU 归一化、YaRN partial RoPE、压缩历史 Attention 和双残差；`code/cuda/src/mla_attention_backend.cu` 保持同一压缩 Cache 契约并通过真实双词元稠密首层对照；`code/model/src/real_moe_feed_forward.cpp` 连接 64 选 6 路由、Q2_K/IQ4_NL 专家和共享专家。
+DeepSeek-V2-Lite 使用四层证据：`src/mla_attention.cpp` 用小尺寸 Float32 数据核对低秩缓存计算；`code/model/src/real_deepseek2_dense_layer.cpp` 连接 CPU 归一化、YaRN 部分维度 RoPE、压缩历史注意力和双残差；`code/cuda/src/mla_attention_backend.cu` 保持同一压缩缓存接口并通过真实双词元稠密首层对照；`code/model/src/real_moe_feed_forward.cpp` 连接 64 选 6 路由、Q2_K/IQ4_NL 专家和共享专家。
 
 完整 GGUF 可用时，先捕获 llama.cpp 首层逐节点参考：
 
@@ -54,9 +54,9 @@ DeepSeek-V2-Lite 当前包含四层证据：`src/mla_attention.cpp` 用小尺寸
 bash code/chapter04_attention/scripts/run_deepseek_v2_lite_layer_capture.sh
 ```
 
-该入口使用两个词元，固定检查每个词元 `2048` 维输入、`3072` 维 Query、`576` 维 K/V-A 输出、`512` 维归一化 latent，以及 Attention、FFN 和层输出。它提供真实模型 golden；`chapter04_mla_attention_test` 负责用小尺寸数据解释低秩缓存与显式展开为什么等价。
+该入口使用两个词元，固定检查每个词元 `2048` 维输入、`3072` 维 Query、`576` 维 K/V-A 输出、`512` 维归一化潜在向量，以及注意力、FFN 和层输出。它提供真实模型固定结果；`chapter04_mla_attention_test` 负责用小尺寸数据解释低秩缓存与显式展开为什么等价。
 
-`real_deepseek2_dense_layer_test` 使用零投影固定 Context 增长、稠密/MoE 分支和失败原子性。真实捕获入口先逐节点比较第 0 层，再让第 1 层继续读取教程第 0 层输出；两层输出余弦相似度分别为 `0.999883` 和 `0.999859`。同一入口随后运行 1 个稠密层、26 个 MoE 层、最终归一化和 LM Head，双词元 logits 与 llama.cpp 的余弦相似度为 `0.999616`，贪心词元一致。
+`real_deepseek2_dense_layer_test` 使用零投影固定上下文增长、稠密/MoE 分支和失败原子性。真实捕获入口先逐节点比较第 0 层，再让第 1 层继续读取教程第 0 层输出，随后运行 1 个稠密层、26 个 MoE 层、最终归一化和 LM Head。具体误差、候选分数与词元结果统一登记在[实验资产表](../../source/reference/experiment_assets.md)。
 
 ## 运行与验证
 
@@ -76,7 +76,7 @@ bash code/chapter04_attention/scripts/run.sh
 bash code/chapter04_attention/scripts/run_real_structure.sh
 ```
 
-该入口验证九个权重的名称、shape、dtype 和 payload。量化权重进入数值 forward 后由 Chapter05 验收。
+该入口验证九个权重的名称、形状、数据类型和载荷。量化权重进入数值前向后由 Chapter05 验收。
 
 准备 Qwen1.5-MoE 后，可执行真实 layer-0 FFN：
 
@@ -88,8 +88,8 @@ bash code/chapter04_attention/scripts/run_qwen15_moe_two_layer_compare.sh
 bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh
 ```
 
-前四个入口依次验证真实 FFN、单词元层输出、双词元因果 Attention 和两层 hidden/K/V 交接。最后一个入口顺序加载 24 层权重，同时执行两种比较：局部比较把 llama.cpp 上一层输出交给当前层，核对 Top-K 与单层数值；累计比较把教程自己的输出继续传给下一层，观察量化误差经过离散路由后怎样放大。固定模型的局部 Top-K 全部一致，最大局部 MAE 为 `0.0418066`；累计路径最终 hidden MAE 为 `0.136931`、余弦相似度为 `0.997824`。最终 RMSNorm 和 Q6_K LM Head 继续生成词表 logits，贪心词元 `151643` 与 llama.cpp 一致。
+前四个入口依次验证真实 FFN、单词元层输出、双词元因果注意力和两层隐藏状态/K/V 交接。最后一个入口顺序加载 24 层权重，同时执行两种比较：局部比较把 llama.cpp 上一层输出交给当前层，核对 Top-K 与单层数值；累计比较把教程自己的输出继续传给下一层，观察量化误差经过离散路由后怎样放大。误差、候选分数和贪心词元结果统一登记在实验资产表。
 
 ## 扩展入口
 
-教学 CPU 路径通过 Core `AttentionBackend` 注入计算实现，backend 生命周期长于 `MultiHeadAttention`。CUDA GQA 路径复用 Core 请求中的形状语义，并通过带 CUDA Stream 的独立接口进入设备执行上下文。真实模型结构通过 Core `DecoderLayerContract` 与 `DecoderExecutionContext` 接入 `code/model` 或 CUDA 执行上下文；多模态路径在统一 embedding 序列处进入同一语言 Decoder。
+教学 CPU 路径通过核心 `AttentionBackend` 接收计算实现，计算后端生命周期长于 `MultiHeadAttention`。CUDA GQA 路径复用核心请求中的形状信息，并通过带 CUDA 流的接口进入设备执行上下文。真实模型结构通过 `DecoderLayerContract` 与 `DecoderExecutionContext` 接入 `code/model` 或 CUDA 执行上下文；多模态路径在统一嵌入序列处进入同一语言解码器。

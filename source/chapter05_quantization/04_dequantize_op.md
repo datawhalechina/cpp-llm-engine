@@ -1,6 +1,6 @@
 # 05.4 按格式还原量化权重
 
-量化权重进入计算前，必须按格式规则还原数值。这里先用 INT8 加标量 scale 固定反量化语义，再比较九种 GGUF block 解码；这些路径共享“读取量化表示、应用参数、产生浮点参考值”这一结果约定。
+量化权重进入计算前，需要按格式规则还原数值。这里先用 INT8 加标量缩放因子说明反量化，再比较九种 GGUF 分块解码；这些路径都执行“读取量化表示、应用参数、产生浮点参考值”。
 
 ## INT8 与 GGUF Block 的还原规则
 
@@ -35,7 +35,7 @@ Q2_K:  weight = block_scale * group_scale * unsigned_q2 - block_minimum * group_
 IQ4_NL: weight = block_scale * nonlinear_codebook[q4_index]
 ```
 
-Q8_0 的 8-bit 值可直接解释为有符号整数。Q4_K 需要组合 4-bit 量化码、分组 scale 和 minimum；Q6_K 则把低 4 bit 与高 2 bit 合成有符号 6-bit 值，再应用分组与 block scale。相同的 `weight` 结果契约让各格式 reference 可以被同一 Linear 测试比较，但它们的 payload 不能共用一套解包代码。
+Q8_0 的 8-bit 值可直接解释为有符号整数。Q4_K 需要组合 4-bit 量化码、分组缩放和最小值；Q6_K 则把低 4 bit 与高 2 bit 合成有符号 6-bit 值，再应用分组与分块缩放。各格式的参考实现都输出浮点 `weight`，因此可以被同一线性层测试比较；不同字节布局仍使用各自的解包代码。
 
 ![Q8_0、Q4_K 与 Q6_K block 布局](../assets/diagrams/chapter05-quantized-block-layout.svg)
 
@@ -74,7 +74,7 @@ def dequantize_q4k(super_block):
 
 INT8 教学路径由 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter05_quantization/src/dequantize_op.cpp"><code>dequantize_op.cpp</code></a> 输出 Float32 Tensor。Q2_K、Q3_K、Q4_K、Q5_0、Q5_1、Q5_K、Q6_K、Q8_0 和 IQ4_NL reference 路径则按 block 还原完整浮点权重或等价参考结果，为 fused backend 提供独立数值基线。
 
-反量化保持为独立 reference 的原因不是要求生产路径始终创建完整浮点权重，而是让格式解析可以单独验证。下一节的 fused Linear 会边解码边累加，省去中间数组，但每个量化值的还原规则不能改变。
+独立参考实现把格式解析与线性计算分开验证。下一节的融合线性层会边解码边累加，省去中间数组，同时复用相同的量化值还原规则。
 
 | 路径 | 输入 | 输出或消费方式 | 用途 |
 | --- | --- | --- | --- |
@@ -82,7 +82,7 @@ INT8 教学路径由 <a href="https://github.com/datawhalechina/cpp-llm-engine/b
 | 九种 GGUF block reference | GGUF packed blocks | 完整浮点权重或等价参考结果 | 校验格式和 fused 结果 |
 | fused Linear | packed blocks、激活向量 | 直接累加输出 | 避免完整反量化中间量 |
 
-量化格式、shape 或 payload 长度不匹配时，接口必须返回明确错误，不能静默按其他 dtype 读取。成熟框架怎样组织格式与 kernel 的对应关系，集中在 [`05.7 量化实现与成熟框架对照`](./07_tensorrt_gemma_vllm_comparison.md)。
+量化格式、形状或载荷长度不匹配时，接口返回明确错误，防止按其他数据类型读取。生产框架怎样组织格式与计算内核的对应关系，集中在 [`05.7 量化实现与框架对照`](./07_tensorrt_gemma_vllm_comparison.md)。
 
 ## 验证与衔接
 

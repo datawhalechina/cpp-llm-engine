@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="700" viewBox="0 0 1240 700" role="img" aria-labelledby="title desc">
+  <title id="title">解码器公共骨架与模型结构差异</title>
+  <desc id="desc">展示归一化、注意力、残差、前馈网络和请求上下文组成的解码器公共骨架，以及 Llama、Qwen、MoE、MLA 和 SigLIP 对这些组件的不同选择。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8f3e7"/><stop offset="1" stop-color="#e5f0ec"/></linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#315650"/></marker>
+    <style>.title{font:700 28px 'Noto Sans CJK SC',sans-serif;fill:#173832}.sub{font:500 15px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.section{font:700 17px 'Noto Sans CJK SC',sans-serif;fill:#173832}.head{font:700 15px 'Noto Sans CJK SC',sans-serif;fill:#173832}.small{font:500 12px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.box{stroke:#315650;stroke-width:1.8;rx:12}.line{stroke:#55746e;stroke-width:1.8;fill:none;marker-end:url(#arrow)}.dash{stroke:#7b918d;stroke-width:1.6;stroke-dasharray:6 5;fill:none;marker-end:url(#arrow)}</style>
+  </defs>
+  <rect width="1240" height="700" fill="url(#bg)"/>
+  <text x="50" y="50" class="title">解码器：公共骨架不变，模型选择不同组件</text>
+  <text x="50" y="78" class="sub">先理解单层结构，再观察稠密模型、MoE、MLA 与视觉 Transformer 在哪些节点发生分叉。</text>
+
+  <text x="55" y="120" class="section">公共单层骨架</text>
+  <rect x="55" y="145" width="170" height="72" class="box" fill="#fff4d7"/><text x="140" y="174" text-anchor="middle" class="head">输入 Hidden</text><text x="140" y="197" text-anchor="middle" class="small">[tokens, hidden]</text>
+  <rect x="260" y="145" width="170" height="72" class="box" fill="#f7fbf9"/><text x="345" y="174" text-anchor="middle" class="head">Norm</text><text x="345" y="197" text-anchor="middle" class="small">RMSNorm / LayerNorm</text>
+  <rect x="465" y="145" width="190" height="72" class="box" fill="#e4eef9"/><text x="560" y="174" text-anchor="middle" class="head">注意力</text><text x="560" y="197" text-anchor="middle" class="small">Q/K/V · RoPE · 掩码</text>
+  <rect x="690" y="145" width="170" height="72" class="box" fill="#f7fbf9"/><text x="775" y="174" text-anchor="middle" class="head">残差 + Norm</text><text x="775" y="197" text-anchor="middle" class="small">保留输入通路</text>
+  <rect x="895" y="145" width="170" height="72" class="box" fill="#e7f2e9"/><text x="980" y="174" text-anchor="middle" class="head">FFN</text><text x="980" y="197" text-anchor="middle" class="small">Dense / MoE</text>
+  <rect x="1095" y="145" width="100" height="72" class="box" fill="#fff4d7"/><text x="1145" y="174" text-anchor="middle" class="head">输出</text><text x="1145" y="197" text-anchor="middle" class="small">Hidden</text>
+  <path d="M225 181H260" class="line"/><path d="M430 181H465" class="line"/><path d="M655 181H690" class="line"/><path d="M860 181H895" class="line"/><path d="M1065 181H1095" class="line"/>
+
+  <rect x="420" y="248" width="400" height="70" class="box" fill="#dcece7"/><text x="620" y="276" text-anchor="middle" class="head">请求上下文与位置</text><text x="620" y="299" text-anchor="middle" class="small">每层 K/V · 位置偏移 · 预填充/解码隔离</text>
+  <path d="M560 217V248" class="line"/><path d="M775 217V235H700V248" class="dash"/>
+
+  <rect x="300" y="337" width="640" height="34" rx="12" fill="#f8eadf" stroke="#315650" stroke-width="1.6"/>
+  <text x="620" y="359" text-anchor="middle" class="small">模型配置选择归一化、注意力、FFN 与上下文的具体形态</text>
+  <path d="M620 337V318" class="dash"/>
+
+  <text x="55" y="400" class="section">模型架构怎样改变公共骨架</text>
+  <rect x="55" y="420" width="210" height="102" class="box" fill="#fff4d7"/><text x="160" y="447" text-anchor="middle" class="head">TinyLlama / Llama</text><text x="160" y="470" text-anchor="middle" class="small">RMSNorm · GQA</text><text x="160" y="490" text-anchor="middle" class="small">Llama RoPE · SwiGLU</text><text x="160" y="510" text-anchor="middle" class="small">连续或分页 K/V</text>
+  <rect x="285" y="420" width="210" height="102" class="box" fill="#f4ead9"/><text x="390" y="447" text-anchor="middle" class="head">Qwen3</text><text x="390" y="470" text-anchor="middle" class="small">Q/K Norm · GQA</text><text x="390" y="490" text-anchor="middle" class="small">NeoX RoPE · SwiGLU</text><text x="390" y="510" text-anchor="middle" class="small">共享输出权重</text>
+  <rect x="515" y="420" width="210" height="102" class="box" fill="#e7f2e9"/><text x="620" y="447" text-anchor="middle" class="head">Qwen1.5-MoE</text><text x="620" y="470" text-anchor="middle" class="small">标准注意力</text><text x="620" y="490" text-anchor="middle" class="small">Router · Top-K 专家</text><text x="620" y="510" text-anchor="middle" class="small">共享专家合并</text>
+  <rect x="745" y="420" width="210" height="102" class="box" fill="#dcece7"/><text x="850" y="447" text-anchor="middle" class="head">DeepSeek-V2-Lite</text><text x="850" y="470" text-anchor="middle" class="small">压缩 MLA K/V</text><text x="850" y="490" text-anchor="middle" class="small">解耦位置分支</text><text x="850" y="510" text-anchor="middle" class="small">Dense / 64 选 6 MoE</text>
+  <rect x="975" y="420" width="210" height="102" class="box" fill="#e4eef9"/><text x="1080" y="447" text-anchor="middle" class="head">SigLIP Block</text><text x="1080" y="470" text-anchor="middle" class="small">LayerNorm · MHA</text><text x="1080" y="490" text-anchor="middle" class="small">双向全注意力</text><text x="1080" y="510" text-anchor="middle" class="small">GELU FFN · 无生成缓存</text>
+  <path d="M160 420V385H360V371" class="dash"/><path d="M390 420V371" class="dash"/><path d="M620 420V371" class="dash"/><path d="M850 420V385H800V371" class="dash"/><path d="M1080 420V385H880V371" class="dash"/>
+
+  <text x="55" y="565" class="section">阅读时追踪三类关系</text>
+  <rect x="55" y="585" width="350" height="66" class="box" fill="#f7fbf9"/><text x="230" y="611" text-anchor="middle" class="head">数值关系</text><text x="230" y="634" text-anchor="middle" class="small">归一化、注意力、激活和残差怎样改变隐藏状态</text>
+  <rect x="445" y="585" width="350" height="66" class="box" fill="#f7fbf9"/><text x="620" y="611" text-anchor="middle" class="head">状态关系</text><text x="620" y="634" text-anchor="middle" class="small">每个请求怎样拥有位置、分层 K/V 和路由结果</text>
+  <rect x="835" y="585" width="350" height="66" class="box" fill="#f7fbf9"/><text x="1010" y="611" text-anchor="middle" class="head">后端关系</text><text x="1010" y="634" text-anchor="middle" class="small">CPU 与 CUDA 保持结构顺序，替换局部执行路径</text>
+</svg>

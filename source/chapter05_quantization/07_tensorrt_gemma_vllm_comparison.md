@@ -1,10 +1,10 @@
-# 05.7 量化实现与成熟框架对照
+# 05.7 量化实现与框架对照
 
-本章把量化拆成格式解析、block 解码、Linear 执行、backend policy 和数值 A/B。成熟框架还要根据设备能力、模型层和吞吐目标选择量化路径。
+本章把量化拆成格式解析、分块解码、线性层执行、计算后端策略和数值 A/B。生产框架还要根据设备能力、模型层和吞吐目标选择量化路径。
 
 ## 对象映射
 
-| 教程对象 | 成熟框架中的对应物 | 阅读重点 |
+| 教程对象 | 生产框架中的对应物 | 阅读重点 |
 | --- | --- | --- |
 | 九种 GGUF block reader | ggml quantized type/format | scale、min、quant bits 与非线性码表怎样布局 |
 | reference dequantize | reference quant kernels | fused 实现用什么结果校验 |
@@ -14,7 +14,7 @@
 
 ## 教学实现与生产实现
 
-| 本章可验证对象 | 成熟系统继续增加 | 增加它解决什么问题 |
+| 本章可验证对象 | 生产系统常见能力 | 增加它解决什么问题 |
 | --- | --- | --- |
 | INT8 教学格式、九种 GGUF 格式与模型内混合量化 | AWQ、GPTQ、FP8 等多格式 | 适配不同模型资产和硬件能力 |
 | block reference 与 fused CPU Linear | GPU quantized GEMM | 降低设备端带宽和计算成本 |
@@ -40,4 +40,4 @@
 bash code/chapter05_quantization/scripts/run.sh
 ```
 
-先用 component 测试确认九种量化格式共享 Linear 契约，再用 integration 测试核对 Q4_K/Q6_K/Q8_0 如何接收 Chapter02 激活 View。前者覆盖格式实现，后者固定公共激活接口；[`05.8 量化在生成运行时中的位置`](./08_quantization_in_serving_runtime.md) 将继续追踪这项接口怎样被 Decoder 和 Generation Runtime 调用。
+先用组件测试确认九种量化格式共享线性层接口，再用集成测试核对 Q4_K/Q6_K/Q8_0 如何接收 Chapter02 激活视图。前者覆盖格式实现，后者检查公共激活接口；[`05.8 量化在生成运行时中的位置`](./08_quantization_in_serving_runtime.md) 将继续追踪解码器和生成运行时怎样调用该接口。

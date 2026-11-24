@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="690" viewBox="0 0 1240 690" role="img" aria-labelledby="title desc">
+  <title id="title">量化对象、格式、执行路径与模型证据</title>
+  <desc id="desc">区分权重量化、激活量化和 K/V 缓存量化，展开教程实现的 GGUF 权重格式族，并连接 CPU、CUDA 执行路径与真实模型证据。</desc>
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8f3e7"/><stop offset="1" stop-color="#e7f1ed"/></linearGradient><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#315650"/></marker><style>.title{font:700 28px 'Noto Sans CJK SC',sans-serif;fill:#173832}.sub{font:500 15px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.section{font:700 17px 'Noto Sans CJK SC',sans-serif;fill:#173832}.head{font:700 15px 'Noto Sans CJK SC',sans-serif;fill:#173832}.small{font:500 12px 'Noto Sans CJK SC',sans-serif;fill:#5c716c}.inverse{fill:#fff}.box{stroke:#315650;stroke-width:1.8;rx:12}.line{stroke:#5c7872;stroke-width:1.8;fill:none;marker-end:url(#arrow)}.dash{stroke:#7d918d;stroke-width:1.6;stroke-dasharray:6 5;fill:none;marker-end:url(#arrow)}</style></defs>
+  <rect width="1240" height="690" fill="url(#bg)"/>
+  <text x="50" y="50" class="title">量化：先区分对象，再选择格式与执行路径</text>
+  <text x="50" y="78" class="sub">Chapter05 完整实现仅权重量化；激活与 K/V Cache 量化用于建立边界和后续扩展坐标。</text>
+
+  <text x="55" y="120" class="section">量化对象</text>
+  <rect x="55" y="145" width="350" height="90" class="box" fill="#fff1cf"/><text x="230" y="175" text-anchor="middle" class="head">权重量化 · 本章主线</text><text x="230" y="199" text-anchor="middle" class="small">低比特权重 + 浮点输入/输出</text><text x="230" y="219" text-anchor="middle" class="small">减少模型存储和权重读取带宽</text>
+  <rect x="445" y="145" width="350" height="90" class="box" fill="#f7fbf9"/><text x="620" y="175" text-anchor="middle" class="head">激活量化 · 扩展边界</text><text x="620" y="199" text-anchor="middle" class="small">运行时 hidden / activation 使用低精度</text><text x="620" y="219" text-anchor="middle" class="small">需要校准、动态 scale 与算子协同</text>
+  <rect x="835" y="145" width="350" height="90" class="box" fill="#f7fbf9"/><text x="1010" y="175" text-anchor="middle" class="head">K/V Cache 量化 · 扩展边界</text><text x="1010" y="199" text-anchor="middle" class="small">缓存历史状态使用低精度</text><text x="1010" y="219" text-anchor="middle" class="small">影响容量、注意力读取和长上下文误差</text>
+
+  <text x="55" y="282" class="section">GGUF 权重格式族</text>
+  <rect x="55" y="305" width="350" height="98" class="box" fill="#f4ead9"/><text x="230" y="334" text-anchor="middle" class="head">普通分块格式</text><text x="230" y="359" text-anchor="middle" class="small">Q5_0 · Q5_1 · Q8_0</text><text x="230" y="382" text-anchor="middle" class="small">每个 block 保存量化值与缩放参数</text>
+  <rect x="445" y="305" width="350" height="98" class="box" fill="#e4eef9"/><text x="620" y="334" text-anchor="middle" class="head">K-quant 超级块</text><text x="620" y="359" text-anchor="middle" class="small">Q2_K · Q3_K · Q4_K · Q5_K · Q6_K</text><text x="620" y="382" text-anchor="middle" class="small">共享超级块参数，并保存局部 scale/min</text>
+  <rect x="835" y="305" width="350" height="98" class="box" fill="#e7f2e9"/><text x="1010" y="334" text-anchor="middle" class="head">非线性码表格式</text><text x="1010" y="359" text-anchor="middle" class="small">IQ4_NL</text><text x="1010" y="382" text-anchor="middle" class="small">索引查询固定码表，再结合 block scale</text>
+  <path d="M230 235V305" class="line"/><path d="M230 260H620V305" class="line"/><path d="M230 270H1010V305" class="line"/>
+
+  <text x="55" y="448" class="section">同一线性层接口下的执行路径</text>
+  <rect x="55" y="472" width="270" height="92" class="box" fill="#f7fbf9"/><text x="190" y="502" text-anchor="middle" class="head">CPU 反量化参考</text><text x="190" y="526" text-anchor="middle" class="small">恢复浮点 block 后计算</text><text x="190" y="547" text-anchor="middle" class="small">用于固定格式和数值语义</text>
+  <rect x="365" y="472" width="270" height="92" class="box" fill="#e7f2e9"/><text x="500" y="502" text-anchor="middle" class="head">CPU 融合 / SIMD</text><text x="500" y="526" text-anchor="middle" class="small">读取 block 时直接乘加</text><text x="500" y="547" text-anchor="middle" class="small">避免完整浮点权重副本</text>
+  <rect x="675" y="472" width="270" height="92" class="box" fill="#e4eef9"/><text x="810" y="502" text-anchor="middle" class="head">CUDA 融合 GEMV</text><text x="810" y="526" text-anchor="middle" class="small">设备端解码、点积与归约</text><text x="810" y="547" text-anchor="middle" class="small">按 batch 与格式选择计算核</text>
+  <rect x="985" y="472" width="200" height="92" class="box" fill="#fff1cf"/><text x="1085" y="502" text-anchor="middle" class="head">正确性与性能</text><text x="1085" y="526" text-anchor="middle" class="small">Golden · logits</text><text x="1085" y="547" text-anchor="middle" class="small">A/B · 性能剖析</text>
+  <path d="M230 403V472" class="dash"/><path d="M620 403V440H500V472" class="dash"/><path d="M620 403V440H810V472" class="dash"/><path d="M1010 403V440H810V472" class="dash"/>
+  <path d="M190 564V580M500 564V580M810 564V580" stroke="#5c7872" stroke-width="1.8" fill="none"/>
+  <path d="M190 580H1085V564" class="line"/>
+
+  <text x="55" y="610" class="section">真实模型提供格式组合证据</text>
+  <rect x="55" y="630" width="1130" height="40" rx="12" fill="#173832"/>
+  <text x="180" y="655" text-anchor="middle" class="small inverse">TinyLlama：Q4_K / Q6_K</text><text x="450" y="655" text-anchor="middle" class="small inverse">SmolVLM：Q8_0</text><text x="730" y="655" text-anchor="middle" class="small inverse">Qwen1.5-MoE：Q3/Q4/Q5 混合</text><text x="1030" y="655" text-anchor="middle" class="small inverse">DeepSeek：Q2_K / IQ4_NL</text>
+</svg>

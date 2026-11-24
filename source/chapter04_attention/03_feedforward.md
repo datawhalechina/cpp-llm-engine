@@ -26,13 +26,13 @@ Tensor activated = apply_activation(hidden, ActivationKind::Relu);
 return fc2_.forward(activated);
 ```
 
-两个线性层复用 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/linear_layer.cpp"><code>linear_layer.cpp</code></a>。`forward()` 保留 Chapter04 的教学张量接口；`try_forward()` 接收公共只读输入视图和可写输出视图，因此 Chapter02 张量可以直接进入同一线性计算。两条入口都要求 CPU Float32、二维连续布局和匹配的输入输出形状，不会替调用者隐式连续化。
+两个线性层复用 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/linear_layer.cpp"><code>linear_layer.cpp</code></a>。`forward()` 接收 Chapter04 的教学张量；`try_forward()` 接收公共只读输入视图和可写输出视图，因此 Chapter02 张量可以进入同一线性计算。两条入口都要求 CPU Float32、二维连续布局和匹配的输入输出形状；非连续输入由调用方先执行 `contiguous()`。
 
 线性层、LayerNorm、ReLU、残差相加和完整 FFN 均提供公共视图接口。Chapter04 教学张量负责原有入口和中间结果的存储所有权，公共视图负责跨章传递布局与数据引用。
 
 ## 从教学 FFN 到真实 SwiGLU
 
-TinyLlama 的 FFN 不是简单地把 ReLU 换成 SiLU。它使用三组权重并在两个升维分支之间执行逐元素门控：
+TinyLlama 的 FFN 使用三组权重，并在两个升维分支之间执行逐元素门控：
 
 SwiGLU 的 gate、up、down 计算与代码归属见 [`F-FFN-01`](../reference/formulas.md#f-ffn-01)。
 
@@ -68,7 +68,7 @@ output = selected_output + shared_output
 
 这里的稳定 Top-K 表示分数相同时优先选择编号较小的专家，使测试和不同运行环境得到相同路由。教学实现对选中专家重新归一化，便于观察加权和；Qwen1.5-MoE 和 DeepSeek-V2-Lite 都先对全部专家做 Softmax，再保留 Top-K 概率，因此选中权重之和通常小于 1。Qwen1.5-MoE 用单独门控控制共享专家贡献，DeepSeek-V2-Lite 则把共享专家输出直接相加。真实适配器根据模型元数据选择这两种共享专家语义。
 
-<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/moe_feed_forward.cpp"><code>moe_feed_forward.cpp</code></a> 使用小尺寸 Float32 权重完整执行这条语义链，并把每个词元的专家编号和路由权重保存在 `MoeRoute` 中。真实路径由 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/src/real_moe_feed_forward.cpp"><code>real_moe_feed_forward.cpp</code></a> 连接 Chapter01 的三维 packed expert 权重与 Chapter05 的量化 Linear。Qwen1.5-MoE 使用 60 选 4 和 Q3_K/Q5_K 等格式；DeepSeek-V2-Lite 使用 64 选 6，专家 Gate/Up 为 Q2_K、Down 为 IQ4_NL，共享专家输出不经过额外门控。
+<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter04_attention/src/moe_feed_forward.cpp"><code>moe_feed_forward.cpp</code></a> 使用小尺寸 Float32 权重完整执行这条计算链，并把每个词元的专家编号和路由权重保存在 `MoeRoute` 中。真实路径由 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/model/src/real_moe_feed_forward.cpp"><code>real_moe_feed_forward.cpp</code></a> 连接 Chapter01 的三维打包专家权重与 Chapter05 的量化线性层。Qwen1.5-MoE 使用 60 选 4 和 Q3_K/Q5_K 等格式；DeepSeek-V2-Lite 使用 64 选 6，专家 Gate/Up 为 Q2_K、Down 为 IQ4_NL，共享专家输出直接相加。
 
 ![MoE 路由、专家分发与合并](../assets/diagrams/chapter04-moe-routing.svg)
 
@@ -85,15 +85,15 @@ token hidden
   -> 加入每个 token 的共享专家输出
 ```
 
-`run_real_moe_feed_forward_batch()` 返回 assignment 数、活跃专家数和单个专家接收的最大 token 数。CPU 实现复用每个专家的 packed 权重 View，并把同一专家接收的输入交给 batch Linear。Q3_K/Q5_K 后端每次解码一个量化块，再同时累加多个输入行；这与生产系统的 grouped GEMM 目标一致，但当前仍是标量 CPU 教学实现，不等同于 GPU grouped GEMM。
+`run_real_moe_feed_forward_batch()` 返回分配项数量、活跃专家数和单个专家接收的最大词元数。CPU 实现复用每个专家的打包权重视图，并把同一专家接收的输入交给批量线性层。Q3_K/Q5_K 后端每次解码一个量化块，再同时累加多个输入行。该标量 CPU 实现展示按专家分组和权重复用；GPU 分组 GEMM 还会增加并行矩阵计算。
 
 多个请求一起 Decode 时，每个请求保持独立序列，并从自己的历史 K/V 计算 Attention。教程先按请求完成当前解码层的 Attention，再把同一解码层的 FFN 输入放进共同的专家分发表；专家输出随后按请求拆回。这样可以跨请求复用专家权重，同时保持请求之间的 K/V 隔离。
 
-CUDA Tensor Prefill 还要处理数据布局。逐行基线先把连续 `[T,D]` Tensor 拆成 `T` 个行对象，再为每个专家重新打包，最后把专家输出下载到 Host 完成加权合并。`packed-dispatch` 保持 `[T,D]` 连续：设备按行索引收集命中同一专家的词元，Gate、Up、Down 完成后再按路由权重散回原行。
+CUDA 张量预填充还要处理数据布局。逐行基线把连续 `[T,D]` 张量拆成 `T` 个行对象，再为每个专家重新打包，最后把专家输出下载到主机完成加权合并。打包分发路径保持 `[T,D]` 连续：设备按行索引收集命中同一专家的词元，Gate、Up、Down 完成后再按路由权重散回原行。
 
 设备路由路径进一步把 Router 点积、全专家 Softmax、稳定 Top-K 和选中权重归一化放进同一个 CUDA kernel。每个词元只回传 `K` 个专家编号和权重，Host 据此建立专家分组；回传规模从 `T×D` 降为 `T×K`。默认路径随后把行号和权重交给设备端 gather/scatter。
 
-教程还保留一条设备分组候选。它让每个专家按固定顺序扫描 `T×K` 路由表，在设备内生成行号、权重和计数，因此不再上传每个专家的分组元数据。这个方法容易验证且输出确定，但工作量随专家数增加，并且 Host 仍要读取专家计数来选择工作区。它用于说明“减少传输”不一定等于“缩短端到端时间”，没有替换默认路径。完整路由公式见 [F-FFN-02](../reference/formulas.md#f-ffn-02)。
+设备分组候选让每个专家按固定顺序扫描 `T×K` 路由表，在设备内生成行号、权重和计数，从而省去每个专家的分组元数据上传。其工作量随专家数增加，主机仍需读取专家计数来选择工作区。该实现用于比较传输减少量与端到端时间；完整路由公式见 [F-FFN-02](../reference/formulas.md#f-ffn-02)。
 
 在解码器中，注意力和 FFN 各自位于一条残差支路：
 
@@ -114,7 +114,7 @@ bash code/chapter04_attention/scripts/run.sh
 
 `chapter04_attention_test` 构造 `FeedForward(4,8)`，输入 `[2,4]` 后检查输出仍为 `[2,4]`。跨章测试还把 Chapter02 的 `[1,2]` 张量送入 `LinearLayer(2,3)` 和 `FeedForward(2,3)`，分别验证 `[0.05,0.10,0.15]` 与 `[0.007,0.014]`。`chapter04_moe_feed_forward_test` 使用三个专家、Top-2 和共享专家，固定检查并列分数的选择顺序、归一化权重、合并结果与失败时输出不变。模型组件测试另外要求分组执行与逐词元执行一致，并核对专家分发表统计和失败原子性。
 
-CUDA 组件测试继续固定乱序行收集、加权散回、重复目标拒绝和索引越界，并用 CPU 公式核对设备 Router 的稳定 Top-K、归一化权重与确定性专家分组。真实模型先在长度 32/128 下比较 `row-copies` 与 `packed-dispatch`，再比较 Host Router 与设备 Router。设备 Router 的端到端中位数分别降低约 `4.3%/5.9%`，最大 logits 误差不超过 `3.91e-5`，贪心词元一致。接入后的 profile 进一步确认：长度 128 的 D2H 字节减少约 `97.9%`，剩余 `3117` 次小型 H2D 来自 Host 专家分组元数据。设备分组候选保持输出完全一致，但长度 32 慢约 `22.5%`、长度 128 基本持平，所以默认仍由 Host 建组。
+CUDA 组件测试固定乱序行收集、加权散回、重复目标拒绝和索引越界，并用 CPU 公式核对设备路由器的稳定 Top-K、归一化权重与确定性专家分组。真实模型分别比较逐行复制与打包分发、主机路由与设备路由、主机建组与设备建组。当前端到端测量选择设备路由作为默认路径，设备建组保留为实验候选；具体负载、传输字节与配对样本见[实验资产登记表](../reference/experiment_assets.md#exp-gpu-31)。
 
 准备 Qwen1.5-MoE 后，可继续运行：
 
@@ -132,7 +132,7 @@ bash code/chapter04_attention/scripts/run_qwen15_moe_decoder_compare.sh
 bash code/chapter04_attention/scripts/run_deepseek_v2_lite_layer_capture.sh
 ```
 
-第 1 层从第 0 层输出开始，自行执行 MLA、两条残差支路、64 选 6 路由专家和共享专家。固定双词元最终层输出 MAE 为 `0.001289`、余弦相似度为 `0.999859`；其中 MoE 合并输出 MAE 为 `0.001043`。同一入口继续执行完整 27 层和 LM Head，最终 logits 余弦相似度为 `0.999616`，教程实现与 llama.cpp 的贪心词元同为 `185`。
+第 1 层从第 0 层输出开始，自行执行 MLA、两条残差支路、64 选 6 路由专家和共享专家。同一入口继续执行完整 27 层和 LM Head，并检查中间量、最终候选分数与贪心词元。固定误差阈值与结果记录在实验资产表，正文只保留验证层次。
 
 CUDA 路径先用 Host Router 固定单层数值边界，再把相同点积、全专家 Softmax 和稳定 Top-6 迁到设备。设备端继续执行命中的路由专家和共享专家，并与 MLA 输出完成第二条残差。真实第 1 层双词元输出相对 CPU 的最大绝对误差为 `9.83e-7`；完整 27 层设备 Router A/B 保持词元一致。缓存位置只在整层成功后推进，失败时回退该层新增的压缩 K/V。
 
