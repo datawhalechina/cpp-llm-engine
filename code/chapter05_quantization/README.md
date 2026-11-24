@@ -18,6 +18,8 @@ packed 权重 + Float32 激活
 
 `QuantizedLinearPolicy` 只选择已经注册且运行机器支持的 CPU backend；请求不可用实现时返回明确 `Status`。
 
+`chapter05_quantization` 提供通用量化库，x86_64 构建还提供独立的 `chapter05_quantization_avx2` 加速目标。直接构建本章时，`CHAPTER05_BUILD_STANDALONE_TARGETS` 默认开启并生成示例、benchmark 与测试；Model 和多模态等上层模块可以关闭该选项，只链接所需库目标。
+
 ## 阅读顺序与资产
 
 | 顺序 | 文件 | 阅读重点 | 对应验证 |

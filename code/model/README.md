@@ -4,6 +4,17 @@
 
 ## 代码架构
 
+构建目标按依赖范围拆分。多模态的语言侧只需要稠密 Llama/Qwen/SmolVLM Decoder，因此链接聚焦目标；MoE 与 DeepSeek 路径由完整模型目标聚合，避免视觉组件为未使用的模型实现付出编译成本。
+
+| CMake 目标 | 代码范围 | 主要调用方 |
+| --- | --- | --- |
+| `cpp_llm_engine_llama_cpu_model` | 稠密 Llama/Qwen CPU Model 与请求 Context | Chapter04、Engine、多模态真实检查器 |
+| `cpp_llm_engine_model` | 稠密目标加 Qwen MoE、DeepSeek CPU 实现 | 多模型 Engine 与 MoE/MLA 测试 |
+| `cpp_llm_engine_llama_cuda_model` | 稠密 Llama/Qwen CUDA Model 与请求 Context | CUDA Runtime、多模态语言 Context |
+| `cpp_llm_engine_model_cuda` | 稠密 CUDA 目标加 DeepSeek MLA/MoE 实现 | DeepSeek CUDA Runtime 与服务 |
+
+`CPP_LLM_MODEL_BUILD_STANDALONE_TARGETS` 默认生成本目录的示例和测试；作为上层子目录引入时可以关闭，只保留库目标。
+
 | 资产 | 职责 |
 | --- | --- |
 | `RealLlamaCpuModel` | 持有共享只读权重和模型结构规则 |

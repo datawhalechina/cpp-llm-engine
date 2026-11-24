@@ -22,6 +22,8 @@ GGUF bytes -> GgufReader -> Metadata/Tokenizer adapters -> ModelConfig
 
 Reader 只解释外部格式，Adapter 把外部字段转换为稳定配置，Loader 负责 payload 边界，Builder 检查模型结构。任一步失败都不提交半加载结果。
 
+`chapter01_tensor_loader` 是供 Model、多模态和 Engine 复用的库目标。直接构建本章时，`CHAPTER01_BUILD_STANDALONE_TARGETS` 默认开启并生成检查工具与测试；上层模块可以关闭该选项，只消费 Loader 库，避免重复构建本章入口。
+
 ## 阅读顺序与资产
 
 先读 `tensor.*` 和 `model_loader.*`，用小文件理解对象与失败路径；再沿 GGUF Reader、Adapter、Tensor Loader、Model Builder 阅读真实加载链；最后查看检查工具和测试。

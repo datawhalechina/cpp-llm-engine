@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
 project(chapter05_quantization LANGUAGES CXX)
 
+option(
+    CHAPTER05_BUILD_STANDALONE_TARGETS
+    "Build Chapter 05 examples and tests"
+    ON
+)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -64,18 +70,6 @@ target_link_libraries(chapter05_quantization
 
 target_compile_features(chapter05_quantization PUBLIC cxx_std_17)
 
-add_executable(chapter05_quantization_demo
-    examples/main_quantization.cpp
-)
-
-add_executable(q4k_benchmark
-    examples/q4k_benchmark.cpp
-)
-
-target_link_libraries(q4k_benchmark
-    PRIVATE chapter05_quantization
-)
-
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
     add_library(chapter05_quantization_avx2
         src/q4k_linear_avx2.cpp
@@ -87,66 +81,83 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
     )
     target_compile_options(chapter05_quantization_avx2 PRIVATE -mavx2 -mfma)
     target_link_libraries(chapter05_quantization_avx2 PUBLIC chapter05_quantization)
-    target_compile_definitions(q4k_benchmark PRIVATE CHAPTER05_HAS_AVX2=1)
-    target_link_libraries(q4k_benchmark PRIVATE chapter05_quantization_avx2)
 endif()
 
-target_link_libraries(chapter05_quantization_demo
-    PRIVATE chapter05_quantization
-)
+if(CHAPTER05_BUILD_STANDALONE_TARGETS)
+    add_executable(chapter05_quantization_demo
+        examples/main_quantization.cpp
+    )
 
-add_executable(chapter05_quantization_test
-    tests/chapter05_quantization_test.cpp
-)
+    add_executable(q4k_benchmark
+        examples/q4k_benchmark.cpp
+    )
 
-add_executable(chapter05_deepseek_quantization_test
-    tests/deepseek_quantization_test.cpp
-)
+    target_link_libraries(q4k_benchmark
+        PRIVATE chapter05_quantization
+    )
 
-add_executable(chapter02_tensor_quantized_linear_integration_test
-    tests/chapter02_tensor_quantized_linear_integration_test.cpp
-)
+    if(TARGET chapter05_quantization_avx2)
+        target_compile_definitions(q4k_benchmark PRIVATE CHAPTER05_HAS_AVX2=1)
+        target_link_libraries(q4k_benchmark PRIVATE chapter05_quantization_avx2)
+    endif()
 
-target_link_libraries(chapter05_quantization_test
-    PRIVATE chapter05_quantization
-)
-cpp_llm_prepare_test(chapter05_quantization_test)
+    target_link_libraries(chapter05_quantization_demo
+        PRIVATE chapter05_quantization
+    )
 
-target_link_libraries(chapter05_deepseek_quantization_test
-    PRIVATE chapter05_quantization
-)
-cpp_llm_prepare_test(chapter05_deepseek_quantization_test)
+    add_executable(chapter05_quantization_test
+        tests/chapter05_quantization_test.cpp
+    )
 
-target_link_libraries(chapter02_tensor_quantized_linear_integration_test
-    PRIVATE chapter02_tensor_ops chapter05_quantization
-)
-cpp_llm_prepare_test(chapter02_tensor_quantized_linear_integration_test)
+    add_executable(chapter05_deepseek_quantization_test
+        tests/deepseek_quantization_test.cpp
+    )
 
-if(TARGET chapter05_quantization_avx2)
-    target_compile_definitions(chapter05_quantization_test PRIVATE CHAPTER05_HAS_AVX2=1)
-    target_link_libraries(chapter05_quantization_test PRIVATE chapter05_quantization_avx2)
+    add_executable(chapter02_tensor_quantized_linear_integration_test
+        tests/chapter02_tensor_quantized_linear_integration_test.cpp
+    )
+
+    target_link_libraries(chapter05_quantization_test
+        PRIVATE chapter05_quantization
+    )
+    cpp_llm_prepare_test(chapter05_quantization_test)
+
+    target_link_libraries(chapter05_deepseek_quantization_test
+        PRIVATE chapter05_quantization
+    )
+    cpp_llm_prepare_test(chapter05_deepseek_quantization_test)
+
+    target_link_libraries(chapter02_tensor_quantized_linear_integration_test
+        PRIVATE chapter02_tensor_ops chapter05_quantization
+    )
+    cpp_llm_prepare_test(chapter02_tensor_quantized_linear_integration_test)
+
+    if(TARGET chapter05_quantization_avx2)
+        target_compile_definitions(chapter05_quantization_test PRIVATE CHAPTER05_HAS_AVX2=1)
+        target_link_libraries(chapter05_quantization_test PRIVATE chapter05_quantization_avx2)
+    endif()
+
+    include(CTest)
+    enable_testing()
+
+    add_test(NAME chapter05_quantization_test COMMAND chapter05_quantization_test)
+    add_test(
+        NAME chapter05_deepseek_quantization_test
+        COMMAND chapter05_deepseek_quantization_test)
+    add_test(
+        NAME chapter02_tensor_quantized_linear_integration_test
+        COMMAND chapter02_tensor_quantized_linear_integration_test
+    )
+    cpp_llm_set_test_labels(chapter05_quantization_test quantization)
+    cpp_llm_set_test_contract(
+        chapter05_quantization_test OWNER 05 LEVEL component STATUS active)
+    cpp_llm_set_test_labels(
+        chapter05_deepseek_quantization_test quantization deepseek q2k iq4nl)
+    cpp_llm_set_test_contract(
+        chapter05_deepseek_quantization_test OWNER 05 LEVEL component STATUS active)
+    cpp_llm_set_test_labels(
+        chapter02_tensor_quantized_linear_integration_test tensor quantization)
+    cpp_llm_set_test_contract(
+        chapter02_tensor_quantized_linear_integration_test
+        OWNER 05 LEVEL integration STATUS active)
 endif()
-
-include(CTest)
-enable_testing()
-
-add_test(NAME chapter05_quantization_test COMMAND chapter05_quantization_test)
-add_test(
-    NAME chapter05_deepseek_quantization_test
-    COMMAND chapter05_deepseek_quantization_test)
-add_test(
-    NAME chapter02_tensor_quantized_linear_integration_test
-    COMMAND chapter02_tensor_quantized_linear_integration_test
-)
-cpp_llm_set_test_labels(chapter05_quantization_test quantization)
-cpp_llm_set_test_contract(
-    chapter05_quantization_test OWNER 05 LEVEL component STATUS active)
-cpp_llm_set_test_labels(
-    chapter05_deepseek_quantization_test quantization deepseek q2k iq4nl)
-cpp_llm_set_test_contract(
-    chapter05_deepseek_quantization_test OWNER 05 LEVEL component STATUS active)
-cpp_llm_set_test_labels(
-    chapter02_tensor_quantized_linear_integration_test tensor quantization)
-cpp_llm_set_test_contract(
-    chapter02_tensor_quantized_linear_integration_test
-    OWNER 05 LEVEL integration STATUS active)

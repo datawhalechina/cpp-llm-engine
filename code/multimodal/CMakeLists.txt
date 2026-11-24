@@ -22,6 +22,47 @@ set(MULTIMODAL_CUDA_SMOLVLM_MODEL "" CACHE FILEPATH
 set(MULTIMODAL_CUDA_SMOLVLM_IMAGE "" CACHE FILEPATH
     "Optional image for the CUDA vision-to-context test")
 
+if(NOT TARGET chapter01_tensor_loader)
+    set(CHAPTER01_BUILD_STANDALONE_TARGETS OFF)
+    if(MULTIMODAL_ENABLE_LLAMA_CPP_TOKENIZER)
+        set(CHAPTER01_ENABLE_LLAMA_CPP ON)
+    endif()
+    add_subdirectory(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../chapter01_tensor_loader
+        ${CMAKE_CURRENT_BINARY_DIR}/chapter01_tensor_loader
+        EXCLUDE_FROM_ALL
+    )
+    unset(CHAPTER01_BUILD_STANDALONE_TARGETS)
+    unset(CHAPTER01_ENABLE_LLAMA_CPP)
+endif()
+
+if(NOT TARGET chapter05_quantization)
+    set(CHAPTER05_BUILD_STANDALONE_TARGETS OFF)
+    add_subdirectory(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../chapter05_quantization
+        ${CMAKE_CURRENT_BINARY_DIR}/chapter05_quantization
+        EXCLUDE_FROM_ALL
+    )
+    unset(CHAPTER05_BUILD_STANDALONE_TARGETS)
+endif()
+
+if(MULTIMODAL_ENABLE_CUDA AND NOT TARGET cpp_llm_engine_cuda)
+    add_subdirectory(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../cuda
+        ${CMAKE_CURRENT_BINARY_DIR}/cuda
+    )
+endif()
+
+if(NOT TARGET cpp_llm_engine_model)
+    set(CPP_LLM_MODEL_BUILD_STANDALONE_TARGETS OFF)
+    add_subdirectory(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../model
+        ${CMAKE_CURRENT_BINARY_DIR}/model
+        EXCLUDE_FROM_ALL
+    )
+    unset(CPP_LLM_MODEL_BUILD_STANDALONE_TARGETS)
+endif()
+
 add_library(cpp_llm_multimodal
     src/input_embedding.cpp
     src/idefics3_preprocessor.cpp
@@ -33,50 +74,16 @@ add_library(cpp_llm_multimodal
     src/vision_encoder.cpp
     src/vision_projector.cpp
     src/vision_weights.cpp
-    ../chapter01_tensor_loader/src/gguf_reader.cpp
-    ../chapter01_tensor_loader/src/gguf_tensor_loader.cpp
-    ../chapter01_tensor_loader/src/model_metadata.cpp
-    ../chapter01_tensor_loader/src/model_metadata_adapter.cpp
-    ../chapter01_tensor_loader/src/model_schema.cpp
-    ../chapter01_tensor_loader/src/real_layer_weights.cpp
-    ../model/src/real_llama_cpu_decoder.cpp
-    ../chapter01_tensor_loader/src/tensor.cpp
-    ../chapter05_quantization/src/iq4nl_dequantize.cpp
-    ../chapter05_quantization/src/iq4nl_linear.cpp
-    ../chapter05_quantization/src/q2k_dequantize.cpp
-    ../chapter05_quantization/src/q2k_linear.cpp
-    ../chapter05_quantization/src/q3k_dequantize.cpp
-    ../chapter05_quantization/src/q3k_linear.cpp
-    ../chapter05_quantization/src/q4k_dequantize.cpp
-    ../chapter05_quantization/src/q4k_kernel.cpp
-    ../chapter05_quantization/src/q4k_linear.cpp
-    ../chapter05_quantization/src/q5_0_dequantize.cpp
-    ../chapter05_quantization/src/q5_0_linear.cpp
-    ../chapter05_quantization/src/q5_1_dequantize.cpp
-    ../chapter05_quantization/src/q5_1_linear.cpp
-    ../chapter05_quantization/src/q5k_linear.cpp
-    ../chapter05_quantization/src/q6k_dequantize.cpp
-    ../chapter05_quantization/src/q6k_kernel.cpp
-    ../chapter05_quantization/src/q6k_linear.cpp
-    ../chapter05_quantization/src/q8_0_dequantize.cpp
-    ../chapter05_quantization/src/q8_0_linear.cpp
-    ../chapter05_quantization/src/quantized_linear_policy.cpp
 )
 target_include_directories(cpp_llm_multimodal PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../chapter01_tensor_loader/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../chapter05_quantization/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../core/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../model/include
+)
+target_link_libraries(cpp_llm_multimodal
+    PUBLIC chapter01_tensor_loader
+    PRIVATE chapter05_quantization
 )
 
 if(MULTIMODAL_ENABLE_CUDA)
-    if(NOT TARGET cpp_llm_engine_cuda)
-        add_subdirectory(
-            ${CMAKE_CURRENT_SOURCE_DIR}/../cuda
-            ${CMAKE_CURRENT_BINARY_DIR}/cuda
-        )
-    endif()
     add_library(cpp_llm_multimodal_cuda
         src/cuda_siglip_block.cpp
         src/cuda_vision_encoder.cpp
@@ -139,11 +146,11 @@ if(MULTIMODAL_ENABLE_CUDA)
     )
     add_executable(multimodal_cuda_smolvlm_context_inspect
         examples/cuda_smolvlm_context_inspect.cpp
-        ../model/src/cuda_llama_layer_weights.cpp
-        ../model/src/real_llama_cuda_model.cpp
     )
     target_link_libraries(multimodal_cuda_smolvlm_context_inspect PRIVATE
         cpp_llm_multimodal_cuda
+        cpp_llm_engine_llama_cpu_model
+        cpp_llm_engine_llama_cuda_model
     )
 endif()
 
@@ -183,33 +190,21 @@ add_executable(multimodal_vision_encoder_inspect examples/vision_encoder_inspect
 target_link_libraries(multimodal_vision_encoder_inspect PRIVATE cpp_llm_multimodal)
 
 add_executable(multimodal_vision_projector_inspect examples/vision_projector_inspect.cpp)
-target_link_libraries(multimodal_vision_projector_inspect PRIVATE cpp_llm_multimodal)
+target_link_libraries(multimodal_vision_projector_inspect PRIVATE
+    cpp_llm_multimodal
+    cpp_llm_engine_llama_cpu_model
+)
 
 if(MULTIMODAL_ENABLE_LLAMA_CPP_TOKENIZER)
-    if(NOT EXISTS "${LLAMA_CPP_ROOT}/include/llama.h" OR
-       NOT EXISTS "${LLAMA_CPP_BUILD_DIR}/bin")
-        message(FATAL_ERROR "LLAMA_CPP_ROOT and LLAMA_CPP_BUILD_DIR are required for the real tokenizer")
+    if(NOT TARGET chapter01_real_tokenizer)
+        message(FATAL_ERROR
+            "The real tokenizer requires the chapter01_real_tokenizer target")
     endif()
-    find_library(LLAMA_LIBRARY NAMES llama PATHS "${LLAMA_CPP_BUILD_DIR}/bin" NO_DEFAULT_PATH REQUIRED)
-    find_library(GGML_LIBRARY NAMES ggml PATHS "${LLAMA_CPP_BUILD_DIR}/bin" NO_DEFAULT_PATH REQUIRED)
-    find_library(GGML_BASE_LIBRARY NAMES ggml-base PATHS "${LLAMA_CPP_BUILD_DIR}/bin" NO_DEFAULT_PATH REQUIRED)
-    find_library(GGML_CPU_LIBRARY NAMES ggml-cpu PATHS "${LLAMA_CPP_BUILD_DIR}/bin" NO_DEFAULT_PATH REQUIRED)
-    target_sources(multimodal_vision_projector_inspect PRIVATE
-        ../chapter01_tensor_loader/src/real_tokenizer.cpp
-    )
-    target_include_directories(multimodal_vision_projector_inspect PRIVATE
-        ${LLAMA_CPP_ROOT}/include
-        ${LLAMA_CPP_ROOT}/ggml/include
-    )
     target_compile_definitions(multimodal_vision_projector_inspect PRIVATE
         CPP_LLM_MULTIMODAL_HAS_REAL_TOKENIZER=1
     )
     target_link_libraries(multimodal_vision_projector_inspect PRIVATE
-        ${LLAMA_LIBRARY}
-        ${GGML_LIBRARY}
-        ${GGML_CPU_LIBRARY}
-        ${GGML_BASE_LIBRARY}
-        ${CMAKE_DL_LIBS}
+        chapter01_real_tokenizer
     )
     set_target_properties(multimodal_vision_projector_inspect PROPERTIES
         BUILD_RPATH "${LLAMA_CPP_BUILD_DIR}/bin"

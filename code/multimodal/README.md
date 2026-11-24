@@ -2,6 +2,20 @@
 
 本目录建立图片进入视觉编码器之前的可验证数据路径。默认构建只需要 C++17；系统存在 `libjpeg` 时增加 JPEG 解码，PPM、原始 RGB、resize、normalize 和 patch 测试不依赖真实模型或 `llama.cpp`。
 
+## 模块边界
+
+多模态模块拥有图片解码、动态切图、视觉 Encoder、Projector、图文 embedding 组装和阶段指标。它复用 Chapter01 的 GGUF Reader、Chapter05 的量化 Linear，以及 Model 中聚焦的稠密 Llama CPU/CUDA 目标；这些实现通过 CMake target 链接，不在本目录重复编译源文件。
+
+```text
+Chapter01 Loader ─┐
+Chapter05 Linear ─┼─> multimodal CPU/CUDA ─> 统一 embedding 序列
+CUDA Backend ─────┘                              │
+                                                v
+稠密 Llama Model/Context <────────────── Engine / Chapter06 Runtime
+```
+
+图片路径扩展输入类型，Chapter06–10 继续负责生成、缓存、调度和服务。多模态目录不复制 Request、K/V Cache、Scheduler 或 Transport；真实检查器只在需要语言模型对照时链接 `cpp_llm_engine_llama_cpu_model` 或 `cpp_llm_engine_llama_cuda_model`。
+
 ## 资产总览
 
 当前资产覆盖 IDEFICS3 动态切图、单张视觉 tile 预处理、mmproj schema、Float32 Patch/Position Embedding、使用真实 Q8_0 权重的 12 层 SigLIP Vision Encoder、IDEFICS3 Projector，以及图文 embedding 序列拼接。
