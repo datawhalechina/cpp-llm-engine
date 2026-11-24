@@ -25,7 +25,7 @@
 | 性能实验 | workload、指标、结果或 A/B 实验 | 固定环境、复现命令和机器可读结果 |
 | 框架对照 | 成熟框架的实现坐标和工程差异 | 官方源码或资料、版本和核验日期 |
 
-教程正文位于 `source/`，章节实现和测试位于 `code/<chapter>/`，练习位于 `exercises/`，跨章术语和资产索引位于 `source/reference/`。同一事实只在一个位置维护，其他位置使用链接。
+教程正文位于 `source/`，章节实现和测试位于 `code/<chapter>/`，练习位于 `exercises/`，跨章术语和资产索引位于 `source/reference/`。同一事实只在一个位置维护，其他位置使用链接。跨章脚本按 `checks/`、`workflows/`、`gates/`、`release/` 和 `maintenance/` 分类，规则见 [`scripts/README.md`](scripts/README.md)。
 
 ## 基本要求
 
@@ -44,13 +44,14 @@ Pull Request 中的 CI 覆盖无模型、无网络服务和无 GPU 的默认路�
 
 | 修改范围 | 必须运行 |
 | --- | --- |
-| Markdown、SVG、导航或链接 | `npm run docs:check-structure`、`npm run docs:check-style`、`npm run docs:check-reference`、`npm run docs:check-links` |
+| Markdown、SVG、导航或链接 | `npm run docs:check-structure`、`npm run docs:check-reference`、`npm run docs:check-links` |
+| 跨章脚本目录或稳定入口 | `npm run test:check-script-catalog`、`npm run test:regression` |
 | 章节 C++ 代码 | 对应章节 `run.sh`、`npm run code:check-headers`、`npm run test:regression` |
 | Foundation 练习 | `bash exercises/foundation/run_all.sh`、`npm run test:regression` |
 | 引擎集成 / `ServiceCore` | 对应 CTest 或 `bash code/engine/scripts/run.sh`、`npm run test:regression` |
 | CUDA backend 或 kernel | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh`，并记录 GPU、驱动和 CUDA 版本 |
-| 真实 CUDA Runtime / Serving | [GPU 纵向验收](USAGE.md#gpu-纵向验收)中的三项命令和环境信息 |
-| 多模态 | `bash code/multimodal/scripts/run.sh`；真实模型结果另附 golden |
+| 真实 CUDA Runtime / Serving | [可选扩展](USAGE.md#可选扩展)中的三项纵向验收命令和环境信息 |
+| 多模态 | `bash code/multimodal/scripts/run.sh`；修改 CUDA target 时再运行 `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda.sh`，真实模型结果另附固定结果（golden） |
 | 测试注册或公共接口约定 | `npm run test:check-contracts`、`npm run test:release-contracts` |
 | 发布或大范围重构 | 全部文档检查、`npm run test:regression`、`npm run test:release-contracts` |
 

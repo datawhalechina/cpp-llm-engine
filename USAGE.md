@@ -32,11 +32,11 @@ A 教学基线 → B 真实主线
 
 | 路线 | 学习内容 | 建议起点 | 完成标志 |
 | --- | --- | --- | --- |
-| CPU 主线 | 从模型输入到单机推理服务 | [CPU 六任务学习计划](source/guides/cpu_learning_plan.md) | 默认回归通过，能解释权重到服务的完整链路 |
+| CPU 主线 | 从模型输入到单机推理服务 | [CPU 六任务学习计划](source/guides/cpu_learning_plan.md) | 默认回归通过，能解释加载、执行、生成、调度和服务的对象关系 |
 | GPU 扩展 | 将算子、工作区和 K/V 存储迁移到 CUDA | [GPU 六任务学习计划](source/guides/gpu_learning_plan.md) | CPU/CUDA 数值对照和真实设备测试通过 |
-| 多模态扩展 | 增加图片预处理、视觉编码器和投影层 | [多模态六任务学习计划](source/guides/multimodal_learning_plan.md) | 图片形成嵌入序列并进入现有语言模型运行时 |
+| 多模态扩展 | 增加图片预处理、视觉编码器和投影层 | [多模态扩展教程](source/extensions/multimodal/intro.md) | 图片形成嵌入序列并进入现有语言模型运行时 |
 
-A 建立可观察的小尺寸闭环，B 连接真实 CPU 结构；G 和 M 是选做扩展，不是排在 B 之后的必修章节。只学习执行核心时可先完成 Chapter00–06，继续学习缓存、调度和服务时再进入 Chapter07–10。
+A 使用小尺寸数据验证公式和对象关系，B 连接真实 CPU 模型；G 和 M 是选做扩展，不是排在 B 之后的必修章节。只学习执行核心时可先完成 Chapter00–06，继续学习缓存、调度和服务时再进入 Chapter07–10。
 
 ## 章节与运行入口
 
@@ -48,7 +48,7 @@ A 建立可观察的小尺寸闭环，B 连接真实 CPU 结构；G 和 M 是选
 | Chapter02 | 共享存储的张量视图 | `bash code/chapter02_tensor_ops/scripts/run.sh` |
 | Chapter03 | 可验证的 CPU 矩阵乘法后端 | `bash code/chapter03_matmul/scripts/run.sh` |
 | Chapter04 | 注意力、前馈网络与单层解码器 | `bash code/chapter04_attention/scripts/run.sh` |
-| Chapter05 | Q4_K/Q6_K 量化线性层 | `bash code/chapter05_quantization/scripts/run.sh` |
+| Chapter05 | Q2_K/Q3_K/Q4_K/Q5/Q6_K/Q8_0/IQ4_NL 量化线性层 | `bash code/chapter05_quantization/scripts/run.sh` |
 | Chapter06 | 预填充、逐词元解码、采样与流式输出 | `bash code/chapter06_generation/scripts/run.sh` |
 | Chapter07 | 块表、分页 K/V 与缓存事务 | `bash code/chapter07_kv_cache/scripts/run.sh` |
 | Chapter08 | 调度器、连续批处理与张量批次 | `bash code/chapter08_scheduling/scripts/run.sh` |
@@ -84,7 +84,7 @@ CMake 选项决定编译哪些后端，运行参数从已编译能力中选择�
 | --- | --- | --- |
 | CUDA 后端 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/cuda/scripts/run.sh` | 设备资源、量化线性层、K/V、GQA、MLA、解码器和 MoE 数据面 |
 | 真实模型集成 | [`code/engine/README.md`](code/engine/README.md) | TinyLlama、Qwen3、Qwen1.5-MoE 与 DeepSeek-V2-Lite 的分阶段入口 |
-| 多模态 CPU | `bash code/multimodal/scripts/run.sh` | SmolVLM 输入、12 层视觉编码器、投影层、解码器与服务基准结果 |
+| 多模态 CPU | `bash code/multimodal/scripts/run.sh` | SmolVLM 输入、12 层视觉编码器、投影层及图文嵌入交接 |
 | 多模态 CUDA 组件 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda.sh` | 合成 Patch/Position、单个 SigLIP 编码块与投影层的 CPU/CUDA 对照 |
 | 多模态真实 CUDA 编码块 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_block.sh` | 真实 mmproj Q8_0 第 0 编码块与 CPU 参考实现一致 |
 | 多模态真实 CUDA 编码器 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_real_encoder.sh` | 真实 mmproj 12 层 Q8_0 编码器与 CPU 参考实现一致 |
@@ -106,7 +106,7 @@ bash code/engine/scripts/run_real_cuda_serving.sh
 章节学习直接运行对应 `run.sh`。需要检查全仓代码、文档和发布规则时，再安装 Node.js 与 npm 依赖：
 
 ```bash
-npm install
+npm ci
 npm run test:check-model-capabilities
 npm run test:regression
 npm run test:release-contracts
@@ -140,4 +140,4 @@ npm run docs:check-links
 | 算子 | Chapter03–05、CUDA | 一次计算做什么，由哪个 CPU/GPU 后端执行 |
 | 系统 | Chapter00、06–10 | 请求怎样推进、测量、回收并通过服务输出 |
 
-术语不明确时查[术语表](source/reference/glossary.md)，推导不明确时查[公式表](source/reference/formulas.md)，寻找跨章实现时查[教程资产索引](source/reference/tutorial_assets.md)。运行失败时先执行对应章节的 `run.sh`；Chapter00 环境和模型问题见[排错页](source/chapter00_quickstart/05_troubleshooting.md)。
+术语不明确时查[术语表](source/reference/glossary.md)，推导不明确时查[公式表](source/reference/formulas.md)，追踪跨章对象时查[系统与执行架构](source/reference/architecture.md)。运行失败时先执行对应章节的 `run.sh`；Chapter00 环境和模型问题见[排错页](source/chapter00_quickstart/05_troubleshooting.md)。

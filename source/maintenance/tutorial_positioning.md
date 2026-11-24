@@ -15,7 +15,7 @@
 | 深度 | 纳入内容 | 验收要求 |
 | --- | --- | --- |
 | 主线实现 | TinyLlama GGUF、Tokenizer、CPU Decoder、Runtime、量化、性能证据和 HTTP/SSE | CPU 可运行；默认回归不依赖模型、网络或 GPU |
-| 扩展实现 | 单卡 NVIDIA GPU backend、SmolVLM 多模态 CPU 路径 | 先有 CPU golden，再验证设备或多模态增量 |
+| 扩展实现 | 单卡 NVIDIA GPU backend、SmolVLM 多模态 CPU 路径与 CUDA 视觉组件 | 先有 CPU golden，再验证设备或多模态增量 |
 | 教学设计 | Paged KV、Radix Cache、LPM、Overlap Scheduling、结构化输出 | 给出数据结构、状态变化和最小实验 |
 | 工程参照 | 多进程、模型并行、Prefill/Decode 分离、Expert Parallel、集群 KV | 说明生产问题、约束和源码坐标 |
 | 非目标 | 训练、反向传播、全部模型格式、生产集群和多租户运维 | 不进入主线实现承诺 |

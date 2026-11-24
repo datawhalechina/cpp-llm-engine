@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
   <title id="title">推理策略从算法语义进入设备执行</title>
-  <desc id="desc">量化线性层、在线注意力、分页缓存、连续批处理和前缀复用先建立算法语义与公共契约，再分别进入 CPU 参考执行和 CUDA 加速，最终由正确性测试、真实模型、A/B 实验与性能剖析验证。</desc>
+  <desc id="desc">量化线性层、分块在线注意力、分页缓存、连续批处理和前缀复用先明确共同输入、状态与行为，再分别进入 CPU 参考实现和 CUDA 加速实现，最终由正确性测试、真实模型对照、配对实验与性能剖析验证。</desc>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#f8fafc"/>
@@ -27,8 +27,8 @@
   </defs>
 
   <rect width="1280" height="640" rx="24" fill="url(#bg)"/>
-  <text x="52" y="54" class="title">推理策略：先固定语义，再替换设备执行</text>
-  <text x="52" y="82" class="subtitle">章节实现负责把策略变成可观察对象；公共契约隔离设备差异；性能证据决定优化是否保留。</text>
+  <text x="52" y="54" class="title">推理策略：先验证共同语义，再优化设备执行</text>
+  <text x="52" y="82" class="subtitle">每项策略先明确输入、状态和结果，再通过同一接口进入 CPU 或 CUDA；正确性与性能共同决定优化是否保留。</text>
 
   <text x="52" y="127" class="section">算法与系统语义</text>
   <g filter="url(#shadow)">
@@ -40,9 +40,9 @@
   </g>
   <text x="159" y="178" text-anchor="middle" class="label">量化线性层</text>
   <text x="159" y="202" text-anchor="middle" class="small">权重布局 · 缩放 · 点积</text>
-  <text x="395" y="178" text-anchor="middle" class="label">在线注意力</text>
+  <text x="395" y="178" text-anchor="middle" class="label">分块在线注意力</text>
   <text x="395" y="202" text-anchor="middle" class="small">分块 Softmax · 因果关系</text>
-  <text x="631" y="178" text-anchor="middle" class="label">分页 K/V</text>
+  <text x="631" y="178" text-anchor="middle" class="label">分页 K/V 缓存</text>
   <text x="631" y="202" text-anchor="middle" class="small">页表 · 事务 · 生命周期</text>
   <text x="867" y="178" text-anchor="middle" class="label">连续批处理</text>
   <text x="867" y="202" text-anchor="middle" class="small">预算 · 优先级 · 回滚</text>
@@ -59,9 +59,9 @@
   <g filter="url(#shadow)">
     <rect x="220" y="282" width="840" height="88" rx="18" fill="#ffffff" stroke="#60a5fa" stroke-width="1.5"/>
   </g>
-  <text x="640" y="315" text-anchor="middle" class="section">公共数据与执行契约</text>
+  <text x="640" y="315" text-anchor="middle" class="section">共同输入、状态与行为</text>
   <text x="640" y="342" text-anchor="middle" class="code">Linear · Attention · BlockTable · ExecutorBatch · PrefixBlockStore</text>
-  <text x="640" y="360" text-anchor="middle" class="small">形状、布局、所有权、请求状态与失败回滚保持一致</text>
+  <text x="640" y="360" text-anchor="middle" class="small">张量形状、内存布局、所有权、请求状态与失败回滚保持一致</text>
 
   <path d="M 640 370 L 640 398 L 344 398 L 344 423" class="line"/>
   <path d="M 640 370 L 640 398 L 936 398 L 936 423" class="line"/>
@@ -70,16 +70,16 @@
     <rect x="108" y="423" width="472" height="104" rx="18" fill="#f0fdf4" stroke="#4ade80" stroke-width="1.5"/>
     <rect x="700" y="423" width="472" height="104" rx="18" fill="#eff6ff" stroke="#60a5fa" stroke-width="1.5"/>
   </g>
-  <text x="344" y="458" text-anchor="middle" class="section">CPU 参考与批执行</text>
+  <text x="344" y="458" text-anchor="middle" class="section">CPU 参考实现与批执行</text>
   <text x="344" y="485" text-anchor="middle" class="small">标量正确性 · 量化块解码 · 专家分组 · 请求调度</text>
   <text x="344" y="508" text-anchor="middle" class="code">Chapter04 · 05 · 07 · 08</text>
-  <text x="936" y="458" text-anchor="middle" class="section">CUDA 数据面与融合执行</text>
-  <text x="936" y="485" text-anchor="middle" class="small">设备内存 · 量化 GEMV · 分页 GQA · Tensor Batch</text>
+  <text x="936" y="458" text-anchor="middle" class="section">CUDA 加速与融合执行</text>
+  <text x="936" y="485" text-anchor="middle" class="small">设备内存 · 量化 GEMV · 分页 GQA/MLA · MoE 批执行</text>
   <text x="936" y="508" text-anchor="middle" class="code">code/cuda · Chapter09</text>
 
   <path d="M 344 527 L 344 552 L 640 552 L 640 574" class="soft-line"/>
   <path d="M 936 527 L 936 552 L 640 552" class="soft-line"/>
   <path d="M 640 552 L 640 574" class="line"/>
   <rect x="244" y="574" width="792" height="46" rx="14" fill="#172033"/>
-  <text x="640" y="603" text-anchor="middle" class="inverse">正确性测试 → 真实模型 → A/B 实验 → 性能剖析 → KEEP / REJECT</text>
+  <text x="640" y="603" text-anchor="middle" class="inverse">正确性测试 → 真实模型对照 → 配对实验 → 性能剖析 → 保留或撤回</text>
 </svg>

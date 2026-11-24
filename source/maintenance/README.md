@@ -23,8 +23,11 @@
 | 目的 | 命令 |
 | --- | --- |
 | 修改范围与空白 | `git status --short`、`git diff --check`、`git diff --stat` |
-| 文档结构与站点 | `npm run docs:check-structure`、`npm run docs:check-style`、`npm run docs:check-reference`、`npm run docs:check-links` |
+| 文档结构与站点 | `npm run docs:check-structure`、`npm run docs:check-reference`、`npm run docs:check-links` |
+| 跨章脚本目录或入口 | `npm run test:check-script-catalog`、`npm run test:regression` |
 | 默认无外部依赖回归 | `npm run test:regression` |
 | 测试 owner 与发布验收 | `npm run test:check-contracts`、`npm run test:release-contracts` |
 
-新增维护文件前先判断内容能否合入现有四类规则。没有新的长期职责时，不为一次任务、一个章节或一轮审核创建永久文件。
+跨章脚本的目录职责、分级和依赖记录在 [`scripts/README.md`](../../scripts/README.md)。个人扫描和主观文风审核放在被 Git 忽略的 `scripts/local/`，不进入 CI；只有输入输出稳定、结论可重复的检查才进入共享门禁。
+
+新增维护文件前先判断内容能否合入现有三类规则。没有新的长期职责时，不为一次任务、一个章节或一轮审核创建永久文件。
