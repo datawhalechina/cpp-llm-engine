@@ -62,11 +62,12 @@ public:
         const PreparedStepBatch& prepared,
         const TokenStreamCallback& on_token = {},
         chapter07_kv_cache::KvCacheTransaction* block_pool = nullptr,
-        PriorityAgingPolicy* policy = nullptr) const;
+        PriorityAgingPolicy* policy = nullptr);
 
 private:
     bool enabled_ = true;
     std::size_t next_batch_id_ = 1;
+    std::size_t last_dispatched_batch_id_ = 0;
 };
 
 }  // namespace chapter08_scheduling

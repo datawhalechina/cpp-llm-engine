@@ -69,6 +69,8 @@ public:
 struct StepBatchStats {
     std::size_t scheduled_requests = 0;
     std::size_t scheduled_tokens = 0;
+    std::size_t advanced_requests = 0;
+    std::size_t advanced_tokens = 0;
     std::size_t prefill_requests = 0;
     std::size_t decode_requests = 0;
     std::size_t generated_tokens = 0;
@@ -88,6 +90,15 @@ public:
         const TokenStreamCallback& on_token = {},
         chapter07_kv_cache::KvCacheTransaction* block_pool = nullptr,
         std::size_t max_prefill_chunk_tokens = 0,
+        PriorityAgingPolicy* policy = nullptr,
+        const chapter06_generation::ExecutorBatchRunner* batch_runner = nullptr) const;
+
+    StepBatchStats execute_plan(
+        chapter06_generation::Runtime& runtime,
+        const std::vector<ScheduledRequest>& requests,
+        const StepBatchPlan& plan,
+        const TokenStreamCallback& on_token = {},
+        chapter07_kv_cache::KvCacheTransaction* block_pool = nullptr,
         PriorityAgingPolicy* policy = nullptr,
         const chapter06_generation::ExecutorBatchRunner* batch_runner = nullptr) const;
 };

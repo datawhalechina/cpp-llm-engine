@@ -85,6 +85,53 @@ int main() {
                 OverlapDispatchStatus::Stale);
     });
 
+    suite.run("dispatch executes the prepared candidate order", [&] {
+        GenerationConfig config;
+        config.max_new_tokens = 1;
+        Runtime runtime(config);
+        GreedySampler sampler;
+        Request first_request({1});
+        Request second_request({2});
+        auto first_executor = std::make_shared<testing::FixedTokenExecutor>(4);
+        auto second_executor = std::make_shared<testing::FixedTokenExecutor>(5);
+        std::vector<ScheduledRequest> requests{
+            {60, &first_request, &sampler, first_executor, {0, 0}},
+            {61, &second_request, &sampler, second_executor, {0, 1}},
+        };
+        OverlapScheduler overlap;
+        const auto prepared = overlap.prepare(requests, 1, 1);
+
+        // Scheduling metadata is not execution state. Dispatch must use the prepared order.
+        requests[1].scheduling.priority = 10;
+        const auto result = overlap.dispatch(runtime, requests, prepared);
+
+        CPP_LLM_CHECK(suite, result.status == OverlapDispatchStatus::Executed);
+        CPP_LLM_CHECK(suite, first_request.finished());
+        CPP_LLM_CHECK(suite, !second_request.prefilled());
+    });
+
+    suite.run("prepared batch IDs reject replay and out of order dispatch", [&] {
+        GenerationConfig config;
+        Runtime runtime(config);
+        const std::vector<ScheduledRequest> requests;
+        OverlapScheduler overlap;
+        const auto older = overlap.prepare(requests, 1);
+        const auto newer = overlap.prepare(requests, 1);
+
+        CPP_LLM_CHECK(
+            suite,
+            overlap.dispatch(runtime, requests, newer).status ==
+                OverlapDispatchStatus::Empty);
+        CPP_LLM_CHECK(
+            suite,
+            overlap.dispatch(runtime, requests, older).status ==
+                OverlapDispatchStatus::Stale);
+        CPP_LLM_CHECK(
+            suite,
+            overlap.dispatch(runtime, requests, newer).status ==
+                OverlapDispatchStatus::Stale);
+    });
+
     suite.run("disabled overlap uses synchronous fallback", [&] {
         GenerationConfig config;
         config.max_new_tokens = 1;

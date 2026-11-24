@@ -144,6 +144,9 @@ int main() {
         const auto failed = ContinuousBatchScheduler{}.run_step(
             runtime, {{50, &request, &sampler, executor}}, 2, 0, {}, &pool);
         CPP_LLM_CHECK(suite, failed.generated_tokens == 0);
+        CPP_LLM_CHECK(suite, failed.scheduled_requests == 1);
+        CPP_LLM_CHECK(suite, failed.advanced_requests == 0);
+        CPP_LLM_CHECK(suite, failed.advanced_tokens == 0);
         CPP_LLM_CHECK(suite, request.failed());
         CPP_LLM_CHECK(suite, !pool.contains(50));
         CPP_LLM_CHECK(suite, pool.free_blocks() == 2);

@@ -206,6 +206,17 @@ StepBatchStats ContinuousBatchScheduler::run_step(
     const chapter06_generation::ExecutorBatchRunner* batch_runner) const {
     const StepBatchPlan plan = StepBatchPlanner{}.build(
         requests, max_batch_tokens, max_requests, max_prefill_chunk_tokens, policy);
+    return execute_plan(runtime, requests, plan, on_token, block_pool, policy, batch_runner);
+}
+
+StepBatchStats ContinuousBatchScheduler::execute_plan(
+    chapter06_generation::Runtime& runtime,
+    const std::vector<ScheduledRequest>& requests,
+    const StepBatchPlan& plan,
+    const TokenStreamCallback& on_token,
+    chapter07_kv_cache::KvCacheTransaction* block_pool,
+    PriorityAgingPolicy* policy,
+    const chapter06_generation::ExecutorBatchRunner* batch_runner) const {
     StepBatchStats stats;
     stats.deferred_requests = plan.deferred_requests;
     std::vector<std::size_t> advanced_request_ids;
@@ -322,6 +333,8 @@ StepBatchStats ContinuousBatchScheduler::run_step(
                     throw std::logic_error("reserved batch KV blocks cannot commit");
                 }
                 advanced_request_ids.push_back(item.candidate->request_id);
+                ++stats.advanced_requests;
+                ++stats.advanced_tokens;
                 ++stats.generated_tokens;
                 if (on_token) {
                     on_token(
@@ -368,7 +381,11 @@ StepBatchStats ContinuousBatchScheduler::run_step(
 
         const bool advanced = request.generated_size() > before ||
             request.prefill_offset() > prefill_before;
-        if (advanced) advanced_request_ids.push_back(candidate.request_id);
+        if (advanced) {
+            advanced_request_ids.push_back(candidate.request_id);
+            ++stats.advanced_requests;
+            stats.advanced_tokens += candidate.token_count;
+        }
         if (block_pool != nullptr) {
             if (advanced) {
                 if (!block_pool->commit_tokens(

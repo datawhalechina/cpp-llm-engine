@@ -83,8 +83,12 @@ OverlapDispatchResult OverlapScheduler::dispatch(
     const PreparedStepBatch& prepared,
     const TokenStreamCallback& on_token,
     chapter07_kv_cache::KvCacheTransaction* block_pool,
-    PriorityAgingPolicy* policy) const {
+    PriorityAgingPolicy* policy) {
     OverlapDispatchResult result;
+    if (prepared.batch_id == 0 || prepared.batch_id <= last_dispatched_batch_id_) {
+        result.status = OverlapDispatchStatus::Stale;
+        return result;
+    }
     if (!enabled_) {
         result.status = OverlapDispatchStatus::SynchronousFallback;
         result.stats = ContinuousBatchScheduler{}.run_step(
@@ -97,9 +101,10 @@ OverlapDispatchResult OverlapScheduler::dispatch(
             prepared.max_prefill_chunk_tokens,
             policy,
             nullptr);
+        last_dispatched_batch_id_ = prepared.batch_id;
         return result;
     }
-    if (prepared.batch_id == 0 || prepared.snapshots.size() != requests.size() ||
+    if (prepared.snapshots.size() != requests.size() ||
         prepared.has_policy != (policy != nullptr) ||
         (policy != nullptr && prepared.policy_version != policy->version())) {
         result.status = OverlapDispatchStatus::Stale;
@@ -113,19 +118,19 @@ OverlapDispatchResult OverlapScheduler::dispatch(
     }
     if (prepared.plan.candidates.empty()) {
         result.status = OverlapDispatchStatus::Empty;
+        last_dispatched_batch_id_ = prepared.batch_id;
         return result;
     }
     result.status = OverlapDispatchStatus::Executed;
-    result.stats = ContinuousBatchScheduler{}.run_step(
+    result.stats = ContinuousBatchScheduler{}.execute_plan(
         runtime,
         requests,
-        prepared.plan.token_budget,
-        prepared.max_requests,
+        prepared.plan,
         on_token,
         block_pool,
-        prepared.max_prefill_chunk_tokens,
         policy,
         nullptr);
+    last_dispatched_batch_id_ = prepared.batch_id;
     return result;
 }
 

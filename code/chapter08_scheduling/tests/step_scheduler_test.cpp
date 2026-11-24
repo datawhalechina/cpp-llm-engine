@@ -77,6 +77,8 @@ int main() {
         const ContinuousBatchScheduler scheduler;
         const auto first = scheduler.run_step(runtime, requests, 2);
         CPP_LLM_CHECK(suite, first.prefill_requests == 1);
+        CPP_LLM_CHECK(suite, first.advanced_requests == 1);
+        CPP_LLM_CHECK(suite, first.advanced_tokens == 2);
         CPP_LLM_CHECK(suite, first.generated_tokens == 1);
 
         const auto mixed = scheduler.run_step(runtime, requests, 4);
