@@ -12,7 +12,7 @@
 | Qwen3-0.6B | 已验证 | 已验证 | 已验证 | 已验证 | 已验证 |
 | Qwen1.5-MoE-A2.7B-Chat | 已验证 | 已验证 | 已验证 | 规划 | 规划 |
 | DeepSeek-V2-Lite | 已验证 | 已验证 | 已验证 | 已验证 | 已验证 |
-| SmolVLM-500M-Instruct | 部分完成：真实资产按需准备 | 已验证 | 部分完成：继续补图片 HTTP 传输 | 已验证：完整 tile、真实图文 Prompt 与四词元生成通过 CPU/CUDA 对照 | 部分完成：同步/SSE 与资源释放已验证；图片传输和模型组批待接入 |
+| SmolVLM-500M-Instruct | 部分完成：真实资产按需准备 | 已验证 | 部分完成：继续补图片 HTTP 传输 | 已验证：完整 tile、固定网格双图片组批、真实图文 Prompt 与四词元生成通过 CPU/CUDA 对照 | 部分完成：同步/SSE、资源释放和双请求 Decode 组批已验证；服务视觉收集、图片传输与 Prefill 组批待接入 |
 
 机器可校验的状态和证据路径登记在 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/testing/model_capabilities.json"><code>model_capabilities.json</code></a>，运行 `npm run test:check-model-capabilities` 可检查状态词、入口文件和待办边界。该检查不下载模型，也不执行可选 GPU 路径。
 

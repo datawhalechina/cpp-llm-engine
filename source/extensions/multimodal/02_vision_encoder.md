@@ -28,7 +28,15 @@ Patch/Position Embedding 先把每个 Patch 映射到视觉隐藏宽度并加入
 | LayerNorm 2 + MLP | hidden -> intermediate -> hidden | GELU 与两层 Linear |
 | Residual 2 | residual 1 + MLP output | 编码块最终输出 |
 
-视觉注意力允许一个 tile 内的每个 Patch 读取全部位置，因此不使用语言 Decoder 的因果遮罩。CPU 和 CUDA 后端共享相同输入输出，CUDA 路径通过 `causal=false` 复用公共注意力执行接口。
+视觉注意力允许一个 tile 内的每个 Patch 读取全部位置，因此不使用语言 Decoder 的因果遮罩。多图片组批把相同网格的图片打包为 `[B×T,H,D]`；每个 query 只读取同一图片的 `T` 个 key/value。LayerNorm、Linear 和 MLP 可以合并全部 `B×T` 行，Attention 仍必须保留图片边界，否则一张图会读取另一张图的 Patch。
+
+```text
+图片 0: token 0 ... T-1   ┐
+图片 1: token 0 ... T-1   ├─ packed Linear / MLP
+图片 B: token 0 ... T-1   ┘
+              ↓
+Attention Softmax：每行只覆盖所属图片的 T 个位置
+```
 
 ![SigLIP 首个 Block 的 CPU 计算路径](../../assets/diagrams/siglip-first-block.svg)
 
@@ -44,4 +52,4 @@ CUDA 路径保留量化载荷并由融合 GEMV 解码，同时使用两个隐藏
 
 ![SigLIP 视觉编码器的逐层权重执行](../../assets/diagrams/siglip-encoder-streaming.svg)
 
-CPU、NumPy 与 CUDA 的固定误差、checksum 和资源结果统一查 [VAL-MM-01、VAL-MM-02 与 VAL-MM-CUDA-03～07](../../reference/experiment_assets.md#多模态cuda-与正确性资产)。其中完整 CUDA tile 执行 1024 个 Patch，并由 Projector 输出 64 行语言宽度向量。下一步进入[投影层与运行时交接](./03_runtime_handoff.md)。
+CPU、NumPy 与 CUDA 的固定误差、checksum 和资源结果统一查 [VAL-MM-01、VAL-MM-02 与 VAL-MM-CUDA-03～11](../../reference/experiment_assets.md#多模态cuda-与正确性资产)。其中完整 CUDA tile 执行 1024 个 Patch，并由 Projector 输出 64 行语言宽度向量；双图片入口在一次 packed forward 中处理 2048 个 Patch，并保持两份输出隔离。下一步进入[投影层与运行时交接](./03_runtime_handoff.md)。

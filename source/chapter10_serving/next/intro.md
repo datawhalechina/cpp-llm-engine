@@ -45,7 +45,7 @@ Chapter06 定义单请求生成，Chapter07 管理 K/V 资源，Chapter08 选择
 | L5 Qwen1.5-MoE 动态准入 | `bash code/chapter09_performance/scripts/run_qwen15_moe_service_ab.sh` | 运行中加入请求后，输出、批量执行和终态释放一致 | 学习 MoE 服务时选做 |
 | L6 DeepSeek 服务 | `bash code/chapter10_serving/scripts/run_deepseek_v2_lite_service.sh` | 动态准入与双请求组批成立；同步 Completion、SSE、指标和终态释放一致 | 学习 MLA 与 MoE 服务时选做 |
 | L6 DeepSeek CUDA 服务 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_serving.sh` | 双请求 Decode 进入一次专家 batch；流式回调、取消、指标和资源释放通过 | 学习 MLA-MoE GPU 服务时选做 |
-| L7 SmolVLM CUDA 服务 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh ... mixed-service` | 完整图文 embedding 的同步/SSE 四词元输出、请求隔离与资源释放通过 | 学习多模态服务交接时选做 |
+| L7 SmolVLM CUDA 服务 | `CUDA_HOME=/usr/local/cuda-12.8 bash code/multimodal/scripts/run_cuda_smolvlm_context.sh ... mixed-service` | 完整图文 embedding 的同步/SSE、双请求 Decode 组批、请求隔离与资源释放通过 | 学习多模态服务交接时选做 |
 | L7 DeepSeek CUDA HTTP | `CUDA_HOME=/usr/local/cuda-12.8 bash code/engine/scripts/run_deepseek_v2_lite_cuda_http_server.sh --check` | 文本分词、Completion、SSE、分页 MLA 与终态释放通过 | 完整设备服务组合验收 |
 
 L1 入口会构建 Chapter06–08 依赖与 `chapter10_serving`，再运行 ServiceCore、终态释放、HTTP/SSE 契约和请求 Worker 四个测试。
