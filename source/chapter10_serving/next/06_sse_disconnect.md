@@ -28,8 +28,8 @@ SSE 在 headers 发出后持续写入词元事件。<a href="https://github.com/
 | Deadline | 进入 TimedOut，不再 decode |
 | 背压 | 当前停止生成、取消请求并释放，不静默丢 token |
 
-暂停与恢复需要传输层在连接重新可写时通知 `ServiceCore`，调度器暂时排除该请求，同时保留 Request、Executor 和已提交 K/V。当前同步 Writer 只支持“检测背压后取消”，异步流量控制留给后续事件循环实现。
+暂停与恢复需要传输层在连接重新可写时通知服务事件循环，调度器暂时排除该请求，同时保留 Request、Executor 和已提交 K/V。当前异步服务循环已经分离模型执行与网络线程；Writer 检测到背压后仍采用取消并释放策略，暂停/恢复队列留给后续扩展。
 
 ## 验证事件顺序和断连
 
-运行 `bash code/chapter10_serving/scripts/run.sh`。`chapter10_http_contract_test` 应检查响应头只写一次、词元步数单调、终止事件唯一，以及 ClientClosed/Backpressure 转换为取消和释放。该测试覆盖当前同步写出规则；暂停恢复需要单独的异步测试。`10.7` 继续区分连接、请求和模型批次的并发。
+运行 `bash code/chapter10_serving/scripts/run.sh`。`chapter10_http_contract_test` 检查响应头、词元步数、终止事件以及 ClientClosed/Backpressure；`chapter10_async_service_test` 检查后台事件交付。暂停恢复仍需要独立的流量控制测试。`10.7` 继续区分连接、请求和模型批次的并发。

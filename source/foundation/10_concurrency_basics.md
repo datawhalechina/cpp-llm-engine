@@ -61,4 +61,4 @@ work_ready.wait(lock, [&] { return stopping || !queue.empty(); });
 bash code/chapter10_serving/scripts/run.sh
 ```
 
-`chapter10_request_worker_test` 证明两个独立 Request/Executor 可以在线程中重叠；`chapter10_service_core_test` 证明多请求状态和 Tensor Batch 由 Scheduler 组织。完成后应能解释“多个连接”“多个线程”“多个 running 请求”和“一次 Tensor Batch”为什么不是同一件事。
+`chapter10_async_service_test` 证明网络线程可以提交请求并等待后台事件，`chapter10_request_worker_test` 证明两个独立 Request/Executor 可以在线程中重叠，`chapter10_service_core_test` 证明多请求状态和 Tensor Batch 由 Scheduler 组织。完成后应能解释“多个连接”“异步事件循环”“多个工作线程”“多个 running 请求”和“一次 Tensor Batch”为什么不是同一件事。

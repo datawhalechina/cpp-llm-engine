@@ -4,13 +4,16 @@
 
 | 并发层级 | 实际发生什么 | 当前证据 |
 | --- | --- | --- |
-| 传输层接入 | 网络库可以接收多个连接；当前在适配器前串行化 | cpp-httplib 回环与互斥入口 |
-| `ServiceCore` 多请求状态 | 等待/运行集合可以保存多个请求，API 由单线程调用 | 准入与状态测试 |
+| 传输层接入 | 网络库接收多个连接并投递类型化请求 | cpp-httplib 回环 |
+| 异步服务循环 | 网络线程等待各自结果；后台单线程修改服务状态 | `chapter10_async_service_test` |
+| `ServiceCore` 多请求状态 | 等待/运行集合保存多个请求，API 由事件循环单线程调用 | 准入与状态测试 |
 | 请求级工作线程 | 独立执行器与上下文在 CPU 线程重叠 | 顺序/并行 A/B |
 | 模型步组批 | 一个调度步选择多个请求 | Chapter08 `StepBatchPlan` |
 | 张量组批 | 多行激活进入一次模型或算子调用 | Chapter08 批量执行证据 |
 
-下图从连接入口一直追踪到模型调用。当前套接字层可以出现多个连接，但进入 `HttpAdapter` 和 `ServiceCore` 前会串行化；`ServiceCore` 保存多个请求不表示它支持多线程调用。多个请求的激活进入同一次模型调用时，才属于张量组批。
+下图从连接入口一直追踪到模型调用。多个连接可以并发调用异步 Adapter，但只有后台事件循环调用 `ServiceCore`。`ServiceCore` 保存多个请求不等于张量组批；多个请求的激活进入同一次模型调用时，才属于张量组批。
+
+事件循环默认收到请求就开始调度。模型入口也可以设置一个很短的提交收集窗口：服务空闲时先等待同批请求到达，再一次交给 `ServiceCore`。窗口越长，形成批次的机会越多，首个请求的排队延迟也越高。SmolVLM 验收使用 10 ms 窗口稳定收集两个图文请求；通用服务默认保持 0 ms。
 
 ![连接并发、请求并发与张量组批](../../assets/diagrams/chapter10-concurrency-layers.svg)
 
@@ -28,4 +31,4 @@
 
 ## 验证并发隔离
 
-运行 `bash code/chapter10_serving/scripts/run.sh`。<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/tests/request_worker_test.cpp"><code>chapter10_request_worker_test</code></a> 应证明多个请求可以在独立 Context 上并发、结果不串扰，并在不支持的 BlockPool 组合下显式拒绝。`10.8` 从这些请求的状态时间点产生可观测证据。
+运行 `bash code/chapter10_serving/scripts/run.sh`。`chapter10_async_service_test` 检查并发 HTTP 调用、事件隔离、准入结果和资源释放；<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter10_serving/tests/request_worker_test.cpp"><code>chapter10_request_worker_test</code></a> 检查独立 CPU Context 的线程重叠。`10.8` 从这些请求的状态时间点产生可观测证据。
