@@ -1,0 +1,5 @@
+Time (%),Total Time (ns),Instances,Avg (ns),Name
+83.4,3619000326,1488,2432123.9,quantized_gemv_q8_0_tile4
+0.4,17108208,960,17821.0,gqa_score_kernel
+0.4,16437269,960,17122.2,stable_softmax_kernel
+0.3,11846084,960,12339.7,gqa_value_kernel

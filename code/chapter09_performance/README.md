@@ -115,6 +115,8 @@ node code/chapter09_performance/scripts/import_legacy_evidence.mjs \
 
 CUDA 入口需要相应模型、CUDA Toolkit，性能剖析入口还需要 Nsight Systems 或 Nsight Compute。Profiler 附件用于解释原因，不能替代端到端 A/B 决策。已归档 CUDA 结果与默认路径结论见[实验资产登记表](../../source/reference/experiment_assets.md#多模态cuda-与正确性资产)。
 
+首次使用 `nsys` 或 `ncu` 时，先阅读 [`09.5 按问题选择性能剖析工具`](../../source/chapter09_performance/next/05_profiling_tools.md)。该节给出工具检查、报告导出、指标阅读和从计算核原因返回端到端 A/B 的完整顺序；本页只维护稳定的代码入口。
+
 DeepSeek Tensor Prefill 剖析入口通过 `CHAPTER09_DEEPSEEK2_TENSOR_PREFILL_PROFILE_MLA_PATH=legacy|absorbed` 显式选择路径，默认值为 `absorbed`。结果元数据会记录该选择，避免把优化前后的 Kernel 分布混在同一结论中。
 
 DeepSeek 量化 GEMV 使用两级证据。格式矩阵固定权重形状与批大小，定位 Q2_K 和 IQ4_NL 的主要停顿；格式专用 A/B 只改变线程组织，并以 CPU 参考结果、执行指令和吞吐解释变化。真实模型实验再逐项叠加已经验证的优化，完整 27 层预填充保持 logits 一致且端到端时间改善后，工厂才切换默认路径。设备 Router、设备端专家分组和热点迁移的实验编号、配置与结果见[实验资产登记表](../../source/reference/experiment_assets.md)。
@@ -125,9 +127,10 @@ DeepSeek 量化 GEMV 使用两级证据。格式矩阵固定权重形状与批�
 | --- | --- | --- |
 | CPU 动态切图、视觉编码、语言生成和服务的端到端时间怎样分布 | `code/multimodal/scripts/run_real_service_benchmark.sh` | 重复样本、阶段统计、固定输出和资源释放 |
 | CUDA 视觉流水线与图文生成是否保持 CPU 语义 | `code/multimodal/scripts/run_cuda_smolvlm_context.sh ... mixed-prompt` | 完整图文序列、四词元生成和 CPU/CUDA 对照 |
-| CUDA 服务能否隔离请求并组批解码 | `code/multimodal/scripts/run_cuda_smolvlm_context.sh ... mixed-service` | 同步/SSE、双请求解码组批和终态释放 |
+| CUDA 服务能否接收图像请求并组批 Prefill/Decode | `code/multimodal/scripts/run_cuda_smolvlm_context.sh ... mixed-service` | JSON/Base64 图片、同步/SSE、双请求组批和终态释放 |
+| Packed Prefill 是否优于串行 Context Prefill | `code/chapter09_performance/scripts/run_cuda_smolvlm_prefill_ab.sh` | 两个等长图文请求共同执行 Linear/FFN，Attention 保持请求级 K/V 隔离；两轮端到端均回退，因此只保留显式实验路径 |
 
-现有 CUDA 多模态证据回答正确性、组合关系和请求隔离，尚未形成视觉阶段与语言阶段的端到端性能 A/B。新增性能结论时，应先固定图片、切图数量、文本提示和输出长度，再分别记录视觉预处理、Vision Encoder、Projector、预填充与解码样本。
+现有 CUDA 多模态证据回答正确性、组合关系、请求隔离和语言 Prefill 路径选择。视觉阶段与语言阶段仍需建立分阶段端到端性能 A/B；新增结论时应固定图片、切图数量、文本提示和输出长度，再分别记录视觉预处理、Vision Encoder、Projector、预填充与解码样本。
 
 ## 结果目录
 

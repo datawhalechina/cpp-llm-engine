@@ -1,0 +1,13 @@
+experiment=smolvlm-cuda-packed-prefill-attention-launches
+workload=two identical 88-token multimodal embedding requests in mixed-service mode
+device=NVIDIA GeForce RTX 5070 Ti Laptop GPU
+cuda=12.8
+profiler=Nsight Systems 2024.6.2
+comparison=tokenwise packed attention vs per-request multi-query packed attention
+scope=whole mixed-service process including vision, serial reference, service, and synthetic batch checks
+tokenwise_attention_instances=12096 per score/softmax/value kernel
+multiquery_attention_instances=960 per score/softmax/value kernel
+tokenwise_q8_tile4_share=80.2 percent
+multiquery_q8_tile4_share=83.4 percent
+decision=keep packed path explicit; adaptive remains serial because end-to-end packed latency regressed 7.7 to 11.7 percent
+correctness=PASS

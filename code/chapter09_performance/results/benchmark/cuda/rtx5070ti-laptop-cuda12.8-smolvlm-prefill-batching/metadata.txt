@@ -1,0 +1,9 @@
+experiment=smolvlm-cuda-packed-prefill
+workload=two identical 88-token multimodal embedding requests
+comparison=serial context prefill vs equal-length packed tensor prefill
+iterations=2
+order=serial-first within each process
+model_asset=SmolVLM-500M-Instruct-Q8_0.gguf
+mmproj_asset=mmproj-SmolVLM-500M-Instruct-Q8_0.gguf
+image_asset=test-1.jpeg
+note=packed linear and FFN rows with per-request multi-query attention; adaptive remains serial until paired latency improves
