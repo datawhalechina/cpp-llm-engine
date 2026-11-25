@@ -40,6 +40,11 @@ struct RealLlamaCudaBatchItem final {
     std::int32_t token = 0;
 };
 
+struct RealLlamaCudaPrefillItem final {
+    RealLlamaCudaContext* context = nullptr;
+    const core::DecoderEmbeddingSequence* embeddings = nullptr;
+};
+
 class RealLlamaCudaModel final {
 public:
     static std::unique_ptr<RealLlamaCudaModel> load(
@@ -62,6 +67,11 @@ public:
         std::string* error = nullptr) const;
     bool decode_batch(
         const std::vector<RealLlamaCudaBatchItem>& items,
+        RealLlamaCudaBatchWorkspace* workspace,
+        std::vector<std::vector<float>>* logits,
+        std::string* error = nullptr) const;
+    bool prefill_embeddings_batch(
+        const std::vector<RealLlamaCudaPrefillItem>& items,
         RealLlamaCudaBatchWorkspace* workspace,
         std::vector<std::vector<float>>* logits,
         std::string* error = nullptr) const;

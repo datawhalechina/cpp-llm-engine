@@ -259,12 +259,40 @@ struct RealLlamaCudaBatchWorkspace::Impl final {
     std::shared_ptr<const RealLlamaCudaModel::Impl> model;
     cuda::CudaExecutionContext execution;
     cuda::CudaTensor hidden;
+    cuda::CudaTensor selected_hidden;
     cuda::CudaTensor final_hidden;
     cuda::CudaTensor logits;
     std::vector<cuda::CudaTensor> embedding_rows;
     cuda::CudaDecoderBatchLayer decoder_layer;
     std::size_t batch_size = 0;
+    std::size_t output_batch_size = 0;
     std::size_t use_count = 0;
+
+    core::Status prepare_output_workspace(std::size_t count) {
+        if (count == output_batch_size) return core::Status::ok();
+        cuda::CudaTensor final_replacement;
+        cuda::CudaTensor selected_replacement;
+        cuda::CudaTensor logits_replacement;
+        core::Status status = cuda::CudaTensor::create_contiguous(
+            {count, model->metadata.hidden_size}, core::DType::Float32,
+            &selected_replacement);
+        if (status.is_ok()) {
+            status = cuda::CudaTensor::create_contiguous(
+                {count, model->metadata.hidden_size}, core::DType::Float32,
+                &final_replacement);
+        }
+        if (status.is_ok()) {
+            status = cuda::CudaTensor::create_contiguous(
+                {count, model->metadata.vocab_size}, core::DType::Float32,
+                &logits_replacement);
+        }
+        if (!status.is_ok()) return status;
+        selected_hidden = std::move(selected_replacement);
+        final_hidden = std::move(final_replacement);
+        logits = std::move(logits_replacement);
+        output_batch_size = count;
+        return core::Status::ok();
+    }
 };
 
 void RealLlamaCudaContext::set_attention_path(cuda::CudaAttentionPath path) {
@@ -463,10 +491,17 @@ RealLlamaCudaModel::create_batch_workspace(
     auto workspace = std::make_unique<RealLlamaCudaBatchWorkspace::Impl>();
     workspace->model = impl_;
     workspace->batch_size = batch_size;
+    workspace->output_batch_size = batch_size;
     core::Status status = cuda::CudaExecutionContext::create(&workspace->execution);
     if (status.is_ok()) {
         status = cuda::CudaTensor::create_contiguous(
             {batch_size, hidden_size()}, core::DType::Float32, &workspace->hidden);
+    }
+    if (status.is_ok()) {
+        status = cuda::CudaTensor::create_contiguous(
+            {batch_size, hidden_size()},
+            core::DType::Float32,
+            &workspace->selected_hidden);
     }
     if (status.is_ok()) {
         status = cuda::CudaTensor::create_contiguous(
@@ -655,6 +690,137 @@ bool RealLlamaCudaModel::decode_batch(
     return true;
 }
 
+bool RealLlamaCudaModel::prefill_embeddings_batch(
+    const std::vector<RealLlamaCudaPrefillItem>& items,
+    RealLlamaCudaBatchWorkspace* workspace,
+    std::vector<std::vector<float>>* logits,
+    std::string* error) const {
+    if (items.empty() || workspace == nullptr || workspace->impl_ == nullptr ||
+        logits == nullptr || workspace->impl_->model != impl_ ||
+        items.front().embeddings == nullptr) {
+        if (error != nullptr) {
+            *error = "CUDA packed prefill requires matching items and workspace";
+        }
+        return false;
+    }
+    const std::size_t tokens_per_request =
+        items.front().embeddings->token_count;
+    if (tokens_per_request == 0 ||
+        items.size() > std::numeric_limits<std::size_t>::max() /
+            tokens_per_request ||
+        workspace->impl_->batch_size != items.size() * tokens_per_request) {
+        if (error != nullptr) {
+            *error = "CUDA packed prefill requires equal non-empty sequences";
+        }
+        return false;
+    }
+
+    auto& storage = *workspace->impl_;
+    std::unordered_set<RealLlamaCudaContext*> unique;
+    std::vector<float> packed_embeddings;
+    packed_embeddings.reserve(
+        items.size() * tokens_per_request * hidden_size());
+    for (const auto& item : items) {
+        if (item.context == nullptr || item.embeddings == nullptr ||
+            !unique.insert(item.context).second ||
+            item.context->impl_->model != impl_ ||
+            item.context->impl_->position != 0 ||
+            item.context->impl_->external_kv != nullptr ||
+            item.context->impl_->capacity_tokens < tokens_per_request ||
+            item.embeddings->token_count != tokens_per_request ||
+            !item.embeddings->validate(hidden_size()).is_ok()) {
+            if (error != nullptr) {
+                *error = "CUDA packed prefill requires unique empty continuous contexts";
+            }
+            return false;
+        }
+        const core::Status sync_status = item.context->impl_->execution.synchronize();
+        if (!sync_status.is_ok()) {
+            if (error != nullptr) *error = sync_status.message();
+            return false;
+        }
+        packed_embeddings.insert(
+            packed_embeddings.end(), item.embeddings->values.begin(),
+            item.embeddings->values.end());
+    }
+
+    core::Status status = storage.prepare_output_workspace(items.size());
+    if (status.is_ok()) {
+        status = storage.execution.upload(
+            &storage.hidden, packed_embeddings.data(),
+            packed_embeddings.size() * sizeof(float));
+    }
+    const auto rollback = [&]() {
+        for (const auto& item : items) {
+            for (auto& cache : item.context->impl_->caches) cache.clear();
+            item.context->impl_->position = 0;
+        }
+    };
+    const std::vector<std::size_t> offsets(items.size(), 0);
+    for (std::size_t layer = 0;
+         status.is_ok() && layer < impl_->layers.size(); ++layer) {
+        std::vector<cuda::CudaKvCache*> caches;
+        caches.reserve(items.size());
+        for (const auto& item : items) {
+            caches.push_back(&item.context->impl_->caches[layer]);
+        }
+        status = storage.decoder_layer.prefill_packed_sequences(
+            &storage.execution, impl_->layers[layer].decoder_weights(), caches,
+            &storage.hidden, tokens_per_request, offsets);
+    }
+
+    std::vector<cuda::CudaTensor*> all_rows;
+    all_rows.reserve(storage.embedding_rows.size());
+    for (auto& row : storage.embedding_rows) all_rows.push_back(&row);
+    if (status.is_ok()) {
+        status = storage.execution.unpack_rows(storage.hidden, all_rows);
+    }
+    std::vector<const cuda::CudaTensor*> final_rows;
+    final_rows.reserve(items.size());
+    for (std::size_t item = 0; item < items.size(); ++item) {
+        final_rows.push_back(
+            &storage.embedding_rows[(item + 1) * tokens_per_request - 1]);
+    }
+    if (status.is_ok()) {
+        status = storage.execution.pack_rows(final_rows, &storage.selected_hidden);
+    }
+    if (status.is_ok()) {
+        status = storage.execution.rms_norm_batch(
+            storage.selected_hidden, impl_->output_norm, &storage.final_hidden,
+            impl_->metadata.rms_norm_epsilon);
+    }
+    if (status.is_ok()) {
+        status = storage.execution.quantized_linear_batch(
+            impl_->output_weight, storage.final_hidden, &storage.logits);
+    }
+    std::vector<float> flat_logits(items.size() * vocab_size());
+    if (status.is_ok()) {
+        status = storage.execution.download(
+            storage.logits, flat_logits.data(),
+            flat_logits.size() * sizeof(float));
+    }
+    if (status.is_ok()) status = storage.execution.synchronize();
+    if (!status.is_ok()) {
+        rollback();
+        if (error != nullptr) *error = status.message();
+        return false;
+    }
+
+    std::vector<std::vector<float>> result(items.size());
+    for (std::size_t item = 0; item < items.size(); ++item) {
+        result[item].assign(
+            flat_logits.begin() +
+                static_cast<std::ptrdiff_t>(item * vocab_size()),
+            flat_logits.begin() +
+                static_cast<std::ptrdiff_t>((item + 1) * vocab_size()));
+        items[item].context->impl_->position = tokens_per_request;
+    }
+    *logits = std::move(result);
+    ++storage.use_count;
+    if (error != nullptr) error->clear();
+    return true;
+}
+
 RealLlamaCudaBatchWorkspace::RealLlamaCudaBatchWorkspace(
     std::unique_ptr<Impl> impl)
     : impl_(std::move(impl)) {}
@@ -674,7 +840,8 @@ std::size_t RealLlamaCudaBatchWorkspace::use_count() const {
 }
 
 std::size_t RealLlamaCudaBatchWorkspace::device_bytes() const {
-    std::size_t bytes = impl_->hidden.size_bytes() + impl_->final_hidden.size_bytes() +
+    std::size_t bytes = impl_->hidden.size_bytes() +
+        impl_->selected_hidden.size_bytes() + impl_->final_hidden.size_bytes() +
         impl_->logits.size_bytes() + impl_->decoder_layer.device_bytes() +
         impl_->execution.workspace_capacity_bytes();
     for (const auto& row : impl_->embedding_rows) bytes += row.size_bytes();

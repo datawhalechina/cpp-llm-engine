@@ -269,6 +269,57 @@ int main() {
     CHECK(prefill_context.synchronize().is_ok());
     CHECK(close(prefill_after_failure, prefill_output));
 
+    CudaExecutionContext packed_prefill_context;
+    CudaDecoderBatchLayer packed_prefill_layer;
+    CudaKvCache packed_prefill_cache_a;
+    CudaKvCache packed_prefill_cache_b;
+    CudaTensor packed_prefill_hidden;
+    CHECK(CudaExecutionContext::create(&packed_prefill_context).is_ok());
+    CHECK(CudaDecoderBatchLayer::create(
+        config, 4, &packed_prefill_layer).is_ok());
+    CHECK(CudaKvCache::create(
+        4, 2, 2, &packed_prefill_cache_a).is_ok());
+    CHECK(CudaKvCache::create(
+        4, 2, 2, &packed_prefill_cache_b).is_ok());
+    CHECK(CudaTensor::create_contiguous(
+        {4, 8}, DType::Float32, &packed_prefill_hidden).is_ok());
+    std::vector<float> packed_prefill_input = batch_hidden_host;
+    packed_prefill_input.insert(
+        packed_prefill_input.end(),
+        batch_hidden_host.begin(), batch_hidden_host.end());
+    CHECK(packed_prefill_context.upload(
+        &packed_prefill_hidden, packed_prefill_input.data(),
+        packed_prefill_input.size() * sizeof(float)).is_ok());
+    CHECK(packed_prefill_layer.prefill_packed_sequences(
+        &packed_prefill_context, weights,
+        {&packed_prefill_cache_a, &packed_prefill_cache_b},
+        &packed_prefill_hidden, 2, {0, 0}).is_ok());
+    std::vector<float> packed_prefill_output(32);
+    CHECK(packed_prefill_context.download(
+        packed_prefill_hidden, packed_prefill_output.data(),
+        packed_prefill_output.size() * sizeof(float)).is_ok());
+    CHECK(packed_prefill_context.synchronize().is_ok());
+    std::vector<float> packed_prefill_expected = prefill_output;
+    packed_prefill_expected.insert(
+        packed_prefill_expected.end(),
+        prefill_output.begin(), prefill_output.end());
+    CHECK(close(packed_prefill_output, packed_prefill_expected));
+    CHECK(packed_prefill_cache_a.size_tokens() == 2);
+    CHECK(packed_prefill_cache_b.size_tokens() == 2);
+    CHECK(!packed_prefill_layer.prefill_packed_sequences(
+        &packed_prefill_context, invalid_batch_weights,
+        {&packed_prefill_cache_a, &packed_prefill_cache_b},
+        &packed_prefill_hidden, 2, {2, 2}).is_ok());
+    CHECK(packed_prefill_context.synchronize().is_ok());
+    CHECK(packed_prefill_cache_a.size_tokens() == 2);
+    CHECK(packed_prefill_cache_b.size_tokens() == 2);
+    std::vector<float> packed_prefill_after_failure(32);
+    CHECK(packed_prefill_context.download(
+        packed_prefill_hidden, packed_prefill_after_failure.data(),
+        packed_prefill_after_failure.size() * sizeof(float)).is_ok());
+    CHECK(packed_prefill_context.synchronize().is_ok());
+    CHECK(close(packed_prefill_after_failure, packed_prefill_output));
+
     CudaExecutionContext paged_prefill_context;
     CudaDecoderBatchLayer paged_prefill_layer;
     CudaPagedKvCache paged_prefill_cache;

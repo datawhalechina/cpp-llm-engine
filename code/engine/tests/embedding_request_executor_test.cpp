@@ -1,5 +1,5 @@
 // Engine 测试：验证预计算 embedding 通过既有 Chapter06 Runtime 同步生成。
-// 覆盖：shape/position 校验、prefill 后输入释放、decode、EOS 和错误传播。
+// 覆盖：shape/position 校验、批 Prefill 回滚、输入释放、decode、EOS 和错误传播。
 // 依赖：使用合成 Decoder Context，不依赖真实模型、图片、Python、网络或 GPU。
 // 运行：由 CTest 执行 embedding_request_executor_test。
 #include "cpp_llm_engine/embedding_request_executor.h"
@@ -120,6 +120,33 @@ int main() {
         chapter06_generation::Logits logits;
         CPP_LLM_CHECK(suite, !executor->prefill({0}, &logits, &error));
         CPP_LLM_CHECK(suite, error.find("position count") != std::string::npos);
+    });
+
+    suite.run("batched prefill keeps embeddings until commit and supports rollback", [&] {
+        auto context = std::make_unique<FakeEmbeddingContext>();
+        auto* observed = context.get();
+        std::string error;
+        auto executor = cpp_llm_engine::EmbeddingRequestExecutor::create(
+            std::move(context),
+            {2, 4, std::vector<float>(8, 1.0f)},
+            &error);
+        CPP_LLM_REQUIRE(suite, executor != nullptr);
+        chapter06_generation::Logits logits;
+        CPP_LLM_CHECK(
+            suite, executor->prepare_batched_prefill({0, 0}, &logits, &error));
+        CPP_LLM_CHECK_EQ(suite, executor->context_token_count(), 2U);
+        CPP_LLM_CHECK_EQ(suite, executor->embedding_storage_bytes(), 8 * sizeof(float));
+        CPP_LLM_CHECK(suite, !executor->prefilled());
+
+        executor->rollback_batched_prefill();
+        CPP_LLM_CHECK_EQ(suite, executor->context_token_count(), 0U);
+        CPP_LLM_CHECK_EQ(suite, executor->embedding_storage_bytes(), 8 * sizeof(float));
+        CPP_LLM_CHECK(
+            suite, executor->prepare_batched_prefill({0, 0}, &logits, &error));
+        executor->commit_batched_prefill();
+        CPP_LLM_CHECK(suite, executor->prefilled());
+        CPP_LLM_CHECK_EQ(suite, executor->embedding_storage_bytes(), 0U);
+        CPP_LLM_CHECK_EQ(suite, observed->embedding_prefill_calls, 2U);
     });
 
     suite.run("factory rejects embedding width outside model contract", [&] {

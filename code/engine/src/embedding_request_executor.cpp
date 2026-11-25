@@ -71,6 +71,61 @@ bool EmbeddingRequestExecutor::prefill(
     return true;
 }
 
+bool EmbeddingRequestExecutor::prepare_batched_prefill(
+    const chapter06_generation::TokenSequence& prompt_positions,
+    chapter06_generation::Logits* logits,
+    std::string* error) {
+    if (prefilled_ || batch_prefill_pending_) {
+        return fail(error, "embedding request is already prefilled or pending");
+    }
+    if (logits == nullptr) return fail(error, "embedding prefill logits must not be null");
+    if (prompt_positions.size() != embeddings_.token_count) {
+        return fail(error, "request position count does not match embedding rows");
+    }
+    if (context_->token_count() != 0) {
+        return fail(error, "embedding prefill requires an empty decoder context");
+    }
+    const auto status = context_->prefill_embeddings(embeddings_, logits);
+    if (!status.is_ok()) return fail(error, status.message());
+    if (logits->empty()) {
+        context_->reset();
+        return fail(error, "embedding prefill returned empty logits");
+    }
+    batch_prefill_pending_ = true;
+    if (error != nullptr) error->clear();
+    return true;
+}
+
+bool EmbeddingRequestExecutor::prepare_packed_prefill(
+    const chapter06_generation::TokenSequence& prompt_positions,
+    std::string* error) {
+    if (prefilled_ || batch_prefill_pending_) {
+        return fail(error, "embedding request is already prefilled or pending");
+    }
+    if (prompt_positions.size() != embeddings_.token_count) {
+        return fail(error, "request position count does not match embedding rows");
+    }
+    if (context_->token_count() != 0) {
+        return fail(error, "embedding prefill requires an empty decoder context");
+    }
+    batch_prefill_pending_ = true;
+    if (error != nullptr) error->clear();
+    return true;
+}
+
+void EmbeddingRequestExecutor::commit_batched_prefill() {
+    if (!batch_prefill_pending_) return;
+    prefilled_ = true;
+    batch_prefill_pending_ = false;
+    std::vector<float>().swap(embeddings_.values);
+}
+
+void EmbeddingRequestExecutor::rollback_batched_prefill() {
+    if (!batch_prefill_pending_) return;
+    context_->reset();
+    batch_prefill_pending_ = false;
+}
+
 bool EmbeddingRequestExecutor::decode(
     chapter06_generation::TokenId token,
     chapter06_generation::Logits* logits,
@@ -114,6 +169,10 @@ core::DecoderExecutionContext* EmbeddingRequestExecutor::decoder_context() {
 const core::DecoderExecutionContext*
 EmbeddingRequestExecutor::decoder_context() const {
     return context_.get();
+}
+
+const core::DecoderEmbeddingSequence& EmbeddingRequestExecutor::embeddings() const {
+    return embeddings_;
 }
 
 }  // namespace cpp_llm_engine

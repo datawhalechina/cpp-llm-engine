@@ -188,6 +188,49 @@ int main() {
         CPP_LLM_CHECK(suite, states[0].expired());
     });
 
+    suite.run("request preparer binds visual positions and executor", [&] {
+        chapter10_serving::ServiceCore service(2, 2);
+        std::vector<std::weak_ptr<ContextState>> states;
+        std::size_t prepare_calls = 0;
+        chapter10_serving::HttpAdapter adapter(
+            service,
+            runtime,
+            sampler,
+            {},
+            {},
+            [&](const chapter10_serving::HttpRequest& request,
+                chapter10_serving::PreparedCompletionRequest* prepared,
+                std::string* error) {
+                ++prepare_calls;
+                if (request.body.find("\"image_base64\"") == std::string::npos) {
+                    if (error != nullptr) *error = "image field is missing";
+                    return chapter10_serving::CompletionPrepareStatus::invalid_request;
+                }
+                prepared->prompt_positions = {0, 0, 0};
+                prepared->executor = make_executor(false, &states);
+                return chapter10_serving::CompletionPrepareStatus::ready;
+            });
+
+        const auto response = adapter.handle({
+            "POST",
+            "/v1/completions",
+            "{\"request_id\":74,\"prompt\":\"describe\","
+            "\"image_base64\":\"synthetic\"}"});
+        CPP_LLM_CHECK_EQ(suite, response.status_code, 200);
+        CPP_LLM_CHECK(
+            suite,
+            response.body.find("\"generated_token_ids\":[2,4]") !=
+                std::string::npos);
+        CPP_LLM_CHECK_EQ(suite, prepare_calls, 1U);
+        CPP_LLM_REQUIRE(suite, states.size() == 1);
+        CPP_LLM_CHECK(suite, states[0].expired());
+
+        const auto invalid = adapter.handle({
+            "POST", "/v1/completions", "{\"request_id\":75,\"prompt\":\"x\"}"});
+        CPP_LLM_CHECK_EQ(suite, invalid.status_code, 400);
+        CPP_LLM_CHECK_EQ(suite, service.inflight_size(), 0U);
+    });
+
     suite.run("mixed sync and SSE requests do not retain contexts", [&] {
         chapter10_serving::ServiceCore service(4, 4);
         std::vector<std::weak_ptr<ContextState>> states;

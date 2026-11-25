@@ -143,6 +143,8 @@ CUDA 库只接收 `CudaAttentionPath` 等类型化策略，不读取命令行或
 
 随后增加的 `prefill_sequence()` 复用 `[T,D]` 批量算子，并让融合 Attention 一次处理多个 query；TinyLlama 22 层、2-token embedding Prefill 与逐 token 顺序执行的最大误差为 `3.05e-05`。`RealLlamaCudaContext::prefill_tokens()` 再接入批量 embedding、最终 logits 和按 shape 复用的持久 workspace，22 层 logits 最大误差为 `1.19e-05`。连续与分页 CUDA Executor 都使用 Tensor Prefill，真实 Runtime 保持 golden token `3561 12053`。
 
+`CudaDecoderBatchLayer::prefill_packed_sequences()` 将多个等长请求的词元行打包，Linear 与 FFN 共同处理 `[B*T,D]`，再为每个请求组装独立的多查询 Attention 输入和 K/V 历史。组件测试比较 Packed 与顺序 Prefill，并注入错误权重验证 hidden 与所有请求缓存一起回滚。SmolVLM 双请求的首版逐词元 Attention 让 Score、Softmax 和 Value 各启动 `12096` 次；按请求改为多查询调用后降到 `960` 次，但 Q8_0 GEMV 与行重排仍使端到端回退约 `7.7%`～`11.7%`，所以该路径没有替换默认实现。
+
 EXP-GPU-04 进一步比较 32-token Tensor Prefill 和一次 Decode。两轮端到端中位数一轮回退、一轮改善，未形成稳定收益，因而不切换默认路径。融合实现仍有教学价值：它让学习者直接比较完整 score workspace 与在线状态 `(m,l,o)` 的内存行为，也为后续 Nsight 定位和 kernel 调优保留真实入口。
 
 ## 分页 Device K/V 与 GQA

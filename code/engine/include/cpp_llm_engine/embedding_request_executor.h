@@ -30,10 +30,20 @@ public:
     chapter06_generation::ModelExecutionState execution_state() const override;
 
     bool prefilled() const;
+    bool prepare_batched_prefill(
+        const chapter06_generation::TokenSequence& prompt_positions,
+        chapter06_generation::Logits* logits,
+        std::string* error = nullptr);
+    bool prepare_packed_prefill(
+        const chapter06_generation::TokenSequence& prompt_positions,
+        std::string* error = nullptr);
+    void commit_batched_prefill();
+    void rollback_batched_prefill();
     std::size_t embedding_storage_bytes() const;
     std::size_t context_token_count() const;
     core::DecoderExecutionContext* decoder_context();
     const core::DecoderExecutionContext* decoder_context() const;
+    const core::DecoderEmbeddingSequence& embeddings() const;
 
 private:
     EmbeddingRequestExecutor(
@@ -43,6 +53,7 @@ private:
     std::unique_ptr<core::DecoderExecutionContext> context_;
     core::DecoderEmbeddingSequence embeddings_;
     bool prefilled_ = false;
+    bool batch_prefill_pending_ = false;
 };
 
 }  // namespace cpp_llm_engine

@@ -35,6 +35,13 @@ public:
         CudaKvCache* cache,
         CudaTensor* hidden,
         std::size_t position_offset);
+    core::Status prefill_packed_sequences(
+        CudaExecutionContext* context,
+        const CudaDecoderLayerWeights& weights,
+        const std::vector<CudaKvCache*>& caches,
+        CudaTensor* hidden,
+        std::size_t tokens_per_sequence,
+        const std::vector<std::size_t>& position_offsets);
     core::Status prefill_sequence_paged(
         CudaExecutionContext* context,
         const CudaDecoderLayerWeights& weights,
@@ -54,6 +61,10 @@ public:
     std::size_t device_bytes() const;
 
 private:
+    core::Status prepare_packed_sequence_workspace(
+        std::size_t sequence_count,
+        std::size_t tokens_per_sequence);
+
     CudaDecoderLayerConfig config_;
     std::size_t batch_size_ = 0;
     CudaTensor hidden_backup_;
@@ -72,6 +83,12 @@ private:
     std::vector<CudaTensor> key_rows_;
     std::vector<CudaTensor> value_rows_;
     std::vector<CudaTensor> attention_rows_;
+    std::size_t packed_sequence_count_ = 0;
+    std::size_t packed_tokens_per_sequence_ = 0;
+    std::vector<CudaTensor> packed_query_sequences_;
+    std::vector<CudaTensor> packed_key_sequences_;
+    std::vector<CudaTensor> packed_value_sequences_;
+    std::vector<CudaTensor> packed_attention_sequences_;
 };
 
 }  // namespace cpp_llm_engine::cuda

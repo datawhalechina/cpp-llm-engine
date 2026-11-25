@@ -112,6 +112,6 @@ bash code/chapter09_performance/scripts/run_qwen15_moe_scheduling_ab.sh
 | TinyLlama CPU/CUDA | 多行 Linear、分页 K/V 和真实解码批次 |
 | Qwen1.5-MoE CPU | 请求 Context 隔离，同层输入按专家分组 |
 | DeepSeek-V2-Lite CPU/CUDA | 独立 MLA 历史，FFN 输入按专家分组；CUDA 使用分页 MLA 事务 |
-| SmolVLM CUDA | 图文请求分别预填充，语言解码进入 `CudaEmbeddingBatchRunner` |
+| SmolVLM CUDA | 等长图文请求可进入 Packed Prefill，语言解码进入 `CudaEmbeddingBatchRunner`；两者都保持请求 Context 隔离 |
 
-后续扩展包括真实多请求 Prefill Tensor batch、DeepSeek CPU Factory 分页绑定、设备端融合路由与拆回、Deadline、协作式抢占、设备事件重叠和开放环到达率。每项扩展继续沿用 `ExecutorBatchRunner` 的整批提交或整批回滚规则。
+后续扩展包括变长多请求 Prefill Tensor batch、DeepSeek CPU Factory 分页绑定、设备端融合路由与拆回、Deadline、协作式抢占、设备事件重叠和开放环到达率。每项扩展继续沿用 `ExecutorBatchRunner` 的整批提交或整批回滚规则。

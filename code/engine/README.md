@@ -108,6 +108,8 @@ EXP-GPU-16 使用该入口覆盖 batch 1/2、上下文 `16/128` 和 Decode `1/8`
 
 `EmbeddingRequestExecutor` 接收 Core `DecoderEmbeddingSequence` 和每请求 `DecoderExecutionContext`，把预计算 embedding 适配为 Chapter06 `RequestModelExecutor`。Request 中的 prompt position 只承担序列长度和调度计数，真实 hidden values 由 Context 消费；prefill 成功后适配器立即释放 embedding storage，decode 继续使用同一 Context 和既有 KV 生命周期。`decoder_context()` 返回不转移所有权的底层 Context 指针，供类型匹配的 `ExecutorBatchRunner` 校验位置并执行批量 Decode；Context 的生命周期仍由 Executor 管理。`CudaEmbeddingBatchRunner` 实现该交接，按 batch 大小缓存工作区并调用真实 Llama CUDA batch。默认测试用合成 Context 验证 Runtime 生成、长度校验、错误传播、类型交接点与释放，不要求多模态模型文件。
 
+等长图文请求还可以显式选择 `PackedEqualLength` Prefill。Runner 把 `B` 个长度为 `T` 的嵌入序列打包为 `[B*T,D]`，共享 Linear 与 FFN；每个请求独立追加 K/V，并按请求执行多查询因果 Attention。模型成功后一次提交所有 Context，任一路径失败则把全部 Context 裁剪回批次开始位置。工作区按 `(batch,tokens_per_request)` 复用。Chapter09 的双请求实验显示该路径仍比串行 Context Prefill 慢约 `7.7%`～`11.7%`，因此 `Adaptive` 当前选择串行路径，Packed 作为正确性和性能研究入口保留。
+
 `embedding_request_service_test` 将同一个适配器注入 Chapter10 `HttpAdapter`。同步 completion 与真实 `ResponseWriter` SSE 都生成 `[2,4]`；压力段连续执行 32 个成功请求、8 个 prefill 失败请求，再覆盖客户端断开和 deadline 超时。每次终态后都检查 Context 析构、inflight 归零以及 accepted 与 completed/failed/cancelled/timed_out/released 计数。该测试固定服务复用契约，不解析图片 HTTP body，也不代替真实 SmolVLM 服务 benchmark。
 
 Engine 已支持通过 `TokenizerBackend` 注入 tokenizer。默认路径使用 toy tokenizer；启用 llama.cpp 后，可验证真实 TinyLlama tokenizer 已进入 Engine 的 prompt、Request 和 Runtime 链路：

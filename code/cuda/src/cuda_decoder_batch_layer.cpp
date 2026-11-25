@@ -71,6 +71,49 @@ core::Status CudaDecoderBatchLayer::create(
     return core::Status::ok();
 }
 
+core::Status CudaDecoderBatchLayer::prepare_packed_sequence_workspace(
+    std::size_t sequence_count,
+    std::size_t tokens_per_sequence) {
+    if (sequence_count == packed_sequence_count_ &&
+        tokens_per_sequence == packed_tokens_per_sequence_) {
+        return core::Status::ok();
+    }
+    std::vector<CudaTensor> query(sequence_count);
+    std::vector<CudaTensor> key(sequence_count);
+    std::vector<CudaTensor> value(sequence_count);
+    std::vector<CudaTensor> attention(sequence_count);
+    core::Status status = core::Status::ok();
+    for (std::size_t sequence = 0;
+         status.is_ok() && sequence < sequence_count; ++sequence) {
+        status = CudaTensor::create_contiguous(
+            {tokens_per_sequence, config_.query_heads, config_.head_dimension},
+            core::DType::Float32, &query[sequence]);
+        if (status.is_ok()) {
+            status = CudaTensor::create_contiguous(
+                {tokens_per_sequence, config_.kv_heads, config_.head_dimension},
+                core::DType::Float32, &key[sequence]);
+        }
+        if (status.is_ok()) {
+            status = CudaTensor::create_contiguous(
+                {tokens_per_sequence, config_.kv_heads, config_.head_dimension},
+                core::DType::Float32, &value[sequence]);
+        }
+        if (status.is_ok()) {
+            status = CudaTensor::create_contiguous(
+                {tokens_per_sequence, config_.query_heads, config_.head_dimension},
+                core::DType::Float32, &attention[sequence]);
+        }
+    }
+    if (!status.is_ok()) return status;
+    packed_query_sequences_ = std::move(query);
+    packed_key_sequences_ = std::move(key);
+    packed_value_sequences_ = std::move(value);
+    packed_attention_sequences_ = std::move(attention);
+    packed_sequence_count_ = sequence_count;
+    packed_tokens_per_sequence_ = tokens_per_sequence;
+    return core::Status::ok();
+}
+
 core::Status CudaDecoderBatchLayer::forward(
     CudaExecutionContext* context,
     const CudaDecoderLayerWeights& weights,
@@ -232,6 +275,155 @@ core::Status CudaDecoderBatchLayer::prefill_sequence(
     RETURN_IF_PREFILL_ERROR(context->linear_batch(swiglu_, weights.down, &down_));
     RETURN_IF_PREFILL_ERROR(context->vector_add(*hidden, down_, hidden));
 #undef RETURN_IF_PREFILL_ERROR
+    return core::Status::ok();
+}
+
+core::Status CudaDecoderBatchLayer::prefill_packed_sequences(
+    CudaExecutionContext* context,
+    const CudaDecoderLayerWeights& weights,
+    const std::vector<CudaKvCache*>& caches,
+    CudaTensor* hidden,
+    std::size_t tokens_per_sequence,
+    const std::vector<std::size_t>& position_offsets) {
+    if (context == nullptr || hidden == nullptr || caches.empty() ||
+        tokens_per_sequence == 0 || caches.size() != position_offsets.size() ||
+        caches.size() > std::numeric_limits<std::size_t>::max() /
+            tokens_per_sequence ||
+        caches.size() * tokens_per_sequence != batch_size_ ||
+        weights.attention_norm == nullptr || weights.ffn_norm == nullptr ||
+        (weights.query_norm == nullptr) != (weights.key_norm == nullptr) ||
+        !weights.query.valid() || !weights.key.valid() ||
+        !weights.value.valid() || !weights.attention_output.valid() ||
+        !weights.gate.valid() || !weights.up.valid() || !weights.down.valid() ||
+        hidden->contract().shape.dimensions !=
+            std::vector<std::size_t>{batch_size_, config_.hidden_size}) {
+        return core::Status::error("CUDA packed prefill input shape is invalid");
+    }
+    std::unordered_set<CudaKvCache*> unique;
+    for (std::size_t sequence = 0; sequence < caches.size(); ++sequence) {
+        if (caches[sequence] == nullptr ||
+            !unique.insert(caches[sequence]).second ||
+            !caches[sequence]->valid() ||
+            caches[sequence]->kv_head_count() != config_.kv_heads ||
+            caches[sequence]->head_dimension() != config_.head_dimension ||
+            caches[sequence]->size_tokens() != position_offsets[sequence]) {
+            return core::Status::error(
+                "CUDA packed prefill cache state is invalid");
+        }
+    }
+    core::Status status = prepare_packed_sequence_workspace(
+        caches.size(), tokens_per_sequence);
+    if (!status.is_ok()) return status;
+
+    std::vector<std::size_t> positions(batch_size_);
+    for (std::size_t sequence = 0; sequence < caches.size(); ++sequence) {
+        for (std::size_t token = 0; token < tokens_per_sequence; ++token) {
+            positions[sequence * tokens_per_sequence + token] =
+                position_offsets[sequence] + token;
+        }
+    }
+    status = context->copy(*hidden, &hidden_backup_);
+    if (!status.is_ok()) return status;
+    const auto rollback = [&](const core::Status& failure) {
+        for (std::size_t sequence = 0; sequence < caches.size(); ++sequence) {
+            const core::Status trim_status =
+                caches[sequence]->trim(position_offsets[sequence]);
+            if (!trim_status.is_ok()) return trim_status;
+        }
+        const core::Status hidden_status = context->copy(hidden_backup_, hidden);
+        return hidden_status.is_ok() ? failure : hidden_status;
+    };
+#define RETURN_IF_PACKED_PREFILL_ERROR(expression) do { status = (expression); \
+    if (!status.is_ok()) return rollback(status); } while (false)
+    RETURN_IF_PACKED_PREFILL_ERROR(context->rms_norm_batch(
+        *hidden, *weights.attention_norm, &attention_normalized_,
+        config_.rms_epsilon));
+    RETURN_IF_PACKED_PREFILL_ERROR(context->linear_batch(
+        attention_normalized_, weights.query, &query_));
+    RETURN_IF_PACKED_PREFILL_ERROR(context->linear_batch(
+        attention_normalized_, weights.key, &key_));
+    RETURN_IF_PACKED_PREFILL_ERROR(context->linear_batch(
+        attention_normalized_, weights.value, &value_));
+    if (weights.query_norm != nullptr) {
+        RETURN_IF_PACKED_PREFILL_ERROR(context->rms_norm_batch(
+            query_, *weights.query_norm, &query_, config_.rms_epsilon));
+        RETURN_IF_PACKED_PREFILL_ERROR(context->rms_norm_batch(
+            key_, *weights.key_norm, &key_, config_.rms_epsilon));
+    }
+    RETURN_IF_PACKED_PREFILL_ERROR(context->rope_batch(
+        &query_, positions, config_.rotary_dimension,
+        config_.rope_frequency_base, config_.rotary_pairing));
+    RETURN_IF_PACKED_PREFILL_ERROR(context->rope_batch(
+        &key_, positions, config_.rotary_dimension,
+        config_.rope_frequency_base, config_.rotary_pairing));
+
+    std::vector<CudaTensor*> query_rows;
+    std::vector<CudaTensor*> key_rows;
+    std::vector<CudaTensor*> value_rows;
+    std::vector<const CudaTensor*> attention_rows;
+    query_rows.reserve(batch_size_);
+    key_rows.reserve(batch_size_);
+    value_rows.reserve(batch_size_);
+    attention_rows.reserve(batch_size_);
+    for (std::size_t row = 0; row < batch_size_; ++row) {
+        query_rows.push_back(&query_rows_[row]);
+        key_rows.push_back(&key_rows_[row]);
+        value_rows.push_back(&value_rows_[row]);
+        attention_rows.push_back(&attention_rows_[row]);
+    }
+    RETURN_IF_PACKED_PREFILL_ERROR(context->unpack_rows(query_, query_rows));
+    RETURN_IF_PACKED_PREFILL_ERROR(context->unpack_rows(key_, key_rows));
+    RETURN_IF_PACKED_PREFILL_ERROR(context->unpack_rows(value_, value_rows));
+    for (std::size_t sequence = 0; sequence < caches.size(); ++sequence) {
+        std::vector<const CudaTensor*> sequence_query_rows;
+        std::vector<const CudaTensor*> sequence_key_rows;
+        std::vector<const CudaTensor*> sequence_value_rows;
+        std::vector<CudaTensor*> sequence_attention_rows;
+        sequence_query_rows.reserve(tokens_per_sequence);
+        sequence_key_rows.reserve(tokens_per_sequence);
+        sequence_value_rows.reserve(tokens_per_sequence);
+        sequence_attention_rows.reserve(tokens_per_sequence);
+        for (std::size_t token = 0; token < tokens_per_sequence; ++token) {
+            const std::size_t row = sequence * tokens_per_sequence + token;
+            sequence_query_rows.push_back(&query_rows_[row]);
+            sequence_key_rows.push_back(&key_rows_[row]);
+            sequence_value_rows.push_back(&value_rows_[row]);
+            sequence_attention_rows.push_back(&attention_rows_[row]);
+        }
+        RETURN_IF_PACKED_PREFILL_ERROR(context->pack_rows(
+            sequence_query_rows, &packed_query_sequences_[sequence]));
+        RETURN_IF_PACKED_PREFILL_ERROR(context->pack_rows(
+            sequence_key_rows, &packed_key_sequences_[sequence]));
+        RETURN_IF_PACKED_PREFILL_ERROR(context->pack_rows(
+            sequence_value_rows, &packed_value_sequences_[sequence]));
+        RETURN_IF_PACKED_PREFILL_ERROR(context->append_kv(
+            caches[sequence], packed_key_sequences_[sequence],
+            packed_value_sequences_[sequence]));
+        RETURN_IF_PACKED_PREFILL_ERROR(context->gqa_attention(
+            packed_query_sequences_[sequence], *caches[sequence],
+            &packed_attention_sequences_[sequence],
+            position_offsets[sequence]));
+        RETURN_IF_PACKED_PREFILL_ERROR(context->unpack_rows(
+            packed_attention_sequences_[sequence], sequence_attention_rows));
+    }
+    RETURN_IF_PACKED_PREFILL_ERROR(
+        context->pack_rows(attention_rows, &attention_context_));
+    RETURN_IF_PACKED_PREFILL_ERROR(context->linear_batch(
+        attention_context_, weights.attention_output, &projection_));
+    RETURN_IF_PACKED_PREFILL_ERROR(
+        context->vector_add(*hidden, projection_, hidden));
+    RETURN_IF_PACKED_PREFILL_ERROR(context->rms_norm_batch(
+        *hidden, *weights.ffn_norm, &ffn_normalized_, config_.rms_epsilon));
+    RETURN_IF_PACKED_PREFILL_ERROR(
+        context->linear_batch(ffn_normalized_, weights.gate, &gate_));
+    RETURN_IF_PACKED_PREFILL_ERROR(
+        context->linear_batch(ffn_normalized_, weights.up, &up_));
+    RETURN_IF_PACKED_PREFILL_ERROR(context->swiglu(gate_, up_, &swiglu_));
+    RETURN_IF_PACKED_PREFILL_ERROR(
+        context->linear_batch(swiglu_, weights.down, &down_));
+    RETURN_IF_PACKED_PREFILL_ERROR(
+        context->vector_add(*hidden, down_, hidden));
+#undef RETURN_IF_PACKED_PREFILL_ERROR
     return core::Status::ok();
 }
 
@@ -459,6 +651,12 @@ std::size_t CudaDecoderBatchLayer::device_bytes() const {
     for (std::size_t index = 0; index < query_rows_.size(); ++index) {
         bytes += query_rows_[index].size_bytes() + key_rows_[index].size_bytes() +
             value_rows_[index].size_bytes() + attention_rows_[index].size_bytes();
+    }
+    for (std::size_t index = 0; index < packed_query_sequences_.size(); ++index) {
+        bytes += packed_query_sequences_[index].size_bytes() +
+            packed_key_sequences_[index].size_bytes() +
+            packed_value_sequences_[index].size_bytes() +
+            packed_attention_sequences_[index].size_bytes();
     }
     return bytes;
 }
