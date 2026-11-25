@@ -29,6 +29,11 @@ struct FloatImage {
 };
 
 bool load_rgb_image(const std::string& path, RgbImage* output, std::string* error = nullptr);
+bool decode_rgb_image(
+    const std::vector<std::uint8_t>& encoded,
+    const std::string& media_type,
+    RgbImage* output,
+    std::string* error = nullptr);
 bool jpeg_decoder_available();
 
 }  // namespace multimodal

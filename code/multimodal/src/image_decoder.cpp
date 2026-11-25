@@ -13,6 +13,10 @@ namespace multimodal {
 
 #if defined(CPP_LLM_HAS_LIBJPEG)
 bool load_jpeg(const std::string& path, RgbImage* output, std::string* error);
+bool decode_jpeg(
+    const std::vector<std::uint8_t>& encoded,
+    RgbImage* output,
+    std::string* error);
 #endif
 
 namespace {
@@ -65,13 +69,7 @@ bool parse_int_token(std::istream& input, int* value) {
     return parser && parser.eof();
 }
 
-bool load_ppm(const std::string& path, RgbImage* output, std::string* error) {
-    std::ifstream input(path, std::ios::binary);
-    if (!input) {
-        set_error(error, "unable to open image: " + path);
-        return false;
-    }
-
+bool decode_ppm(std::istream& input, RgbImage* output, std::string* error) {
     std::string magic;
     if (!next_ppm_token(input, &magic) || (magic != "P3" && magic != "P6")) {
         set_error(error, "unsupported PPM encoding");
@@ -110,6 +108,15 @@ bool load_ppm(const std::string& path, RgbImage* output, std::string* error) {
 
     *output = std::move(decoded);
     return true;
+}
+
+bool load_ppm(const std::string& path, RgbImage* output, std::string* error) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) {
+        set_error(error, "unable to open image: " + path);
+        return false;
+    }
+    return decode_ppm(input, output, error);
 }
 
 std::string lowercase_extension(const std::string& path) {
@@ -164,6 +171,37 @@ bool load_rgb_image(const std::string& path, RgbImage* output, std::string* erro
     }
 #endif
     set_error(error, "unsupported image extension: " + extension);
+    return false;
+}
+
+bool decode_rgb_image(
+    const std::vector<std::uint8_t>& encoded,
+    const std::string& media_type,
+    RgbImage* output,
+    std::string* error) {
+    if (output == nullptr) {
+        set_error(error, "image output must not be null");
+        return false;
+    }
+    if (encoded.empty()) {
+        set_error(error, "encoded image must not be empty");
+        return false;
+    }
+    if (media_type == "image/x-portable-pixmap" || media_type == "image/ppm") {
+        const std::string bytes(
+            reinterpret_cast<const char*>(encoded.data()), encoded.size());
+        std::istringstream input(bytes, std::ios::binary);
+        return decode_ppm(input, output, error);
+    }
+#if defined(CPP_LLM_HAS_LIBJPEG)
+    if (media_type == "image/jpeg") return decode_jpeg(encoded, output, error);
+#else
+    if (media_type == "image/jpeg") {
+        set_error(error, "JPEG support is unavailable; install libjpeg development files and rebuild");
+        return false;
+    }
+#endif
+    set_error(error, "unsupported image media type: " + media_type);
     return false;
 }
 

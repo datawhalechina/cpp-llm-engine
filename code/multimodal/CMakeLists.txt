@@ -64,6 +64,7 @@ if(NOT TARGET cpp_llm_engine_model)
 endif()
 
 add_library(cpp_llm_multimodal
+    src/http_request.cpp
     src/input_embedding.cpp
     src/idefics3_preprocessor.cpp
     src/image_decoder.cpp

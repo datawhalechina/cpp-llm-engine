@@ -4,6 +4,7 @@
 // 运行：由 CTest 执行 multimodal_preprocessor_test。
 #include "multimodal/image.h"
 #include "multimodal/image_preprocessor.h"
+#include "multimodal/http_request.h"
 #include "multimodal/idefics3_preprocessor.h"
 
 #include <cmath>
@@ -47,6 +48,39 @@ void test_ppm_decode() {
     CHECK(image.pixels[4] == 255);
     CHECK(image.pixels[8] == 255);
     CHECK(image.pixels[9] == 255);
+}
+
+void test_multimodal_http_request() {
+    const std::string ppm_base64 =
+        "UDMKIyByZWQsIGdyZWVuLCBibHVlLCB3aGl0ZQoyIDIKMjU1CjI1NSAwIDAgICAwIDI1NSAw"
+        "CjAgMCAyNTUgICAyNTUgMjU1IDI1NQo=";
+    const std::string body =
+        "{\"request_id\":1,\"prompt\":\"describe\\nimage\","
+        "\"image_media_type\":\"image/ppm\",\"image_base64\":\"" +
+        ppm_base64 + "\"}";
+    multimodal::MultimodalHttpRequest request;
+    std::string error;
+    CHECK(multimodal::parse_multimodal_http_request(body, &request, &error));
+    CHECK(error.empty());
+    CHECK(request.prompt == "describe\nimage");
+    CHECK(request.image.valid());
+    CHECK(request.image.width == 2 && request.image.height == 2);
+
+    const auto unchanged = request.image.pixels;
+    CHECK(!multimodal::parse_multimodal_http_request(
+        "{\"prompt\":\"x\",\"image_media_type\":\"image/ppm\","
+        "\"image_base64\":\"%%%%\"}",
+        &request,
+        &error));
+    CHECK(request.image.pixels == unchanged);
+    CHECK(!multimodal::parse_multimodal_http_request(body, &request, &error, 4));
+    CHECK(error.find("size limit") != std::string::npos);
+    CHECK(!multimodal::parse_multimodal_http_request(
+        "{\"prompt\":\"x\",\"image_media_type\":\"image/png\","
+        "\"image_base64\":\"" + ppm_base64 + "\"}",
+        &request,
+        &error));
+    CHECK(error.find("media type") != std::string::npos);
 }
 
 void test_resize_and_normalize() {
@@ -163,6 +197,7 @@ void test_idefics3_tile_order() {
 
 int main() {
     test_ppm_decode();
+    test_multimodal_http_request();
     test_resize_and_normalize();
     test_bilinear_center();
     test_patch_order();
