@@ -51,8 +51,8 @@ Prompt 解析产生文本片段和图片片段。文本词元经过 Token Embedd
 
 阶段指标分别记录图片解码、动态切图、Prompt 分词、Vision Encoder、Projector、嵌入组装和语言 Prefill。共享模型权重、请求中间量与进程 RSS 使用不同口径，比较前需要固定负载和统计范围。
 
-图片上传协议属于 Transport 设计。多模态输入层先把图片与 Prompt 转换为 Executor，Chapter10 再管理准入、同步/流式输出、断连和资源释放；multipart、base64、大小限制和图片缓存可以在不改变 Runtime 契约的前提下扩展。
+图片请求包含问题、媒体类型和 Base64 数据。多模态请求准备收集器负责大小限制、解码与预处理，并在短窗口内把同网格图片送入一次视觉 batch；随后拆分输出、创建每请求 Executor。Chapter10 管理准入、Completion/SSE、断连和资源释放。后续增加 multipart、图片缓存或网格分桶时，仍复用相同准备边界。
 
 图文嵌入、32 层 Decoder、真实 Prompt、动态切图服务和 CUDA Context 的固定结果统一查[多模态验证资产](../../reference/experiment_assets.md#多模态cuda-与正确性资产)。CUDA 路径已把 6 个前缀文本词元、64 行视觉向量和 18 个后缀文本词元组成 `88x960` 序列，并复用 Chapter06 Runtime 完成四词元 CPU/CUDA 贪心生成对照。首个词元来自 Prefill logits，后续三个词元由逐词元 Decode 推进，因此四词元生成只增加三次 Context Decode。
 
-服务验收让 Executor Factory 为同步与 SSE 请求分别创建 CUDA Context。两个请求生成相同四词元并独立释放，说明 Chapter10 无需识别视觉向量即可管理多模态终态。进一步把两个图文请求同时交给 Chapter08 后，每个请求先独立 Prefill，后三个词元由三次 `batch=2` CUDA Decode 产生；模型权重计算合并，请求位置与 K/V 保持隔离。视觉层也已用双图片 packed pipeline 验证 Attention 与空间合并边界。Service 将多个待处理图片收集为视觉 batch、图片 HTTP 传输和图文 Prefill 组批仍是后续交接点。继续阅读 [Python 与生产框架对照](./04_framework_comparison.md)，再按[多模态六任务学习计划](../../guides/multimodal_learning_plan.md)运行验证。
+服务验收让 Completion 与 SSE 请求先进入一次 `batch=2` 视觉流水线，再分别创建 CUDA Context。两个请求生成相同四词元并独立释放，说明 Chapter10 无需识别视觉向量即可管理多模态终态。Chapter08 随后执行一次 Prefill 组批和三次 `batch=2` CUDA Decode，请求位置与 K/V 保持隔离。等长请求的 Packed Prefill 已能共享 Linear/FFN，并为每个请求单独执行多查询 Attention；两轮端到端结果仍慢于串行 Context，因此默认路径保持串行。下一步性能交接点是减少 Q8_0 GEMV 与行重排成本，以及为不同图片网格增加分桶或填充。继续阅读 [Python 与生产框架对照](./04_framework_comparison.md)，再按[多模态六任务学习计划](../../guides/multimodal_learning_plan.md)运行验证。

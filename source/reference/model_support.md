@@ -28,7 +28,7 @@ TinyLlama 固定 Llama 稠密基线，其余模型分别改变归一化与位置
 | DeepSeek-V2-Lite | 已验证 | 已验证 | 已验证 | 已验证 | 已验证 |
 | SmolVLM-500M-Instruct | 部分完成 | 已验证 | 部分完成 | 已验证 | 部分完成 |
 
-SmolVLM 的“部分完成”表示真实资产按需准备，语言服务生命周期和 CUDA 双请求 Decode 组批已经验证；图片 HTTP 传输、服务视觉收集和 Prefill 组批仍待接入。Qwen1.5-MoE 当前以 CPU 分组路径为默认实现，CUDA 专家执行尚未进入支持矩阵。
+SmolVLM 的“部分完成”表示真实资产按需准备，JSON/Base64 图片输入、跨请求 CUDA Vision batch、语言服务生命周期以及双请求 Packed Prefill/Decode 组批已经验证；Packed Prefill 已通过结果、隔离和回滚检查，但性能证据尚不支持替换串行默认路径。Qwen1.5-MoE 当前以 CPU 分组路径为默认实现，CUDA 专家执行尚未进入支持矩阵。
 
 机器可校验状态登记在 <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/testing/model_capabilities.json"><code>model_capabilities.json</code></a>。运行 `npm run test:check-model-capabilities` 可检查状态词、入口文件和待办边界；该检查不下载模型，也不执行可选 GPU 路径。
 
@@ -66,7 +66,7 @@ TinyLlama 是默认模型，因为 Llama GGUF 字段、Tokenizer、22 层 Decode
 
 ### SmolVLM 多模态
 
-SmolVLM 使用 IDEFICS3 图片路径、SigLIP Vision Encoder 和 Projector，把视觉向量转换为语言模型宽度后进入统一嵌入。CPU 已建立逐阶段 Golden、真实图文生成和服务生命周期；CUDA 已接通完整视觉 tile、双图片视觉组批、图文生成和双请求 Decode 组批。图片网络传输与服务端 Prefill 组批继续由[多模态扩展教程](../extensions/multimodal/intro.md)跟踪。
+SmolVLM 使用 IDEFICS3 图片路径、SigLIP Vision Encoder 和 Projector，把视觉向量转换为语言模型宽度后进入统一嵌入。CPU 已建立逐阶段 Golden、真实图文生成和服务生命周期；CUDA 已接通完整视觉 tile、跨 HTTP 请求双图片视觉组批、JSON/Base64 图片服务、图文生成、双请求 Packed Prefill 和 Decode 组批。不同图片网格以及 Packed Prefill 的 GEMV 与行重排优化继续由[多模态扩展教程](../extensions/multimodal/intro.md)跟踪。
 
 ## 规划模型
 
