@@ -49,6 +49,7 @@ int main(int argc, char** argv) {
     chapter06_generation::GreedySampler sampler;
     chapter10_serving::ServiceCore service(
         16, 8, {}, factory->paged_mla_resource(), {}, factory.get());
+    chapter10_serving::AsyncServiceLoop async_service(service, runtime, sampler);
     chapter10_serving::HttpAdapter adapter(
         service,
         runtime,
@@ -56,7 +57,8 @@ int main(int argc, char** argv) {
         [&factory]() { return factory->create_executor(); },
         [&tokenizer](const std::string& prompt) {
             return tokenizer->encode(prompt);
-        });
+        },
+        {}, &async_service);
 
     std::cout << "DeepSeek-V2-Lite CUDA HTTP server: http://" << bind_address
               << ':' << port << "\nmodel layers: " << factory->layer_count()

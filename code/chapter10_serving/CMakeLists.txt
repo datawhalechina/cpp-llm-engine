@@ -2,6 +2,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(chapter10_serving LANGUAGES CXX)
 
+find_package(Threads REQUIRED)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -22,7 +24,9 @@ if(NOT TARGET chapter08_scheduling)
 endif()
 
 add_library(chapter10_serving
+    src/async_service.cpp
     src/http_adapter.cpp
+    src/request_preparer.cpp
     src/request_worker.cpp
     src/service_core.cpp
 )
@@ -32,6 +36,7 @@ target_link_libraries(chapter10_serving
         chapter06_generation
         chapter07_kv_cache
         chapter08_scheduling
+        Threads::Threads
 )
 target_compile_features(chapter10_serving PUBLIC cxx_std_17)
 
@@ -61,6 +66,18 @@ add_chapter10_test(
     chapter10_http_contract_test
     tests/http_contract_test.cpp
     "integration;serving;http;streaming"
+    integration
+)
+add_chapter10_test(
+    chapter10_async_service_test
+    tests/async_service_test.cpp
+    "integration;serving;async;concurrency"
+    integration
+)
+add_chapter10_test(
+    chapter10_request_preparer_test
+    tests/request_preparer_test.cpp
+    "integration;serving;async;batching"
     integration
 )
 add_chapter10_test(

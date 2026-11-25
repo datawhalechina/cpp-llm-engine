@@ -4,7 +4,7 @@
 
 ## 代码架构
 
-`CppHttplibServer` 只处理套接字和分块写出，并在进入当前单线程 `HttpAdapter` 前串行化调用。适配器解析 Completion 参数、持有请求对象并映射 HTTP/SSE 结果；`ServiceCore` 管理等待/运行状态、准入、指标和终态释放，再把每个执行步交给 Chapter08。模型状态由请求专属执行器与上下文持有，分页 K/V 通过 Chapter07 事务释放。
+`CppHttplibServer` 只处理套接字和分块写出。真实服务入口把请求交给 `AsyncServiceLoop`，由后台单线程依次调用 `ServiceCore`；网络线程等待自己的词元事件并写回 Completion 或 SSE。`ServiceCore` 管理等待/运行状态、准入、指标和终态释放，再把每个执行步交给 Chapter08。模型状态由请求专属执行器与上下文持有，分页 K/V 通过 Chapter07 事务释放。
 
 配置批执行器后，准入顺序是“绑定请求数据面 → 估算缓存前缀 → 进入等待队列”。估算不增加块引用，同优先级请求只用它决定提升顺序；获得运行槽时再重新查询并采用真实前缀，同步块表、`Request` 和模型上下文，实际长度随后传给 Chapter08 规划器。终态释放顺序是“发布完整缓存块 → 释放请求块引用 → 清理历史与服务条目”。`ServiceCore` 只调用生命周期钩子，不解析 Radix 树或修改 K/V 载荷。
 
@@ -18,13 +18,15 @@
 | 调度执行 | Chapter08 Scheduler、Executor | 每步提交候选；失败写入 Request 终态 |
 | 缓存发布与回收 | Chapter07 cache transaction、Engine Factory | 终态先发布可复用块，再释放请求引用 |
 
-当前互斥入口让传输层串行调用 `ServiceCore`，因此真实 HTTP Completion/SSE 逐个进入适配器。`RequestWorkerPool` 验证独立上下文的 CPU 线程重叠；Chapter08 张量组批验证一次模型调用处理多请求。前者属于线程执行方式，后者属于模型数据面，当前 HTTP 入口尚未把多个连接汇入同一个模型批次。
+异步入口允许多个 HTTP Completion/SSE 先进入等待队列，再由同一个 Chapter08 调度步选择。`AsyncRequestHandle` 分别保存词元事件和终态，网络线程不直接修改 `ServiceCore`。`AsyncServiceLoop` 的可选提交收集窗口会在服务空闲时短暂等待同批请求；默认值为零，模型入口可用数毫秒延迟换取更稳定的组批机会。`RequestWorkerPool` 验证独立上下文的 CPU 线程重叠；Chapter08 张量组批验证一次模型调用处理多请求。异步接入、工作线程和模型数据面是三个不同层次。
 
 ## 阅读顺序与资产
 
 | 模块 | 学习内容 | 验证 |
 | --- | --- | --- |
 | `ServiceCore` | 准入、缓存采用、等待/运行队列、调度交接、指标和统一释放 | `chapter10_service_core_test` |
+| `AsyncServiceLoop` | 将网络提交、取消和超时投递给单线程服务状态机 | `chapter10_async_service_test` |
+| `CompletionRequestCollector` | 在短窗口内收集请求并调用一次模型专属准备 batch | `chapter10_request_preparer_test` |
 | `RequestWorkerPool` | 用独立 Request 与 Executor 并行执行 CPU 请求 | `chapter10_request_worker_test` |
 | `ResponseWriter` | 表达响应头、SSE 事件、断连和背压 | `chapter10_http_contract_test` |
 | `HttpAdapter` | 把 health、metrics 和 Completion 路由映射到 ServiceCore | `chapter10_http_contract_test` |
@@ -43,7 +45,7 @@
 
 ## 运行与验证
 
-默认脚本使用进程内适配器，运行服务状态、HTTP 接口、并行工作线程和终态释放测试：
+默认脚本使用进程内适配器，运行服务状态、终态释放、HTTP/SSE、异步循环、请求准备收集器和并行工作线程测试：
 
 ```bash
 bash code/chapter10_serving/scripts/run.sh
@@ -61,7 +63,7 @@ npm run test:fault-injection
 bash code/chapter10_serving/scripts/run_cpp_httplib_loopback.sh
 ```
 
-准备本地 `httplib.h` 后可以设置 `CHAPTER10_CPPHTTPLIB_INCLUDE_DIR`；未设置时，CMake 获取固定版本 `v0.18.3`。该入口验证 health、metrics、同步 Completion 和 SSE，不代表并发 HTTP 服务。
+准备本地 `httplib.h` 后可以设置 `CHAPTER10_CPPHTTPLIB_INCLUDE_DIR`；未设置时，CMake 获取固定版本 `v0.18.3`。该入口验证 health、metrics、异步 Completion 和 SSE；模型是否形成 batch 还取决于同时到达的请求与 Batch Runner。
 
 TinyLlama 使用真实 socket 回环验证默认 CPU 服务，Qwen3 使用独立固定模型入口验证第二种稠密架构、双请求调度和 Radix 命中：
 
@@ -115,9 +117,9 @@ CUDA_HOME=/usr/local/cuda-12.8 \
 bash code/engine/scripts/run_deepseek_v2_lite_cuda_http_server.sh --check
 ```
 
-该回环以文本 `prompt` 验证真实分词器、CUDA 工厂、分页 MLA、Completion、SSE 和终态释放。传输层仍串行进入适配器，因此它只验证单请求网络组合，不验证并发连接形成模型批次。
+该回环以文本 `prompt` 验证真实分词器、CUDA 工厂、分页 MLA、异步 Completion/SSE 和终态释放。并发连接可共同进入等待/运行集合；是否形成张量 batch 仍取决于 Chapter08 计划和 CUDA Batch Runner。
 
-SmolVLM 在进入 Chapter10 前已经把图片与文本转换为请求专属的连续嵌入。下面的入口验证 CUDA 图文生成、同步/SSE、双请求解码组批、请求隔离和终态释放；图片 HTTP 请求体解析与视觉预填充组批仍是后续服务能力。
+SmolVLM 通过 Chapter10 的请求准备收集器，把两个 JSON/Base64 图片请求交给一次 CUDA Vision batch，再分别建立连续嵌入和请求 Context。下面的入口验证图文生成、Completion/SSE、视觉组批、语言 Prefill/Decode 组批、请求隔离和终态释放；HTTP Adapter 与 ServiceCore 仍保持模型无关。
 
 ```bash
 CUDA_HOME=/usr/local/cuda-12.8 \
@@ -127,4 +129,4 @@ bash code/multimodal/scripts/run_cuda_smolvlm_context.sh \
 
 ## 扩展入口
 
-`ServiceCore` 已接通 Chapter08 优先级策略、真实解码张量组批和分页 K/V 数据。当前背压会取消并释放请求；后续可以增加自动截止时间、异步写出器暂停/恢复和单线程 `ServiceCore` 事件循环。真实多请求预填充张量组批仍属于 Chapter08 数据面能力，需要由调度计划和批执行器共同实现。
+`ServiceCore` 已接通 Chapter08 优先级策略、异步请求事件循环、真实解码张量组批和分页 K/V 数据。当前背压会取消并释放请求；后续可以增加自动截止时间和异步写出器暂停/恢复。真实多请求预填充张量组批仍属于 Chapter08 数据面能力，需要由调度计划和批执行器共同实现。

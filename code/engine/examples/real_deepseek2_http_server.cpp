@@ -38,11 +38,13 @@ int main(int argc, char** argv) {
     chapter06_generation::Runtime runtime(config);
     chapter06_generation::GreedySampler sampler;
     chapter10_serving::ServiceCore service(16, 16, {}, {}, {}, factory.get());
+    chapter10_serving::AsyncServiceLoop async_service(service, runtime, sampler);
     chapter10_serving::HttpAdapter adapter(
         service,
         runtime,
         sampler,
-        [&factory]() { return factory->create_executor(); });
+        [&factory]() { return factory->create_executor(); },
+        {}, {}, &async_service);
 
     std::cout << "DeepSeek-V2-Lite HTTP server: http://" << bind_address
               << ':' << port << "\nmodel layers: " << factory->layer_count()

@@ -218,6 +218,8 @@ DispatchStats ServiceCore::dispatch_step(
         completed,
         scheduler_stats.model_batch_calls,
         scheduler_stats.tensor_batch_requests,
+        scheduler_stats.prefill_group_calls,
+        scheduler_stats.prefill_group_requests,
     };
 }
 

@@ -1,5 +1,5 @@
 // Chapter 10：实现 cpp-httplib 的 HTTP 与 chunked SSE 写回。
-// 契约：网络库类型停留在本文件，并在进入单线程 ServiceCore 前串行化请求。
+// 契约：网络库类型停留在本文件；同步 Adapter 串行，异步 Adapter 并发投递。
 // 验证：可选 loopback 脚本检查 health、metrics、Completion 和 SSE。
 #include "chapter10_serving/cpp_httplib_transport.h"
 
@@ -67,11 +67,13 @@ int CppHttplibServer::listen() {
     httplib::Server server;
     std::mutex adapter_mutex;
     server.Get("/health", [&](const httplib::Request& request, httplib::Response& response) {
-        const std::lock_guard<std::mutex> lock(adapter_mutex);
+        std::unique_lock<std::mutex> lock(adapter_mutex, std::defer_lock);
+        if (!adapter_.asynchronous()) lock.lock();
         write_response(adapter_.handle(to_http_request(request)), response);
     });
     server.Get("/metrics", [&](const httplib::Request& request, httplib::Response& response) {
-        const std::lock_guard<std::mutex> lock(adapter_mutex);
+        std::unique_lock<std::mutex> lock(adapter_mutex, std::defer_lock);
+        if (!adapter_.asynchronous()) lock.lock();
         write_response(adapter_.handle(to_http_request(request)), response);
     });
     server.Post(
@@ -79,7 +81,8 @@ int CppHttplibServer::listen() {
         [&](const httplib::Request& request, httplib::Response& response) {
             const HttpRequest http_request = to_http_request(request);
             if (!is_stream_request(request)) {
-                const std::lock_guard<std::mutex> lock(adapter_mutex);
+                std::unique_lock<std::mutex> lock(adapter_mutex, std::defer_lock);
+                if (!adapter_.asynchronous()) lock.lock();
                 write_response(adapter_.handle(http_request), response);
                 return;
             }
@@ -88,7 +91,8 @@ int CppHttplibServer::listen() {
                 [this, &adapter_mutex, http_request](
                     std::size_t,
                     httplib::DataSink& sink) mutable {
-                    const std::lock_guard<std::mutex> lock(adapter_mutex);
+                    std::unique_lock<std::mutex> lock(adapter_mutex, std::defer_lock);
+                    if (!adapter_.asynchronous()) lock.lock();
                     HttplibResponseWriter writer(sink);
                     (void)adapter_.handle_stream(http_request, writer);
                     writer.finish();

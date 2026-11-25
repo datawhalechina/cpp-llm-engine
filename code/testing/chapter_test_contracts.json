@@ -531,6 +531,24 @@
       "status": "active"
     },
     {
+      "target": "chapter10_async_service_test",
+      "source": "code/chapter10_serving/tests/async_service_test.cpp",
+      "owner": "10",
+      "level": "integration",
+      "dependencies": ["06", "07", "08", "10"],
+      "status": "active",
+      "note": "验证异步准入、Completion/SSE 事件交付和统一终态释放"
+    },
+    {
+      "target": "chapter10_request_preparer_test",
+      "source": "code/chapter10_serving/tests/request_preparer_test.cpp",
+      "owner": "10",
+      "level": "integration",
+      "dependencies": ["10"],
+      "status": "active",
+      "note": "验证多请求准备收集、批回调和逐请求结果拆分"
+    },
+    {
       "target": "chapter10_request_worker_test",
       "source": "code/chapter10_serving/tests/request_worker_test.cpp",
       "owner": "10",

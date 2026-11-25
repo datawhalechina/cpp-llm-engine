@@ -23,7 +23,8 @@ int main(int argc, char** argv) {
     Runtime runtime(config, transformer);
     GreedySampler sampler;
     ServiceCore service(16, 4);
-    HttpAdapter adapter(service, runtime, sampler);
+    AsyncServiceLoop async_service(service, runtime, sampler);
+    HttpAdapter adapter(service, runtime, sampler, {}, {}, {}, &async_service);
     CppHttplibServer server(adapter, "127.0.0.1", port);
     return server.listen();
 }

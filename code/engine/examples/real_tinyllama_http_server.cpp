@@ -50,11 +50,13 @@ int main(int argc, char** argv) {
     }
     chapter10_serving::ServiceCore service(
         16, 16, {}, factory->paged_kv_resource(), {}, factory.get());
+    chapter10_serving::AsyncServiceLoop async_service(service, runtime, sampler);
     chapter10_serving::HttpAdapter adapter(
         service,
         runtime,
         sampler,
-        [&factory]() { return factory->create_executor(); });
+        [&factory]() { return factory->create_executor(); },
+        {}, {}, &async_service);
 
     const auto example_tokens = tokenizer->encode("Hello TinyLlama");
     std::cout << "real TinyLlama HTTP server: http://" << bind_address << ':' << port << '\n'
