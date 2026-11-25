@@ -5,6 +5,7 @@
 #include "multimodal/cuda_vision_pipeline.h"
 #include "multimodal/image.h"
 #include "multimodal/image_preprocessor.h"
+#include "multimodal/http_request.h"
 #include "multimodal/input_embedding.h"
 #include "multimodal/mmproj_schema.h"
 #include "multimodal/smolvlm_prompt.h"
@@ -22,6 +23,7 @@
 #endif
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -32,6 +34,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -59,14 +62,57 @@ public:
     bool finished = false;
 };
 
-std::string service_request_body(std::size_t request_id, std::size_t positions) {
-    std::ostringstream body;
-    body << "{\"request_id\":" << request_id << ",\"prompt_tokens\":[";
-    for (std::size_t index = 0; index < positions; ++index) {
-        if (index != 0) body << ',';
-        body << '0';
+std::string base64_encode(const std::vector<std::uint8_t>& bytes) {
+    static constexpr char kAlphabet[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string encoded;
+    encoded.reserve((bytes.size() + 2) / 3 * 4);
+    for (std::size_t offset = 0; offset < bytes.size(); offset += 3) {
+        const std::uint32_t first = bytes[offset];
+        const std::uint32_t second =
+            offset + 1 < bytes.size() ? bytes[offset + 1] : 0;
+        const std::uint32_t third =
+            offset + 2 < bytes.size() ? bytes[offset + 2] : 0;
+        const std::uint32_t bits = (first << 16U) | (second << 8U) | third;
+        encoded.push_back(kAlphabet[(bits >> 18U) & 0x3fU]);
+        encoded.push_back(kAlphabet[(bits >> 12U) & 0x3fU]);
+        encoded.push_back(
+            offset + 1 < bytes.size() ? kAlphabet[(bits >> 6U) & 0x3fU] : '=');
+        encoded.push_back(
+            offset + 2 < bytes.size() ? kAlphabet[bits & 0x3fU] : '=');
     }
-    body << "]}";
+    return encoded;
+}
+
+std::string json_escape(const std::string& value) {
+    std::string escaped;
+    for (const char ch : value) {
+        switch (ch) {
+            case '"': escaped += "\\\""; break;
+            case '\\': escaped += "\\\\"; break;
+            case '\n': escaped += "\\n"; break;
+            case '\r': escaped += "\\r"; break;
+            case '\t': escaped += "\\t"; break;
+            default: escaped.push_back(ch); break;
+        }
+    }
+    return escaped;
+}
+
+std::string service_request_body(
+    std::size_t request_id,
+    const multimodal::RgbImage& image,
+    const std::string& prompt) {
+    std::ostringstream ppm;
+    ppm << "P6\n" << image.width << ' ' << image.height << "\n255\n";
+    const std::string header = ppm.str();
+    std::vector<std::uint8_t> bytes(header.begin(), header.end());
+    bytes.insert(bytes.end(), image.pixels.begin(), image.pixels.end());
+    std::ostringstream body;
+    body << "{\"request_id\":" << request_id
+         << ",\"prompt\":\"" << json_escape(prompt)
+         << "\",\"image_media_type\":\"image/ppm\",\"image_base64\":\""
+         << base64_encode(bytes) << "\"}";
     return body.str();
 }
 
@@ -348,7 +394,18 @@ int main(int argc, char** argv) {
     bool service_batch_released = false;
     std::size_t service_model_batch_calls = 0;
     std::size_t service_tensor_batch_requests = 0;
+    std::size_t service_prefill_group_calls = 0;
+    std::size_t service_prefill_group_requests = 0;
     std::size_t service_batch_workspaces = 0;
+    std::size_t service_vision_batch_calls = 0;
+    std::size_t service_vision_max_batch_size = 0;
+    std::size_t service_async_prefill_group_calls = 0;
+    std::size_t service_async_tensor_batch_requests = 0;
+    std::size_t service_async_packed_prefill_calls = 0;
+    std::size_t service_packed_prefill_calls = 0;
+    std::size_t service_prefill_workspaces = 0;
+    double service_serial_prefill_ms = 0.0;
+    double service_batched_prefill_ms = 0.0;
     if (mixed_prompt && matched) {
         std::vector<float> cpu_decode_logits;
         std::vector<float> cuda_decode_logits;
@@ -434,31 +491,187 @@ int main(int argc, char** argv) {
             runtime_cuda_position == embeddings.token_count + 3;
 #ifdef CPP_LLM_MULTIMODAL_HAS_SERVICE
         if (service_mode && matched) {
-            chapter10_serving::ServiceCore service(2, 2);
+            cpp_llm_engine::CudaEmbeddingBatchRunner service_runner(
+                *cuda_model,
+                cpp_llm_engine::CudaEmbeddingPrefillPath::PackedEqualLength);
+            chapter10_serving::ServiceCore service(
+                2, 2, {}, {}, {}, &service_runner);
+            chapter10_serving::AsyncServiceLoop async_service(
+                service, runtime, sampler, 2048, 0,
+                std::chrono::milliseconds(10));
+            chapter10_serving::CompletionRequestCollector preparation_collector(
+                [&](const std::vector<chapter10_serving::HttpRequest>& requests,
+                    std::vector<chapter10_serving::CompletionPreparationResult>* results) {
+                    service_factory_calls += requests.size();
+                    results->assign(requests.size(), {});
+                    std::vector<multimodal::MultimodalHttpRequest> parsed(
+                        requests.size());
+                    std::vector<multimodal::PreprocessedImage> prepared_images(
+                        requests.size());
+                    std::vector<std::size_t> valid_indices;
+                    std::vector<multimodal::PatchTensor> patch_batch;
+                    std::vector<std::vector<std::size_t>> position_batch;
+                    for (std::size_t index = 0; index < requests.size(); ++index) {
+                        std::string request_error;
+                        if (!multimodal::parse_multimodal_http_request(
+                                requests[index].body, &parsed[index], &request_error) ||
+                            !multimodal::preprocess_image(
+                                parsed[index].image, preprocess,
+                                &prepared_images[index], &request_error)) {
+                            (*results)[index].status =
+                                chapter10_serving::CompletionPrepareStatus::invalid_request;
+                            (*results)[index].error = std::move(request_error);
+                            continue;
+                        }
+                        std::vector<std::size_t> request_positions(
+                            prepared_images[index].patches.patch_count);
+                        for (std::size_t position = 0;
+                             position < request_positions.size(); ++position) {
+                            request_positions[position] = position;
+                        }
+                        valid_indices.push_back(index);
+                        patch_batch.push_back(prepared_images[index].patches);
+                        position_batch.push_back(std::move(request_positions));
+                    }
+                    if (valid_indices.empty()) return;
+
+                    CudaTensor request_visual_output;
+                    auto request_status = CudaTensor::create_contiguous(
+                        {valid_indices.size() * visual_tokens, config.projection_dim},
+                        DType::Float32,
+                        &request_visual_output);
+                    if (request_status.is_ok()) {
+                        request_status = pipeline.forward_batch(
+                            &vision_context, patch_batch, position_batch,
+                            source_grid, source_grid, &request_visual_output);
+                    }
+                    std::vector<float> packed_visual_values(
+                        valid_indices.size() * visual_tokens * config.projection_dim);
+                    if (request_status.is_ok()) {
+                        request_status = vision_context.download(
+                            request_visual_output,
+                            packed_visual_values.data(),
+                            packed_visual_values.size() * sizeof(float));
+                    }
+                    if (request_status.is_ok()) {
+                        request_status = vision_context.synchronize();
+                    }
+                    if (!request_status.is_ok()) {
+                        for (const std::size_t index : valid_indices) {
+                            (*results)[index].status =
+                                chapter10_serving::CompletionPrepareStatus::executor_unavailable;
+                            (*results)[index].error = request_status.message();
+                        }
+                        return;
+                    }
+
+                    const std::size_t values_per_image =
+                        visual_tokens * config.projection_dim;
+                    for (std::size_t slot = 0; slot < valid_indices.size(); ++slot) {
+                        const std::size_t index = valid_indices[slot];
+                        auto& result = (*results)[index];
+                        std::string create_error;
+                        multimodal::SmolvlmPromptChunks request_prompt;
+                        if (!multimodal::build_smolvlm_single_turn_prompt(
+                                parsed[index].prompt, 0, 0,
+                                &request_prompt, &create_error)) {
+                            result.status = chapter10_serving::
+                                CompletionPrepareStatus::invalid_request;
+                            result.error = std::move(create_error);
+                            continue;
+                        }
+                        chapter01::TokenSequence request_tokens;
+                        std::size_t placeholder =
+                            std::numeric_limits<std::size_t>::max();
+                        for (const auto& chunk : request_prompt.chunks) {
+                            if (chunk.kind == multimodal::PromptChunkKind::Text) {
+                                const auto chunk_tokens = tokenizer->encode(
+                                    chunk.text, false, true);
+                                request_tokens.insert(
+                                    request_tokens.end(), chunk_tokens.begin(),
+                                    chunk_tokens.end());
+                            } else if (placeholder ==
+                                       std::numeric_limits<std::size_t>::max()) {
+                                placeholder = request_tokens.size();
+                                request_tokens.push_back(0);
+                            } else {
+                                create_error =
+                                    "service request contains multiple image placeholders";
+                                break;
+                            }
+                        }
+                        cpp_llm_engine::core::DecoderEmbeddingSequence request_text;
+                        if (!create_error.empty() ||
+                            placeholder == std::numeric_limits<std::size_t>::max() ||
+                            !cpu_model->embed_tokens(
+                                request_tokens, &request_text, &create_error)) {
+                            result.status = chapter10_serving::
+                                CompletionPrepareStatus::executor_unavailable;
+                            result.error = std::move(create_error);
+                            continue;
+                        }
+                        std::vector<float> request_visual_values(
+                            packed_visual_values.begin() + slot * values_per_image,
+                            packed_visual_values.begin() + (slot + 1) * values_per_image);
+                        multimodal::MultimodalEmbeddingSequence request_sequence;
+                        if (!multimodal::compose_multimodal_embeddings(
+                                {request_text.token_count, request_text.hidden_size,
+                                 std::move(request_text.values)},
+                                {{placeholder,
+                                  {visual_tokens, config.projection_dim,
+                                   std::move(request_visual_values)}}},
+                                &request_sequence, &create_error)) {
+                            result.status = chapter10_serving::
+                                CompletionPrepareStatus::executor_unavailable;
+                            result.error = std::move(create_error);
+                            continue;
+                        }
+                        cpp_llm_engine::core::DecoderEmbeddingSequence request_embeddings{
+                            request_sequence.embeddings.rows,
+                            request_sequence.embeddings.cols,
+                            std::move(request_sequence.embeddings.values)};
+                        auto context = cuda_model->create_context(
+                            request_embeddings.token_count + 4, &create_error);
+                        result.prepared.executor =
+                            cpp_llm_engine::EmbeddingRequestExecutor::create(
+                                std::move(context), request_embeddings, &create_error);
+                        if (result.prepared.executor == nullptr) {
+                            result.status = chapter10_serving::
+                                CompletionPrepareStatus::executor_unavailable;
+                            result.error = std::move(create_error);
+                            continue;
+                        }
+                        result.prepared.prompt_positions.assign(
+                            request_embeddings.token_count, 0);
+                        result.status =
+                            chapter10_serving::CompletionPrepareStatus::ready;
+                    }
+                },
+                2,
+                std::chrono::milliseconds(10));
             chapter10_serving::HttpAdapter adapter(
-                service,
-                runtime,
-                sampler,
-                [&]() -> std::shared_ptr<chapter06_generation::RequestModelExecutor> {
-                    ++service_factory_calls;
-                    std::string create_error;
-                    auto context = cuda_model->create_context(
-                        embeddings.token_count + 4, &create_error);
-                    if (context == nullptr) return nullptr;
-                    return cpp_llm_engine::EmbeddingRequestExecutor::create(
-                        std::move(context), embeddings, &create_error);
-                });
-            const auto sync_response = adapter.handle({
-                "POST", "/v1/completions",
-                service_request_body(901, embeddings.token_count)});
+                service, runtime, sampler, {}, {}, {},
+                &async_service, &preparation_collector);
+            const std::string visual_request = service_request_body(
+                901, image, argv[5]);
+            chapter10_serving::HttpResponse sync_response;
+            chapter10_serving::HttpResponse stream_response;
+            RecordingWriter writer;
+            const std::string stream_request = service_request_body(
+                902, image, argv[5]);
+            std::thread sync_client([&] {
+                sync_response = adapter.handle({
+                    "POST", "/v1/completions", visual_request});
+            });
+            std::thread stream_client([&] {
+                stream_response = adapter.handle_stream({
+                    "POST", "/v1/completions", stream_request}, writer);
+            });
+            sync_client.join();
+            stream_client.join();
             service_sync_match = sync_response.status_code == 200 &&
                 sync_response.body.find(token_array_json(runtime_cuda_tokens)) !=
                     std::string::npos;
-
-            RecordingWriter writer;
-            const auto stream_response = adapter.handle_stream({
-                "POST", "/v1/completions",
-                service_request_body(902, embeddings.token_count)}, writer);
             service_stream_match = stream_response.status_code == 200 &&
                 writer.headers_written && writer.finished &&
                 writer.head.status_code == 200 &&
@@ -466,13 +679,63 @@ int main(int argc, char** argv) {
                 contains_tokens_in_order(writer.body, runtime_cuda_tokens) &&
                 writer.body.find("\"finish_reason\":\"stop\"") !=
                     std::string::npos;
-            const auto& metrics = service.metrics();
+            const auto service_snapshot = async_service.snapshot();
+            const auto& metrics = service_snapshot.metrics;
+            const auto collector_stats = preparation_collector.stats();
+            service_vision_batch_calls = collector_stats.batch_calls;
+            service_vision_max_batch_size = collector_stats.max_batch_size;
+            service_async_prefill_group_calls =
+                service_snapshot.dispatch.prefill_group_calls;
+            service_async_tensor_batch_requests =
+                service_snapshot.dispatch.tensor_batch_requests;
+            service_async_packed_prefill_calls =
+                service_runner.packed_prefill_count();
             service_metrics_match = service_factory_calls == 2 &&
+                service_vision_batch_calls == 1 &&
+                service_vision_max_batch_size == 2 &&
+                service_async_prefill_group_calls == 1 &&
+                service_async_packed_prefill_calls == 1 &&
+                service_async_tensor_batch_requests == 6 &&
                 metrics.accepted_total == 2 && metrics.completed_total == 2 &&
                 metrics.released_total == 2 &&
                 metrics.generated_tokens_total == 8 &&
-                service.inflight_size() == 0;
-            cpp_llm_engine::CudaEmbeddingBatchRunner batch_runner(*cuda_model);
+                service_snapshot.waiting == 0 && service_snapshot.running == 0;
+            auto serial_executor_a = cpp_llm_engine::EmbeddingRequestExecutor::create(
+                cuda_model->create_context(embeddings.token_count + 4, &error),
+                embeddings,
+                &error);
+            auto serial_executor_b = cpp_llm_engine::EmbeddingRequestExecutor::create(
+                cuda_model->create_context(embeddings.token_count + 4, &error),
+                embeddings,
+                &error);
+            chapter06_generation::Request serial_request_a(positions);
+            chapter06_generation::Request serial_request_b(positions);
+            chapter10_serving::ServiceCore serial_service(2, 2);
+            const bool serial_admitted = serial_executor_a != nullptr &&
+                serial_executor_b != nullptr &&
+                serial_service.admit(
+                    905, serial_request_a, sampler, serial_executor_a).accepted() &&
+                serial_service.admit(
+                    906, serial_request_b, sampler, serial_executor_b).accepted();
+            const auto serial_start = std::chrono::steady_clock::now();
+            const auto serial_prefill_stats = serial_service.dispatch_step(runtime, 2048);
+            const auto serial_end = std::chrono::steady_clock::now();
+            service_serial_prefill_ms = std::chrono::duration<double, std::milli>(
+                serial_end - serial_start).count();
+            for (std::size_t step = 1;
+                 step < 8 &&
+                     (!serial_request_a.terminal() || !serial_request_b.terminal());
+                 ++step) {
+                if (serial_service.dispatch_step(runtime, 2048).scheduled_requests == 0) {
+                    break;
+                }
+            }
+            const bool serial_released =
+                serial_service.release_terminal() == 2 &&
+                serial_service.inflight_size() == 0;
+            cpp_llm_engine::CudaEmbeddingBatchRunner batch_runner(
+                *cuda_model,
+                cpp_llm_engine::CudaEmbeddingPrefillPath::PackedEqualLength);
             auto batch_executor_a = cpp_llm_engine::EmbeddingRequestExecutor::create(
                 cuda_model->create_context(embeddings.token_count + 4, &error),
                 embeddings,
@@ -491,7 +754,18 @@ int main(int argc, char** argv) {
                     903, batch_request_a, sampler, batch_executor_a).accepted() &&
                 batch_service.admit(
                     904, batch_request_b, sampler, batch_executor_b).accepted();
-            for (std::size_t step = 0;
+            const auto batch_start = std::chrono::steady_clock::now();
+            const auto batch_prefill_stats = batch_service.dispatch_step(runtime, 2048);
+            const auto batch_end = std::chrono::steady_clock::now();
+            service_batched_prefill_ms = std::chrono::duration<double, std::milli>(
+                batch_end - batch_start).count();
+            service_model_batch_calls += batch_prefill_stats.model_batch_calls;
+            service_tensor_batch_requests +=
+                batch_prefill_stats.tensor_batch_requests;
+            service_prefill_group_calls += batch_prefill_stats.prefill_group_calls;
+            service_prefill_group_requests +=
+                batch_prefill_stats.prefill_group_requests;
+            for (std::size_t step = 1;
                  step < 8 &&
                      (!batch_request_a.terminal() || !batch_request_b.terminal());
                  ++step) {
@@ -501,12 +775,28 @@ int main(int argc, char** argv) {
                 if (stats.scheduled_requests == 0) break;
             }
             service_batch_workspaces = batch_runner.workspace_count();
-            service_batch_match = batch_admitted &&
+            service_packed_prefill_calls = batch_runner.packed_prefill_count();
+            service_prefill_workspaces =
+                batch_runner.prefill_workspace_count();
+            const bool prefill_ab_match = serial_admitted && serial_released &&
+                batch_admitted &&
+                serial_prefill_stats.scheduled_requests == 2 &&
+                serial_prefill_stats.model_batch_calls == 0 &&
+                batch_prefill_stats.scheduled_requests == 2 &&
+                batch_prefill_stats.prefill_group_calls == 1 &&
+                batch_prefill_stats.prefill_group_requests == 2 &&
+                serial_request_a.generated() == batch_request_a.generated() &&
+                serial_request_b.generated() == batch_request_b.generated();
+            service_batch_match = prefill_ab_match &&
                 batch_request_a.finished() && batch_request_b.finished() &&
                 batch_request_a.generated() == runtime_cuda_tokens &&
                 batch_request_b.generated() == runtime_cuda_tokens &&
                 service_model_batch_calls == 3 &&
                 service_tensor_batch_requests == 6 &&
+                service_prefill_group_calls == 1 &&
+                service_prefill_group_requests == 2 &&
+                service_packed_prefill_calls == 1 &&
+                service_prefill_workspaces == 1 &&
                 service_batch_workspaces == 1;
             service_batch_released =
                 batch_service.release_terminal() == 2 &&
@@ -563,6 +853,16 @@ int main(int argc, char** argv) {
               << "service_metrics_match: "
               << (service_metrics_match ? "true" : "false") << '\n'
               << "service_factory_calls: " << service_factory_calls << '\n'
+              << "service_vision_batch_calls: "
+              << service_vision_batch_calls << '\n'
+              << "service_vision_max_batch_size: "
+              << service_vision_max_batch_size << '\n'
+              << "service_async_prefill_group_calls: "
+              << service_async_prefill_group_calls << '\n'
+              << "service_async_tensor_batch_requests: "
+              << service_async_tensor_batch_requests << '\n'
+              << "service_async_packed_prefill_calls: "
+              << service_async_packed_prefill_calls << '\n'
               << "service_batch_match: "
               << (service_batch_match ? "true" : "false") << '\n'
               << "service_batch_released: "
@@ -571,8 +871,20 @@ int main(int argc, char** argv) {
               << service_model_batch_calls << '\n'
               << "service_tensor_batch_requests: "
               << service_tensor_batch_requests << '\n'
+              << "service_prefill_group_calls: "
+              << service_prefill_group_calls << '\n'
+              << "service_prefill_group_requests: "
+              << service_prefill_group_requests << '\n'
               << "service_batch_workspaces: "
               << service_batch_workspaces << '\n'
+              << "service_packed_prefill_calls: "
+              << service_packed_prefill_calls << '\n'
+              << "service_prefill_workspaces: "
+              << service_prefill_workspaces << '\n'
+              << "service_serial_prefill_ms: "
+              << service_serial_prefill_ms << '\n'
+              << "service_batched_prefill_ms: "
+              << service_batched_prefill_ms << '\n'
               << "context_positions: " << cpu_context->token_count() << ','
               << cuda_context->position() << '\n'
               << "cpu_cuda_match: " << (matched ? "true" : "false") << '\n';
