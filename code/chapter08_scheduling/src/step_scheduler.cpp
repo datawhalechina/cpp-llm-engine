@@ -220,6 +220,115 @@ StepBatchStats ContinuousBatchScheduler::execute_plan(
     StepBatchStats stats;
     stats.deferred_requests = plan.deferred_requests;
     std::vector<std::size_t> advanced_request_ids;
+    std::set<std::size_t> batched_indices;
+
+    struct BatchedPrefill {
+        const BatchCandidate* candidate = nullptr;
+        const ScheduledRequest* scheduled = nullptr;
+        std::size_t committed_tokens = 0;
+    };
+    std::vector<BatchedPrefill> batched_prefills;
+    if (batch_runner != nullptr && batch_runner->supports_prefill_batch() &&
+        runtime.ready()) {
+        std::set<std::size_t> request_ids;
+        for (const BatchCandidate& candidate : plan.candidates) {
+            const ScheduledRequest& scheduled = requests[candidate.scheduled_index];
+            if (!candidate.prefill || scheduled.request == nullptr ||
+                scheduled.executor == nullptr || scheduled.sampler == nullptr ||
+                scheduled.request->terminal() || scheduled.request->prefilled() ||
+                scheduled.request->prefill_offset() != 0 ||
+                candidate.token_count != scheduled.request->prompt_size() ||
+                scheduled.request->prompt_size() == 0 ||
+                !request_ids.insert(candidate.request_id).second) {
+                continue;
+            }
+            const auto& config = runtime.config();
+            if (config.max_context_tokens > 0 &&
+                (scheduled.request->prompt_size() > config.max_context_tokens ||
+                 config.max_new_tokens >
+                     config.max_context_tokens - scheduled.request->prompt_size())) {
+                continue;
+            }
+            const std::size_t committed_tokens = block_pool == nullptr
+                ? 0
+                : block_pool->token_count(candidate.request_id);
+            if (committed_tokens != 0 ||
+                (block_pool != nullptr &&
+                 !block_pool->reserve(candidate.request_id, candidate.token_count))) {
+                ++stats.deferred_requests;
+                batched_indices.insert(candidate.scheduled_index);
+                continue;
+            }
+            batched_prefills.push_back({&candidate, &scheduled, committed_tokens});
+            batched_indices.insert(candidate.scheduled_index);
+        }
+    }
+
+    if (!batched_prefills.empty()) {
+        std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>> executors;
+        std::vector<chapter06_generation::TokenSequence> prompts;
+        std::vector<std::size_t> request_ids;
+        std::vector<chapter06_generation::BatchDecodeItem> runtime_items;
+        executors.reserve(batched_prefills.size());
+        prompts.reserve(batched_prefills.size());
+        request_ids.reserve(batched_prefills.size());
+        runtime_items.reserve(batched_prefills.size());
+        for (const BatchedPrefill& item : batched_prefills) {
+            executors.push_back(item.scheduled->executor);
+            prompts.push_back(item.scheduled->request->prompt());
+            request_ids.push_back(item.candidate->request_id);
+            runtime_items.push_back({
+                item.scheduled->request, item.scheduled->sampler});
+            ++stats.scheduled_requests;
+            stats.scheduled_tokens += item.candidate->token_count;
+            ++stats.prefill_requests;
+        }
+
+        std::vector<chapter06_generation::Logits> logits;
+        std::string error;
+        const bool model_ok = batch_runner->prefill_batch(
+            executors, prompts, request_ids, &logits, &error);
+        const chapter06_generation::BatchDecodeResult committed = model_ok
+            ? runtime.commit_prefill_logits(runtime_items, logits)
+            : chapter06_generation::BatchDecodeResult{};
+        if (!model_ok || committed.tokens.size() != batched_prefills.size()) {
+            for (const BatchedPrefill& item : batched_prefills) {
+                if (block_pool != nullptr) {
+                    block_pool->trim_to_tokens(
+                        item.candidate->request_id, item.committed_tokens);
+                }
+                if (!item.scheduled->request->terminal()) {
+                    item.scheduled->request->mark_failed(
+                        error.empty() ? "batch prefill executor failed" : error);
+                }
+                ++stats.terminal_requests;
+            }
+        } else {
+            ++stats.prefill_group_calls;
+            stats.prefill_group_requests += batched_prefills.size();
+            for (const chapter06_generation::BatchTokenResult& output :
+                 committed.tokens) {
+                const BatchedPrefill& item = batched_prefills[output.batch_index];
+                if (block_pool != nullptr && !block_pool->commit_tokens(
+                        item.candidate->request_id,
+                        item.candidate->token_count)) {
+                    throw std::logic_error(
+                        "reserved batch prefill KV blocks cannot commit");
+                }
+                advanced_request_ids.push_back(item.candidate->request_id);
+                ++stats.advanced_requests;
+                stats.advanced_tokens += item.candidate->token_count;
+                ++stats.generated_tokens;
+                if (on_token) {
+                    on_token(
+                        item.candidate->request_id, output.token, output.step);
+                }
+                if (item.scheduled->request->terminal()) {
+                    ++stats.terminal_requests;
+                }
+            }
+        }
+    }
 
     struct BatchedDecode {
         const BatchCandidate* candidate = nullptr;
@@ -227,7 +336,6 @@ StepBatchStats ContinuousBatchScheduler::execute_plan(
         std::size_t committed_tokens = 0;
     };
     std::vector<BatchedDecode> batched;
-    std::set<std::size_t> batched_indices;
     if (batch_runner != nullptr) {
         for (const BatchCandidate& candidate : plan.candidates) {
             const ScheduledRequest& scheduled = requests[candidate.scheduled_index];

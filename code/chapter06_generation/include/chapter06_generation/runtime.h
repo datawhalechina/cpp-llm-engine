@@ -57,6 +57,9 @@ public:
     BatchDecodeResult commit_batch_logits(
         const std::vector<BatchDecodeItem>& items,
         const LogitsBatch& logits);
+    BatchDecodeResult commit_prefill_logits(
+        const std::vector<BatchDecodeItem>& items,
+        const LogitsBatch& logits);
     std::size_t decode_one(Request& request, const Sampler& sampler, const LogitsProvider& logits_provider);
     std::size_t decode_one(Request& request, const Sampler& sampler, RequestModelExecutor& executor);
     PrefillChunkResult prefill_chunk(

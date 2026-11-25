@@ -78,6 +78,8 @@ struct StepBatchStats {
     std::size_t deferred_requests = 0;
     std::size_t model_batch_calls = 0;
     std::size_t tensor_batch_requests = 0;
+    std::size_t prefill_group_calls = 0;
+    std::size_t prefill_group_requests = 0;
 };
 
 class ContinuousBatchScheduler final {

@@ -188,6 +188,50 @@ BatchDecodeResult Runtime::commit_batch_logits(
     return result;
 }
 
+BatchDecodeResult Runtime::commit_prefill_logits(
+    const std::vector<BatchDecodeItem>& items,
+    const LogitsBatch& logits) {
+    BatchDecodeResult result;
+    if (!ready() || items.empty() || items.size() != logits.size()) return result;
+
+    std::unordered_set<Request*> unique_requests;
+    for (std::size_t index = 0; index < items.size(); ++index) {
+        const BatchDecodeItem& item = items[index];
+        if (item.request == nullptr || item.sampler == nullptr ||
+            item.request->terminal() || item.request->prefilled() ||
+            item.request->prefill_offset() != 0 ||
+            item.request->prompt_size() == 0 || logits[index].empty() ||
+            !unique_requests.insert(item.request).second ||
+            (config_.max_context_tokens > 0 &&
+             (item.request->prompt_size() > config_.max_context_tokens ||
+              config_.max_new_tokens >
+                  config_.max_context_tokens - item.request->prompt_size()))) {
+            return {};
+        }
+    }
+
+    result.tokens.reserve(items.size());
+    for (std::size_t index = 0; index < items.size(); ++index) {
+        Request& request = *items[index].request;
+        for (const TokenId prompt_token : request.prompt()) {
+            request.history().append(prompt_token);
+        }
+        request.advance_prefill(request.prompt_size());
+        request.mark_prefilled();
+        request.mark_decoding();
+        const TokenId token = items[index].sampler->sample(logits[index]);
+        request.append_generated_token(token);
+        request.history().append(token);
+        if (token == config_.eos_token_id ||
+            request.generated_size() >= config_.max_new_tokens) {
+            request.mark_finished();
+        }
+        result.tokens.push_back({index, token, 0});
+    }
+    result.model_calls = 1;
+    return result;
+}
+
 std::size_t Runtime::decode_one(
     Request& request,
     const Sampler& sampler,

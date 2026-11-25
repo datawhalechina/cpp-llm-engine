@@ -72,6 +72,18 @@ public:
     }
     virtual void publish_cached_prefix(std::size_t, const Request&) const {}
 
+    virtual bool supports_prefill_batch() const { return false; }
+    // 成功时全部执行器完成完整 Prefill；失败时实现必须恢复所有模型 Context。
+    virtual bool prefill_batch(
+        const std::vector<std::shared_ptr<RequestModelExecutor>>&,
+        const std::vector<TokenSequence>&,
+        const std::vector<std::size_t>&,
+        std::vector<Logits>*,
+        std::string* error = nullptr) const {
+        if (error != nullptr) *error = "executor does not support batched prefill";
+        return false;
+    }
+
     // 成功时每个执行器恰好推进一个位置，并返回同顺序 logits。
     // 失败时实现负责恢复全部模型 Context；Scheduler 只能回滚 Request 和外部 K/V 资源。
     virtual bool decode_batch(

@@ -11,7 +11,54 @@
 
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <vector>
+
+namespace {
+
+class PrefillGroupRunner final
+    : public chapter06_generation::ExecutorBatchRunner {
+public:
+    bool supports_prefill_batch() const override { return true; }
+
+    bool prefill_batch(
+        const std::vector<std::shared_ptr<
+            chapter06_generation::RequestModelExecutor>>& executors,
+        const std::vector<chapter06_generation::TokenSequence>& prompts,
+        const std::vector<std::size_t>& request_ids,
+        std::vector<chapter06_generation::Logits>* logits,
+        std::string* error) const override {
+        if (executors.size() != prompts.size() ||
+            executors.size() != request_ids.size() || logits == nullptr) {
+            return false;
+        }
+        logits->assign(executors.size(), {});
+        for (std::size_t index = 0; index < executors.size(); ++index) {
+            if (executors[index] == nullptr ||
+                !executors[index]->prefill(prompts[index], &(*logits)[index], error)) {
+                return false;
+            }
+        }
+        ++calls;
+        requests += executors.size();
+        return true;
+    }
+
+    bool decode_batch(
+        const std::vector<std::shared_ptr<chapter06_generation::RequestModelExecutor>>&,
+        const chapter06_generation::TokenSequence&,
+        const std::vector<std::size_t>&,
+        const std::vector<std::size_t>&,
+        std::vector<chapter06_generation::Logits>*,
+        std::string*) const override {
+        return false;
+    }
+
+    mutable std::size_t calls = 0;
+    mutable std::size_t requests = 0;
+};
+
+}  // namespace
 
 int main() {
     using namespace chapter06_generation;
@@ -85,6 +132,40 @@ int main() {
         CPP_LLM_CHECK(suite, mixed.decode_requests == 1);
         CPP_LLM_CHECK(suite, mixed.prefill_requests == 1);
         CPP_LLM_CHECK(suite, request_a.finished());
+        CPP_LLM_CHECK(suite, request_b.generated() == TokenSequence({6}));
+    });
+
+    suite.run("scheduler collects complete prefills without claiming tensor batch", [&] {
+        GenerationConfig config;
+        config.max_new_tokens = 1;
+        config.max_context_tokens = 16;
+        Runtime runtime(config);
+        GreedySampler sampler;
+        Request request_a({1, 2});
+        Request request_b({3, 4, 5});
+        auto executor_a = std::make_shared<testing::FixedTokenExecutor>(5);
+        auto executor_b = std::make_shared<testing::FixedTokenExecutor>(6);
+        PrefillGroupRunner runner;
+
+        const auto stats = ContinuousBatchScheduler{}.run_step(
+            runtime,
+            {{17, &request_a, &sampler, executor_a},
+             {18, &request_b, &sampler, executor_b}},
+            5,
+            2,
+            {},
+            nullptr,
+            0,
+            nullptr,
+            &runner);
+        CPP_LLM_CHECK_EQ(suite, runner.calls, 1U);
+        CPP_LLM_CHECK_EQ(suite, runner.requests, 2U);
+        CPP_LLM_CHECK_EQ(suite, stats.prefill_group_calls, 1U);
+        CPP_LLM_CHECK_EQ(suite, stats.prefill_group_requests, 2U);
+        CPP_LLM_CHECK_EQ(suite, stats.model_batch_calls, 0U);
+        CPP_LLM_CHECK_EQ(suite, stats.tensor_batch_requests, 0U);
+        CPP_LLM_CHECK(suite, request_a.finished() && request_b.finished());
+        CPP_LLM_CHECK(suite, request_a.generated() == TokenSequence({5}));
         CPP_LLM_CHECK(suite, request_b.generated() == TokenSequence({6}));
     });
 
