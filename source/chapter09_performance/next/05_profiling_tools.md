@@ -31,6 +31,94 @@ Nsight Compute（`ncu`）会重放选中的 CUDA Kernel 并采集硬件计数器
 | `nsys` | Kernel 总时间、实例数、CUDA API 和同步 | `.nsys-rep`、Kernel 汇总 CSV | 某个 Kernel 的硬件瓶颈已经确定 |
 | `ncu` | DRAM 吞吐、L2 命中、占用率、Warp stall | `.ncu-rep`、单 Kernel 指标 | 请求端到端一定变快 |
 
+两者分工可以概括为：`nsys` 选择值得分析的计算核，`ncu` 解释这个计算核受计算、访存还是调度限制。先用 `ncu` 随机挑选计算核，容易花费很长时间采集一个对端到端延迟影响很小的局部。
+
+## 检查本机工具
+
+Nsight Systems 和 Nsight Compute 随 CUDA Toolkit 或 NVIDIA Nsight 工具安装，具体路径取决于安装方式。本教程通过 `CUDA_HOME` 定位 CUDA 工具，先检查版本和设备状态：
+
+```bash
+export CUDA_HOME=/usr/local/cuda-12.8
+
+"${CUDA_HOME}/bin/nsys" --version
+"${CUDA_HOME}/bin/ncu" --version
+nvidia-smi
+```
+
+版本检查失败时，先确认 `CUDA_HOME` 是否指向实际安装目录。只有 `ncu` 报 `ERR_NVGPUCTRPERM` 时，才需要检查 GPU 性能计数器权限；`nsys` 的 CUDA 时间线通常不依赖这些硬件计数器。
+
+## 用 nsys 建立时间分布
+
+TinyLlama CUDA 生成入口会完成 Release 构建、固定四词元生成、正确性检查和报告导出：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+CHAPTER09_CUDA_RESULT_DIR=/tmp/cpp-llm-cuda-profile \
+bash code/chapter09_performance/scripts/run_cuda_profile.sh
+```
+
+结果目录包含：
+
+| 文件 | 阅读目的 |
+| --- | --- |
+| `metadata.txt` | 核对模型、负载、GPU、驱动、CUDA 和正确性 |
+| `program-output.txt` | 核对真实生成结果 |
+| `kernel*.csv` | 按总时间和实例数寻找高占比计算核 |
+| `memory*.csv` | 查看 Host/Device 搬运与显存操作时间 |
+
+先按计算核总时间排序，再同时观察实例数。总时间高且实例数少，通常适合优化单次执行；总时间高且实例数很多，还应检查能否通过组批、持久化工作区或算子融合减少启动次数。报告中的单次平均时间不能代替端到端墙钟，因为服务还包含 Host 编排、同步和数据搬运。
+
+需要保留可视化时间线时，可以直接运行 `nsys profile`。下面使用现成可执行文件表示命令结构，`<executable>` 和参数应替换为已通过正确性检查的固定负载：
+
+```bash
+"${CUDA_HOME}/bin/nsys" profile \
+  --trace=cuda,nvtx,osrt \
+  --sample=none \
+  --cpuctxsw=none \
+  --output=/tmp/cpp-llm-profile \
+  <executable> <fixed-workload-arguments>
+
+"${CUDA_HOME}/bin/nsys" stats \
+  --report cuda_gpu_kern_sum \
+  --format csv \
+  /tmp/cpp-llm-profile.nsys-rep
+```
+
+时间线重点检查三个关系：Host 是否频繁同步等待 GPU，小计算核是否被大量重复启动，内存复制是否与计算串行。它们分别对应异步边界、组批或融合机会、数据驻留策略。
+
+## 用 ncu 解释热点计算核
+
+确认量化 GEMV 是热点后，运行仓库中的固定 tile 与自适应 tile 对照。脚本先执行正确性测试和配对计时，再为同一矩阵、格式、批大小和路径采集一个计算核：
+
+```bash
+CUDA_HOME=/usr/local/cuda-12.8 \
+CHAPTER09_CUDA_ADAPTIVE_GEMV_PROFILE=1 \
+CHAPTER09_CUDA_ADAPTIVE_GEMV_RESULT_DIR=/tmp/cpp-llm-adaptive-gemv-ncu \
+bash code/chapter09_performance/scripts/run_cuda_adaptive_gemv_ab.sh
+```
+
+`ncu-summary.json` 汇总两条路径，原始 `ncu-*.csv` 保留 Compute、Instruction、Memory、Scheduler 和 Warp State 五组信息。阅读时按下面的因果顺序进行：
+
+| 现象 | 优先核对 | 可能原因 |
+| --- | --- | --- |
+| DRAM 或 L1/TEX 吞吐高，计算管线利用率低 | Memory Workload、缓存命中率 | 权重读取、布局或访存合并受限 |
+| 指令数量高，吞吐没有同步增加 | Instruction Stats | 重复解码、无效 tile 行或地址计算过多 |
+| 活跃 Warp 少 | Occupancy、寄存器和共享内存 | 每个线程块资源占用过高 |
+| Eligible Warp 少且 stall 高 | Scheduler、Warp State | 数据依赖、内存等待、同步或屏障过多 |
+
+一次只比较一个受控变量，并确认计算核名称、矩阵形状、量化格式、批大小和启动次数一致。`ncu` 可能多次重放计算核，采集耗时和程序墙钟会显著放大，所以这些 CSV 用于原因归因，不进入端到端延迟结论。
+
+## 从剖析回到优化决策
+
+以 SmolVLM 双请求 Packed Prefill 为例，第一版把 Linear 和 FFN 的词元行合并，却逐词元启动 Attention。`nsys` 显示 Score、Softmax 和 Value 各启动 `12096` 次。改为每个请求一次多查询 Attention 后，各自降到 `960` 次，但端到端仍比串行路径慢约 `7.7%`～`11.7%`；剩余时间主要落在 Q8_0 GEMV 和行重排。因此 Packed 路径保留为显式实验路径，默认自适应路径继续选择串行 Context Prefill。
+
+这个案例说明，组批不等于融合，也不保证加速。性能决策需要依次回答：
+
+1. `nsys` 是否确认启动次数或热点分布发生预期变化。
+2. `ncu` 是否解释了热点计算核的资源限制和变化原因。
+3. 相同负载的端到端配对 A/B 是否改善。
+4. 输出、缓存隔离和失败回滚是否仍通过正确性门禁。
+
 本教程先运行已固定负载的脚本，避免手工命令遗漏模型和正确性闸门：
 
 ```bash

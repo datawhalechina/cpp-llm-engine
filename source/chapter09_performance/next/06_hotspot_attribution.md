@@ -41,3 +41,9 @@ DeepSeek CUDA 的连续实验展示了热点怎样随优化迁移。逐项负载
 | 回到系统边界 | EXP-GPU-30 至 33 | GEMV 改善后，CPU 路由与专家分组的数据往返变得可见 | 迁移设备路由；对设备分组的短序列回退保留基线而不替换默认路径 |
 
 这组实验体现了两条通用规则。第一，优化默认路径后必须重新采集热点，不能沿用旧的占比排序。第二，硬件计数器只解释局部实现为什么变化；是否进入默认路径仍由真实模型正确性、端到端配对结果和适用范围共同决定。`09.7` 将把这种单变量修改组织成可比较的 A/B 实验。
+
+## Packed Prefill 怎样暴露局部与整体差异
+
+SmolVLM 双请求实验先把等长词元行打包。首版逐词元执行 Attention，Nsight Systems 记录到 Score、Softmax 和 Value 各 `12096` 次；改为按请求执行多查询 Attention 后，各自降到 `960` 次。启动次数变化证明 Attention 编排已经改善，但 Q8_0 GEMV 仍占约 `83.4%` 的 GPU 计算核时间，完整 Packed Prefill 两轮分别回退约 `7.7%` 和 `11.7%`。
+
+因此归因结论分成两层：局部上保留多查询 Attention，系统上暂不让 Packed Prefill 替换串行默认路径。原始配对样本和计算核摘要见 [`EXP-MM-CUDA-01`](../../reference/experiment_assets.md#exp-mm-cuda-01)。

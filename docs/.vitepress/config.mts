@@ -192,6 +192,7 @@ function createSidebar() {
             { text: '选读：用 PyTorch 独立复算', file: '05_test_with_pytorch.md' },
             { text: '复杂度直觉', file: '06_complexity_intuition.md' },
             { text: '从 MatMul 到真实推理 backend', file: '07_runtime_backend_bridge.md' },
+            { text: '算子融合', file: '08_operator_fusion.md' },
           ]),
           chapterGroup('04', '第 04 章 Decoder 结构与 Attention', '/chapter04_attention', [
             { text: '多头注意力', file: '01_multihead_attention.md' },

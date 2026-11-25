@@ -21,6 +21,7 @@ Chapter02 已经能用张量视图找到一段数据。本章把两个连续二�
 | 计算内核（kernel） | 真正遍历数据并产生输出的底层函数 | [`03.3 CPU 参考实现`](./03_cpu_reference.md) |
 | GEMV / GEMM | 矩阵乘向量 / 矩阵乘矩阵的执行形状 | [`03.2 GEMV 和 GEMM`](./02_matmul_design.md#gemv-和-gemm-描述什么形状) |
 | 工作区（workspace） | 执行期间复用的临时内存 | [`03.2 临时结果与工作区`](./02_matmul_design.md#临时结果和-workspace-由谁持有) |
+| 算子融合（operator fusion） | 让相邻计算共享中间状态，减少显存往返和启动次数 | [`03.8 算子融合`](./08_operator_fusion.md) |
 
 ![Chapter 03 主图：矩阵乘法与计算后端](../assets/diagrams/chapter03-main.svg)
 
@@ -36,7 +37,7 @@ bash code/chapter03_matmul/scripts/run.sh
 
 | 路线 | 阅读顺序 | 先看代码 | 完成后能解释什么 |
 | --- | --- | --- | --- |
-| A/B CPU 主线 | [`03.1`](./01_operator_base.md) → [`03.2`](./02_matmul_design.md) → [`03.3`](./03_cpu_reference.md) → [`03.5`](./05_test_with_pytorch.md) → [`03.6`](./06_complexity_intuition.md) → [`03.7`](./07_runtime_backend_bridge.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/src/cpu_kernel.cpp"><code>cpu_kernel.cpp</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> | 张量视图怎样进入 CPU 循环并安全写回结果 |
+| A/B CPU 主线 | [`03.1`](./01_operator_base.md) → [`03.2`](./02_matmul_design.md) → [`03.3`](./03_cpu_reference.md) → [`03.5`](./05_test_with_pytorch.md) → [`03.6`](./06_complexity_intuition.md) → [`03.7`](./07_runtime_backend_bridge.md) → [`03.8`](./08_operator_fusion.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/src/cpu_kernel.cpp"><code>cpu_kernel.cpp</code></a>、<a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/chapter03_matmul/src/tensor_matmul_adapter.cpp"><code>tensor_matmul_adapter.cpp</code></a> | 张量视图怎样进入 CPU 循环，并判断融合是否值得保留 |
 | G GPU 扩展 | 完成 03.3 后选读 [`03.4`](./04_cublas_implement.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/cuda/src/cublas_matmul_backend.cpp"><code>cublas_matmul_backend.cpp</code></a> | 行优先矩阵怎样交给 cuBLAS，并与 CPU 结果比较 |
 | M 多模态复用 | 完成 CPU 主线后查看[多模态学习计划](../guides/multimodal_learning_plan.md) | <a href="https://github.com/datawhalechina/cpp-llm-engine/blob/main/code/multimodal/src/vision_projector.cpp"><code>vision_projector.cpp</code></a> | 视觉线性层和投影层怎样复用矩阵乘法 |
 
